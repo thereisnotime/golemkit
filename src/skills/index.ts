@@ -15,3 +15,22 @@ import { gather } from './gather.ts'
 /** The standard skill set most bots want. */
 export const standardSkills = () => [status(), movement(), combat(), survival(), inventorySkill(), gather()]
 export { navigation, getHome, setHome, getPlaces, setPlace, type Place } from './navigation.ts'
+
+// Extended skills: crafting, storage, farming, woodcutting, building, picking up drops.
+export { crafting } from './crafting.ts'
+export { containers } from './containers.ts'
+export { farming } from './farming.ts'
+export { woodcutting } from './woodcutting.ts'
+export { building } from './building.ts'
+export { pickup, pickupNearby } from './pickup.ts'
+export { placeAt, reachBlock } from './world.ts'
+
+import { crafting } from './crafting.ts'
+import { containers } from './containers.ts'
+import { farming } from './farming.ts'
+import { woodcutting } from './woodcutting.ts'
+import { building } from './building.ts'
+import { pickup } from './pickup.ts'
+
+/** Extra skills on top of standardSkills(): crafting, containers, farming, woodcutting, building, pickup. */
+export const extendedSkills = () => [crafting(), containers(), farming(), woodcutting(), building(), pickup()]

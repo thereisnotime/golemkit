@@ -62,6 +62,7 @@ them as a local site with `just docs` (dev server) or `just docs-build` (static 
 Self-sufficient NPCs (utility-AI brain, behaviours, `bots/villager.ts`): [docs/guide/npc-brain.md](docs/guide/npc-brain.md).
 LLM-driven bots on your Claude / Codex subscription or an API (`bots/companion.ts`): [docs/guide/llm-brain.md](docs/guide/llm-brain.md).
 
+What each skill and action does, including `extendedSkills()` (crafting, chests, farming, woodcutting, building): [docs/skills.md](docs/skills.md).
 Scenes with several bots acting together (`bots/actor.ts`, `scenes/*.yaml`): [docs/guide/scenes.md](docs/guide/scenes.md).
 
 ## buddy's commands

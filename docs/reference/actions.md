@@ -5,7 +5,24 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-7 skills, 28 actions.
+13 skills, 39 actions.
+
+## building
+
+Placing blocks.
+
+### `place_block`
+
+Place a block from the inventory at x y z. Needs a solid block next to that spot to build against.
+
+*aliases: `place`*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `item` | string | yes |  | block item to place, e.g. cobblestone |
+| `x` | number | yes |  |  |
+| `y` | number | yes |  |  |
+| `z` | number | yes |  |  |
 
 ## combat
 
@@ -38,6 +55,110 @@ Fight back against whatever hostile mob is closest (used by reflexes).
 *internal*
 
 No parameters.
+
+## containers
+
+Storing items in and taking them out of chests and barrels.
+
+### `deposit`
+
+Put items into the nearest chest/barrel (or the one at x y z). item="all" stores everything except tools, armour, food and anything in keep.
+
+*aliases: `store`*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `item` | string |  | `"all"` | item name, or "all" |
+| `count` | integer (..9007199254740991) |  |  | how many; default all of them |
+| `keep` | array |  |  | item names never to store |
+| `x` | number |  |  | container x; omit all three to use the nearest chest/barrel |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
+
+### `withdraw`
+
+Take items out of the nearest chest/barrel (or the one at x y z).
+
+*aliases: `take`*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `item` | string | yes |  | item name, or "all" to empty the container |
+| `count` | integer (..9007199254740991) |  |  | how many; default all of that item |
+| `x` | number |  |  | container x; omit all three to use the nearest chest/barrel |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
+
+### `list_container`
+
+Say what is inside the nearest chest/barrel (or the one at x y z). Looks inside if it is within reach and the bot is idle, otherwise reports what it saw last time.
+
+*non-exclusive · aliases: `chest`*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `x` | number |  |  | container x; omit all three to use the nearest chest/barrel |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
+
+## crafting
+
+Crafting and smelting.
+
+### `craft`
+
+Craft an item from what is in the inventory. Uses a crafting table within 16 blocks when the recipe needs one, or puts one down (from the inventory, or made from planks).
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `item` | string | yes |  | item to make, e.g. stick, crafting_table, stone_pickaxe |
+| `count` | integer (1..256) |  | `1` | how many items to end up with (not recipe runs) |
+
+### `smelt`
+
+Smelt items in a furnace within 32 blocks (or one placed from the inventory), add fuel, wait and take the results.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `item` | string | yes |  | item to smelt, e.g. raw_iron, sand, oak_log |
+| `count` | integer (1..64) |  | `1` |  |
+| `fuel` | string |  |  | fuel item; default the best one in the inventory (coal, charcoal, planks, logs...) |
+
+## farming
+
+Harvesting, planting and tilling crops.
+
+### `harvest`
+
+Harvest ripe wheat, carrots, potatoes and beetroot nearby, pick up the drops and replant from the inventory.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `radius` | number (1..32) |  | `16` | how far to look for crops, in blocks |
+| `max` | integer (1..256) |  | `64` | stop after this many crops |
+| `replant` | boolean |  | `true` |  |
+
+### `plant`
+
+Plant seeds (wheat_seeds, carrot, potato, beetroot_seeds) on empty farmland nearby.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `seed` | string |  |  | seed item; default whatever seeds the bot has |
+| `count` | integer (1..256) |  | `64` | how many to plant at most |
+| `radius` | number (1..32) |  | `12` |  |
+
+### `till`
+
+Turn dirt or grass into farmland with a hoe, either at x y z or the nearest spots next to water. Needs digging enabled.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `x` | number |  |  | block to till; omit x/y/z to pick dirt near water |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
+| `count` | integer (1..64) |  | `1` |  |
+| `radius` | number (1..16) |  | `8` |  |
 
 ## gather
 
@@ -222,6 +343,21 @@ Run away from the nearest hostile mob until it is a safe distance away.
 |---|---|---|---|---|
 | `distance` | number (4..32) |  | `16` | how far to get from the mob |
 
+## pickup
+
+Picking up dropped items.
+
+### `pickup_items`
+
+Walk over dropped items lying nearby to pick them up.
+
+*aliases: `pickup`*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `radius` | number (1..32) |  | `12` | how far to look for drops, in blocks |
+| `item` | string |  |  | only pick up this item, e.g. oak_log; default everything |
+
 ## status
 
 Status, stop and chat.
@@ -281,3 +417,18 @@ No parameters.
 Get out of bed.
 
 No parameters.
+
+## woodcutting
+
+Felling trees.
+
+### `chop_tree`
+
+Fell the nearest natural tree (any wood type): cut the logs it can reach, pick up the drops and plant a sapling. Needs digging enabled.
+
+*aliases: `chop`*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `radius` | number (4..64) |  | `32` | how far to look for a tree, in blocks |
+| `replant` | boolean |  | `true` | plant a sapling of the same kind afterwards if the bot has one |

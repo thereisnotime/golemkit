@@ -1,0 +1,11 @@
+- [x] Shared helpers (world.ts): placement, reach, free spot
+- [x] crafting: craft, smelt
+- [x] containers: deposit, withdraw, list_container, observe hook
+- [x] farming: harvest, plant, till
+- [x] woodcutting: chop_tree with natural-tree check and replant
+- [x] building: place_block
+- [x] pickup: pickup_items
+- [x] extendedSkills() bundle and index exports
+- [x] Unit tests for the pure logic
+- [x] scripts/skill-test.ts and a live check on mc02
+- [x] docs/skills.md

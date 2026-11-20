@@ -39,6 +39,7 @@ export default defineConfig({
       {
         text: 'Reference',
         items: [
+          { text: 'Skills', link: '/skills' },
           { text: 'Actions', link: '/reference/actions' },
           { text: 'CLI and just recipes', link: '/reference/cli' },
           { text: 'Configuration', link: '/reference/config' }
