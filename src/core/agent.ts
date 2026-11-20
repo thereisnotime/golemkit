@@ -19,6 +19,7 @@ import { attachNeoForge } from './neoforge/handshake.ts'
 import { installTolerantParser } from './neoforge/tolerantParser.ts'
 import { solidifyUnknownBlocks } from './modded.ts'
 import { fmtPos, itemName } from './helpers.ts'
+import type { Fleet } from './fleet.ts'
 
 export interface ChatMessage {
   from: string
@@ -93,6 +94,8 @@ export class Agent extends TypedEmitter<AgentEvents> {
   private readonly channels: ChannelStore
 
   private _bot: Bot | null = null
+  private _fleet: Fleet | null = null
+  private _serverName = 'default'
   private sessionController: AbortController | null = null
   private current: Running | null = null
   private suspended: Running[] = []
@@ -120,6 +123,24 @@ export class Agent extends TypedEmitter<AgentEvents> {
     for (const skill of this.skills) {
       for (const action of skill.actions ?? []) this.registerAction(action)
     }
+  }
+
+  // ---------------------------------------------------------------- fleet
+
+  /** Called by Fleet.add(). Every running agent belongs to a fleet (a fleet of one for `run`). */
+  attachFleet (fleet: Fleet, serverName: string): void {
+    this._fleet = fleet
+    this._serverName = serverName
+  }
+
+  get fleet (): Fleet {
+    if (!this._fleet) throw new Error('agent is not part of a fleet')
+    return this._fleet
+  }
+
+  /** Name of the server this agent is on (fleet file key, "default" otherwise). */
+  get serverName (): string {
+    return this._serverName
   }
 
   // ---------------------------------------------------------------- actions

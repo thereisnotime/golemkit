@@ -9,11 +9,14 @@ export interface CommandBrainOptions {
   prefix?: string
   /** Reply to failed/unknown commands. Default true. */
   verbose?: boolean
+  /** Say hello in public chat after each login. Default false (fleets would spam). */
+  greet?: boolean
 }
 
 export const commandBrain = (opts: CommandBrainOptions = {}) => {
   const prefix = opts.prefix ?? process.env.MC_PREFIX ?? '!'
   const verbose = opts.verbose ?? true
+  const greet = opts.greet ?? false
 
   return defineBrain({
     name: 'command',
@@ -21,7 +24,7 @@ export const commandBrain = (opts: CommandBrainOptions = {}) => {
       agent.on('chat', (msg) => { void handle(agent, msg) })
     },
     session (agent) {
-      agent.say(`hi! I'm ${agent.username}. Say ${prefix}help for commands`)
+      if (greet) agent.say(`hi! I'm ${agent.username}. Say ${prefix}help for commands`)
     }
   })
 

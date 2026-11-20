@@ -7,9 +7,8 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
-import YAML from 'yaml'
-import { z } from 'zod'
-import { Agent, serverFromEnv, createLogger, type BotDefinition, type InstanceOptions, type ServerConfig } from './core/index.ts'
+import { Agent, Fleet, serverFromEnv, createLogger, type BotDefinition, type InstanceOptions, type ServerConfig } from './core/index.ts'
+import { parseFleetFile, resolveUsername } from './core/fleetFile.ts'
 
 const BOTS_DIR = resolve(import.meta.dirname, '..', 'bots')
 const log = createLogger('mc-buddy')
@@ -31,37 +30,18 @@ function listBots (): string[] {
     .sort()
 }
 
-const FleetSchema = z.object({
-  server: z.object({
-    host: z.string().optional(),
-    port: z.number().optional(),
-    auth: z.enum(['offline', 'microsoft']).optional(),
-    version: z.string().optional()
-  }).optional(),
-  /** Delay between bot logins, to stay under connection throttles. */
-  staggerMs: z.number().default(5000),
-  bots: z.array(z.object({
-    bot: z.string(),
-    username: z.string().optional(),
-    owners: z.array(z.string()).optional(),
-    canDig: z.boolean().optional(),
-    settings: z.record(z.string(), z.unknown()).optional(),
-    count: z.number().int().min(1).default(1).describe('spawn N copies; usernames get a number suffix')
-  })).min(1)
-})
-
-function runAgents (agents: Agent[], staggerMs: number): void {
+function runFleet (fleet: Fleet, staggerMs: number | ((server: string) => number)): void {
   let stopping = false
   const shutdown = async () => {
     if (stopping) process.exit(1)
     stopping = true
     log.info('shutting down')
-    await Promise.allSettled(agents.map(a => a.stop()))
+    await fleet.stop()
     setTimeout(() => process.exit(0), 300)
   }
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
-  agents.forEach((a, i) => setTimeout(() => { void a.start() }, i * staggerMs))
+  fleet.start(staggerMs)
 }
 
 async function main (): Promise<void> {
@@ -91,28 +71,26 @@ async function main (): Promise<void> {
         owners: values.owners?.split(',').map(s => s.trim()).filter(Boolean),
         canDig: values.dig
       }
-      runAgents([new Agent(def, server, opts)], 0)
+      const fleet = new Fleet()
+      fleet.add(new Agent(def, server, opts))
+      runFleet(fleet, 0)
       break
     }
     case 'fleet': {
       if (!arg) throw new Error('usage: fleet <fleet.yaml>')
-      const fleet = FleetSchema.parse(YAML.parse(readFileSync(arg, 'utf8')))
-      const fleetServer = { ...server, ...fleet.server }
-      const agents: Agent[] = []
-      for (const entry of fleet.bots) {
-        const def = await loadBot(entry.bot)
-        for (let i = 1; i <= entry.count; i++) {
-          const base = entry.username ?? def.username ?? def.name
-          agents.push(new Agent(def, fleetServer, {
-            username: entry.count > 1 ? `${base}${i}` : base,
-            owners: entry.owners,
-            canDig: entry.canDig,
-            settings: entry.settings
-          }))
-        }
+      const plan = parseFleetFile(readFileSync(arg, 'utf8'), server)
+      const fleet = new Fleet()
+      for (const p of plan.agents) {
+        const def = await loadBot(p.bot)
+        const opts = resolveUsername(p, def.username ?? def.name, plan.multiServer)
+        fleet.add(new Agent(def, p.serverConfig, opts), p.server)
       }
-      log.info(`fleet: ${agents.map(a => a.username).join(', ')}`)
-      runAgents(agents, fleet.staggerMs)
+      for (const name of fleet.servers) {
+        const s = plan.servers[name]!
+        log.info(`${name} (${s.host}:${s.port}): ${fleet.onServer(name).map(a => a.username).join(', ')}`)
+      }
+      // Logins are staggered per server; servers start in parallel.
+      runFleet(fleet, (name) => plan.servers[name]?.staggerMs ?? plan.staggerMs)
       break
     }
     case 'list':

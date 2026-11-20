@@ -111,6 +111,25 @@ Run with `node src/cli.ts run <bot>`, or many at once with a fleet file (see
 `fleet.example.yaml`). Instance overrides (username, owners, canDig, settings) come from CLI
 flags or the fleet file.
 
+## Fleets and multiple servers
+
+Every running agent belongs to a `Fleet` (a fleet of one for `run`). A fleet file can list
+several `servers`; each bot entry picks one (`defaults.server` otherwise), logins are
+staggered per server and servers start in parallel. When the same username runs on more than
+one server, its data goes to `data/bots/<server>/<username>`.
+
+Coordination between bots on the same server (messages never cross servers):
+
+```ts
+const fleet = agent.fleet
+fleet.peers(agent)                                         // other bots on this server
+fleet.send({ from: agent.username, server: agent.serverName, topic: 'cart-broken', to: 'Miner1' })
+fleet.subscribe(agent, msg => { ... })                     // addressed to me or broadcast
+await fleet.waitFor(agent, m => m.topic === 'ready', 30_000, signal)
+const board = fleet.board(agent.serverName)                // shared blackboard per server
+board.set('scene', 'act2'); board.watch('scene', v => ...)
+```
+
 ## NeoForge layer
 
 See README "How it gets in". It lives in `src/core/neoforge/` and is transparent to skills.

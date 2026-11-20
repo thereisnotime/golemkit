@@ -8,5 +8,5 @@ export default defineBot({
   description: 'Player assistant driven by chat commands',
   username: 'McBuddy',
   skills: standardSkills(),
-  brains: [commandBrain(), reflexes()]
+  brains: [commandBrain({ greet: true }), reflexes()]
 })
