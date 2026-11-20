@@ -59,6 +59,29 @@ reset-channels:
     @echo "{{YELLOW}}==> removing learned channel caches{{NORMAL}}"
     rm -f data/channels-*.json
 
+# Docs site dev server (http://localhost:5173)
+[group('docs')]
+docs: docs-gen
+    @echo "{{BOLD}}{{BLUE}}==> docs dev server{{NORMAL}}"
+    npx vitepress dev docs
+
+# Regenerate the action reference from the code
+[group('docs')]
+docs-gen:
+    @node scripts/gen-docs.ts
+
+# Build the static docs site into docs/.vitepress/dist
+[group('docs')]
+docs-build: docs-gen
+    @echo "{{BOLD}}{{BLUE}}==> building docs{{NORMAL}}"
+    npx vitepress build docs
+    @echo "{{GREEN}}✔ open docs/.vitepress/dist/index.html (or: npx vitepress preview docs){{NORMAL}}"
+
+# Build the container image (podman)
+[group('deploy')]
+image tag="mc-buddy":
+    podman build -t {{tag}} .
+
 # Typecheck + unit tests
 [group('check')]
 check: typecheck test

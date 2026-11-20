@@ -1,6 +1,6 @@
 # mc-buddy
 
-Framework for Minecraft bots on NeoForge servers, built on Mineflayer. TypeScript run directly by Node (see `.tool-versions`), no build step. Read `docs/architecture.md` before changing core, skills or brains.
+Framework for Minecraft bots on NeoForge servers, built on Mineflayer. TypeScript run directly by Node (see `.tool-versions`), no build step. Read `docs/concepts/architecture.md` before changing core, skills or brains.
 
 ## Layout
 

@@ -52,7 +52,12 @@ The pieces:
   resume).
 - **Bots** pick skills, brains, persona and settings.
 
-Details in [docs/architecture.md](docs/architecture.md).
+Details in [docs/concepts/architecture.md](docs/concepts/architecture.md).
+
+## Docs
+
+The full docs live in [docs/](docs/) (guides, concepts, generated action reference). Browse
+them as a local site with `just docs` (dev server) or `just docs-build` (static HTML).
 
 ## buddy's commands
 
