@@ -9,16 +9,20 @@
 // (permission mode dontAsk), no user/project settings, hooks, plugins or CLAUDE.md
 // (settingSources: []), no session persistence, and an empty scratch dir as cwd.
 //
-// Auth: the `claude` login (~/.claude), or CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`
-// (a subscription token meant for unattended jobs; interactive logins expire).
-// Claude Code prefers ANTHROPIC_API_KEY over the subscription login when both exist.
-// So unless allowApiKey is set, ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN are removed from
-// the child's environment, and the turn is aborted if Claude Code still reports an API key
-// as its credential source.
+// Auth and isolation: Claude Code runs in a profile (see proc.ts): HOME and CLAUDE_CONFIG_DIR
+// point at .auth/claude (or `profile`), with a minimal allowlisted environment. Your own
+// ~/.claude (settings, CLAUDE.md, hooks, plugins, MCP servers, login) and shell variables
+// (ANTHROPIC_BASE_URL, gateways, keys) never reach it. Log in once: `just llm-login claude`
+// (interactive) or `just llm-login claude token` (`claude setup-token`, for unattended bots;
+// put the token in CLAUDE_CODE_OAUTH_TOKEN, which is passed through explicitly).
+// profile 'user' uses your normal login instead (settings are still ignored).
+// API keys are never passed unless allowApiKey is set, and the turn is aborted if Claude Code
+// still reports an API key as its credential source.
 import { query, type Options, type SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import { join } from 'node:path'
 import { buildMcpServer } from '../mcp.ts'
 import { ProviderError, type LlmProvider, type TurnInput, type TurnResult, type Usage } from '../types.ts'
-import { childEnv, runProcess, scratchDir, tail, which } from './proc.ts'
+import { isolatedEnv, resolveProfile, runProcess, scratchDir, tail, which, type Profile } from './proc.ts'
 
 export interface ClaudeSubscriptionOptions {
   mode?: 'sdk' | 'cli'
@@ -31,6 +35,8 @@ export interface ClaudeSubscriptionOptions {
   allowApiKey?: boolean
   /** claude binary for mode 'cli' and the login check. Default `claude` on PATH. */
   bin?: string
+  /** Login profile: directory used as HOME (default .auth/claude), or 'user' for your normal login. */
+  profile?: string
 }
 
 const KEY_VARS = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN']
@@ -42,15 +48,20 @@ export class ClaudeSubscriptionProvider implements LlmProvider {
   readonly needsMcp: boolean
   readonly model?: string
   private readonly opts: ClaudeSubscriptionOptions
+  readonly profile: Profile
 
   constructor (opts: ClaudeSubscriptionOptions = {}) {
     this.opts = opts
+    this.profile = resolveProfile('claude', opts.profile)
     this.model = opts.model
     this.needsMcp = opts.mode === 'cli' || opts.transport === 'http'
   }
 
   private env (): NodeJS.ProcessEnv {
-    return childEnv({ drop: this.opts.allowApiKey ? [] : KEY_VARS, set: { CLAUDE_AGENT_SDK_CLIENT_APP: 'mc-buddy/0.1' } })
+    const set: Record<string, string> = { CLAUDE_AGENT_SDK_CLIENT_APP: 'mc-buddy/0.1' }
+    if (this.profile.kind === 'isolated') set.CLAUDE_CONFIG_DIR = join(this.profile.home, '.claude')
+    const pass = ['CLAUDE_CODE_OAUTH_TOKEN', ...(this.profile.kind === 'user' ? ['CLAUDE_CONFIG_DIR'] : []), ...(this.opts.allowApiKey ? KEY_VARS : [])]
+    return isolatedEnv(this.profile, { set, pass })
   }
 
   async check (): Promise<string | null> {
@@ -64,7 +75,7 @@ export class ClaudeSubscriptionProvider implements LlmProvider {
     try {
       const r = await runProcess(bin, ['auth', 'status', '--json'], { env: this.env(), timeoutMs: 15_000 })
       const s = JSON.parse(r.stdout) as { loggedIn?: boolean, authMethod?: string }
-      if (!s.loggedIn) return 'Claude Code is not logged in: run `claude` and /login (or `claude auth login`) with your subscription account'
+      if (!s.loggedIn) return `Claude Code is not logged in for profile ${this.profile.home}: run \`just llm-login claude\``
       if (!this.opts.allowApiKey && /api.?key/i.test(s.authMethod ?? '')) return `Claude Code auth method is ${s.authMethod}, not a subscription login`
       return null
     } catch (e) {

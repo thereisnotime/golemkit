@@ -14,7 +14,7 @@
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ProviderError, type LlmProvider, type TurnInput, type TurnResult } from '../types.ts'
-import { childEnv, runProcess, scratchDir, tail, which } from './proc.ts'
+import { isolatedEnv, resolveProfile, runProcess, scratchDir, tail, which, type Profile } from './proc.ts'
 
 export interface OpenCodeProviderOptions {
   /** provider/model, e.g. "openai/gpt-5.5" or "github-copilot/claude-sonnet-5-5". Default: OpenCode's default. */
@@ -24,6 +24,8 @@ export interface OpenCodeProviderOptions {
   configVersion?: 'v2' | 'v1'
   /** Extra args inserted before the prompt (e.g. ["--print-logs"]). */
   extraArgs?: string[]
+  /** Login profile: directory used as HOME (default .auth/opencode), or 'user' for your normal login. */
+  profile?: string
 }
 
 const SERVER = 'minecraft'
@@ -37,9 +39,11 @@ export class OpenCodeProvider implements LlmProvider {
   readonly needsMcp = true
   readonly model?: string
   private readonly opts: OpenCodeProviderOptions
+  readonly profile: Profile
 
   constructor (opts: OpenCodeProviderOptions = {}) {
     this.opts = opts
+    this.profile = resolveProfile('opencode', opts.profile)
     this.model = opts.model
   }
 
@@ -93,7 +97,9 @@ export class OpenCodeProvider implements LlmProvider {
       args.push(...(this.opts.extraArgs ?? []), turn.userMessage)
       const r = await runProcess(bin, args, {
         cwd: scratch.path,
-        env: childEnv({ set: { [TOKEN_VAR]: turn.mcp!.token } }),
+        // Isolated HOME/XDG dirs: OpenCode keeps auth in $XDG_DATA_HOME/opencode and config in
+        // $XDG_CONFIG_HOME/opencode, so your global OpenCode config is never read.
+        env: isolatedEnv(this.profile, { set: { [TOKEN_VAR]: turn.mcp!.token } }),
         timeoutMs: turn.timeoutMs,
         signal: turn.signal
       })

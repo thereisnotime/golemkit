@@ -1,9 +1,9 @@
 // Helpers for CLI providers: run a child non-interactively with a timeout, kill its whole
 // process group on timeout/abort, stream stdout lines, and build a clean environment.
 import { spawn } from 'node:child_process'
-import { accessSync, constants, mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { delimiter, join } from 'node:path'
+import { accessSync, constants, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
+import { delimiter, dirname, join, resolve } from 'node:path'
 
 export interface RunOptions {
   cwd?: string
@@ -106,4 +106,64 @@ export function scratchDir (prefix: string): { path: string, remove (): void } {
 export function tail (s: string, n = 600): string {
   const t = s.trim()
   return t.length > n ? '...' + t.slice(-n) : t
+}
+
+// ---------------------------------------------------------------- isolated profiles
+//
+// CLI providers (claude, codex) run in a *profile*: a directory used as their HOME, holding
+// their own login and nothing else. Your ~/.claude, ~/.codex, shell config and env vars
+// (gateways, API keys, base URLs) never reach them. Profiles default to .auth/<provider>
+// in the repo; log in once with `just llm-login <provider>`.
+//
+// profile values: undefined / '' -> .auth/<provider>; 'user' -> your normal login in your real
+// home (settings/hooks/plugins/MCP servers are still ignored by the provider flags);
+// anything else -> that directory.
+
+/** Variables passed through to CLI children; everything else in our environment is dropped. */
+const ENV_ALLOWLIST = [
+  'PATH', 'LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE', 'LC_MESSAGES', 'TZ', 'TMPDIR',
+  'SSL_CERT_FILE', 'SSL_CERT_DIR', 'NODE_EXTRA_CA_CERTS',
+  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy'
+]
+
+export interface Profile {
+  /** 'isolated' (own HOME) or 'user' (real home, real login). */
+  kind: 'isolated' | 'user'
+  /** Directory used as HOME for the child. */
+  home: string
+}
+
+export function resolveProfile (provider: string, value?: string): Profile {
+  if (value === 'user') return { kind: 'user', home: homedir() }
+  const raw = value || join('.auth', provider)
+  const home = resolve(raw.startsWith('~/') ? join(homedir(), raw.slice(2)) : raw)
+  return { kind: 'isolated', home }
+}
+
+export interface IsolatedEnvOptions {
+  /** Extra variables to set (provider config dirs, MCP tokens...). */
+  set?: Record<string, string>
+  /** Variables from our own environment to pass through when set (explicit opt-ins like CLAUDE_CODE_OAUTH_TOKEN). */
+  pass?: string[]
+}
+
+/**
+ * A minimal environment for a CLI child: allowlisted basics, HOME/XDG dirs pointing into the
+ * profile (isolated) or the real home (user), plus `set`. The directory running node is put
+ * first on PATH so `#!/usr/bin/env node` CLIs find a real node, not a version-manager shim.
+ */
+export function isolatedEnv (profile: Profile, opts: IsolatedEnvOptions = {}): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {}
+  for (const k of [...ENV_ALLOWLIST, ...(opts.pass ?? [])]) if (process.env[k] !== undefined) env[k] = process.env[k]
+  env.PATH = [dirname(process.execPath), env.PATH ?? ''].filter(Boolean).join(delimiter)
+  env.HOME = profile.home
+  if (profile.kind === 'isolated') {
+    mkdirSync(profile.home, { recursive: true, mode: 0o700 })
+    env.XDG_CONFIG_HOME = join(profile.home, '.config')
+    env.XDG_DATA_HOME = join(profile.home, '.local', 'share')
+    env.XDG_CACHE_HOME = join(profile.home, '.cache')
+    env.XDG_STATE_HOME = join(profile.home, '.local', 'state')
+  }
+  Object.assign(env, opts.set ?? {})
+  return env
 }

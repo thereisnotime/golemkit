@@ -59,11 +59,11 @@ reset-channels:
     @echo "{{YELLOW}}==> removing learned channel caches{{NORMAL}}"
     rm -f data/channels-*.json
 
-# Docs site dev server (http://localhost:5173)
+# Docs site dev server (http://127.0.0.1:5173)
 [group('docs')]
 docs: docs-gen
     @echo "{{BOLD}}{{BLUE}}==> docs dev server{{NORMAL}}"
-    npx vitepress dev docs
+    npx vitepress dev docs --host 127.0.0.1 --port 5173
 
 # Regenerate the action reference from the code
 [group('docs')]
@@ -76,6 +76,16 @@ docs-build: docs-gen
     @echo "{{BOLD}}{{BLUE}}==> building docs{{NORMAL}}"
     npx vitepress build docs
     @echo "{{GREEN}}✔ open docs/.vitepress/dist/index.html (or: npx vitepress preview docs){{NORMAL}}"
+
+# Log a subscription CLI into its isolated mc-buddy profile (claude [token] | codex [device] | opencode)
+[group('llm')]
+llm-login provider mode="" *args:
+    @node scripts/llm-login.ts {{provider}} {{mode}} {{args}}
+
+# Show which LLM providers are logged in (isolated profiles in .auth/)
+[group('llm')]
+llm-status *args:
+    @node scripts/llm-login.ts status {{args}}
 
 # Build the container image (podman)
 [group('deploy')]

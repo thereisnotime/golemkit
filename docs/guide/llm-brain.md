@@ -51,37 +51,73 @@ chat / events / timer ──► LlmRuntime ──► provider.run(turn) ──�
 
 | Provider | Auth | How tools reach the model | Sandboxing | Status |
 |---|---|---|---|---|
-| `claude-subscription` | Your `claude` login (Pro/Max) or `CLAUDE_CODE_OAUTH_TOKEN`. API keys are stripped from the child env; the turn aborts if Claude Code still reports an API key | Claude Agent SDK with an in-process SDK MCP server (default), or the HTTP bridge (`MC_CLAUDE_TRANSPORT=http`), or `claude -p --mcp-config` (`MC_CLAUDE_MODE=cli`) | `tools: []` / `--tools ""`, strict MCP config, only `mcp__minecraft` allowed, permission mode `dontAsk`, no settings/hooks/plugins/CLAUDE.md, no session persistence, empty scratch cwd | Wiring checked (tool list, MCP connected, auth source, API key stripping); no model turn run, the login on the dev machine had expired |
-| `codex` | Your `codex login` (ChatGPT) | `codex exec` with `-c mcp_servers.minecraft.*` overrides, token via env | `--ignore-user-config`, shell/exec/browser/computer-use/plugins/hooks features off, web search off, read-only sandbox, empty scratch cwd, `--ephemeral` | Tested end to end (smoke script and live server) |
+| `claude-subscription` | Login in its own profile (`just llm-login claude`) or `CLAUDE_CODE_OAUTH_TOKEN`. Isolated env, no API keys; the turn aborts if Claude Code still reports an API key | Claude Agent SDK with an in-process SDK MCP server (default), or the HTTP bridge (`MC_CLAUDE_TRANSPORT=http`), or `claude -p --mcp-config` (`MC_CLAUDE_MODE=cli`) | `tools: []` / `--tools ""`, strict MCP config, only `mcp__minecraft` allowed, permission mode `dontAsk`, no settings/hooks/plugins/CLAUDE.md, no session persistence, empty scratch cwd | Wiring checked (tool list, MCP connected, auth source, API key stripping); no model turn run, the login on the dev machine had expired |
+| `codex` | Login in its own profile (`just llm-login codex`, ChatGPT) | `codex exec` with `-c mcp_servers.minecraft.*` overrides, token via env | `--ignore-user-config`, shell/exec/browser/computer-use/plugins/hooks features off, web search off, read-only sandbox, empty scratch cwd, `--ephemeral` | Tested end to end (smoke script and live server) |
 | `anthropic` | `ANTHROPIC_API_KEY` | Messages API tool loop, in-process | No built-in tools exist | Unit-tested against a fake server; not run against the API |
 | `opencode` | `opencode auth login` | `opencode --standalone run` with a project `opencode.jsonc` (V2 schema) | Agent permissions: deny `*`, allow `minecraft_*` | Untested (not installed), built from the V2 docs |
 | `openai` | `MC_OPENAI_API_KEY` or none (Ollama) | Chat completions tool calling, in-process | No built-in tools exist | Unit-tested against a fake server |
 
+### Login profiles (isolation from your own setup)
+
+The CLI providers (`claude-subscription`, `codex`, `opencode`) never use your personal setup.
+Each runs in a **profile**: a directory used as the CLI's `HOME`, holding only its own login.
+
+- Default profile: `.auth/<provider>` in the repo (gitignored), e.g. `.auth/claude`.
+- The child process gets a minimal environment rebuilt from an allowlist (`PATH`, locale, TLS
+  and proxy variables) plus what the provider sets. Your shell's `ANTHROPIC_*`, `OPENAI_*`,
+  `CLAUDE_*`, `CODEX_*`, base URLs and gateways don't reach it.
+- Your `~/.claude` (settings, `CLAUDE.md`, hooks, plugins, MCP servers, login),
+  `~/.codex/config.toml` and global OpenCode config are never read.
+
+Log in once per profile:
+
+```bash
+just llm-login claude          # interactive login into .auth/claude
+just llm-login claude token    # long-lived token (claude setup-token) for unattended bots
+just llm-login codex           # ChatGPT sign-in into .auth/codex (codex device: `just llm-login codex device`)
+just llm-status                # which providers are logged in, and where
+```
+
+Other profile locations, e.g. a second account for a second bot:
+
+```bash
+just llm-login claude --profile ~/mc-profiles/alt
+MC_CLAUDE_PROFILE=~/mc-profiles/alt just run companion
+```
+
+| setting | env | per bot (`llm: { providerOptions: { profile } }` or provider options) |
+|---|---|---|
+| Claude profile | `MC_CLAUDE_PROFILE` | `profile: '/path'` |
+| Codex profile | `MC_CODEX_PROFILE` | `profile: '/path'` |
+| OpenCode profile | `MC_OPENCODE_PROFILE` | `profile: '/path'` |
+
+`profile: user` (or `MC_*_PROFILE=user`) opts back into your normal login in your real home.
+Settings, hooks, plugins and your MCP servers are still ignored by the provider flags, but the
+login (and for Codex, `CODEX_HOME`) is your own.
+
 ### claude-subscription
 
-1. Log in once: run `claude`, then `/login` with your Claude Pro/Max account (or
-   `claude auth login`). Check with `claude auth status`.
-2. Interactive logins expire. For a bot that runs for weeks, create a long-lived token with
-   `claude setup-token` and put it in `.env` as `CLAUDE_CODE_OAUTH_TOKEN`.
+1. `just llm-login claude` (Claude Pro/Max account). Check with `just llm-status`.
+2. Interactive logins expire. For a bot that runs for weeks, run `just llm-login claude token`
+   and put the token in `.env` as `CLAUDE_CODE_OAUTH_TOKEN` (the only Claude variable passed
+   through on purpose).
 3. `MC_LLM_PROVIDER=claude-subscription`, optionally `MC_LLM_MODEL=sonnet` (aliases work) and
    `MC_LLM_EFFORT=low`.
 
-Claude Code prefers `ANTHROPIC_API_KEY` over the subscription when both are present, which
-would bill the API. The provider removes `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` from
-the child environment and refuses to continue if the session still reports an API key source.
-Set `MC_CLAUDE_ALLOW_API_KEY=true` if you actually want that.
+API keys never reach Claude Code (the environment is rebuilt from an allowlist), and the turn
+aborts if the session still reports an API key as its credential source. Set
+`MC_CLAUDE_ALLOW_API_KEY=true` if you actually want API billing.
 
 ### codex
 
-1. `codex login` (Sign in with ChatGPT). Check with `codex login status`.
+1. `just llm-login codex` (Sign in with ChatGPT). Check with `just llm-status`.
 2. `MC_LLM_PROVIDER=codex`, optionally `MC_LLM_MODEL` and `MC_LLM_EFFORT` (reasoning effort,
    default `low`).
 
-Your `~/.codex/config.toml` is never modified and by default not even loaded
-(`--ignore-user-config`), so your own MCP servers, hooks, plugins and custom model providers
-stay out of the bot. Auth still comes from `CODEX_HOME`. If you route Codex through a gateway
-in config.toml and want the bot to use it, set `MC_CODEX_USE_USER_CONFIG=true` (your MCP servers
-then load too) or pass the provider with `MC_CODEX_CONFIG`.
+Codex runs with `CODEX_HOME` inside its profile and `--ignore-user-config`. If you want the bot
+to go through a model gateway, put a `config.toml` with just that provider into the profile
+(`.auth/codex/.codex/config.toml`) and set `MC_CODEX_USE_USER_CONFIG=true`; it loads the
+profile's config, not yours. One-off settings also work via `MC_CODEX_CONFIG`.
 
 What's left of Codex's built-ins after the flags (codex-cli 0.154): code mode's `exec`
 (JavaScript that can only call exposed tools; Codex routes MCP calls through it, so it has to
@@ -99,12 +135,12 @@ support it.
 
 ### opencode (untested)
 
-Install OpenCode, `opencode auth login`, then `MC_LLM_PROVIDER=opencode` and
+Install OpenCode, `just llm-login opencode`, then `MC_LLM_PROVIDER=opencode` and
 `MC_LLM_MODEL=provider/model`. Each turn writes `opencode.jsonc` into an empty scratch dir with
 our MCP server (`mcp.servers.minecraft`, `codemode: false`) and an `mcbot` agent whose
 permissions deny everything except `minecraft_*`, then runs `opencode --standalone run`. Older
-installs: `MC_OPENCODE_CONFIG_VERSION=v1`. Global and `/etc/opencode` config still merge in;
-the agent's rules come last so they win. Usage is estimated (no numbers in `run` output).
+installs: `MC_OPENCODE_CONFIG_VERSION=v1`. It runs in its own profile, so your global config
+doesn't merge in (only `/etc/opencode`, if it exists); the agent's rules come last either way. Usage is estimated (no numbers in `run` output).
 
 ### openai (OpenAI-compatible)
 

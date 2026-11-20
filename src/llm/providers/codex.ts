@@ -14,15 +14,22 @@
 // `code_mode_host` makes our MCP tools unreachable), request_user_input (no-op in exec mode),
 // apply_patch, and the collaboration/sub-agent tools (sub-agents get the same tool set).
 import { ProviderError, type LlmProvider, type TurnInput, type TurnResult, type Usage } from '../types.ts'
-import { childEnv, runProcess, scratchDir, tail, which } from './proc.ts'
+import { isolatedEnv, resolveProfile, runProcess, scratchDir, tail, which, type Profile } from './proc.ts'
+import { join } from 'node:path'
 
 export interface CodexProviderOptions {
   model?: string
   /** model_reasoning_effort: minimal | low | medium | high | xhigh. Default low. */
   reasoningEffort?: string
   bin?: string
-  /** Load ~/.codex/config.toml (custom providers/gateways). Its MCP servers are still loaded then. Default false. */
+  /**
+   * Load config.toml from the profile's CODEX_HOME (e.g. a model provider/gateway you put
+   * there on purpose). With profile 'user' that's your real ~/.codex/config.toml, MCP servers
+   * included. Default false.
+   */
   useUserConfig?: boolean
+  /** Login profile: directory used as HOME (default .auth/codex), or 'user' for your normal login. */
+  profile?: string
   /** Extra `-c key=value` overrides. */
   config?: string[]
 }
@@ -43,10 +50,19 @@ export class CodexProvider implements LlmProvider {
   readonly needsMcp = true
   readonly model?: string
   private readonly opts: CodexProviderOptions
+  readonly profile: Profile
 
   constructor (opts: CodexProviderOptions = {}) {
     this.opts = opts
+    this.profile = resolveProfile('codex', opts.profile)
     this.model = opts.model
+  }
+
+  /** Isolated child environment: HOME and CODEX_HOME in the profile, no inherited OPENAI or CODEX variables. */
+  env (extra: Record<string, string> = {}): NodeJS.ProcessEnv {
+    const set: Record<string, string> = { ...extra }
+    if (this.profile.kind === 'isolated') set.CODEX_HOME = join(this.profile.home, '.codex')
+    return isolatedEnv(this.profile, { set, pass: this.profile.kind === 'user' ? ['CODEX_HOME'] : [] })
   }
 
   private bin (): string | null {
@@ -56,9 +72,9 @@ export class CodexProvider implements LlmProvider {
   async check (): Promise<string | null> {
     const bin = this.bin()
     if (!bin) return 'codex CLI not found on PATH (install it, or set MC_CODEX_BIN)'
-    const r = await runProcess(bin, ['login', 'status'], { env: childEnv(), timeoutMs: 15_000 }).catch(e => ({ code: 1, stdout: '', stderr: String(e) }))
+    const r = await runProcess(bin, ['login', 'status'], { env: this.env(), timeoutMs: 15_000 }).catch(e => ({ code: 1, stdout: '', stderr: String(e) }))
     const out = `${r.stdout}\n${r.stderr}`
-    if (r.code !== 0 || /not logged in/i.test(out)) return 'codex is not logged in: run `codex login` (ChatGPT sign-in)'
+    if (r.code !== 0 || /not logged in/i.test(out)) return `codex is not logged in for profile ${this.profile.home}: run \`just llm-login codex\``
     return null
   }
 
@@ -96,7 +112,7 @@ export class CodexProvider implements LlmProvider {
     try {
       const r = await runProcess(bin, this.args(turn, scratch.path), {
         cwd: scratch.path,
-        env: childEnv({ drop: ['OPENAI_API_KEY'], set: { [TOKEN_VAR]: turn.mcp!.token } }),
+        env: this.env({ [TOKEN_VAR]: turn.mcp!.token }),
         timeoutMs: turn.timeoutMs,
         signal: turn.signal,
         stdin: turn.userMessage,

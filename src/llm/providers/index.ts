@@ -28,6 +28,7 @@ const list = (v: string | undefined) => (v ?? '').split(/\s+/).filter(Boolean)
  *   MC_LLM_EFFORT                       anthropic / claude-subscription effort, codex reasoning effort
  *   ANTHROPIC_API_KEY                   anthropic
  *   MC_CLAUDE_MODE=sdk|cli, MC_CLAUDE_TRANSPORT=sdk|http, MC_CLAUDE_ALLOW_API_KEY, MC_CLAUDE_BIN
+ *   MC_CLAUDE_PROFILE, MC_CODEX_PROFILE, MC_OPENCODE_PROFILE: login profile dir (default .auth/<provider>) or "user"
  *   MC_CODEX_BIN, MC_CODEX_USE_USER_CONFIG, MC_CODEX_CONFIG (space-separated key=value overrides)
  *   MC_OPENCODE_BIN, MC_OPENCODE_CONFIG_VERSION=v2|v1
  *   MC_OPENAI_BASE_URL, MC_OPENAI_API_KEY (or OPENAI_API_KEY)
@@ -47,6 +48,7 @@ export function createProvider (name: string, opts: Record<string, unknown> = {}
         transport: (env.MC_CLAUDE_TRANSPORT as 'sdk' | 'http' | undefined) ?? 'sdk',
         allowApiKey: bool(env.MC_CLAUDE_ALLOW_API_KEY),
         bin: env.MC_CLAUDE_BIN,
+        profile: env.MC_CLAUDE_PROFILE || undefined,
         ...opts
       })
     case 'codex':
@@ -54,6 +56,7 @@ export function createProvider (name: string, opts: Record<string, unknown> = {}
         model,
         reasoningEffort: effort,
         bin: env.MC_CODEX_BIN,
+        profile: env.MC_CODEX_PROFILE || undefined,
         useUserConfig: bool(env.MC_CODEX_USE_USER_CONFIG),
         config: list(env.MC_CODEX_CONFIG),
         ...opts
@@ -62,6 +65,7 @@ export function createProvider (name: string, opts: Record<string, unknown> = {}
       return new OpenCodeProvider({
         model,
         bin: env.MC_OPENCODE_BIN,
+        profile: env.MC_OPENCODE_PROFILE || undefined,
         configVersion: (env.MC_OPENCODE_CONFIG_VERSION as 'v1' | 'v2' | undefined) ?? 'v2',
         ...opts
       })
