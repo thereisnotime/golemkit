@@ -22,7 +22,7 @@ import { query, type Options, type SDKMessage } from '@anthropic-ai/claude-agent
 import { join } from 'node:path'
 import { buildMcpServer } from '../mcp.ts'
 import { ProviderError, type LlmProvider, type TurnInput, type TurnResult, type Usage } from '../types.ts'
-import { isolatedEnv, resolveProfile, runProcess, scratchDir, tail, which, type Profile } from './proc.ts'
+import { isolatedEnv, readEnvFileVar, resolveProfile, runProcess, scratchDir, tail, which, type Profile } from './proc.ts'
 
 export interface ClaudeSubscriptionOptions {
   mode?: 'sdk' | 'cli'
@@ -37,6 +37,14 @@ export interface ClaudeSubscriptionOptions {
   bin?: string
   /** Login profile: directory used as HOME (default .auth/claude), or 'user' for your normal login. */
   profile?: string
+  /**
+   * Long-lived subscription token (from `claude setup-token`) to authenticate with, passed to
+   * Claude Code as CLAUDE_CODE_OAUTH_TOKEN. Give it directly, or by variable name: read from
+   * `oauthTokenFile` (a dotenv file, only that one variable is read) or from our environment.
+   */
+  oauthToken?: string
+  oauthTokenVar?: string
+  oauthTokenFile?: string
 }
 
 const KEY_VARS = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN']
@@ -57,8 +65,18 @@ export class ClaudeSubscriptionProvider implements LlmProvider {
     this.needsMcp = opts.mode === 'cli' || opts.transport === 'http'
   }
 
+  /** The subscription token to use, if one is configured (never logged). */
+  private token (): string | undefined {
+    if (this.opts.oauthToken) return this.opts.oauthToken
+    const name = this.opts.oauthTokenVar
+    if (!name) return undefined
+    return (this.opts.oauthTokenFile ? readEnvFileVar(this.opts.oauthTokenFile, name) : undefined) ?? process.env[name]
+  }
+
   private env (): NodeJS.ProcessEnv {
     const set: Record<string, string> = { CLAUDE_AGENT_SDK_CLIENT_APP: 'mc-buddy/0.1' }
+    const token = this.token()
+    if (token) set.CLAUDE_CODE_OAUTH_TOKEN = token
     if (this.profile.kind === 'isolated') set.CLAUDE_CONFIG_DIR = join(this.profile.home, '.claude')
     const pass = ['CLAUDE_CODE_OAUTH_TOKEN', ...(this.profile.kind === 'user' ? ['CLAUDE_CONFIG_DIR'] : []), ...(this.opts.allowApiKey ? KEY_VARS : [])]
     return isolatedEnv(this.profile, { set, pass })
@@ -66,7 +84,10 @@ export class ClaudeSubscriptionProvider implements LlmProvider {
 
   async check (): Promise<string | null> {
     // A long-lived subscription token from `claude setup-token` (for unattended bots).
-    if (process.env.CLAUDE_CODE_OAUTH_TOKEN) return null
+    if (this.opts.oauthTokenVar && !this.token()) {
+      return `token variable ${this.opts.oauthTokenVar} not found${this.opts.oauthTokenFile ? ` in ${this.opts.oauthTokenFile}` : ''}`
+    }
+    if (this.token() || process.env.CLAUDE_CODE_OAUTH_TOKEN) return null
     const bin = which(this.opts.bin ?? 'claude')
     if (!bin) {
       if (this.opts.mode === 'cli') return 'claude CLI not found on PATH (set MC_CLAUDE_BIN)'

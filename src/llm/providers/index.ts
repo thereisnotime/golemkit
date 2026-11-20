@@ -28,6 +28,7 @@ const list = (v: string | undefined) => (v ?? '').split(/\s+/).filter(Boolean)
  *   MC_LLM_EFFORT                       anthropic / claude-subscription effort, codex reasoning effort
  *   ANTHROPIC_API_KEY                   anthropic
  *   MC_CLAUDE_MODE=sdk|cli, MC_CLAUDE_TRANSPORT=sdk|http, MC_CLAUDE_ALLOW_API_KEY, MC_CLAUDE_BIN
+ *   MC_CLAUDE_OAUTH_TOKEN_VAR (+ MC_CLAUDE_OAUTH_TOKEN_FILE): take the subscription token from that variable (in that dotenv file)
  *   MC_CLAUDE_PROFILE, MC_CODEX_PROFILE, MC_OPENCODE_PROFILE: login profile dir (default .auth/<provider>) or "user"
  *   MC_CODEX_BIN, MC_CODEX_USE_USER_CONFIG, MC_CODEX_CONFIG (space-separated key=value overrides)
  *   MC_OPENCODE_BIN, MC_OPENCODE_CONFIG_VERSION=v2|v1
@@ -49,6 +50,8 @@ export function createProvider (name: string, opts: Record<string, unknown> = {}
         allowApiKey: bool(env.MC_CLAUDE_ALLOW_API_KEY),
         bin: env.MC_CLAUDE_BIN,
         profile: env.MC_CLAUDE_PROFILE || undefined,
+        oauthTokenVar: env.MC_CLAUDE_OAUTH_TOKEN_VAR || undefined,
+        oauthTokenFile: env.MC_CLAUDE_OAUTH_TOKEN_FILE || undefined,
         ...opts
       })
     case 'codex':

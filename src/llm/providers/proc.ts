@@ -1,7 +1,7 @@
 // Helpers for CLI providers: run a child non-interactively with a timeout, kill its whole
 // process group on timeout/abort, stream stdout lines, and build a clean environment.
 import { spawn } from 'node:child_process'
-import { accessSync, constants, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { accessSync, constants, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { delimiter, dirname, join, resolve } from 'node:path'
 
@@ -166,4 +166,29 @@ export function isolatedEnv (profile: Profile, opts: IsolatedEnvOptions = {}): N
   }
   Object.assign(env, opts.set ?? {})
   return env
+}
+
+/** Expands a leading "~/" to the home directory. */
+export function expandHome (p: string): string {
+  return p.startsWith('~/') ? join(homedir(), p.slice(2)) : p
+}
+
+/**
+ * Reads one variable from a dotenv-style file (KEY=VALUE, optional `export`, quotes, comments)
+ * without loading anything else from it into our environment.
+ */
+export function readEnvFileVar (file: string, name: string): string | undefined {
+  let text: string
+  try { text = readFileSync(expandHome(file), 'utf8') } catch { return undefined }
+  for (const raw of text.split('\n')) {
+    const line = raw.trim()
+    if (!line || line.startsWith('#')) continue
+    const m = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line)
+    if (!m || m[1] !== name) continue
+    let v = m[2]!.trim()
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1)
+    else v = v.replace(/\s+#.*$/, '')
+    return v
+  }
+  return undefined
 }

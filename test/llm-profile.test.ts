@@ -53,3 +53,16 @@ test('MC_*_PROFILE env selects the profile', () => {
   const p = createProvider('codex', {}, { MC_CODEX_PROFILE: '/tmp/x-profile' } as NodeJS.ProcessEnv) as CodexProvider
   assert.equal(p.profile.home, '/tmp/x-profile')
 })
+
+test('readEnvFileVar reads one variable from a dotenv file', async () => {
+  const { writeFileSync, rmSync } = await import('node:fs')
+  const { readEnvFileVar } = await import('../src/llm/providers/proc.ts')
+  const f = join(tmpdir(), `mcb-env-${process.pid}`)
+  writeFileSync(f, '# comment\nOTHER=nope\nexport KN_TOKEN="sk-ant-oat-abc"\nPLAIN=x # trailing\n')
+  try {
+    assert.equal(readEnvFileVar(f, 'KN_TOKEN'), 'sk-ant-oat-abc')
+    assert.equal(readEnvFileVar(f, 'PLAIN'), 'x')
+    assert.equal(readEnvFileVar(f, 'MISSING'), undefined)
+    assert.equal(process.env.OTHER, undefined, 'nothing else is loaded into our env')
+  } finally { rmSync(f) }
+})
