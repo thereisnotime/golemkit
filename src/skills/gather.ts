@@ -1,4 +1,5 @@
 import { defineSkill, defineAction, z, ok, fail, goals, goto, checkAborted } from '../core/index.ts'
+import { digBlock, DigRefusedError } from './world.ts'
 
 const collect = defineAction({
   name: 'collect',
@@ -18,11 +19,13 @@ const collect = defineAction({
       if (!target) break
       try {
         await goto(bot, new goals.GoalLookAtBlock(target.position, bot.world), signal)
-        await bot.dig(target)
+        await digBlock(bot, target, signal)
         got++
       } catch (e) {
         checkAborted(signal)
-        log.debug(`collect: ${(e as Error).message}`)
+        // Refused breaks (spawn protection, claims) leave the block in place; say so instead of looping.
+        if (e instanceof DigRefusedError) return got ? ok(`collected ${got} ${block}, then hit a protected area`) : fail(e.message)
+        log.debug('collect stopped', { error: (e as Error).message })
         break
       }
     }

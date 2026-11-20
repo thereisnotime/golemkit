@@ -3,7 +3,7 @@
 // Chores (chop_tree, harvest, deposit) switch on by themselves if a skill provides them.
 // Players can still command it with !commands; player priority beats the NPC brain.
 import { defineBot } from '../src/core/index.ts'
-import { status, movement, combat, survival, inventorySkill, navigation } from '../src/skills/index.ts'
+import { status, movement, combat, survival, inventorySkill, navigation, extendedSkills } from '../src/skills/index.ts'
 import { commandBrain, reflexes } from '../src/brains/index.ts'
 import {
   npcBrain, actionBehavior, wander, goHome, sleepAtNight, eatWhenHungry, fleeOrFight,
@@ -17,7 +17,8 @@ export default defineBot({
   description: 'Self-sufficient NPC that lives around its home',
   username: 'Villager',
   persona: 'a calm villager who keeps to their home and greets passers-by',
-  skills: [status(), movement(), combat(), survival(), inventorySkill(), navigation()],
+  // chop_tree needs canDig (--dig or canDig in the fleet file); harvest and deposit work without it.
+  skills: [status(), movement(), combat(), survival(), inventorySkill(), navigation(), ...extendedSkills()],
   brains: [
     commandBrain({ verbose: false }),
     reflexes(),
