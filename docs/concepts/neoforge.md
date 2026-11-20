@@ -41,7 +41,7 @@ After negotiation the server runs NeoForge's configuration tasks. `handshake.ts`
 
 | payload | reply |
 |---|---|
-| `neoforge:frozen_registry_sync_*` | `frozen_registry_sync_completed` when done |
+| `neoforge:frozen_registry_sync_*` | parsed (see below), then `frozen_registry_sync_completed` |
 | `neoforge:config_file` | (none, ignored) |
 | `neoforge:known_registry_data_maps` | claims to know all of them (so mandatory ones don't kick us) |
 | `neoforge:extensible_enum_data` | `extensible_enum_ack` |
@@ -64,7 +64,31 @@ level).
 Consequences: inventories and containers can be incomplete when they hold modded items; the
 bot doesn't know recipes from the server (mineflayer uses minecraft-data's vanilla recipes).
 
-## 4. Modded blocks
+## 4. Modded item and entity names
+
+During login NeoForge sends its frozen registries: every item, entity type, block and so on,
+with the numeric ids this server uses (on mc02: 3111 items, 1778 of them modded; 200 entity
+types, 70 modded). `registries.ts` decodes them, caches the item, entity and block maps in
+`data/registries-<host>-<port>.json`, and adds the modded entries to each bot's own copy of
+the mineflayer registry (minecraft-data maps are shared between bots, so they're copied, never
+mutated). It also checks that vanilla ids match minecraft-data and warns if they don't.
+
+The result:
+
+- modded items have real names: `create:andesite_alloy`, `ars_nouveau:source_gem`. They show
+  up in inventories and work in actions like `drop`, `deposit` and `equip`;
+- modded entities have names and a type: `hostile` if they match a hostile pattern, `object`
+  for projectiles/contraptions/effects, `mob` otherwise. Combat and guard only attack
+  `hostile` ones.
+
+Hostile patterns: `ars_nouveau:wilden_*` is built in. Add more per bot with
+`settings: { moddedHostile: ['somemod:*_zombie'] }` or for everything with
+`MC_MODDED_HOSTILE=somemod:ghoul,othermod:*`.
+
+Item stacks that carry modded *data components* still can't be parsed (see section 3), so
+those particular stacks remain invisible even though the item's name is known.
+
+## 5. Modded blocks
 
 NeoForge appends modded block states after the vanilla ones, so vanilla state ids stay valid
 and anything above the vanilla maximum is modded. prismarine-block would treat those as air,
@@ -72,7 +96,12 @@ so the bot would fall through Create casings. `modded.ts` maps them to a stand-i
 `modded_block`: a solid, non-diggable full cube. Pathfinding treats machines as walls, which
 is the safe default.
 
-Unknown items show up as `modded#<id>` (`itemName()` in core helpers).
+Why blocks don't get names like items do: chunks store block *state* ids, and the number of
+states each modded block has (its properties) is defined in mod code, not in the registry
+snapshot. The block id→name map is cached anyway, for a future step that reads block state
+definitions from the mod jars.
+
+Items the registry doesn't know (rare after the sync) show up as `modded#<id>` (`itemName()`).
 
 ## Debugging a new server
 

@@ -15,6 +15,7 @@ fleet bot entry / CLI flags.
 | `MC_PREFIX` | `!` | chat command prefix |
 | `MC_CAN_DIG` | `false` | let bots break blocks |
 | `MC_RECONNECT_DELAY_MS` | `10000` | wait before reconnecting |
+| `MC_MODDED_HOSTILE` | | extra hostile modded mobs, comma-separated globs (`somemod:*_zombie`) |
 | `MC_LOG_LEVEL` | `info` | level spec, e.g. `info,McBuddy=debug,*/neoforge=trace` ([logging](../guide/logging)) |
 | `MC_LOG_FORMAT` | `pretty` | `pretty`, `plain`, `json` |
 | `MC_LOG_COLOR` | `auto` | `auto`, `always`, `never` (`NO_COLOR` also works) |
@@ -34,6 +35,7 @@ fleet bot entry / CLI flags.
 | `bots/` | bot definitions |
 | `fleet.yaml` | your fleet (gitignored); `fleet.example.yaml` is the template |
 | `data/channels-<host>-<port>.json` | learned NeoForge channels per server |
+| `data/registries-<host>-<port>.json` | the server's item / entity / block registries (from the sync) |
 | `data/bots/<username>/store.json` | per-bot storage (`agent.storage`) |
 | `data/bots/<server>/<username>/` | same, when a username runs on several servers |
 | `.auth/` | Microsoft auth token cache |

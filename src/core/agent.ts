@@ -18,6 +18,7 @@ import { ChannelStore } from './neoforge/channelStore.ts'
 import { attachNeoForge } from './neoforge/handshake.ts'
 import { installTolerantParser } from './neoforge/tolerantParser.ts'
 import { solidifyUnknownBlocks } from './modded.ts'
+import { RegistryCache, applyModdedRegistries, type RegistrySnapshot } from './neoforge/registries.ts'
 import { fmtPos, itemName } from './helpers.ts'
 import type { Fleet } from './fleet.ts'
 import type { UsageSnapshot } from '../llm/usage.ts'
@@ -97,6 +98,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
   private readonly brains: BrainDef[]
   private readonly reconnectDelayMs: number
   private readonly channels: ChannelStore
+  private readonly registryCache: RegistryCache
 
   private _bot: Bot | null = null
   private _fleet: Fleet | null = null
@@ -128,6 +130,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
     this.canDig = opts.canDig ?? definition.canDig ?? process.env.MC_CAN_DIG === 'true'
     this.reconnectDelayMs = opts.reconnectDelayMs ?? Number(process.env.MC_RECONNECT_DELAY_MS || 10000)
     this.channels = new ChannelStore(join('data', `channels-${server.host}-${server.port}.json`))
+    this.registryCache = new RegistryCache(join('data', `registries-${server.host}-${server.port}.json`))
     this.skills = definition.skills
     this.brains = definition.brains
 
@@ -477,7 +480,20 @@ export class Agent extends TypedEmitter<AgentEvents> {
         }
       }
 
-      bot.once('login', () => solidifyUnknownBlocks(bot.registry))
+      bot._client.on('neoforge_registry' as any, (snap: RegistrySnapshot) => this.registryCache.add(snap))
+      bot._client.on('neoforge_registries_done' as any, () => this.registryCache.save())
+
+      bot.once('login', () => {
+        solidifyUnknownBlocks(bot.registry)
+        // Modded item and entity names from the server's registry sync (or the cached copy).
+        const hostile = [
+          ...((this.settings.moddedHostile as string[] | undefined) ?? []),
+          ...listFromEnv(process.env.MC_MODDED_HOSTILE)
+        ]
+        const r = applyModdedRegistries(bot.registry, this.registryCache, { hostile })
+        if (r.items || r.entities) this.logs.neoforge.debug('modded registries applied', { items: r.items, entities: r.entities })
+        if (r.mismatches.length) this.logs.neoforge.warn(`server ids differ from vanilla data for ${r.mismatches.length} entries, names may be wrong`, { first: r.mismatches.slice(0, 3) })
+      })
 
       bot.once('spawn', () => {
         this._bot = bot

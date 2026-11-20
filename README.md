@@ -95,12 +95,15 @@ Mineflayer only speaks vanilla. `src/core/neoforge/` adds:
 3. **Unparseable packets are dropped.** Item stacks with modded data components can't be
    parsed (components have no length prefix), which would kill the connection. Those packets
    (recipe list, command tree, some item packets) are skipped instead.
-4. **Modded blocks are solid.** Unknown block states are treated as full cubes so bots don't
+4. **Modded names.** The server's registry sync gives modded items and mobs their real names
+   (`create:andesite_alloy`), and `ars_nouveau:wilden_*`-style patterns mark modded hostiles.
+5. **Modded blocks are solid.** Unknown block states are treated as full cubes so bots don't
    fall through Create casings.
 
 ## Limitations
 
-- Modded items show as `modded#<id>`; modded blocks are all `modded_block` (full cubes).
+- Modded items and mobs have real names (from NeoForge's registry sync); modded blocks are
+  all `modded_block` (full cubes), since their states aren't in the sync.
 - Packets with modded items may be skipped, so inventories can be incomplete.
 - No interaction with Create contraptions, Ars spells, Curios slots or mod GUIs yet.
 

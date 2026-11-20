@@ -2,6 +2,7 @@
 import type { Client } from 'minecraft-protocol'
 import { encodeQuery, decodeSetupFailed, decodeNetworkSetup, PROTOCOL, Writer, Reader, type QueryComponent, type NetworkSetup } from './codec.ts'
 import type { ChannelStore } from './channelStore.ts'
+import { decodeFrozenRegistry, type RegistrySnapshot } from './registries.ts'
 
 // Channel ids must match NeoForge's ResourceLocations exactly (see payload/*.java on branch 1.21.1).
 const CH = {
@@ -44,6 +45,10 @@ export interface NeoForgeEvents {
   neoforge_failed: (failures: Record<string, unknown>) => void
   /** negotiation accepted */
   neoforge_ready: (setup: NetworkSetup) => void
+  /** one frozen registry received (items, blocks, entity types, ...) */
+  neoforge_registry: (snapshot: RegistrySnapshot) => void
+  /** all frozen registries received */
+  neoforge_registries_done: () => void
   /** configuration payloads we don't answer (debugging) */
   neoforge_unhandled: (channel: string, data: Buffer) => void
 }
@@ -108,11 +113,19 @@ export function attachNeoForge (client: Client, store: ChannelStore, log: (msg: 
         send(CH.FLAGS_ACK, Buffer.alloc(0))
         break
       case CH.REG_START:
-      case CH.REG:
       case CH.CONFIG_FILE:
+        break
+      case CH.REG:
+        try {
+          const snap = decodeFrozenRegistry(data)
+          client.emit('neoforge_registry', snap)
+        } catch (e) {
+          log(`could not decode frozen registry: ${(e as Error).message}`)
+        }
         break
       case CH.REG_DONE:
         send(CH.REG_DONE, Buffer.alloc(0))
+        client.emit('neoforge_registries_done')
         break
       case CH.C_VERSION:
         // Common networking: we speak version 1.
