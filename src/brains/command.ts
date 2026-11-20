@@ -11,12 +11,15 @@ export interface CommandBrainOptions {
   verbose?: boolean
   /** Say hello in public chat after each login. Default false (fleets would spam). */
   greet?: boolean
+  /** Require the prefix in whispers too. Default false. Set it when an LLM brain answers plain whispers. */
+  whisperNeedsPrefix?: boolean
 }
 
 export const commandBrain = (opts: CommandBrainOptions = {}) => {
   const prefix = opts.prefix ?? process.env.MC_PREFIX ?? '!'
   const verbose = opts.verbose ?? true
   const greet = opts.greet ?? false
+  const whisperNeedsPrefix = opts.whisperNeedsPrefix ?? false
 
   return defineBrain({
     name: 'command',
@@ -32,7 +35,7 @@ export const commandBrain = (opts: CommandBrainOptions = {}) => {
     if (!agent.isOwner(msg.from)) return
     let body = msg.message.trim()
     if (body.startsWith(prefix)) body = body.slice(prefix.length)
-    else if (!msg.whisper) return
+    else if (!msg.whisper || whisperNeedsPrefix) return
 
     const [name = '', ...words] = body.split(/\s+/)
     if (name === 'help') return help(agent, msg, words[0])

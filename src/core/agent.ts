@@ -20,6 +20,7 @@ import { installTolerantParser } from './neoforge/tolerantParser.ts'
 import { solidifyUnknownBlocks } from './modded.ts'
 import { fmtPos, itemName } from './helpers.ts'
 import type { Fleet } from './fleet.ts'
+import type { UsageSnapshot } from '../llm/usage.ts'
 
 export interface ChatMessage {
   from: string
@@ -43,6 +44,8 @@ export type AgentEvents = {
   serverMessage: (text: string) => void
   actionStart: (info: ActionInfo) => void
   actionEnd: (info: ActionInfo, result: ActionResult) => void
+  /** After every LLM turn (llm brain): that turn's usage plus session/today/all-time totals. */
+  llmUsage: (snapshot: UsageSnapshot) => void
   stopped: () => void
 }
 
@@ -381,12 +384,12 @@ export class Agent extends TypedEmitter<AgentEvents> {
       nearby: near,
       inventory
     }
-    for (const skill of this.skills) {
-      if (!skill.observe) continue
+    for (const part of [...this.skills, ...this.brains]) {
+      if (!part.observe) continue
       try {
-        Object.assign(snapshot, skill.observe(this, bot))
+        Object.assign(snapshot, part.observe(this, bot))
       } catch (e) {
-        this.log.debug(`observe ${skill.name}: ${(e as Error).message}`)
+        this.log.debug(`observe ${part.name}: ${(e as Error).message}`)
       }
     }
     return snapshot

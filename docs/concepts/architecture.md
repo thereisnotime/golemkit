@@ -86,6 +86,7 @@ export const myBrain = (opts) => defineBrain({
   name: 'my-brain',
   start (agent) { agent.on('chat', ...) },        // once
   session (agent, bot) { ...; return cleanup },   // every session
+  observe (agent, bot) { return { mood: 'ok' } }, // optional, merged into agent.observe()
   stop (agent) { ... }
 })
 ```
@@ -99,6 +100,8 @@ Several brains run at once and negotiate through priorities. Shipped:
 - `npcBrain()` keeps NPCs busy on their own: scored behaviours at npc priority, backs off for
   players, LLMs and reflexes. See [NPC brain](../guide/npc-brain.md).
 - `sceneBrain()` lets several bots act out scenes together (see [Scenes](../guide/scenes.md)).
+- `llmBrain()` lets a language model drive the bot at llm priority, through the same actions
+  (as tools, also over MCP). See [LLM brain](../guide/llm-brain.md).
 
 ## Bots
 

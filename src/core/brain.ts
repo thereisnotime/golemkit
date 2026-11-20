@@ -12,6 +12,8 @@ export interface BrainDef {
   session? (agent: Agent, bot: Bot): void | (() => void)
   /** Called when the agent stops. */
   stop? (agent: Agent): void | Promise<void>
+  /** Extra fields for agent.observe() (like a skill's observe), e.g. the LLM brain's usage. */
+  observe? (agent: Agent, bot: Bot): Record<string, unknown>
 }
 
 export function defineBrain (def: BrainDef): BrainDef {
