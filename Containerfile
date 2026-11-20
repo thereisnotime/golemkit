@@ -7,6 +7,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY src ./src
 COPY bots ./bots
+COPY scenes ./scenes
 USER node
 ENTRYPOINT ["node", "src/cli.ts"]
 CMD ["run", "buddy"]
