@@ -24,7 +24,10 @@ const ServerSchema = z.object({
 })
 
 const BotEntrySchema = z.object({
-  bot: z.string().describe('bot definition name (bots/<name>.ts) or path'),
+  profile: z.string().optional().describe('profile name (profiles/<name>.yaml); entry fields override it'),
+  variant: z.string().optional().describe('variant name (variants/<name>.ts) or path'),
+  /** @deprecated older name for variant */
+  bot: z.string().optional(),
   server: z.string().optional().describe('key in `servers`; defaults.server otherwise'),
   username: z.string().optional(),
   owners: z.array(z.string()).optional(),
@@ -58,13 +61,15 @@ export const FleetFileSchema = z.object({
     settings: z.record(z.string(), z.unknown()).optional()
   }).optional(),
   staggerMs: z.number().default(5000),
-  bots: z.array(BotEntrySchema).min(1)
+  bots: z.array(BotEntrySchema.refine(e => e.profile || e.variant || e.bot, 'each entry needs a profile or a variant')).min(1)
 })
 
 export type FleetFile = z.infer<typeof FleetFileSchema>
 
 export interface PlannedAgent {
-  bot: string
+  /** Variant name, unless the profile provides it. */
+  variant?: string
+  profile?: string
   server: string
   serverConfig: ServerConfig
   options: InstanceOptions
@@ -80,11 +85,11 @@ export interface FleetPlan {
   logging?: z.infer<typeof LoggingSchema>
 }
 
-/** Final username and data dir once the bot definition's default username is known. */
-export function resolveUsername (p: PlannedAgent, defUsername: string, multiServer: boolean): InstanceOptions {
+/** Final username and data dir once the default username (profile or variant) is known. */
+export function resolveUsername (p: PlannedAgent, defUsername: string, multiServer: boolean, options: InstanceOptions = p.options): InstanceOptions {
   const username = p.options.username ?? (p.index ? `${defUsername}${p.index}` : defUsername)
   return {
-    ...p.options,
+    ...options,
     username,
     // Keep per-server data apart when the same username runs on several servers.
     ...(multiServer ? { dataDir: join('data', 'bots', p.server, username) } : {})
@@ -108,11 +113,12 @@ export function parseFleetFile (text: string, base: ServerConfig = serverFromEnv
   for (const entry of file.bots) {
     const server = entry.server ?? defaultServer
     const serverConfig = servers[server]
-    if (!serverConfig) throw new Error(`bot ${entry.bot}: unknown server "${server}" (have: ${names.join(', ')})`)
+    if (!serverConfig) throw new Error(`${entry.profile ?? entry.variant ?? entry.bot}: unknown server "${server}" (have: ${names.join(', ')})`)
     for (let i = 1; i <= entry.count; i++) {
       const username = entry.username && entry.count > 1 ? `${entry.username}${i}` : entry.username
       agents.push({
-        bot: entry.bot,
+        variant: entry.variant ?? entry.bot,
+        profile: entry.profile,
         server,
         serverConfig,
         ...(entry.count > 1 ? { index: i } : {}),

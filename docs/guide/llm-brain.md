@@ -6,7 +6,7 @@ It can run on a subscription you already pay for (Claude Pro/Max through Claude 
 through Codex) or on an API key.
 
 ```ts
-// bots/companion.ts (shipped)
+// variants/companion.ts (shipped)
 brains: [
   commandBrain({ verbose: false, whisperNeedsPrefix: true }), // !stop always works
   reflexes(),
@@ -269,11 +269,11 @@ one fleet collides; leave it at 0 (random) there.
 ## Writing an LLM bot
 
 ```ts
-import { defineBot } from '../src/core/index.ts'
+import { defineVariant } from '../src/core/index.ts'
 import { standardSkills } from '../src/skills/index.ts'
 import { commandBrain, reflexes, llmBrain } from '../src/brains/index.ts'
 
-export default defineBot({
+export default defineVariant({
   name: 'guide',
   username: 'Guide',
   persona: 'A patient guide who shows new players around spawn. Short answers.',

@@ -21,7 +21,7 @@ on Node (type stripping), so there is no build step.
 ## Run your first bot
 
 ```bash
-just run          # bots/buddy.ts, username McBuddy
+just run          # variants/buddy.ts, username McBuddy
 ```
 
 The first connection to a NeoForge server takes a few seconds longer: the bot is rejected a

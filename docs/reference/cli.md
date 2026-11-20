@@ -37,5 +37,5 @@ logging flags (any command):
   --log-dir DIR
 ```
 
-`<bot>` is a name in `bots/` or a path to a definition file. `.env` is loaded by the just
+`<bot>` is a name in `variants/` or a path to a definition file. `.env` is loaded by the just
 recipes (`node --env-file-if-exists=.env`).

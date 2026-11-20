@@ -13,7 +13,7 @@ NeoForge layer learns any server's mod channels on its own.
 ```bash
 asdf install            # node + just from .tool-versions
 just setup              # npm ci, creates .env from .env.example
-just run                # runs bots/buddy.ts
+just run                # runs variants/buddy.ts
 ```
 
 In game: `!help`.
@@ -22,18 +22,18 @@ In game: `!help`.
 just bots               # list bots
 just actions buddy      # its commands / LLM tools
 just run buddy --username Helper --owners robin
-just fleet fleet.yaml   # several bots in one process (see fleet.example.yaml)
+just fleet fleet.yaml   # several bots in one process (see fleets/example.yaml)
 ```
 
 ## Writing a bot
 
 ```ts
-// bots/guard.ts
-import { defineBot } from '../src/core/index.ts'
+// variants/guard.ts
+import { defineVariant } from '../src/core/index.ts'
 import { standardSkills } from '../src/skills/index.ts'
 import { commandBrain, reflexes } from '../src/brains/index.ts'
 
-export default defineBot({
+export default defineVariant({
   name: 'guard',
   username: 'Guardian',
   skills: standardSkills(),
@@ -59,11 +59,11 @@ Details in [docs/concepts/architecture.md](docs/concepts/architecture.md).
 The full docs live in [docs/](docs/) (guides, concepts, generated action reference). Browse
 them as a local site with `just docs` (dev server) or `just docs-build` (static HTML).
 
-Self-sufficient NPCs (utility-AI brain, behaviours, `bots/villager.ts`): [docs/guide/npc-brain.md](docs/guide/npc-brain.md).
-LLM-driven bots on your Claude / Codex subscription or an API (`bots/companion.ts`): [docs/guide/llm-brain.md](docs/guide/llm-brain.md).
+Self-sufficient NPCs (utility-AI brain, behaviours, `variants/villager.ts`): [docs/guide/npc-brain.md](docs/guide/npc-brain.md).
+LLM-driven bots on your Claude / Codex subscription or an API (`variants/companion.ts`): [docs/guide/llm-brain.md](docs/guide/llm-brain.md).
 
 What each skill and action does, including `extendedSkills()` (crafting, chests, farming, woodcutting, building): [docs/skills.md](docs/skills.md).
-Scenes with several bots acting together (`bots/actor.ts`, `scenes/*.yaml`): [docs/guide/scenes.md](docs/guide/scenes.md).
+Scenes with several bots acting together (`variants/actor.ts`, `scenes/*.yaml`): [docs/guide/scenes.md](docs/guide/scenes.md).
 
 ## buddy's commands
 

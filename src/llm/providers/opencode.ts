@@ -24,7 +24,9 @@ export interface OpenCodeProviderOptions {
   configVersion?: 'v2' | 'v1'
   /** Extra args inserted before the prompt (e.g. ["--print-logs"]). */
   extraArgs?: string[]
-  /** Login profile: directory used as HOME (default .auth/opencode), or 'user' for your normal login. */
+  /** Login: directory used as the CLI's HOME (default .auth/opencode), or 'user' for your normal login. */
+  login?: string
+  /** @deprecated older name for `login` */
   profile?: string
 }
 
@@ -43,7 +45,7 @@ export class OpenCodeProvider implements LlmProvider {
 
   constructor (opts: OpenCodeProviderOptions = {}) {
     this.opts = opts
-    this.profile = resolveProfile('opencode', opts.profile)
+    this.profile = resolveProfile('opencode', opts.login ?? opts.profile)
     this.model = opts.model
   }
 

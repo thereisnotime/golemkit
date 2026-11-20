@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-13 skills, 39 actions.
+13 skills, 40 actions.
 
 ## building
 
@@ -23,6 +23,17 @@ Place a block from the inventory at x y z. Needs a solid block next to that spot
 | `x` | number | yes |  |  |
 | `y` | number | yes |  |  |
 | `z` | number | yes |  |  |
+
+### `break_block`
+
+Break (mine) the block at x y z with the best tool in the inventory. Needs digging enabled. Refuses chests and other containers unless force=true.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `x` | integer (-9007199254740991..9007199254740991) | yes |  |  |
+| `y` | integer (-9007199254740991..9007199254740991) | yes |  |  |
+| `z` | integer (-9007199254740991..9007199254740991) | yes |  |  |
+| `force` | boolean |  | `false` | also break containers (chests, barrels...) |
 
 ## combat
 
@@ -227,7 +238,9 @@ Follow a player, staying close, until stopped.
 
 ### `goto`
 
-Walk to block coordinates. Omit y to go to the surface at x/z.
+Walk to block coordinates, any distance (long trips go in legs and can take minutes; it keeps going in the background until it arrives, gets stuck or is stopped). Omit y to go to the surface at x/z.
+
+*long-running*
 
 | param | type | required | default | description |
 |---|---|---|---|---|

@@ -1,8 +1,8 @@
 // Connects once with no brains, prints a world snapshot, then quits.
-import { Agent, defineBot, serverFromEnv } from '../src/core/index.ts'
+import { Agent, defineVariant, serverFromEnv } from '../src/core/index.ts'
 import { standardSkills } from '../src/skills/index.ts'
 
-const agent = new Agent(defineBot({ name: 'probe', skills: standardSkills(), brains: [] }), serverFromEnv(), {
+const agent = new Agent(defineVariant({ name: 'probe', skills: standardSkills(), brains: [] }), serverFromEnv(), {
   username: process.env.MC_USERNAME || 'McBuddyProbe',
   dataDir: 'data/probe'
 })

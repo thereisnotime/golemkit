@@ -1,7 +1,9 @@
 # Architecture
 
 ```
-bots/<name>.ts          what a bot is: skills + brains + persona/settings
+variants/<name>.ts      what kind of bot: skills + brains + default persona/settings
+profiles/<name>.yaml    a saved instance: variant + username, owners, server, LLM, settings
+fleets/<name>.yaml      profiles/variants run together, possibly on several servers
 src/brains/             who decides: command (chat), reflexes, npc, llm, ...
 src/skills/             what it can do: actions grouped by topic
 src/core/               agent lifecycle, action lock, chat, storage, NeoForge layer
@@ -106,7 +108,7 @@ Several brains run at once and negotiate through priorities. Shipped:
 ## Bots
 
 ```ts
-export default defineBot({
+export default defineVariant({
   name: 'buddy',
   username: 'McBuddy',
   skills: standardSkills(),
@@ -117,7 +119,7 @@ export default defineBot({
 ```
 
 Run with `node src/cli.ts run <bot>`, or many at once with a fleet file (see
-`fleet.example.yaml`). Instance overrides (username, owners, canDig, settings) come from CLI
+`fleets/example.yaml`). Instance overrides (username, owners, canDig, settings) come from CLI
 flags or the fleet file.
 
 ## Fleets and multiple servers

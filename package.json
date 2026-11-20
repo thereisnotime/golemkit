@@ -27,7 +27,9 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "mermaid": "^11.17.2",
     "typescript": "^7.0.2",
-    "vitepress": "^1.6.4"
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17"
   }
 }

@@ -2,7 +2,7 @@
 
 `npcBrain()` (src/brains/npc/) makes a bot live on its own: wander near home, go back at
 night, sleep, eat, deal with mobs, notice players, do chores when it has the skills. It is a
-utility-AI loop you configure with behaviours. `bots/villager.ts` is the worked example. For brains in general see [Writing brains](writing-brains.md).
+utility-AI loop you configure with behaviours. `variants/villager.ts` is the worked example. For brains in general see [Writing brains](writing-brains.md).
 
 ```ts
 import { npcBrain, wander, goHome, sleepAtNight, fleeOrFight, actionBehavior } from '../src/brains/npc/index.ts'

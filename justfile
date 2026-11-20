@@ -13,33 +13,33 @@ setup:
     @test -f .env || (cp .env.example .env && echo "{{YELLOW}}created .env from .env.example{{NORMAL}}")
     @echo "{{GREEN}}✔ ready, run: just run{{NORMAL}}"
 
-# Run a bot from bots/ (extra args go to the CLI, e.g. --username X --owners a,b --dig)
+# Run a profile (profiles/) or a variant (variants/); extra args go to the CLI (--username X --owners a,b --dig -v)
 [group('run')]
-run bot="buddy" *args:
-    @echo "{{BOLD}}{{GREEN}}==> starting {{bot}}{{NORMAL}}"
-    node --env-file-if-exists=.env src/cli.ts run {{bot}} {{args}}
+run name="buddy" *args:
+    @echo "{{BOLD}}{{GREEN}}==> starting {{name}}{{NORMAL}}"
+    node --env-file-if-exists=.env src/cli.ts run {{name}} {{args}}
 
-# Run a bot with auto-restart on file changes
+# Same as run, restarting on file changes
 [group('run')]
-dev bot="buddy" *args:
-    @echo "{{BOLD}}{{GREEN}}==> starting {{bot}} (watch mode){{NORMAL}}"
-    node --watch --env-file-if-exists=.env src/cli.ts run {{bot}} {{args}}
+dev name="buddy" *args:
+    @echo "{{BOLD}}{{GREEN}}==> starting {{name}} (watch mode){{NORMAL}}"
+    node --watch --env-file-if-exists=.env src/cli.ts run {{name}} {{args}}
 
-# Run several bots in one process from a fleet file
+# Run a fleet (fleets/<name>.yaml or a file path) in one process
 [group('run')]
-fleet file="fleet.yaml":
-    @echo "{{BOLD}}{{GREEN}}==> starting fleet {{file}}{{NORMAL}}"
-    node --env-file-if-exists=.env src/cli.ts fleet {{file}}
+fleet name="example" *args:
+    @echo "{{BOLD}}{{GREEN}}==> starting fleet {{name}}{{NORMAL}}"
+    node --env-file-if-exists=.env src/cli.ts fleet {{name}} {{args}}
 
-# List available bots
+# List variants, profiles and fleets
 [group('bots')]
 bots:
     @node src/cli.ts list
 
-# List a bot's actions (= its chat commands and LLM tools)
+# List a profile's or variant's actions (= its chat commands and LLM tools)
 [group('bots')]
-actions bot="buddy":
-    @node src/cli.ts actions {{bot}}
+actions name="buddy":
+    @node src/cli.ts actions {{name}}
 
 # Connect once, report how far login gets, then quit
 [group('debug')]

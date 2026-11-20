@@ -32,8 +32,8 @@ fleet bot entry / CLI flags.
 | path | |
 |---|---|
 | `.env` | local settings (gitignored), from `.env.example` |
-| `bots/` | bot definitions |
-| `fleet.yaml` | your fleet (gitignored); `fleet.example.yaml` is the template |
+| `variants/` | bot definitions |
+| `fleet.yaml` | your fleet (gitignored); `fleets/example.yaml` is the template |
 | `data/channels-<host>-<port>.json` | learned NeoForge channels per server |
 | `data/registries-<host>-<port>.json` | the server's item / entity / block registries (from the sync) |
 | `data/bots/<username>/store.json` | per-bot storage (`agent.storage`) |

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { parseFleetFile, resolveUsername } from '../src/core/fleetFile.ts'
-import { Agent, Fleet, defineBot } from '../src/core/index.ts'
+import { Agent, Fleet, defineVariant } from '../src/core/index.ts'
 
 const base = { host: 'base.example', port: 25565, auth: 'offline' as const, version: '1.21.1' }
 
@@ -48,7 +48,7 @@ test('unknown server is an error', () => {
 })
 
 test('fleet messages stay on their server and respect recipients', () => {
-  const def = defineBot({ name: 't', skills: [], brains: [] })
+  const def = defineVariant({ name: 't', skills: [], brains: [] })
   const fleet = new Fleet()
   const a = new Agent(def, base, { username: 'A', dataDir: 'data/test/A' })
   const b = new Agent(def, base, { username: 'B', dataDir: 'data/test/B' })

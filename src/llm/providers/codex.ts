@@ -28,7 +28,9 @@ export interface CodexProviderOptions {
    * included. Default false.
    */
   useUserConfig?: boolean
-  /** Login profile: directory used as HOME (default .auth/codex), or 'user' for your normal login. */
+  /** Login: directory used as the CLI's HOME (default .auth/codex), or 'user' for your normal login. */
+  login?: string
+  /** @deprecated older name for `login` */
   profile?: string
   /** Extra `-c key=value` overrides. */
   config?: string[]
@@ -54,7 +56,7 @@ export class CodexProvider implements LlmProvider {
 
   constructor (opts: CodexProviderOptions = {}) {
     this.opts = opts
-    this.profile = resolveProfile('codex', opts.profile)
+    this.profile = resolveProfile('codex', opts.login ?? opts.profile)
     this.model = opts.model
   }
 

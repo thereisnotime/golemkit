@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { Agent, Fleet, defineBot, defineAction, z, sleep, PRIORITY } from '../src/core/index.ts'
+import { Agent, Fleet, defineVariant, defineAction, z, sleep, PRIORITY } from '../src/core/index.ts'
 import {
   SceneRuntime, sceneSkill, sceneActions, parseScene, SCENE_BOARD,
   type Performer, type StageWorld, type SceneInput, type ActorEntry, type RunInfo, type LineProvider
@@ -21,7 +21,7 @@ function stage (names: string[], scenes: SceneInput[], extra: { lineProvider?: L
     time: () => undefined
   }
   const parsed = scenes.map(s => parseScene(s))
-  const def = defineBot({ name: 'actor', skills: [sceneSkill()], brains: [] })
+  const def = defineVariant({ name: 'actor', skills: [sceneSkill()], brains: [] })
   const rts = names.map(username => {
     const agent = new Agent(def, base, { username, dataDir: `data/test/scene/${username}` })
     fleet.add(agent, 's1')
@@ -225,7 +225,7 @@ test('cancelActions stops only matching actions and lets suspended ones resume',
     longRunning: true,
     run: ({ signal }) => new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }))
   })
-  const agent = new Agent(defineBot({ name: 't', skills: [{ name: 's', actions: [hold('npc_walk'), hold('scene_hold')] }], brains: [] }), base, { username: 'X', dataDir: 'data/test/scene/X' })
+  const agent = new Agent(defineVariant({ name: 't', skills: [{ name: 's', actions: [hold('npc_walk'), hold('scene_hold')] }], brains: [] }), base, { username: 'X', dataDir: 'data/test/scene/X' })
   // Pretend to be connected; these actions never touch the bot.
   ;(agent as any)._bot = {}
   ;(agent as any).sessionController = new AbortController()

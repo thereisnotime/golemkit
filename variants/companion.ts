@@ -3,17 +3,18 @@
 // so `!stop` always stops it.
 //
 //   MC_LLM_PROVIDER=codex just run companion
-//   MC_LLM_PROVIDER=claude-subscription just run companion --username Pip
+//   just run pax                      (profiles/pax.yaml: this variant + Sonnet + subscription token)
 //
 // Providers: claude-subscription (default) | codex | anthropic | opencode | openai.
-// See docs/guide/llm-brain.md.
-import { defineBot } from '../src/core/index.ts'
-import { standardSkills } from '../src/skills/index.ts'
+// A profile's `llm:` block (provider, model, login, listen, budget...) overrides these
+// defaults. See docs/guide/llm-brain.md and docs/guide/profiles.md.
+import { defineVariant } from '../src/core/index.ts'
+import { standardSkills, extendedSkills, navigation } from '../src/skills/index.ts'
 import { commandBrain, reflexes, llmBrain } from '../src/brains/index.ts'
 
 const num = (v: string | undefined, d: number) => (v && !Number.isNaN(Number(v)) ? Number(v) : d)
 
-export default defineBot({
+export default defineVariant({
   name: 'companion',
   description: 'LLM companion: chats naturally and acts on requests',
   username: 'Pip',
@@ -21,13 +22,14 @@ export default defineBot({
     'Pip, a cheerful and slightly cheeky adventuring companion. Speaks casually and briefly, likes ' +
     'exploring and helping friends, gets nervous at night, never boasts. Helps with what players ask, ' +
     'follows or guards people when asked, and admits it when something is beyond its abilities.',
-  skills: standardSkills(),
+  skills: [...standardSkills(), navigation(), ...extendedSkills()],
   brains: [
     commandBrain({ verbose: false, whisperNeedsPrefix: true }),
     reflexes(),
     llmBrain({
       provider: process.env.MC_LLM_PROVIDER || 'claude-subscription',
       triggers: {
+        listen: (process.env.MC_LLM_LISTEN as 'mention' | 'conversation' | 'all' | undefined) ?? 'conversation',
         mention: true,
         whisper: true,
         aliases: process.env.MC_LLM_ALIASES?.split(',').map(s => s.trim()).filter(Boolean),

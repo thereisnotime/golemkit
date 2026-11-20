@@ -26,8 +26,20 @@ export interface TriggerOptions extends ChatTriggerOptions {
     death?: boolean
     playerJoined?: boolean
   }
-  /** Ignore chat turns from the same player more often than this. Default 2500 ms. */
+  /** Minimum gap between chat turns for the same player; faster messages are merged into the next turn. Default 2500 ms. */
   playerCooldownMs?: number
+  /**
+   * After a chat turn with a player, their follow-up messages within this window count as
+   * addressed to the bot even without its name ("where are you" after "hi pax"). 0 disables.
+   * Default 90000 ms.
+   */
+  conversationMs?: number
+  /** Start a short turn to report the outcome when a long-running action the LLM started ends. Default true. */
+  reportLongActions?: boolean
+  /** listen 'all': collect overheard lines this long before one turn. Default 4000 ms. */
+  ambientBatchMs?: number
+  /** listen 'all': at least this long between turns for overheard chat. Default 30000 ms. */
+  ambientMinGapMs?: number
 }
 
 export interface LimitOptions extends BudgetOptions {
@@ -46,6 +58,8 @@ export interface LimitOptions extends BudgetOptions {
 export interface RuntimeOptions {
   provider: LlmProvider
   persona?: string
+  /** Stay in character (see SystemPromptInput.immersive). Default false: factual reports. */
+  immersive?: boolean
   rules?: string
   triggers?: TriggerOptions
   limits?: LimitOptions
@@ -123,6 +137,7 @@ export class LlmRuntime {
     return buildSystemPrompt({
       username: this.agent.username,
       persona: this.opts.persona ?? this.agent.definition.persona,
+      immersive: this.opts.immersive,
       rules: this.opts.rules
     })
   }
@@ -173,25 +188,71 @@ export class LlmRuntime {
     this.memory.push({ kind: msg.whisper ? 'whisper' : 'chat', from: msg.from, text: msg.message })
     const t = this.opts.triggers ?? {}
     if ((t.ownersOnly ?? true) && !this.agent.isOwner(msg.from)) return
-    const trigger = chatTrigger(msg, this.agent.username, { commandPrefix: process.env.MC_PREFIX ?? '!', ...t })
-    if (!trigger) return
     const now = Date.now()
     const last = this.lastPlayerTurn.get(msg.from) ?? 0
+    const listen = t.listen ?? (t.allChat ? 'all' : 'conversation')
+    let trigger = chatTrigger(msg, this.agent.username, { commandPrefix: process.env.MC_PREFIX ?? '!', ...t, listen })
+    // Follow-ups in an ongoing conversation don't need the bot's name.
+    const prefix = process.env.MC_PREFIX ?? '!'
+    const conversationMs = listen === 'mention' ? 0 : (t.conversationMs ?? 90_000)
+    const inConversation = last > 0 && now - last < conversationMs && !msg.message.trim().startsWith(prefix)
+    if (inConversation && (!trigger || trigger.kind === 'chat' && trigger.addressed === false)) {
+      trigger = { kind: 'chat', from: msg.from, message: msg.message.trim(), whisper: msg.whisper }
+    }
+    if (!trigger) return
+    if (trigger.kind === 'chat' && trigger.addressed === false) return this.overheard(msg.from, trigger.message)
     const pending = this.queue.find((q): q is Extract<Trigger, { kind: 'chat' }> => q.kind === 'chat' && q.from === msg.from)
     if (pending) {
       // Coalesce: one pending turn per player, with everything they said since.
       pending.message = `${pending.message} / ${msg.message}`.slice(-600)
       return
     }
-    if (now - last < (t.playerCooldownMs ?? 2500)) return
+    const gap = now - last
+    const cooldown = t.playerCooldownMs ?? 2500
     this.lastPlayerTurn.set(msg.from, now)
+    if (gap < cooldown) {
+      // Too fast: start the turn once the cooldown has passed (it merges anything said meanwhile).
+      const delayed = trigger
+      setTimeout(() => this.enqueue(delayed), cooldown - gap).unref()
+      return
+    }
     this.enqueue(trigger)
+  }
+
+  private ambient: string[] = []
+  private ambientTimer: NodeJS.Timeout | null = null
+  private lastAmbientTurn = 0
+
+  /** listen 'all': batch overheard lines and start at most one turn per ambientMinGapMs. */
+  private overheard (from: string, text: string): void {
+    const t = this.opts.triggers ?? {}
+    this.ambient.push(`<${from}> ${text}`)
+    if (this.ambient.length > 20) this.ambient.shift()
+    if (this.ambientTimer) return
+    const wait = Math.max(t.ambientBatchMs ?? 4000, this.lastAmbientTurn + (t.ambientMinGapMs ?? 30_000) - Date.now())
+    this.ambientTimer = setTimeout(() => {
+      this.ambientTimer = null
+      if (!this.ambient.length || this.stopped) return
+      const lines = this.ambient.splice(0).join(' | ')
+      this.lastAmbientTurn = Date.now()
+      this.enqueue({ kind: 'chat', from: from, message: lines.slice(-800), whisper: false, addressed: false })
+    }, wait)
+    this.ambientTimer.unref()
   }
 
   onActionEnd (info: ActionInfo, result: ActionResult): void {
     if (info.caller.kind === 'reflex' && result.ok) return // eating and fending off mobs is routine
-    const who = info.caller.kind === 'brain' && info.caller.name === LLM_CALLER.name ? 'you' : `${info.caller.kind} ${info.caller.name}`
-    this.memory.push({ kind: 'action', text: `${info.name} (by ${who}) ${result.ok ? 'ok' : 'failed'}: ${result.message}`.slice(0, 200) })
+    const mine = info.caller.kind === 'brain' && info.caller.name === LLM_CALLER.name
+    const who = mine ? 'you' : `${info.caller.kind} ${info.caller.name}`
+    const line = `${info.name} (by ${who}) ${result.ok ? 'ok' : 'failed'}: ${result.message}`.slice(0, 200)
+    this.memory.push({ kind: 'action', text: line })
+    // A long-running action we started ran to its end (arrived, got stuck...): report the real
+    // outcome. Not when it was preempted/replaced/stopped (that's someone else's doing).
+    const def = this.agent.actionCatalog().find(a => a.name === info.name)
+    const interrupted = /^(preempted|replaced|stopped|session ended|died|cancelled)/.test(result.message)
+    if (mine && def?.longRunning && !interrupted && (this.opts.triggers?.reportLongActions ?? true)) {
+      this.enqueue({ kind: 'event', event: 'actionDone', detail: line, ...(info.player ? { player: info.player } : {}) })
+    }
   }
 
   /** Something happened in the world. Recorded in memory; starts a turn if that event is enabled. */
@@ -328,7 +389,7 @@ export class LlmRuntime {
     const scope = this.tools.end()
     const calls = scope?.calls ?? []
     const usage = this.account({ result, ok: !error, calls, system, userMessage, durationMs: Date.now() - started })
-    if (result && chat && (this.opts.replyWithFinalText ?? true) && scope && scope.chatCount === 0 && result.text) {
+    if (result && chat && chat.addressed !== false && (this.opts.replyWithFinalText ?? true) && scope && scope.chatCount === 0 && result.text) {
       const text = result.text.replace(/\s+/g, ' ').trim().slice(0, 400)
       if (chat.whisper) this.agent.whisper(chat.from, text)
       else this.agent.say(text)

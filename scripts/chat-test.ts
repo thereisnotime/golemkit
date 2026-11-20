@@ -1,10 +1,10 @@
 // Joins as a second player and sends chat commands to a running bot, printing replies.
 //   node scripts/chat-test.ts "!help,!pos,!hp"
 //   CHAT_DELAY_MS=25000 node scripts/chat-test.ts "Pip come here,!stop"   (slow replies, e.g. LLM bots)
-import { Agent, defineBot, serverFromEnv } from '../src/core/index.ts'
+import { Agent, defineVariant, serverFromEnv } from '../src/core/index.ts'
 
 const cmds = (process.argv[2] || '!help,!pos,!hp,!come,!follow,!inventory,!stop').split(',')
-const tester = new Agent(defineBot({ name: 'tester', skills: [], brains: [] }), serverFromEnv(), {
+const tester = new Agent(defineVariant({ name: 'tester', skills: [], brains: [] }), serverFromEnv(), {
   username: process.env.TESTER || 'BuddyTester',
   dataDir: 'data/tester'
 })

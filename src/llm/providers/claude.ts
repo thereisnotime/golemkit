@@ -35,7 +35,9 @@ export interface ClaudeSubscriptionOptions {
   allowApiKey?: boolean
   /** claude binary for mode 'cli' and the login check. Default `claude` on PATH. */
   bin?: string
-  /** Login profile: directory used as HOME (default .auth/claude), or 'user' for your normal login. */
+  /** Login: directory used as the CLI's HOME (default .auth/claude), or 'user' for your normal login. */
+  login?: string
+  /** @deprecated older name for `login` */
   profile?: string
   /**
    * Long-lived subscription token (from `claude setup-token`) to authenticate with, passed to
@@ -60,7 +62,7 @@ export class ClaudeSubscriptionProvider implements LlmProvider {
 
   constructor (opts: ClaudeSubscriptionOptions = {}) {
     this.opts = opts
-    this.profile = resolveProfile('claude', opts.profile)
+    this.profile = resolveProfile('claude', opts.login ?? opts.profile)
     this.model = opts.model
     this.needsMcp = opts.mode === 'cli' || opts.transport === 'http'
   }

@@ -1,4 +1,4 @@
-import { defineSkill, defineAction, z, noParams, ok, fail, goals, goto, holdGoal, playerEntity, fmtPos } from '../core/index.ts'
+import { defineSkill, defineAction, z, noParams, ok, fail, goals, goto, travel, holdGoal, playerEntity, fmtPos } from '../core/index.ts'
 
 const come = defineAction({
   name: 'come',
@@ -33,16 +33,24 @@ const follow = defineAction({
 
 const gotoAction = defineAction({
   name: 'goto',
-  description: 'Walk to block coordinates. Omit y to go to the surface at x/z.',
+  description: 'Walk to block coordinates, any distance (long trips go in legs and can take minutes; ' +
+    'it keeps going in the background until it arrives, gets stuck or is stopped). Omit y to go to the surface at x/z.',
   params: z.object({
     x: z.number(),
     y: z.number().optional(),
     z: z.number()
   }),
-  async run ({ bot, signal }, p) {
-    const goal = p.y === undefined ? new goals.GoalXZ(p.x, p.z) : new goals.GoalBlock(p.x, p.y, p.z)
-    await goto(bot, goal, signal)
-    return ok(`arrived at ${fmtPos(bot.entity.position)}`)
+  longRunning: true,
+  async run ({ bot, signal, log }, p) {
+    const start = bot.entity.position.clone()
+    const total = Math.round(Math.hypot(p.x - start.x, p.z - start.z))
+    try {
+      await travel(bot, p, signal, { onProgress: ({ remaining, at }) => log.debug('travel progress', { remaining, at, total }) })
+    } catch (e) {
+      if (signal.aborted) throw e
+      return fail(`${(e as Error).message} (target ${p.x} ${p.y ?? '~'} ${p.z})`)
+    }
+    return ok(`arrived at ${fmtPos(bot.entity.position)} (${total} blocks)`)
   }
 })
 

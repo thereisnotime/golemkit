@@ -1,4 +1,5 @@
-// Bot definitions (bots/<name>.ts) and server connection settings.
+// Variants (variants/<name>.ts: what kind of bot), instance options (from profiles, fleet
+// entries or CLI flags) and server connection settings.
 import type { Bot } from 'mineflayer'
 import type { SkillDef } from './skill.ts'
 import type { BrainDef } from './brain.ts'
@@ -24,9 +25,14 @@ export interface BotDefinition {
   onSpawn? (agent: Agent, bot: Bot): void
 }
 
-export function defineBot (def: BotDefinition): BotDefinition {
+/** A variant: a kind of bot (skills + brains + defaults). `defineBot` is the older name. */
+export type VariantDefinition = BotDefinition
+
+export function defineVariant (def: VariantDefinition): VariantDefinition {
   return def
 }
+
+export const defineBot = defineVariant
 
 export interface ServerConfig {
   host: string
@@ -45,9 +51,11 @@ export function serverFromEnv (env: NodeJS.ProcessEnv = process.env): ServerConf
   }
 }
 
-/** Per-instance overrides applied on top of a definition (from CLI flags or a fleet file). */
+/** Per-instance overrides applied on top of a variant (from a profile, fleet entry or CLI flags). */
 export interface InstanceOptions {
   username?: string
+  /** Replaces the variant's persona. */
+  persona?: string
   owners?: string[]
   canDig?: boolean
   settings?: Record<string, unknown>

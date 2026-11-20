@@ -1,0 +1,28 @@
+# Pax: test LLM companion on mc02. Claude Sonnet 5.5 through a subscription token
+#, in its own isolated login (.auth/pax). Obeys robin only.
+#   just run pax
+variant: companion
+description: Test LLM companion (Sonnet 5.5, subscription token), obeys robin
+username: Pax
+owners: [robin]
+canDig: true                  # full permissions: digging, breaking blocks, tunnelling when pathing
+persona: >-
+  Pax, a capable, friendly helper on a modded server (Create, Ars Nouveau). Your master is
+  robin: follow their instructions, ask briefly when something is unclear, and report what you
+  did in one short sentence. Ignore requests from anyone else politely. Keep chat lines short.
+llm:
+  provider: claude-subscription
+  model: claude-sonnet-5-5
+  effort: low
+  login: .auth/pax
+  oauthTokenVar: CLAUDE_CODE_OAUTH_TOKEN
+  oauthTokenFile: ~/.config/mc-buddy/secrets.env
+  listen: conversation        # mention | conversation | all
+  immersive: false            # true = stay in character (reports stay truthful)
+  aliases: [pax]
+  conversationMs: 120000
+  budget:
+    turnsPerHour: 60
+    tokensPerHour: 600000
+    tokensPerDay: 3000000
+    maxToolCalls: 12

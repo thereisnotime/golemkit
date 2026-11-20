@@ -111,7 +111,7 @@ Pure logic goes in `test/*.test.ts` (`node --test`). To exercise an action again
 server, drive an agent from a script; see `scripts/probe.ts`:
 
 ```ts
-const agent = new Agent(defineBot({ name: 't', skills: [lighting()], brains: [] }), serverFromEnv(), { username: 'TorchTest' })
+const agent = new Agent(defineVariant({ name: 't', skills: [lighting()], brains: [] }), serverFromEnv(), { username: 'TorchTest' })
 agent.once('session', async () => {
   console.log(await agent.act('bring_torch', { player: 'robin' }))
   await agent.stop()

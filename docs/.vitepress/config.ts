@@ -1,7 +1,8 @@
 import { defineConfig } from 'vitepress'
+import { withMermaid } from 'vitepress-plugin-mermaid'
 
 // Local docs site: `just docs` (dev server) or `just docs-build` (static HTML in docs/.vitepress/dist).
-export default defineConfig({
+export default withMermaid(defineConfig({
   title: 'mc-buddy',
   description: 'Minecraft bot framework for NeoForge servers',
   cleanUrls: true,
@@ -19,7 +20,8 @@ export default defineConfig({
         items: [
           { text: 'Getting started', link: '/guide/getting-started' },
           { text: 'Running bots and fleets', link: '/guide/running' },
-          { text: 'Writing a bot', link: '/guide/writing-a-bot' },
+          { text: 'Profiles', link: '/guide/profiles' },
+          { text: 'Writing a variant', link: '/guide/writing-a-bot' },
           { text: 'Writing skills', link: '/guide/writing-skills' },
           { text: 'Writing brains', link: '/guide/writing-brains' },
           { text: 'NPC brain', link: '/guide/npc-brain' },
@@ -33,6 +35,7 @@ export default defineConfig({
         text: 'Concepts',
         items: [
           { text: 'Architecture', link: '/concepts/architecture' },
+          { text: 'Variants, profiles, fleets', link: '/concepts/variants-profiles' },
           { text: 'NeoForge support', link: '/concepts/neoforge' }
         ]
       },
@@ -48,5 +51,17 @@ export default defineConfig({
     ],
     search: { provider: 'local' },
     outline: [2, 3]
+  },
+  mermaid: {
+    theme: 'base',
+    themeVariables: {
+      fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+      primaryColor: '#e0f2fe',
+      primaryBorderColor: '#0284c7',
+      primaryTextColor: '#0c4a6e',
+      lineColor: '#64748b',
+      secondaryColor: '#fef3c7',
+      tertiaryColor: '#ede9fe'
+    }
   }
-})
+}))

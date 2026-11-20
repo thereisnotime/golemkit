@@ -1,5 +1,5 @@
 # Three actors on mc02 that can perform scenes together (scenes/*.yaml).
-#   node src/cli.ts fleet fleet.scene.example.yaml
+#   node src/cli.ts fleet fleets/scenes.example.yaml
 # In game: !scene_list, !scene_start broken_cart, !scene_status, !scene_stop
 servers:
   mc02:

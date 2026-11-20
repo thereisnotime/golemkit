@@ -1,4 +1,4 @@
-# node src/cli.ts fleet fleet.example.yaml   (or: just fleet fleet.example.yaml)
+# node src/cli.ts fleet fleets/example.yaml   (or: just fleet fleets/example.yaml)
 #
 # One process, any number of servers. Bots on the same server can coordinate through
 # agent.fleet (message bus + shared blackboard); servers are kept separate.

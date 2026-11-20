@@ -13,7 +13,7 @@ Two bundles live in `src/skills/index.ts`:
 
 ```ts
 import { standardSkills, extendedSkills } from '../src/skills/index.ts'
-export default defineBot({ name: 'farmer', skills: [...standardSkills(), ...extendedSkills()], brains: [...] })
+export default defineVariant({ name: 'farmer', skills: [...standardSkills(), ...extendedSkills()], brains: [...] })
 ```
 
 Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actions marked

@@ -8,7 +8,7 @@ Scenes are data. You write them in YAML (or TS) and the engine does the casting,
 chat pacing and syncing between bots.
 
 ```bash
-node src/cli.ts fleet fleet.scene.example.yaml   # three actors on mc02
+node src/cli.ts fleet fleets/scenes.example.yaml   # three actors on mc02
 ```
 
 In game:
@@ -23,7 +23,7 @@ In game:
 ## Concepts
 
 - **Actor**: a bot with `sceneBrain()`. Actors on the same server register on the fleet
-  blackboard and can be cast into scenes. `bots/actor.ts` is a ready-made one.
+  blackboard and can be cast into scenes. `variants/actor.ts` is a ready-made one.
 - **Scene**: roles, a place to stage it (anchor + marks), a timeline of beats, and optional
   player interactions and a schedule.
 - **Role**: a named part (`hauler`, `foreman`). Casting gives each role a free actor.
@@ -94,7 +94,7 @@ export const hello = scene('hello', 'Two bots say hello and wave.')
   )
   .build()
 
-// bots/actor.ts: sceneBrain({ scenes: [hello] })
+// variants/actor.ts: sceneBrain({ scenes: [hello] })
 ```
 
 `build()` and `defineScene({...})` validate the same way YAML loading does.

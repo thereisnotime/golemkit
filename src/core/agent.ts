@@ -21,6 +21,7 @@ import { solidifyUnknownBlocks } from './modded.ts'
 import { RegistryCache, applyModdedRegistries, type RegistrySnapshot } from './neoforge/registries.ts'
 import { fmtPos, itemName } from './helpers.ts'
 import type { Fleet } from './fleet.ts'
+import { resolveHumanize, typingDelayMs, styleLine, holdStill, between, type HumanizeOptions } from './humanize.ts'
 import type { UsageSnapshot } from '../llm/usage.ts'
 
 export interface ChatMessage {
@@ -34,6 +35,8 @@ export interface ActionInfo {
   params: unknown
   caller: Caller
   priority: number
+  /** Player the action is for, if any. */
+  player?: string
 }
 
 export type AgentEvents = {
@@ -106,13 +109,16 @@ export class Agent extends TypedEmitter<AgentEvents> {
   private sessionController: AbortController | null = null
   private current: Running | null = null
   private suspended: Running[] = []
-  private chatQueue: { to?: string, msg: string }[] = []
+  private chatQueue: { to?: string, msg: string, face?: string }[] = []
   private lastChat = 0
+  private chatSending = false
+  /** Player-like timing (see humanize.ts); null when off. */
+  readonly humanize: HumanizeOptions | null
   private stopping = false
 
   constructor (definition: BotDefinition, server: ServerConfig, opts: InstanceOptions = {}) {
     super()
-    this.definition = definition
+    this.definition = opts.persona ? { ...definition, persona: opts.persona } : definition
     this.server = server
     this.username = opts.username || definition.username || definition.name
     this.log = createLogger(this.username)
@@ -128,6 +134,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
     const envOwners = listFromEnv(process.env.MC_OWNERS)
     this.owners = (opts.owners ?? (definition.owners?.length ? definition.owners : envOwners)).map(s => s.toLowerCase())
     this.canDig = opts.canDig ?? definition.canDig ?? process.env.MC_CAN_DIG === 'true'
+    this.humanize = resolveHumanize(this.settings)
     this.reconnectDelayMs = opts.reconnectDelayMs ?? Number(process.env.MC_RECONNECT_DELAY_MS || 10000)
     this.channels = new ChannelStore(join('data', `channels-${server.host}-${server.port}.json`))
     this.registryCache = new RegistryCache(join('data', `registries-${server.host}-${server.port}.json`))
@@ -221,6 +228,11 @@ export class Agent extends TypedEmitter<AgentEvents> {
       }
     }
     this.current = run
+    // Humanize: a person takes a moment before doing what they were asked.
+    if (this.humanize && (caller.kind === 'player' || caller.kind === 'brain')) {
+      await new Promise(r => setTimeout(r, between(this.humanize!.actionHesitationMs)))
+      if (this.current !== run) return fail('replaced')
+    }
     const result = await this.execute(run)
     if (this.current === run) {
       this.current = null
@@ -263,7 +275,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
     const session = this.sessionController!
     const onSessionEnd = () => run.controller.abort('session ended')
     session.signal.addEventListener('abort', onSessionEnd, { once: true })
-    const info: ActionInfo = { name: run.def.name, params: run.params, caller: run.caller, priority: run.priority }
+    const info: ActionInfo = { name: run.def.name, params: run.params, caller: run.caller, priority: run.priority, ...(run.player ? { player: run.player } : {}) }
     const ctx: ActionContext = {
       agent: this,
       bot,
@@ -315,21 +327,37 @@ export class Agent extends TypedEmitter<AgentEvents> {
   /** Replies the way a message came in (whisper → whisper, chat → chat). */
   reply (to: ChatMessage | string, msg: string): void {
     if (typeof to === 'string') return this.say(msg)
-    if (to.whisper) this.whisper(to.from, msg)
-    else this.say(msg)
+    this.enqueueChat({ ...(to.whisper ? { to: to.from } : {}), msg, face: to.from })
   }
 
-  private enqueueChat (item: { to?: string, msg: string }): void {
+  private enqueueChat (item: { to?: string, msg: string, face?: string }): void {
     for (const line of splitChat(item.msg)) {
       if (this.chatQueue.length >= CHAT_QUEUE_MAX) { this.logs.chat.warn('chat queue full, dropping message', { dropped: line }); return }
-      this.chatQueue.push({ to: item.to, msg: line })
+      this.chatQueue.push({ to: item.to, msg: line, face: item.face ?? item.to })
     }
   }
 
   private pumpChat (): void {
     const bot = this._bot
-    if (!bot || !this.chatQueue.length || Date.now() - this.lastChat < CHAT_INTERVAL_MS) return
-    const { to, msg } = this.chatQueue.shift()!
+    if (!bot || this.chatSending || !this.chatQueue.length || Date.now() - this.lastChat < CHAT_INTERVAL_MS) return
+    const item = this.chatQueue.shift()!
+    if (!this.humanize) return this.sendChat(bot, item.to, item.msg)
+    // Humanize: react, maybe turn to the person and stand still, "type", then send.
+    const h = this.humanize
+    this.chatSending = true
+    const styled = styleLine(item.msg, h)
+    const delay = typingDelayMs(styled.text, h, { reaction: Date.now() - this.lastChat > 4000 })
+    const target = h.lookAtSpeaker && item.face ? bot.players[item.face]?.entity : undefined
+    const face = target ? target.position.offset(0, target.height ?? 1.6, 0) : undefined
+    const wait = h.pauseWhileTyping ? holdStill(bot, delay, face) : new Promise(r => setTimeout(r, delay))
+    void wait.then(() => {
+      if (this._bot !== bot) return
+      this.sendChat(bot, item.to, styled.text)
+      if (styled.correction) this.chatQueue.unshift({ to: item.to, msg: styled.correction })
+    }).finally(() => { this.chatSending = false })
+  }
+
+  private sendChat (bot: Bot, to: string | undefined, msg: string): void {
     this.lastChat = Date.now()
     try {
       if (to) bot.whisper(to, msg)
@@ -506,6 +534,15 @@ export class Agent extends TypedEmitter<AgentEvents> {
 
         const chatTimer = setInterval(() => this.pumpChat(), 100)
         cleanups.push(() => clearInterval(chatTimer))
+        if (this.humanize?.idleFidget) {
+          const fidget = setInterval(() => {
+            if (this.current || this.chatSending || bot.pathfinder?.isMoving?.() || Math.random() > 0.35) return
+            const near = bot.nearestEntity(e => e.type === 'player' && e.position.distanceTo(bot.entity.position) < 10)
+            if (near && Math.random() < 0.6) void bot.lookAt(near.position.offset(0, near.height ?? 1.6, 0)).catch(() => {})
+            else void bot.look(bot.entity.yaw + (Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 0.6).catch(() => {})
+          }, 6000)
+          cleanups.push(() => clearInterval(fidget))
+        }
 
         for (const skill of this.skills) {
           try {

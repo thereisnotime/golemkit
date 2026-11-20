@@ -18,6 +18,8 @@ import type { BotToolsOptions } from '../llm/tools.ts'
 export interface LlmBrainOptions {
   /** A provider instance, or a name: claude-subscription | codex | anthropic | opencode | openai. Default MC_LLM_PROVIDER or claude-subscription. */
   provider?: LlmProvider | string
+  /** Stay in character and don't break the fourth wall (reports stay truthful). Default false. Profile: llm.immersive. */
+  immersive?: boolean
   /** Options for a provider given by name (model, effort, ...). */
   providerOptions?: Record<string, unknown>
   model?: string
@@ -79,21 +81,37 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
   // Brains can be shared by several agents (fleet `count`), so state is per agent.
   const runtimes = new Map<Agent, LlmRuntime>()
 
-  const makeProvider = (): LlmProvider => {
-    const p = opts.provider ?? process.env.MC_LLM_PROVIDER ?? 'claude-subscription'
+  /**
+   * A profile (or fleet entry) can tune the brain through `settings.llm`:
+   *   provider, model, effort, login, oauthTokenVar, oauthTokenFile   -> provider
+   *   listen, aliases, conversationMs, ownersOnly, tickMs              -> triggers
+   *   budget: { turnsPerHour, tokensPerHour, ... }                     -> limits
+   * Profile values win over the variant's code defaults.
+   */
+  const fromSettings = (agent: Agent) => (agent.settings.llm ?? {}) as Record<string, any>
+
+  const makeProvider = (agent: Agent): LlmProvider => {
+    const s = fromSettings(agent)
+    const p = s.provider ?? opts.provider ?? process.env.MC_LLM_PROVIDER ?? 'claude-subscription'
     if (typeof p !== 'string') return p
-    return createProvider(p, { ...(opts.model ? { model: opts.model } : {}), ...opts.providerOptions })
+    const providerKeys = ['model', 'effort', 'login', 'profile', 'oauthTokenVar', 'oauthTokenFile', 'mode', 'transport', 'baseUrl', 'reasoningEffort']
+    const fromProfile = Object.fromEntries(providerKeys.filter(k => s[k] !== undefined).map(k => [k, s[k]]))
+    return createProvider(p, { ...(opts.model ? { model: opts.model } : {}), ...opts.providerOptions, ...fromProfile })
   }
 
   return defineBrain({
     name: 'llm',
     async start (agent) {
+      const s = fromSettings(agent)
+      const triggerKeys = ['listen', 'aliases', 'conversationMs', 'ownersOnly', 'tickMs', 'mention', 'whisper', 'ambientBatchMs', 'ambientMinGapMs', 'playerCooldownMs']
+      const triggersFromProfile = Object.fromEntries(triggerKeys.filter(k => s[k] !== undefined).map(k => [k, s[k]]))
       const rt = new LlmRuntime(agent, {
-        provider: makeProvider(),
+        provider: makeProvider(agent),
         persona: opts.persona,
+        immersive: s.immersive ?? opts.immersive ?? false,
         rules: opts.rules,
-        triggers: { ...opts.triggers, ...(opts.tickMs !== undefined ? { tickMs: opts.tickMs } : {}) },
-        limits: opts.budget,
+        triggers: { ...opts.triggers, ...(opts.tickMs !== undefined ? { tickMs: opts.tickMs } : {}), ...triggersFromProfile },
+        limits: { ...opts.budget, ...(s.budget ?? {}) },
         memory: opts.memory,
         tools: opts.tools,
         mcp: opts.mcp,

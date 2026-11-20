@@ -6,7 +6,7 @@ Framework for Minecraft bots on NeoForge servers, built on Mineflayer. TypeScrip
 
 - `src/core/` agent lifecycle, action lock and priorities, chat queue, storage, CLI helpers. `src/core/index.ts` is the public API; skills, brains and bots import from there.
 - `src/core/neoforge/` the NeoForge layer (wire formats from neoforged/NeoForge branch `1.21.1`, `network/payload/`).
-- `src/skills/` actions grouped by topic. `src/brains/` decision loops. `bots/` bot definitions. `scripts/` live-server tools.
+- `src/skills/` actions grouped by topic. `src/brains/` decision loops. `variants/` bot definitions. `scripts/` live-server tools.
 
 ## Rules
 

@@ -1,17 +1,19 @@
-# Writing a bot
+# Writing a variant
 
-A bot is a file in `bots/` that default-exports `defineBot(...)`: which skills it has (what it
-can do) and which brains it runs (who decides).
+A variant is a kind of bot: a file in `variants/` that default-exports `defineVariant(...)`,
+saying which skills it has (what it can do) and which brains it runs (who decides). To run the
+same variant with a different name, owner, model or server, write a
+[profile](./profiles) instead; no code needed.
 
 ## The smallest useful bot
 
 ```ts
-// bots/guard.ts
-import { defineBot } from '../src/core/index.ts'
+// variants/guard.ts
+import { defineVariant } from '../src/core/index.ts'
 import { standardSkills } from '../src/skills/index.ts'
 import { commandBrain, reflexes } from '../src/brains/index.ts'
 
-export default defineBot({
+export default defineVariant({
   name: 'guard',
   description: 'Follows its owner and kills hostile mobs',
   username: 'Guardian',

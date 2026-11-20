@@ -2,12 +2,12 @@
 //   node scripts/skill-test.ts observe 'chop_tree {"radius":24}' 'craft {"item":"stick","count":4}'
 // "observe" prints the world snapshot, "scan" counts nearby logs/crops/containers,
 // 'place_near {"item":"chest"}' places a block on a free spot next to the bot. Digging is off unless MC_CAN_DIG=true.
-import { Agent, defineBot, serverFromEnv } from '../src/core/index.ts'
+import { Agent, defineVariant, serverFromEnv } from '../src/core/index.ts'
 import { standardSkills, extendedSkills } from '../src/skills/index.ts'
 import { findFreeSpot } from '../src/skills/world.ts'
 
 const steps = process.argv.slice(2)
-const agent = new Agent(defineBot({ name: 'skill-test', skills: [...standardSkills(), ...extendedSkills()], brains: [] }), serverFromEnv(), {
+const agent = new Agent(defineVariant({ name: 'skill-test', skills: [...standardSkills(), ...extendedSkills()], brains: [] }), serverFromEnv(), {
   username: process.env.MC_USERNAME || 'SkillTest',
   dataDir: 'data/skill-test'
 })

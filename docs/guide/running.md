@@ -7,7 +7,7 @@ just run <bot> [flags]
 just run buddy --username Helper --owners robin,friend --dig
 ```
 
-`<bot>` is a file in `bots/` (`bots/buddy.ts` or `bots/buddy/index.ts`) or a path to one.
+`<bot>` is a file in `variants/` (`variants/buddy.ts` or `variants/buddy/index.ts`) or a path to one.
 Flags override the bot definition for this instance:
 
 | flag | meaning |
@@ -21,7 +21,7 @@ Flags override the bot definition for this instance:
 
 ## A fleet
 
-A fleet file runs many bots in one process. Copy `fleet.example.yaml` to `fleet.yaml` (it's
+A fleet file runs many bots in one process. Copy `fleets/example.yaml` to `fleet.yaml` (it's
 gitignored) and run `just fleet`.
 
 ```yaml
