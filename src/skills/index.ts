@@ -14,3 +14,4 @@ import { gather } from './gather.ts'
 
 /** The standard skill set most bots want. */
 export const standardSkills = () => [status(), movement(), combat(), survival(), inventorySkill(), gather()]
+export { navigation, getHome, setHome, getPlaces, setPlace, type Place } from './navigation.ts'

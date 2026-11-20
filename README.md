@@ -59,6 +59,8 @@ Details in [docs/concepts/architecture.md](docs/concepts/architecture.md).
 The full docs live in [docs/](docs/) (guides, concepts, generated action reference). Browse
 them as a local site with `just docs` (dev server) or `just docs-build` (static HTML).
 
+Self-sufficient NPCs (utility-AI brain, behaviours, `bots/villager.ts`): [docs/guide/npc-brain.md](docs/guide/npc-brain.md).
+
 ## buddy's commands
 
 Say them in chat with `!`, or whisper without it. `!help <command>` explains one.

@@ -96,3 +96,8 @@ export const greeter = (greeting = 'welcome, {player}!') => defineBrain({
 
 Bots in the same fleet on the same server can message each other and share a blackboard. See
 [Fleets and multiple servers](../concepts/architecture#fleets-and-multiple-servers).
+
+## NPCs
+
+For bots that should live on their own, use `npcBrain()` with scored behaviours instead of
+writing the loop yourself. See [NPC brain](npc-brain.md).

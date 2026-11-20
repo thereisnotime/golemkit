@@ -93,6 +93,8 @@ Several brains run at once and negotiate through priorities. Shipped:
 - `commandBrain()` maps chat to actions: every action is a command; positional args in schema
   order, `key=value` works, last string param takes the rest of the line.
 - `reflexes()` handles self-defence and auto-eat at reflex priority.
+- `npcBrain()` keeps NPCs busy on their own: scored behaviours at npc priority, backs off for
+  players, LLMs and reflexes. See [NPC brain](../guide/npc-brain.md).
 
 ## Bots
 

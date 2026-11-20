@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-6 skills, 20 actions.
+7 skills, 28 actions.
 
 ## combat
 
@@ -139,6 +139,88 @@ Jump once.
 *non-exclusive*
 
 No parameters.
+
+## navigation
+
+Home, wandering and named places.
+
+### `wander`
+
+Take a short walk to a random spot within a radius of home (or of a given center, or of where the bot stands).
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `radius` | number (1..64) |  | `12` | how far from the center to wander, in blocks |
+| `x` | number |  |  | center x; default home, else current position |
+| `z` | number |  |  | center z |
+
+### `set_home`
+
+Remember a home position (default: where the bot stands now).
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `x` | number |  |  |  |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
+
+### `go_home`
+
+Walk back to the remembered home position.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `range` | number (0..16) |  | `2` | how close to get, in blocks |
+
+### `remember_place`
+
+Remember a named place (default: where the bot stands now), to walk back to later with goto_place.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `name` | string | yes |  |  |
+| `x` | number |  |  |  |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
+
+### `forget_place`
+
+Forget a named place.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `name` | string | yes |  |  |
+
+### `places`
+
+List home and remembered places.
+
+*non-exclusive*
+
+No parameters.
+
+### `goto_place`
+
+Walk to a place remembered with remember_place.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `name` | string | yes |  |  |
+| `range` | number (0..16) |  | `2` |  |
+
+### `flee`
+
+Run away from the nearest hostile mob until it is a safe distance away.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `distance` | number (4..32) |  | `16` | how far to get from the mob |
 
 ## status
 
