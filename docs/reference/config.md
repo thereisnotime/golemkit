@@ -15,8 +15,16 @@ fleet bot entry / CLI flags.
 | `MC_PREFIX` | `!` | chat command prefix |
 | `MC_CAN_DIG` | `false` | let bots break blocks |
 | `MC_RECONNECT_DELAY_MS` | `10000` | wait before reconnecting |
-| `MC_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
-| `NO_COLOR` | | disable coloured log prefixes |
+| `MC_LOG_LEVEL` | `info` | level spec, e.g. `info,McBuddy=debug,*/neoforge=trace` ([logging](../guide/logging)) |
+| `MC_LOG_FORMAT` | `pretty` | `pretty`, `plain`, `json` |
+| `MC_LOG_COLOR` | `auto` | `auto`, `always`, `never` (`NO_COLOR` also works) |
+| `MC_LOG_TIME` | `time` | `time`, `iso`, `none` |
+| `MC_LOG_FILE` | | combined log file |
+| `MC_LOG_DIR` | | directory for per-bot log files |
+| `MC_LOG_FILE_FORMAT` | `plain` | `plain` or `json` inside files |
+| `MC_LOG_MAX_SIZE_MB` | `20` | rotate files at this size (0 = never) |
+| `MC_LOG_MAX_FILES` | `5` | rotated files to keep |
+| `MC_LOG_BUFFER` | `1000` | entries kept in memory (`recentLogs()`) |
 
 ## Files and directories
 
@@ -29,3 +37,4 @@ fleet bot entry / CLI flags.
 | `data/bots/<username>/store.json` | per-bot storage (`agent.storage`) |
 | `data/bots/<server>/<username>/` | same, when a username runs on several servers |
 | `.auth/` | Microsoft auth token cache |
+| `logs/` | log files when `MC_LOG_DIR=logs` (gitignored) |

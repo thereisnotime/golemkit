@@ -27,6 +27,14 @@ node src/cli.ts run <bot> [--username X] [--owners a,b] [--dig] [--host H] [--po
 node src/cli.ts fleet <file.yaml>
 node src/cli.ts list
 node src/cli.ts actions <bot>
+
+logging flags (any command):
+  -l, --log-level SPEC     e.g. 'info,McBuddy=debug'
+  -v, --verbose            debug
+  -q, --quiet              warn
+  --log-format pretty|plain|json
+  --log-file FILE
+  --log-dir DIR
 ```
 
 `<bot>` is a name in `bots/` or a path to a definition file. `.env` is loaded by the just

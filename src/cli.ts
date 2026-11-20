@@ -7,7 +7,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
-import { Agent, Fleet, serverFromEnv, createLogger, type BotDefinition, type InstanceOptions, type ServerConfig } from './core/index.ts'
+import { Agent, Fleet, serverFromEnv, createLogger, configureLogging, installCrashHandlers, type BotDefinition, type InstanceOptions, type ServerConfig } from './core/index.ts'
 import { parseFleetFile, resolveUsername } from './core/fleetFile.ts'
 
 const BOTS_DIR = resolve(import.meta.dirname, '..', 'bots')
@@ -52,9 +52,23 @@ async function main (): Promise<void> {
       owners: { type: 'string' },
       dig: { type: 'boolean' },
       host: { type: 'string' },
-      port: { type: 'string' }
+      port: { type: 'string' },
+      'log-level': { type: 'string', short: 'l' },
+      'log-format': { type: 'string' },
+      'log-file': { type: 'string' },
+      'log-dir': { type: 'string' },
+      verbose: { type: 'boolean', short: 'v' },
+      quiet: { type: 'boolean', short: 'q' }
     }
   })
+  installCrashHandlers(log)
+  const cliLogging = {
+    level: values['log-level'] ?? (values.verbose ? 'debug' : values.quiet ? 'warn' : undefined),
+    format: values['log-format'] as 'pretty' | 'plain' | 'json' | undefined,
+    file: values['log-file'],
+    dir: values['log-dir']
+  }
+  configureLogging(cliLogging)
   const [cmd, arg] = positionals
   const server: ServerConfig = {
     ...serverFromEnv(),
@@ -79,6 +93,9 @@ async function main (): Promise<void> {
     case 'fleet': {
       if (!arg) throw new Error('usage: fleet <fleet.yaml>')
       const plan = parseFleetFile(readFileSync(arg, 'utf8'), server)
+      // Fleet file logging first, then CLI flags on top.
+      if (plan.logging) configureLogging({ ...plan.logging, file: plan.logging.file ?? undefined, dir: plan.logging.dir ?? undefined })
+      configureLogging(cliLogging)
       const fleet = new Fleet()
       for (const p of plan.agents) {
         const def = await loadBot(p.bot)
@@ -109,7 +126,14 @@ async function main (): Promise<void> {
       break
     }
     default:
-      console.log('usage: cli.ts run <bot> [--username X] [--owners a,b] [--dig] | fleet <file> | list | actions <bot>')
+      console.log([
+        'usage: cli.ts <command> [options]',
+        '  run <bot>       [--username X] [--owners a,b] [--dig] [--host H] [--port P]',
+        '  fleet <file>    run a fleet file',
+        '  list            list bot definitions',
+        '  actions <bot>   list a bot\'s actions',
+        'logging: [-l|--log-level SPEC] [--log-format pretty|plain|json] [--log-file F] [--log-dir D] [-v|--verbose] [-q|--quiet]'
+      ].join('\n'))
       process.exitCode = cmd ? 1 : 0
   }
 }

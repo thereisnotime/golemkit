@@ -33,7 +33,21 @@ const BotEntrySchema = z.object({
   count: z.number().int().min(1).default(1).describe('spawn N copies; usernames get a number suffix')
 })
 
+export const LoggingSchema = z.object({
+  level: z.string().optional().describe('level spec, e.g. "info,McBuddy=debug,*/neoforge=trace"'),
+  format: z.enum(['pretty', 'plain', 'json']).optional(),
+  color: z.enum(['auto', 'always', 'never']).optional(),
+  time: z.enum(['time', 'iso', 'none']).optional(),
+  file: z.string().nullable().optional(),
+  dir: z.string().nullable().optional(),
+  fileFormat: z.enum(['plain', 'json']).optional(),
+  maxSizeMb: z.number().optional(),
+  maxFiles: z.number().int().optional(),
+  bufferSize: z.number().int().optional()
+})
+
 export const FleetFileSchema = z.object({
+  logging: LoggingSchema.optional(),
   /** Legacy single-server form. */
   server: ServerSchema.optional(),
   servers: z.record(z.string(), ServerSchema).optional(),
@@ -63,6 +77,7 @@ export interface FleetPlan {
   agents: PlannedAgent[]
   staggerMs: number
   multiServer: boolean
+  logging?: z.infer<typeof LoggingSchema>
 }
 
 /** Final username and data dir once the bot definition's default username is known. */
@@ -110,5 +125,5 @@ export function parseFleetFile (text: string, base: ServerConfig = serverFromEnv
       })
     }
   }
-  return { servers, agents, staggerMs: file.staggerMs, multiServer: multi }
+  return { servers, agents, staggerMs: file.staggerMs, multiServer: multi, logging: file.logging }
 }

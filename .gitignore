@@ -7,3 +7,4 @@ data/
 fleet.yaml
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+logs/

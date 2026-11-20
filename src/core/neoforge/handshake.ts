@@ -63,7 +63,7 @@ export function attachNeoForge (client: Client, store: ChannelStore, log: (msg: 
         const comps = store.components()
         const config = [...BUILTIN_CONFIGURATION, ...comps.filter(c => !BUILTIN_CONFIGURATION.some(b => b.id === c.id))]
         send(CH.QUERY, encodeQuery({ [PROTOCOL.CONFIGURATION]: config, [PROTOCOL.PLAY]: comps }))
-        log(`neoforge: offered ${comps.length} learned + ${BUILTIN_CONFIGURATION.length} builtin channels`)
+        log(`offered ${comps.length} learned + ${BUILTIN_CONFIGURATION.length} builtin channels`)
         break
       }
       case CH.SETUP_FAILED:
@@ -73,7 +73,7 @@ export function attachNeoForge (client: Client, store: ChannelStore, log: (msg: 
         const setup = decodeNetworkSetup(data)
         accepted = setup
         const configChannels = (setup[PROTOCOL.CONFIGURATION] ?? []).map(c => c.id)
-        log(`neoforge: accepted (${Object.values(setup).reduce((n, l) => n + l.length, 0)} channels negotiated)`)
+        log(`accepted (${Object.values(setup).reduce((n, l) => n + l.length, 0)} channels negotiated)`)
         // Tell the server which channels we listen on in the configuration phase.
         const names = [CH.QUERY, CH.NETWORK, CH.SETUP_FAILED, ...configChannels]
         send(CH.MC_REGISTER, Buffer.from(names.join('\0')))

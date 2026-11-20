@@ -7,7 +7,10 @@ export {
 export { defineSkill, type SkillDef } from './skill.ts'
 export { defineBrain, type BrainDef } from './brain.ts'
 export { defineBot, serverFromEnv, type BotDefinition, type ServerConfig, type InstanceOptions } from './definition.ts'
-export { createLogger, setLogLevel, type Logger } from './log.ts'
+export {
+  createLogger, setLogLevel, configureLogging, loggingFromEnv, getLoggingConfig, recentLogs, subscribeLogs, installCrashHandlers, LEVELS,
+  type Logger, type Level, type LogEntry, type LogConfig, type LogFields
+} from './log.ts'
 export { Storage } from './storage.ts'
 export { Fleet, Blackboard, type FleetMessage, type FleetEvents } from './fleet.ts'
 export { goals, Movements, goto, holdGoal, playerEntity, isHostile, nearestHostile, itemName, fmtPos } from './helpers.ts'

@@ -80,6 +80,8 @@ export class Agent extends TypedEmitter<AgentEvents> {
   readonly server: ServerConfig
   readonly username: string
   readonly log: Logger
+  /** Category loggers: "<username>/action", "/chat", "/neoforge", "/server". */
+  private readonly logs: { action: Logger, chat: Logger, neoforge: Logger, server: Logger }
   readonly storage: Storage
   readonly dataDir: string
   readonly settings: Record<string, unknown>
@@ -109,6 +111,12 @@ export class Agent extends TypedEmitter<AgentEvents> {
     this.server = server
     this.username = opts.username || definition.username || definition.name
     this.log = createLogger(this.username)
+    this.logs = {
+      action: this.log.child('action'),
+      chat: this.log.child('chat'),
+      neoforge: this.log.child('neoforge'),
+      server: this.log.child('server')
+    }
     this.dataDir = opts.dataDir || join('data', 'bots', this.username)
     this.storage = new Storage(this.dataDir)
     this.settings = { ...definition.settings, ...opts.settings }
@@ -235,10 +243,11 @@ export class Agent extends TypedEmitter<AgentEvents> {
       signal: run.controller.signal,
       caller: run.caller,
       player: run.player,
-      log: this.log.child(run.def.name)
+      log: this.logs.action.child(run.def.name)
     }
+    const started = Date.now()
     this.emit('actionStart', info)
-    this.log.debug(`action ${run.def.name} ${JSON.stringify(run.params)} by ${run.caller.kind}:${run.caller.name}`)
+    this.logs.action.debug(`start ${run.def.name}`, { params: run.params, caller: `${run.caller.kind}:${run.caller.name}`, priority: run.priority })
     let result: ActionResult
     try {
       result = normalizeResult(await run.def.run(ctx, run.params as any))
@@ -246,12 +255,13 @@ export class Agent extends TypedEmitter<AgentEvents> {
       if (e instanceof ActionAbortedError || run.controller.signal.aborted) {
         result = fail(String(run.controller.signal.reason ?? 'stopped'))
       } else {
-        this.log.warn(`action ${run.def.name} failed: ${(e as Error).stack ?? e}`)
+        this.logs.action.warn(`${run.def.name} threw: ${(e as Error).stack ?? e}`)
         result = fail((e as Error).message)
       }
     } finally {
       session.signal.removeEventListener('abort', onSessionEnd)
     }
+    this.logs.action.debug(`end ${run.def.name}`, { ok: result.ok, ms: Date.now() - started, result: result.message })
     this.emit('actionEnd', info, result)
     return result
   }
@@ -259,7 +269,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
   private resumeSuspended (): void {
     const next = this.suspended.pop()
     if (!next || !this._bot) return
-    this.log.debug(`resuming ${next.def.name}`)
+    this.logs.action.debug(`resuming ${next.def.name}`, { caller: `${next.caller.kind}:${next.caller.name}` })
     void this.act(next.def.name, next.params, { caller: next.caller, priority: next.priority, player: next.player })
   }
 
@@ -284,7 +294,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
 
   private enqueueChat (item: { to?: string, msg: string }): void {
     for (const line of splitChat(item.msg)) {
-      if (this.chatQueue.length >= CHAT_QUEUE_MAX) { this.log.warn('chat queue full, dropping message'); return }
+      if (this.chatQueue.length >= CHAT_QUEUE_MAX) { this.logs.chat.warn('chat queue full, dropping message', { dropped: line }); return }
       this.chatQueue.push({ to: item.to, msg: line })
     }
   }
@@ -297,8 +307,9 @@ export class Agent extends TypedEmitter<AgentEvents> {
     try {
       if (to) bot.whisper(to, msg)
       else bot.chat(msg)
+      this.logs.chat.info(to ? `-> ${to}: ${msg}` : `> ${msg}`)
     } catch (e) {
-      this.log.warn(`chat failed: ${(e as Error).message}`)
+      this.logs.chat.warn(`chat failed: ${(e as Error).message}`)
     }
   }
 
@@ -364,7 +375,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
 
   /** Connects and keeps reconnecting until stop(). Resolves when stopped. */
   async start (): Promise<void> {
-    installTolerantParser((id, e) => this.log.debug(`skipped packet ${id}: ${e.message.slice(0, 120)}`))
+    installTolerantParser((id, e) => this.logs.neoforge.trace(`skipped unparseable packet ${id}`, { error: e.message.slice(0, 160) }))
     for (const brain of this.brains) await brain.start?.(this)
     this.log.info(`starting: ${this.skills.length} skills, ${this.actions.size} actions, brains: ${this.brains.map(b => b.name).join(', ') || 'none'}`)
     let learnRounds = 0
@@ -425,12 +436,12 @@ export class Agent extends TypedEmitter<AgentEvents> {
         resolve({ reason, detail })
       }
 
-      attachNeoForge(bot._client, this.channels, m => this.log.debug(m))
+      attachNeoForge(bot._client, this.channels, m => this.logs.neoforge.debug(m))
       bot._client.on('neoforge_failed' as any, (failures: Record<string, unknown>) => {
         const { changed, unknown } = this.channels.learn(failures)
         this.channels.save()
-        for (const u of unknown.slice(0, 10)) this.log.warn(`unhandled negotiation failure: ${u}`)
-        this.log.info(`server rejected our channel list (${Object.keys(failures).length} issues), ${changed ? `learned, now ${this.channels.size} channels` : 'nothing new learned'}`)
+        for (const u of unknown.slice(0, 10)) this.logs.neoforge.warn(`unhandled negotiation failure: ${u}`)
+        this.logs.neoforge.info(`server rejected our channel list, ${changed ? 'learned from it' : 'nothing new learned'}`, { issues: Object.keys(failures).length, known: this.channels.size })
         finish(changed ? 'learned' : 'ended', changed ? undefined : 'negotiation failed and nothing new to learn')
       })
 
@@ -477,16 +488,23 @@ export class Agent extends TypedEmitter<AgentEvents> {
       })
 
       bot.on('chat', (username, message) => {
-        if (username !== bot.username) this.emit('chat', { from: username, message, whisper: false })
+        if (username === bot.username) return
+        this.logs.chat.info(`<${username}> ${message}`)
+        this.emit('chat', { from: username, message, whisper: false })
       })
       bot.on('whisper', (username, message) => {
-        if (username !== bot.username) this.emit('chat', { from: username, message, whisper: true })
+        if (username === bot.username) return
+        this.logs.chat.info(`<${username} whispers> ${message}`)
+        this.emit('chat', { from: username, message, whisper: true })
       })
       bot.on('messagestr', (msg, position) => {
-        if (position !== 'chat') this.emit('serverMessage', msg)
+        if (position === 'chat') return
+        this.logs.server.debug(msg, { position })
+        this.emit('serverMessage', msg)
       })
       bot.on('death', () => {
-        this.log.info('died')
+        const p = bot.entity?.position
+        this.log.info('died', p ? { at: fmtPos(p) } : undefined)
         this.stopActions('died')
       })
       bot.on('kicked', (reason) => this.log.warn(`kicked: ${typeof reason === 'string' ? reason : JSON.stringify(reason)}`))

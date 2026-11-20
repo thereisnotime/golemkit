@@ -70,8 +70,9 @@ ban them.
 
 ## Logs
 
-Each bot logs with its username as a coloured prefix. `MC_LOG_LEVEL=debug` shows the
-NeoForge handshake, skipped packets and every action call.
+Each bot logs with its username as a coloured prefix. `-v` shows every action call,
+`-l 'info,*/neoforge=trace'` the NeoForge internals. Per-bot files, JSON output and
+everything else: see [Logging](./logging).
 
 ## Stopping
 
