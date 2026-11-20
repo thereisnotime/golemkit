@@ -1,9 +1,20 @@
 # mc-buddy
 
-Mineflayer companion bot for a NeoForge 1.21.1 server. Node (see `.tool-versions`), ESM, no build step.
+Framework for Minecraft bots on NeoForge servers, built on Mineflayer. TypeScript run directly by Node (see `.tool-versions`), no build step. Read `docs/architecture.md` before changing core, skills or brains.
 
-- `src/neoforge/` is the NeoForge layer: `codec.js` (wire formats from neoforged/NeoForge branch `1.21.1`, `network/payload/`), `handshake.js` (configuration-phase replies), `channelStore.js` (learns required channels from setup-failed payloads), `tolerantParser.js` (drops packets with modded data instead of killing the stream).
-- When changing the handshake, check the payload ID and codec in the NeoForge source for that branch; don't guess channel names (`neoforge:extensible_enum_ack`, `neoforge:feature_flags_ack`, not the long forms).
-- `just check` before committing. `just probe` / `just chat-test` hit the real server; only run them when needed and keep them out of `npm test`.
-- Don't add mineflayer plugins that pull an old mineflayer as a dependency (mineflayer-pvp does).
-- Update the OpenSpec specs in `openspec/` when behaviour changes.
+## Layout
+
+- `src/core/` agent lifecycle, action lock and priorities, chat queue, storage, CLI helpers. `src/core/index.ts` is the public API; skills, brains and bots import from there.
+- `src/core/neoforge/` the NeoForge layer (wire formats from neoforged/NeoForge branch `1.21.1`, `network/payload/`).
+- `src/skills/` actions grouped by topic. `src/brains/` decision loops. `bots/` bot definitions. `scripts/` live-server tools.
+
+## Rules
+
+- Node type stripping: only erasable TS syntax. No `enum`, `namespace`, parameter properties or decorators. Relative imports use the `.ts` extension; type-only imports use `import type`.
+- Every capability is an action with a zod schema and a clear `description` (it's shown to players and LLMs). Long actions must honour `ctx.signal`; use `goto`, `holdGoal`, `sleep`, `checkAborted` from core.
+- Brains act through `agent.act()` with a caller and priority, never by driving the pathfinder directly, so the action lock stays authoritative.
+- Chat goes through `agent.say/whisper/reply` (rate limited), never `bot.chat` directly.
+- When changing the handshake, check the payload id and codec in the NeoForge source; don't guess channel names.
+- Don't add mineflayer plugins that depend on an old mineflayer (mineflayer-pvp does).
+- `just check` (tsc + unit tests) before committing. `just probe` / `just chat-test` hit the real server; keep them out of `npm test`.
+- Update `openspec/` when behaviour changes.

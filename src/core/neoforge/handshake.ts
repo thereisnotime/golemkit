@@ -1,6 +1,9 @@
 // NeoForge 21.1 configuration-phase handshake for a node-minecraft-protocol client.
-import { encodeQuery, decodeSetupFailed, decodeNetworkSetup, PROTOCOL, Writer, Reader } from './codec.js'
+import type { Client } from 'minecraft-protocol'
+import { encodeQuery, decodeSetupFailed, decodeNetworkSetup, PROTOCOL, Writer, Reader, type QueryComponent, type NetworkSetup } from './codec.ts'
+import type { ChannelStore } from './channelStore.ts'
 
+// Channel ids must match NeoForge's ResourceLocations exactly (see payload/*.java on branch 1.21.1).
 const CH = {
   QUERY: 'neoforge:register',
   NETWORK: 'neoforge:network',
@@ -18,12 +21,12 @@ const CH = {
   REG: 'neoforge:frozen_registry',
   REG_DONE: 'neoforge:frozen_registry_sync_completed',
   CONFIG_FILE: 'neoforge:config_file'
-}
+} as const
 
 // NeoForge's own configuration-phase payloads (NetworkInitialization, registrar version "1").
 // The server registers them as optional, so if we don't offer them they get dropped, and the
 // CheckExtensibleEnums task then hangs trying to send to a channel we don't have.
-const BUILTIN_CONFIGURATION = [
+const BUILTIN_CONFIGURATION: QueryComponent[] = ([
   { id: CH.CONFIG_FILE, flow: 'CLIENTBOUND' },
   { id: CH.REG_START, flow: 'CLIENTBOUND' },
   { id: CH.REG, flow: 'CLIENTBOUND' },
@@ -34,23 +37,24 @@ const BUILTIN_CONFIGURATION = [
   { id: CH.DATA_MAPS_REPLY, flow: 'SERVERBOUND' },
   { id: CH.ENUM_ACK, flow: 'SERVERBOUND' },
   { id: CH.FLAGS_ACK, flow: 'SERVERBOUND' }
-].map(c => ({ ...c, version: '1', optional: true }))
+] as const).map(c => ({ ...c, version: '1', optional: true }))
 
-/**
- * Attaches the handshake to a client. Emits on the client:
- *  - 'neoforge_failed' (failures)   negotiation rejected, failures decoded
- *  - 'neoforge_ready'  (setup)      negotiation accepted
- *  - 'neoforge_unhandled' (channel, data) payloads we don't answer (for debugging)
- * @param {import('minecraft-protocol').Client} client
- * @param {import('./channelStore.js').ChannelStore} store
- * @param {(msg: string) => void} log
- */
-export function attachNeoForge (client, store, log = () => {}) {
-  let accepted = null
+export interface NeoForgeEvents {
+  /** negotiation rejected; failures decoded per channel */
+  neoforge_failed: (failures: Record<string, unknown>) => void
+  /** negotiation accepted */
+  neoforge_ready: (setup: NetworkSetup) => void
+  /** configuration payloads we don't answer (debugging) */
+  neoforge_unhandled: (channel: string, data: Buffer) => void
+}
 
-  const send = (channel, data) => client.write('custom_payload', { channel, data })
+/** Attaches the handshake to a client. See NeoForgeEvents for what it emits on the client. */
+export function attachNeoForge (client: Client, store: ChannelStore, log: (msg: string) => void = () => {}): { readonly accepted: NetworkSetup | null } {
+  let accepted: NetworkSetup | null = null
 
-  client.on('custom_payload', (packet) => {
+  const send = (channel: string, data: Buffer) => client.write('custom_payload', { channel, data })
+
+  client.on('custom_payload', (packet: { channel: string, data: Buffer }) => {
     if (client.state !== 'configuration') return
     const { channel, data } = packet
 
@@ -68,10 +72,10 @@ export function attachNeoForge (client, store, log = () => {}) {
       case CH.NETWORK: {
         const setup = decodeNetworkSetup(data)
         accepted = setup
+        const configChannels = (setup[PROTOCOL.CONFIGURATION] ?? []).map(c => c.id)
         log(`neoforge: accepted (${Object.values(setup).reduce((n, l) => n + l.length, 0)} channels negotiated)`)
         // Tell the server which channels we listen on in the configuration phase.
-        const names = [CH.QUERY, CH.NETWORK, CH.SETUP_FAILED, ...(setup[PROTOCOL.CONFIGURATION] || []).map(c => c.id)]
-        log(`neoforge: configuration channels: ${(setup[PROTOCOL.CONFIGURATION] || []).map(c => c.id).join(', ') || 'none'}`)
+        const names = [CH.QUERY, CH.NETWORK, CH.SETUP_FAILED, ...configChannels]
         send(CH.MC_REGISTER, Buffer.from(names.join('\0')))
         client.emit('neoforge_ready', setup)
         break

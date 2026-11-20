@@ -2,8 +2,11 @@
 // Without this prismarine-block treats them as air, so the bot falls through Create
 // casings and pathfinder walks into machines. NeoForge appends modded states after the
 // vanilla ones, so vanilla ids stay correct and anything above the vanilla max is modded.
+import type { Block } from 'prismarine-block'
 
-export function solidifyUnknownBlocks (registry) {
+export const MODDED_BLOCK = 'modded_block'
+
+export function solidifyUnknownBlocks (registry: any): void {
   const byState = registry.blocksByStateId
   if (byState.__moddedProxy) return
   const stone = registry.blocksByName.stone
@@ -11,7 +14,7 @@ export function solidifyUnknownBlocks (registry) {
 
   const modded = {
     ...stone,
-    name: 'modded_block',
+    name: MODDED_BLOCK,
     displayName: 'Modded block',
     hardness: -1, // never try to dig it
     diggable: false,
@@ -38,6 +41,6 @@ export function solidifyUnknownBlocks (registry) {
   })
 }
 
-export function isModdedBlock (block) {
-  return block?.name === 'modded_block'
+export function isModdedBlock (block: Block | null | undefined): boolean {
+  return block?.name === MODDED_BLOCK
 }

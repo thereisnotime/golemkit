@@ -13,45 +13,61 @@ setup:
     @test -f .env || (cp .env.example .env && echo "{{YELLOW}}created .env from .env.example{{NORMAL}}")
     @echo "{{GREEN}}✔ ready, run: just run{{NORMAL}}"
 
-# Run the bot (reads .env if present)
+# Run a bot from bots/ (extra args go to the CLI, e.g. --username X --owners a,b --dig)
 [group('run')]
-run:
-    @echo "{{BOLD}}{{GREEN}}==> starting mc-buddy{{NORMAL}}"
-    npm start
+run bot="buddy" *args:
+    @echo "{{BOLD}}{{GREEN}}==> starting {{bot}}{{NORMAL}}"
+    node --env-file-if-exists=.env src/cli.ts run {{bot}} {{args}}
 
-# Run with auto-restart on file changes
+# Run a bot with auto-restart on file changes
 [group('run')]
-dev:
-    @echo "{{BOLD}}{{GREEN}}==> starting mc-buddy (watch mode){{NORMAL}}"
-    npm run dev
+dev bot="buddy" *args:
+    @echo "{{BOLD}}{{GREEN}}==> starting {{bot}} (watch mode){{NORMAL}}"
+    node --watch --env-file-if-exists=.env src/cli.ts run {{bot}} {{args}}
+
+# Run several bots in one process from a fleet file
+[group('run')]
+fleet file="fleet.yaml":
+    @echo "{{BOLD}}{{GREEN}}==> starting fleet {{file}}{{NORMAL}}"
+    node --env-file-if-exists=.env src/cli.ts fleet {{file}}
+
+# List available bots
+[group('bots')]
+bots:
+    @node src/cli.ts list
+
+# List a bot's actions (= its chat commands and LLM tools)
+[group('bots')]
+actions bot="buddy":
+    @node src/cli.ts actions {{bot}}
 
 # Connect once, report how far login gets, then quit
 [group('debug')]
 probe:
     @echo "{{BOLD}}{{BLUE}}==> probing server{{NORMAL}}"
-    node --env-file-if-exists=.env scripts/probe.js
+    node --env-file-if-exists=.env scripts/probe.ts
 
 # Join as a second offline player and send commands to the bot (comma-separated)
 [group('debug')]
-chat-test cmds="!help,!pos,!hp,!come,!follow,!inv,!stop":
+chat-test cmds="!help,!pos,!hp,!come,!follow,!inventory,!stop":
     @echo "{{BOLD}}{{BLUE}}==> chat test: {{cmds}}{{NORMAL}}"
-    node --env-file-if-exists=.env scripts/chat-test.js "{{cmds}}"
+    node --env-file-if-exists=.env scripts/chat-test.ts "{{cmds}}"
 
 # Forget learned NeoForge channels (relearned on next join)
 [group('debug')]
 reset-channels:
-    @echo "{{YELLOW}}==> removing data/ (learned channels){{NORMAL}}"
-    rm -rf data/
+    @echo "{{YELLOW}}==> removing learned channel caches{{NORMAL}}"
+    rm -f data/channels-*.json
 
-# Syntax check + unit tests
+# Typecheck + unit tests
 [group('check')]
-check: lint test
+check: typecheck test
 
-# Syntax check all sources
+# Typecheck everything (tsc, no emit)
 [group('check')]
-lint:
-    @echo "{{BOLD}}{{MAGENTA}}==> lint{{NORMAL}}"
-    npm run lint --silent
+typecheck:
+    @echo "{{BOLD}}{{MAGENTA}}==> typecheck{{NORMAL}}"
+    npx tsc -p .
 
 # Unit tests
 [group('check')]

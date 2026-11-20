@@ -1,0 +1,21 @@
+// A skill groups related actions plus optional per-session setup (event hooks, plugins)
+// and an observe() hook that contributes to the bot's world snapshot.
+import type { Bot } from 'mineflayer'
+import type { ActionDef } from './action.ts'
+import type { Agent } from './agent.ts'
+
+export interface SkillDef {
+  name: string
+  description?: string
+  actions?: ActionDef<any>[]
+  /** Mineflayer plugins this skill needs; loaded once per session before setup(). */
+  plugins?: ((bot: Bot, options: any) => void)[]
+  /** Called on every new session after spawn. Return a cleanup function if needed. */
+  setup? (agent: Agent, bot: Bot): void | (() => void)
+  /** Adds JSON-friendly facts to Agent.observe() (used by LLM brains and debugging). */
+  observe? (agent: Agent, bot: Bot): Record<string, unknown>
+}
+
+export function defineSkill (def: SkillDef): SkillDef {
+  return def
+}

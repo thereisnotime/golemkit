@@ -1,85 +1,106 @@
 # mc-buddy
 
-A companion bot for the **mc02** NeoForge 1.21.1 server (Create, Ars Nouveau, Curios, ...).
-It's a real protocol client built on [Mineflayer](https://github.com/PrismarineJS/mineflayer),
-not a headless Minecraft, so it starts in a second and uses ~100 MB of RAM.
+A TypeScript framework for Minecraft bots on **NeoForge** servers: player assistants,
+self-sufficient NPCs, LLM-driven agents. Bots are real protocol clients built on
+[Mineflayer](https://github.com/PrismarineJS/mineflayer), not headless Minecraft, so they
+start in a second and use ~100 MB each.
 
-Mineflayer only speaks vanilla, so this repo adds the parts needed to get into a modded
-NeoForge server (see [How it gets in](#how-it-gets-in)).
+Built for the **mc02** NeoForge 1.21.1 modpack (Create, Ars Nouveau, Curios, ...), but the
+NeoForge layer learns any server's mod channels on its own.
 
 ## Quick start
 
 ```bash
 asdf install            # node + just from .tool-versions
 just setup              # npm ci, creates .env from .env.example
-just run
+just run                # runs bots/buddy.ts
 ```
 
-Then in game: `!help`.
+In game: `!help`.
 
-## Commands
+```bash
+just bots               # list bots
+just actions buddy      # its commands / LLM tools
+just run buddy --username Helper --owners robin
+just fleet fleet.yaml   # several bots in one process (see fleet.example.yaml)
+```
 
-Say them in chat, or whisper the bot without the `!`.
+## Writing a bot
 
-| Command | What it does |
-|---|---|
-| `!come` | walk to you |
-| `!follow [player]` | follow you (or someone else) |
-| `!goto <x> <y> <z>` / `!goto <player>` | walk somewhere |
-| `!stop` | stop whatever it's doing |
-| `!guard` | follow you and kill hostile mobs near you (toggle) |
-| `!attack` | fight the nearest hostile mob |
-| `!pos` / `!hp` / `!inv` | status |
-| `!drop [item\|all]` | throw items at you |
-| `!eat` | eat the best food it has |
-| `!sleep` | use a bed within 16 blocks |
-| `!collect <block> [n]` | mine blocks (needs `MC_CAN_DIG=true`) |
-| `!say <text>` | say something |
+```ts
+// bots/guard.ts
+import { defineBot } from '../src/core/index.ts'
+import { standardSkills } from '../src/skills/index.ts'
+import { commandBrain, reflexes } from '../src/brains/index.ts'
 
-It also fights back when hit, eats when hungry, respawns, and reconnects when dropped.
+export default defineBot({
+  name: 'guard',
+  username: 'Guardian',
+  skills: standardSkills(),
+  brains: [commandBrain(), reflexes()],
+  onSpawn: (agent) => agent.act('guard', { player: 'robin' }, { caller: { kind: 'system', name: 'boot' } })
+})
+```
+
+The pieces:
+
+- **Actions** are everything a bot can do (`follow`, `attack`, `collect`...), with zod
+  parameter schemas. The same definition is a chat command, an LLM tool and a typed function.
+- **Skills** group actions plus per-session setup and observations.
+- **Brains** decide what to do: chat commands, reflexes, NPC loops, LLMs. Several run at once
+  and share the body through action priorities (player > LLM > NPC, reflexes preempt and
+  resume).
+- **Bots** pick skills, brains, persona and settings.
+
+Details in [docs/architecture.md](docs/architecture.md).
+
+## buddy's commands
+
+Say them in chat with `!`, or whisper without it. `!help <command>` explains one.
+Positional args follow the parameter order, `key=value` works too (`!follow distance=4`).
+
+`!come` `!follow [player] [distance]` `!goto <x> [y] <z>` `!goto_player <player>` `!stop`
+`!guard [player]` `!attack` `!eat` `!sleep` `!wake` `!inventory` `!drop [item|all] [count]`
+`!equip <item>` `!collect <block> [count]` `!pos` `!hp` `!say <text>` `!look_at` `!jump`
+
+It also fights back when hit, eats when hungry, respawns and reconnects.
 
 ## Config
 
-All settings are env vars, see [.env.example](.env.example). The useful ones:
+Env vars, see [.env.example](.env.example): server (`MC_HOST`, `MC_PORT`, `MC_AUTH`),
+`MC_OWNERS` (who may command bots), `MC_CAN_DIG`, `MC_LOG_LEVEL`. Per-bot values in the bot
+definition or the fleet file override them.
 
-- `MC_OWNERS=robin,friend` limits who can give commands (default: everyone)
-- `MC_CAN_DIG=true` lets it break blocks while pathfinding and enables `!collect`
-- `MC_AUTH=microsoft` for online-mode servers (device-code login, token cached in `.auth/`)
-- `MC_DEBUG=true` logs the handshake and every skipped packet
+## How it gets into a NeoForge server
 
-## How it gets in
+Mineflayer only speaks vanilla. `src/core/neoforge/` adds:
 
-1. **Channel negotiation.** NeoForge rejects clients that don't list every payload channel
-   its mods require, with the right version and direction. The bot doesn't know them up
-   front, so it learns them from the server's rejection message (missing channel, then
-   flow, then version) over 3–4 quick reconnects and caches the result in `data/`.
-   All channels are offered as optional on both configuration and play, which makes
-   NeoForge silently ignore the ones that don't apply.
-2. **NeoForge config tasks.** Answers frozen registry sync, config file sync, data map
-   negotiation, extensible enum and feature flag checks (`src/neoforge/handshake.js`).
+1. **Channel negotiation.** NeoForge rejects clients that don't list every payload channel its
+   mods require, with the right version and direction. The bot learns them from the server's
+   rejection message over 3–4 quick reconnects and caches them in `data/`. Channels are offered
+   as optional on both configuration and play, so NeoForge ignores the ones that don't apply.
+2. **NeoForge config tasks.** Answers registry sync, config sync, data map negotiation,
+   extensible enum and feature flag checks.
 3. **Unparseable packets are dropped.** Item stacks with modded data components can't be
-   parsed (components have no length prefix), which normally kills the connection. The
-   bot skips those packets instead (`src/neoforge/tolerantParser.js`). Currently that's
-   the recipe list, the command tree and occasional item-related packets.
-4. **Modded blocks are solid.** Unknown block states are treated as full cubes so the bot
-   doesn't fall through Create casings (`src/modded.js`).
+   parsed (components have no length prefix), which would kill the connection. Those packets
+   (recipe list, command tree, some item packets) are skipped instead.
+4. **Modded blocks are solid.** Unknown block states are treated as full cubes so bots don't
+   fall through Create casings.
 
 ## Limitations
 
-- Modded items show as `modded#<id>`; modded blocks are all "modded_block" (full cubes).
-- Inventory/equipment packets containing modded items may be skipped, so `!inv` can be
-  incomplete.
-- No interaction with Create contraptions, Ars spells, Curios slots or mod GUIs.
-- When the modpack changes, the bot relearns channels on its own; `just reset-channels`
-  forces it.
+- Modded items show as `modded#<id>`; modded blocks are all `modded_block` (full cubes).
+- Packets with modded items may be skipped, so inventories can be incomplete.
+- No interaction with Create contraptions, Ars spells, Curios slots or mod GUIs yet.
 
 ## Development
 
 ```bash
 just            # list recipes
-just check      # syntax check + unit tests
-just probe      # connect once and report how far login gets
-just chat-test  # join as a second player and send commands to the running bot
+just check      # typecheck + unit tests
+just probe      # connect once, dump the world snapshot
+just chat-test  # join as a second player and send commands to a running bot
 ```
 
+TypeScript runs directly on Node 26 (type stripping), no build step; `tsc` only typechecks.
 Specs live in `openspec/`.

@@ -3,14 +3,30 @@
 import nbt from 'prismarine-nbt'
 
 // net.minecraft.network.ConnectionProtocol ordinals (1.21.1)
-export const PROTOCOL = { HANDSHAKING: 0, PLAY: 1, STATUS: 2, LOGIN: 3, CONFIGURATION: 4 }
+export const PROTOCOL = { HANDSHAKING: 0, PLAY: 1, STATUS: 2, LOGIN: 3, CONFIGURATION: 4 } as const
 // net.minecraft.network.protocol.PacketFlow ordinals
-export const FLOW = { SERVERBOUND: 0, CLIENTBOUND: 1 }
+export const FLOW = { SERVERBOUND: 0, CLIENTBOUND: 1 } as const
+export type Flow = keyof typeof FLOW
+
+export interface QueryComponent {
+  id: string
+  version: string
+  flow: Flow | null
+  optional: boolean
+}
+
+export interface NegotiatedChannel {
+  id: string
+  version: string
+}
+
+export type NetworkSetup = Record<number, NegotiatedChannel[]>
 
 export class Writer {
-  constructor () { this.parts = [] }
-  varint (v) {
-    const bytes = []
+  parts: Buffer[] = []
+
+  varint (v: number): this {
+    const bytes: number[] = []
     v >>>= 0
     do {
       let b = v & 0x7f
@@ -22,51 +38,67 @@ export class Writer {
     return this
   }
 
-  bool (v) { this.parts.push(Buffer.from([v ? 1 : 0])); return this }
-  string (s) {
+  bool (v: boolean): this {
+    this.parts.push(Buffer.from([v ? 1 : 0]))
+    return this
+  }
+
+  string (s: string): this {
     const b = Buffer.from(s, 'utf8')
     this.varint(b.length)
     this.parts.push(b)
     return this
   }
 
-  buffer () { return Buffer.concat(this.parts) }
+  buffer (): Buffer {
+    return Buffer.concat(this.parts)
+  }
 }
 
 export class Reader {
-  constructor (buf) { this.buf = buf; this.o = 0 }
-  get done () { return this.o >= this.buf.length }
-  varint () {
-    let v = 0; let s = 0; let b
+  buf: Buffer
+  o = 0
+
+  constructor (buf: Buffer) {
+    this.buf = buf
+  }
+
+  get done (): boolean {
+    return this.o >= this.buf.length
+  }
+
+  varint (): number {
+    let v = 0
+    let s = 0
+    let b: number
     do {
-      b = this.buf[this.o++]
+      b = this.buf[this.o++]!
       v |= (b & 0x7f) << s
       s += 7
     } while (b & 0x80)
     return v >>> 0
   }
 
-  bool () { return this.buf[this.o++] !== 0 }
-  string () {
+  bool (): boolean {
+    return this.buf[this.o++] !== 0
+  }
+
+  string (): string {
     const len = this.varint()
     const s = this.buf.toString('utf8', this.o, this.o + len)
     this.o += len
     return s
   }
 
-  nbt () {
-    const r = nbt.protos.big.read(this.buf, this.o, 'anonymousNbt')
+  nbt (): unknown {
+    const r = (nbt.protos.big as any).read(this.buf, this.o, 'anonymousNbt')
     this.o += r.size
     return nbt.simplify(r.value)
   }
 }
 
-/**
- * ModdedNetworkQueryPayload: Map<ConnectionProtocol, Set<ModdedNetworkQueryComponent>>
- * component = (ResourceLocation id, String version, Optional<PacketFlow> flow, boolean optional)
- * @param {Record<number, Array<{id: string, version: string, flow: string|null, optional: boolean}>>} queries
- */
-export function encodeQuery (queries) {
+/** ModdedNetworkQueryPayload: Map<ConnectionProtocol, Set<(id, version, Optional<PacketFlow>, optional)>> */
+export function encodeQuery (queries: Record<number, QueryComponent[]>): Buffer {
   const w = new Writer()
   const entries = Object.entries(queries)
   w.varint(entries.length)
@@ -75,7 +107,8 @@ export function encodeQuery (queries) {
     w.varint(comps.length)
     for (const c of comps) {
       w.string(c.id).string(c.version ?? '')
-      if (c.flow) w.bool(true).varint(FLOW[c.flow]); else w.bool(false)
+      if (c.flow) w.bool(true).varint(FLOW[c.flow])
+      else w.bool(false)
       w.bool(c.optional)
     }
   }
@@ -83,10 +116,10 @@ export function encodeQuery (queries) {
 }
 
 /** ModdedNetworkSetupFailedPayload: Map<ResourceLocation, Component(NBT)> */
-export function decodeSetupFailed (buf) {
+export function decodeSetupFailed (buf: Buffer): Record<string, unknown> {
   const r = new Reader(buf)
   const n = r.varint()
-  const out = {}
+  const out: Record<string, unknown> = {}
   for (let i = 0; i < n; i++) {
     const id = r.string()
     out[id] = r.nbt()
@@ -95,26 +128,27 @@ export function decodeSetupFailed (buf) {
 }
 
 /** NetworkPayloadSetup: Map<ConnectionProtocol, Map<ResourceLocation, NetworkChannel(id, String chosenVersion)>> */
-export function decodeNetworkSetup (buf) {
+export function decodeNetworkSetup (buf: Buffer): NetworkSetup {
   const r = new Reader(buf)
-  const out = {}
+  const out: NetworkSetup = {}
   const n = r.varint()
   for (let i = 0; i < n; i++) {
     const protocol = r.varint()
     const m = r.varint()
-    out[protocol] = []
+    const list: NegotiatedChannel[] = []
     for (let j = 0; j < m; j++) {
       r.string() // map key, same as id
-      const id = r.string()
-      const version = r.string()
-      out[protocol].push({ id, version })
+      list.push({ id: r.string(), version: r.string() })
     }
+    out[protocol] = list
   }
   return out
 }
 
+export type FlatComponent = string | { key: string, args: FlatComponent[] } | null
+
 /** Flattens a translatable NBT component into { key, args } where args are strings or nested results. */
-export function flattenComponent (c) {
+export function flattenComponent (c: any): FlatComponent {
   if (c == null) return null
   if (typeof c === 'string') return c
   if (typeof c === 'object' && '' in c && Object.keys(c).length === 1) return flattenComponent(c[''])
@@ -124,8 +158,8 @@ export function flattenComponent (c) {
 }
 
 /** Digs through "failure.mod" wrappers and returns the innermost negotiation failure. */
-export function failureReason (component) {
+export function failureReason (component: unknown): FlatComponent {
   let f = flattenComponent(component)
-  while (f && typeof f === 'object' && f.key === 'neoforge.network.negotiation.failure.mod') f = f.args[1]
+  while (f && typeof f === 'object' && f.key === 'neoforge.network.negotiation.failure.mod') f = f.args[1] ?? null
   return f
 }

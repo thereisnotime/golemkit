@@ -2,22 +2,31 @@
 // negotiation failures, so later logins pass the handshake on the first try.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { failureReason } from './codec.js'
+import { failureReason, type Flow, type QueryComponent } from './codec.ts'
 
 const PREFIX = 'neoforge.network.negotiation.failure.'
 
+export interface ChannelInfo {
+  version: string
+  flow: Flow | null
+}
+
 export class ChannelStore {
-  constructor (file) {
+  readonly file: string
+  channels: Record<string, ChannelInfo> = {}
+
+  constructor (file: string) {
     this.file = file
-    this.channels = {} // id -> { version, flow }
     try {
       this.channels = JSON.parse(readFileSync(file, 'utf8')).channels || {}
     } catch {}
   }
 
-  get size () { return Object.keys(this.channels).length }
+  get size (): number {
+    return Object.keys(this.channels).length
+  }
 
-  save () {
+  save (): void {
     mkdirSync(dirname(this.file), { recursive: true })
     const sorted = Object.fromEntries(Object.entries(this.channels).sort(([a], [b]) => a.localeCompare(b)))
     writeFileSync(this.file, JSON.stringify({ updated: new Date().toISOString(), channels: sorted }, null, 2) + '\n')
@@ -28,22 +37,19 @@ export class ChannelStore {
    * NeoForge silently disables optional client channels the server doesn't have,
    * so we never need to know which protocol a channel belongs to.
    */
-  components () {
+  components (): QueryComponent[] {
     return Object.entries(this.channels).map(([id, c]) => ({ id, version: c.version, flow: c.flow, optional: true }))
   }
 
-  /**
-   * Updates the store from a decoded setup-failed payload.
-   * @returns {{changed: boolean, unknown: string[]}}
-   */
-  learn (failures) {
+  /** Updates the store from a decoded setup-failed payload. */
+  learn (failures: Record<string, unknown>): { changed: boolean, unknown: string[] } {
     let changed = false
-    const unknown = []
+    const unknown: string[] = []
     for (const [id, component] of Object.entries(failures)) {
       const reason = failureReason(component)
-      const key = typeof reason === 'object' && reason ? reason.key.replace(PREFIX, '') : String(reason)
-      const args = (reason && reason.args) || []
-      const entry = this.channels[id] || { version: '1', flow: null }
+      const key = reason && typeof reason === 'object' ? reason.key.replace(PREFIX, '') : String(reason)
+      const args = reason && typeof reason === 'object' ? reason.args : []
+      const entry: ChannelInfo = this.channels[id] ?? { version: '1', flow: null }
 
       if (key === 'missing.server.client') {
         // Server requires it, we didn't offer it.
@@ -54,7 +60,7 @@ export class ChannelStore {
         if (entry.version !== serverVersion) { entry.version = serverVersion; this.channels[id] = entry; changed = true }
       } else if (key === 'flow.client.missing' || key === 'flow.client.mismatch') {
         // args[0] is the server's flow
-        const flow = String(args[0]).toUpperCase()
+        const flow = String(args[0]).toUpperCase() as Flow
         if (entry.flow !== flow) { entry.flow = flow; this.channels[id] = entry; changed = true }
       } else if (key === 'flow.server.missing') {
         // We sent a flow the server doesn't have.

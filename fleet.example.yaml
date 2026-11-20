@@ -1,0 +1,13 @@
+# node src/cli.ts fleet fleet.example.yaml
+server:
+  host: mc.example.com
+  port: 25565
+  auth: offline
+staggerMs: 5000
+bots:
+  - bot: buddy
+    username: McBuddy
+    owners: [robin]
+  # - bot: buddy
+  #   username: Helper
+  #   count: 2          # Helper1, Helper2

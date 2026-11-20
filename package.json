@@ -2,22 +2,28 @@
   "name": "mc-buddy",
   "version": "0.1.0",
   "private": true,
-  "description": "A Mineflayer companion bot for the mc02 NeoForge 1.21.1 server",
+  "description": "Framework for Minecraft bots (assistants, NPCs, LLM agents) on NeoForge servers, built on Mineflayer",
   "type": "module",
-  "main": "src/index.js",
+  "main": "src/cli.ts",
   "engines": {
     "node": ">=26"
   },
   "scripts": {
-    "start": "node --env-file-if-exists=.env src/index.js",
-    "dev": "node --watch --env-file-if-exists=.env src/index.js",
-    "lint": "node --check src/*.js src/**/*.js",
+    "start": "node --env-file-if-exists=.env src/cli.ts run buddy",
+    "bot": "node --env-file-if-exists=.env src/cli.ts",
+    "typecheck": "tsc -p .",
     "test": "node --test test/"
   },
   "license": "UNLICENSED",
   "dependencies": {
     "mineflayer": "^4.39.0",
     "mineflayer-pathfinder": "^2.4.5",
-    "prismarine-nbt": "^2.8.0"
+    "prismarine-nbt": "^2.8.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
   }
 }

@@ -1,0 +1,8 @@
+- [x] TypeScript setup (tsconfig, erasable syntax, tsc typecheck)
+- [x] Core: agent, actions, lock/priorities, skills, brains, storage, chat queue, observe, catalog
+- [x] NeoForge layer ported to TS
+- [x] Skills: status, movement, combat, survival, inventory, gather
+- [x] Brains: command, reflexes
+- [x] bots/buddy.ts, CLI run/fleet/list/actions, fleet example
+- [x] Tests: codec, channel learning, command arg parsing
+- [x] Live check on mc02 with chat-test

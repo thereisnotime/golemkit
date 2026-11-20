@@ -3,22 +3,22 @@ import assert from 'node:assert/strict'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import nbt from 'prismarine-nbt'
-import { encodeQuery, decodeNetworkSetup, decodeSetupFailed, failureReason, Reader, Writer, PROTOCOL, FLOW } from '../src/neoforge/codec.js'
-import { ChannelStore } from '../src/neoforge/channelStore.js'
+import { encodeQuery, decodeNetworkSetup, decodeSetupFailed, failureReason, Reader, Writer, PROTOCOL, FLOW } from '../src/core/neoforge/codec.ts'
+import { ChannelStore } from '../src/core/neoforge/channelStore.ts'
 
-const comp = (translate, ...args) => nbt.comp({
+const comp = (translate: string, ...args: any[]): any => nbt.comp({
   translate: nbt.string(translate),
-  with: nbt.list(nbt.comp(args.map(a => typeof a === 'string' ? { '': nbt.string(a) } : a.value)))
+  with: nbt.list(nbt.comp(args.map((a: any) => typeof a === 'string' ? { '': nbt.string(a) } : a.value) as any))
 })
 
-function failedPayload (entries) {
+function failedPayload (entries: [string, any][]): Buffer {
   const w = new Writer().varint(entries.length)
-  const parts = []
+  const parts: Buffer[] = []
   for (const [id, c] of entries) {
     w.string(id)
     parts.push(w.buffer())
     w.parts = []
-    parts.push(nbt.protos.big.createPacketBuffer('anonymousNbt', c))
+    parts.push((nbt.protos.big as any).createPacketBuffer('anonymousNbt', c))
   }
   return Buffer.concat([...parts, w.buffer()])
 }
@@ -52,7 +52,7 @@ test('store learns missing channels, versions and flows', () => {
   const flow = comp('neoforge.network.negotiation.failure.flow.client.missing', 'SERVERBOUND')
   const ver = comp('neoforge.network.negotiation.failure.mod', 'Create', comp('neoforge.network.negotiation.failure.version.mismatch', '1', '6.0.8'))
   const failures = decodeSetupFailed(failedPayload([['create:a', flow], ['create:b', ver]]))
-  assert.equal(failureReason(failures['create:b']).key, 'neoforge.network.negotiation.failure.version.mismatch')
+  assert.equal((failureReason(failures['create:b']) as any).key, 'neoforge.network.negotiation.failure.version.mismatch')
   res = store.learn(failures)
   assert.equal(res.changed, true)
   assert.deepEqual(store.channels['create:a'], { version: '1', flow: 'SERVERBOUND' })
