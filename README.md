@@ -61,6 +61,8 @@ them as a local site with `just docs` (dev server) or `just docs-build` (static 
 
 Self-sufficient NPCs (utility-AI brain, behaviours, `bots/villager.ts`): [docs/guide/npc-brain.md](docs/guide/npc-brain.md).
 
+Scenes with several bots acting together (`bots/actor.ts`, `scenes/*.yaml`): [docs/guide/scenes.md](docs/guide/scenes.md).
+
 ## buddy's commands
 
 Say them in chat with `!`, or whisper without it. `!help <command>` explains one.

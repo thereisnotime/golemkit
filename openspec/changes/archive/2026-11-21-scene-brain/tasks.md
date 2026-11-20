@@ -1,0 +1,12 @@
+- [x] Core: PRIORITY.scene, Agent.cancelActions
+- [x] Scene types, zod parsing/validation, YAML loader, builder
+- [x] Line templating and lineProvider hook
+- [x] Director: timeline, cues, parallel/repeat/choose/if, pause gate, chat pacing
+- [x] Runtime: actor registry, casting, election, member executor, recasting
+- [x] Player interaction detection and reactions
+- [x] Scheduler: interval, game time, players nearby, ambient
+- [x] Control and stage actions, sceneBrain
+- [x] Demo scenes, bots/actor.ts, fleet.scene.example.yaml
+- [x] Unit tests (format, director, casting/recast, cues)
+- [x] docs/scenes.md, README pointer
+- [x] Live test on mc02

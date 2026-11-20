@@ -52,6 +52,7 @@ Only one exclusive action runs at a time. Callers have priorities (`PRIORITY` in
 |---|---|
 | idle | 10 |
 | npc | 20 |
+| scene | 25 |
 | llm | 30 |
 | player | 50 |
 | reflex | 60 |
@@ -60,7 +61,9 @@ Only one exclusive action runs at a time. Callers have priorities (`PRIORITY` in
 A call with higher priority preempts the current action; if that one is `longRunning` it is
 suspended and resumed afterwards (a reflex fights a zombie, then the bot goes back to
 following you). Equal priority replaces. Lower priority is rejected with `busy: ...`.
-`stopActions()` aborts everything and clears the suspended stack.
+`stopActions()` aborts everything and clears the suspended stack. `cancelActions(match)` aborts
+and drops only the actions matching a predicate (a scene uses it to stop exactly what it
+started).
 
 ## Skills
 
@@ -95,6 +98,7 @@ Several brains run at once and negotiate through priorities. Shipped:
 - `reflexes()` handles self-defence and auto-eat at reflex priority.
 - `npcBrain()` keeps NPCs busy on their own: scored behaviours at npc priority, backs off for
   players, LLMs and reflexes. See [NPC brain](../guide/npc-brain.md).
+- `sceneBrain()` lets several bots act out scenes together (see [Scenes](../guide/scenes.md)).
 
 ## Bots
 

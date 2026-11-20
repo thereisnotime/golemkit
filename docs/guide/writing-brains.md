@@ -41,6 +41,7 @@ started, reflexes can interrupt it, and other brains know the body is busy.
 |---|---|---|
 | `idle` | 10 | ambient filler |
 | `npc` | 20 | NPC routines |
+| `scene` | 25 | Scene choreography (sceneBrain), above NPC routines |
 | `llm` | 30 | LLM decisions |
 | `player` | 50 | chat commands |
 | `reflex` | 60 | self-defence, eating |

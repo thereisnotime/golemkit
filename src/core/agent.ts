@@ -231,6 +231,27 @@ export class Agent extends TypedEmitter<AgentEvents> {
     this._bot?.pathfinder?.setGoal(null)
   }
 
+  /**
+   * Aborts the current action and drops suspended ones that match, leaving everything else
+   * alone (unlike stopActions, which forgets every suspended action). Returns how many were
+   * cancelled. Used by brains that need to stop only what they started.
+   */
+  cancelActions (match: (info: ActionInfo) => boolean, reason = 'cancelled'): number {
+    const info = (r: Running): ActionInfo => ({ name: r.def.name, params: r.params, caller: r.caller, priority: r.priority })
+    const before = this.suspended.length
+    this.suspended = this.suspended.filter(r => !match(info(r)))
+    let n = before - this.suspended.length
+    const cur = this.current
+    if (cur && match(info(cur))) {
+      n++
+      cur.controller.abort(reason)
+      this.current = null
+      this._bot?.pathfinder?.setGoal(null)
+      this.resumeSuspended()
+    }
+    return n
+  }
+
   private async execute (run: Running): Promise<ActionResult> {
     const bot = this._bot!
     const session = this.sessionController!

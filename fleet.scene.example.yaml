@@ -1,0 +1,31 @@
+# Three actors on mc02 that can perform scenes together (scenes/*.yaml).
+#   node src/cli.ts fleet fleet.scene.example.yaml
+# In game: !scene_list, !scene_start broken_cart, !scene_status, !scene_stop
+servers:
+  mc02:
+    host: mc.example.com
+    port: 25565
+    auth: offline
+    staggerMs: 5000
+
+defaults:
+  server: mc02
+  owners: [robin]          # who may command the actors (and start scenes)
+  settings:
+    scenes:
+      ambient: true        # idle filler (gossip_walk) when players are around
+      schedule: true       # scene `schedule:` blocks
+
+bots:
+  # Casting fills roles with free actors (lowest name first); `roles` lets a bot ask for
+  # particular parts. Roles a scene doesn't have are ignored.
+  - bot: actor
+    username: Hauler
+    settings: { scenes: { roles: [hauler, talker] } }
+  - bot: actor
+    username: Foreman
+    settings: { scenes: { roles: [foreman, listener] } }
+    # settings: { scenes: { director: true } }   # make this one direct every scene
+  - bot: actor
+    username: Miner
+    settings: { scenes: { roles: [miner] } }

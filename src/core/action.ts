@@ -21,6 +21,8 @@ export type Caller =
 export const PRIORITY = {
   idle: 10,
   npc: 20,
+  /** Scene choreography (src/brains/scene): above NPC routines, below LLM/player/reflex. */
+  scene: 25,
   llm: 30,
   player: 50,
   reflex: 60,

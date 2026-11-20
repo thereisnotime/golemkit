@@ -1,0 +1,119 @@
+# A hauler's cart breaks down. The foreman scolds, the miner fetches parts, they bicker, fix
+# it and celebrate. Walk up and they'll ask you for a hand. Non-destructive: walking, looking,
+# gestures and chat only.
+#   !scene_start broken_cart
+name: broken_cart
+description: A cart breaks down; foreman scolds, miner fetches parts, everyone celebrates.
+
+roles:
+  hauler: { description: owns the unlucky cart }
+  foreman: { description: shouts a lot }
+  miner: { description: has spare parts somewhere }
+
+# Staged wherever the hauler stands when the scene starts.
+anchor: { role: hauler }
+marks:
+  cart: [0, 0]
+  wheel: [1, 1]
+  foreman_spot: [-3, 2]
+  watch: [-2, -2]
+  stash: [7, 5]
+
+vars:
+  helped: false
+
+beats:
+  # Places, everyone.
+  - parallel:
+      - [{ as: hauler, goto: cart }]
+      - [{ as: foreman, goto: foreman_spot }]
+      - [{ as: miner, goto: watch }]
+  - { as: hauler, gesture: crouch, times: 2 }
+  - { as: hauler, say: ["Oh no. Oh no no no.", "Not again...", "Uh oh."] }
+  - { as: hauler, say: "The wheel just snapped clean off! The whole cart's tipped over." }
+  - parallel:
+      - [{ as: foreman, look: hauler }]
+      - [{ as: miner, look: hauler }]
+  - as: foreman
+    say:
+      - "{role:hauler}! What did you do to my cart?"
+      - "Again, {role:hauler}? That's the third cart this week!"
+  - { as: foreman, gesture: shake }
+  - { as: hauler, say: "I didn't do anything! It just... gave up." }
+  - { as: foreman, say: "Carts don't just give up. You overloaded it with cobblestone again." }
+  - { as: miner, say: ["I've got spare parts in my stash. Back in a bit!", "Hang on, I know where there's a wheel."] }
+
+  # The miner runs off; the other two bicker until the parts arrive.
+  - parallel:
+      - - { as: miner, goto: stash }
+        - { as: miner, gesture: swing, times: 3 }
+        - { as: miner, say: "Axle, pins, one slightly used wheel... got it!" }
+        - { as: miner, goto: wheel }
+        - { cue: parts_here }
+      - - { as: foreman, say: "While we wait: who signs off on cart maintenance? That's right. Me." }
+        - { as: hauler, look: foreman }
+        - { as: hauler, say: "Then maybe sign off on a new cart sometime." }
+        - { as: foreman, say: "Watch it." }
+        - { await: parts_here, timeoutMs: 60000 }
+
+  - { as: miner, look: hauler }
+  - { as: miner, say: "Here. Hold it steady." }
+  - repeat:
+      times: [3, 4]
+      beats:
+        - parallel:
+            - [{ as: miner, gesture: swing, times: 2 }]
+            - [{ as: hauler, gesture: crouch }]
+        - { wait: [300, 700] }
+  - choose:
+      - weight: 3
+        beats:
+          - { as: miner, say: "Done! Good as new. Almost." }
+      - weight: 1
+        beats:
+          - { as: miner, say: "Hm. There's a pin left over. That's probably fine." }
+          - { as: foreman, say: "That is NOT fine." }
+  - if: { key: $helped, equals: true }
+    then:
+      - { as: foreman, say: "And thanks to {player} for the hand. More than {role:hauler} did." }
+    else:
+      - { as: foreman, say: "Right. Nobody else saw that." }
+  - parallel:
+      - [{ as: hauler, gesture: jump, times: 2 }]
+      - [{ as: miner, gesture: jump, times: 2 }]
+      - [{ as: foreman, gesture: nod }]
+  - { as: hauler, say: ["Woo! She rolls again!", "Hauling's back on!"] }
+  - { as: foreman, say: "Don't celebrate. Haul." }
+
+interactions:
+  # Someone walks up: pause, ask for help, carry on.
+  - on: approach
+    radius: 6
+    cooldownMs: 60000
+    perPlayerCooldownMs: 300000
+    beats:
+      - { as: hauler, look: player }
+      - as: hauler
+        say:
+          - "Hey {player}! Our cart broke, can you give us a hand?"
+          - "{player}! Perfect timing, help us lift this thing?"
+      - { as: foreman, look: player }
+      - { as: foreman, say: "Yes, help. Unlike some people. Just hold the wheel there." }
+      - { set: { $helped: true } }
+  # Chat near the cast (or naming one of them): a quick aside without pausing.
+  - on: chat
+    match: "\\b(hi|hello|hey|yo|help|cart)\\b"
+    mode: aside
+    cooldownMs: 20000
+    beats:
+      - { look: player }
+      - say:
+          - "Oh hi {player}! Bit busy with this cart right now."
+          - "Hey {player}. Don't mind us, cart trouble."
+  - on: hit
+    mode: aside
+    cooldownMs: 15000
+    beats:
+      - { look: player }
+      - { say: ["Ow! Careful {player}, we're working here!", "Oi! Hands off, {player}."] }
+      - { gesture: shake }

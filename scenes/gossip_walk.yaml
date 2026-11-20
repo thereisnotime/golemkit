@@ -1,0 +1,60 @@
+# Two villagers walk a little loop and gossip. Ambient filler: the scheduler may pick it when
+# nothing else is running and a player is around to overhear.
+name: gossip_walk
+description: Two neighbours walk a loop and gossip.
+
+roles:
+  talker: {}
+  listener: {}
+
+anchor: { role: talker }
+marks:
+  a: [0, 0]
+  b: [5, 0]
+  c: [5, 5]
+  d: [0, 5]
+
+schedule:
+  ambient: true
+  requirePlayersNear: 32
+  cooldownMs: 600000
+
+beats:
+  - { as: talker, say: ["Psst. Did you hear about the miner?", "You won't believe what I saw last night."] }
+  - { as: listener, look: talker }
+  - { as: listener, say: ["No! Tell me everything.", "Go on..."] }
+  - repeat:
+      times: [2, 3]
+      beats:
+        - choose:
+            - beats:
+                - parallel: [[{ as: talker, goto: b }], [{ as: listener, goto: b, range: 2.5 }]]
+            - beats:
+                - parallel: [[{ as: talker, goto: c }], [{ as: listener, goto: c, range: 2.5 }]]
+            - beats:
+                - parallel: [[{ as: talker, goto: d }], [{ as: listener, goto: d, range: 2.5 }]]
+        - { as: talker, look: listener }
+        - choose:
+            - beats:
+                - { as: talker, say: "Apparently someone put a creeper in the wheat field. On purpose." }
+                - { as: listener, say: "Not again." }
+            - beats:
+                - { as: talker, say: "The foreman's been talking to his carts. Out loud." }
+                - { as: listener, gesture: nod, times: 2 }
+                - { as: listener, say: "I've heard him. He calls the blue one Bessie." }
+            - beats:
+                - { as: talker, say: "Somebody's been taking all the bread from the town chest." }
+                - { as: listener, say: "I bet it was the hauler." }
+        - { wait: [1500, 3000] }
+  - parallel: [[{ as: talker, goto: a }], [{ as: listener, goto: a, range: 2.5 }]]
+  - { as: listener, say: ["Well, I'd better get going.", "Same time tomorrow?"] }
+  - { as: talker, gesture: nod }
+
+interactions:
+  - on: approach
+    radius: 4
+    mode: pause
+    cooldownMs: 120000
+    beats:
+      - { look: player }
+      - { say: ["Oh! {player}! We weren't talking about you. Promise.", "Shh, someone's listening... hello {player}!"] }

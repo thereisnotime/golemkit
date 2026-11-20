@@ -24,6 +24,7 @@ export default defineConfig({
           { text: 'Writing brains', link: '/guide/writing-brains' },
           { text: 'NPC brain', link: '/guide/npc-brain' },
           { text: 'Logging', link: '/guide/logging' },
+          { text: 'Scenes', link: '/guide/scenes' },
           { text: 'Deployment', link: '/guide/deployment' }
         ]
       },
