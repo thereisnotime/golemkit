@@ -23,6 +23,11 @@ import { isCreative, takeFromCreative } from './creative.ts'
 const ACTIVE_KEY = 'build.active'
 /** Positions of blocks this bot placed for builds, so it never mistakes its own work for a player's. */
 const OWN_KEY = 'build.own'
+
+/** settings.respectBuilds: leave blocks that look player-made alone (default off: bots may use anything). */
+export function respectsBuilds (agent: Pick<Agent, 'settings'>): boolean {
+  return (agent.settings as { respectBuilds?: boolean }).respectBuilds === true
+}
 const OWN_MAX = 6000
 
 /** The blocks this bot placed itself (agent storage, keyed by position). */
@@ -352,14 +357,17 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
   const own = ownBlocks(agent)
   // replace=true (only for an owner): blocks in the footprint that don't fit may be dug and replaced,
   // e.g. our own older builds from before build.own existed. Never inside protected areas.
+  // By default bots may dig anything they need (settings.respectBuilds off). With respectBuilds on,
+  // only natural blocks and their own work, unless an owner asks with replace=true.
+  const respect = respectsBuilds(agent)
   const ownerAsked = !!params.replace && !!ctx.player && agent.isOwner(ctx.player)
-  if (params.replace && !ownerAsked) return fail('replace=true is only for my owners: I don\'t dig up blocks I can\'t tell are mine otherwise')
-  const mine = (p: Pos) => own.has(p) || (ownerAsked && !agent.protectedAreas.isProtected(p))
+  if (respect && params.replace && !ownerAsked) return fail('replace=true is only for my owners: I don\'t dig up blocks I can\'t tell are mine otherwise')
+  const mine = (p: Pos) => own.has(p) || ((!respect || ownerAsked) && !agent.protectedAreas.isProtected(p))
   let diff = diffCells(cells, at, roles, agent.canDig, mine)
   if (diff.blocked.length) {
     const b = diff.blocked[0]!
     if (planned.resumed) agent.storage.delete(ACTIVE_KEY)
-    return fail(`won't build a ${bp.name} at ${fmtPos(origin)}: ${diff.blocked.length} spot${diff.blocked.length === 1 ? '' : 's'} in the footprint hold blocks that look player-made or that I may not dig (${at(b)} at ${fmtPos(b)})`)
+    return fail(`won't build a ${bp.name} at ${fmtPos(origin)}: ${diff.blocked.length} spot${diff.blocked.length === 1 ? '' : 's'} in the footprint hold blocks that ${respect ? 'look player-made (respectBuilds is on; an owner can say replace=true) or that ' : ''}I may not dig (${at(b)} at ${fmtPos(b)})`)
   }
   const solid = solidCells(cells)
   const total = solid.length
@@ -440,7 +448,7 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
       const above = at({ x: c.x, y: c.y + 1, z: c.z })
       if (!isReplaceable(above)) {
         const b = bot.blockAt(vec(bot, c.x, c.y + 1, c.z))
-        if (!b || !agent.canDig || !isNaturalBlock(b.name)) { errors.push(`no headroom for the door at ${fmtPos(c)} (${above})`); return 'failed' }
+        if (!b || !agent.canDig || (respectsBuilds(agent) && !isNaturalBlock(b.name) && !own.has(b.position))) { errors.push(`no headroom for the door at ${fmtPos(c)} (${above})`); return 'failed' }
         await reachToDig(bot, b.position, signal, log)
         await equipFor(bot, b)
         await digBlock(bot, b, signal)

@@ -51,6 +51,8 @@ export const ProfileSchema = z.object({
   username: z.string().optional(),
   owners: z.array(z.string()).optional(),
   canDig: z.boolean().optional(),
+  /** Leave blocks that look player-made alone (default off: the bot may dig and use anything it needs). */
+  respectBuilds: z.boolean().optional(),
   persona: z.string().optional(),
   server: z.object({
     host: z.string().optional(),
@@ -149,6 +151,7 @@ export function profilePath (name: string, dir = PROFILES_DIR): string | null {
 export function parseProfile (text: string, name = 'profile', file = '(inline)'): LoadedProfile {
   const profile = ProfileSchema.parse(YAML.parse(text))
   const settings: Record<string, unknown> = { ...profile.settings }
+  if (profile.respectBuilds !== undefined) settings.respectBuilds = profile.respectBuilds
   if (profile.llm) settings.llm = { ...(settings.llm as object | undefined), ...profile.llm }
   if (profile.humanize !== undefined) settings.humanize = profile.humanize
   if (profile.reflexes) settings.reflexes = { ...(settings.reflexes as object | undefined), ...profile.reflexes }

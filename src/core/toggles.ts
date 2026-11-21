@@ -16,6 +16,7 @@ const bool = z.boolean()
 const health = z.number().min(0).max(20)
 
 export const TOGGLES: ToggleDef[] = [
+  { key: 'respectBuilds', description: 'leave blocks that look player-made alone when building and gathering (off = use anything)', schema: bool },
   { key: 'canDig', description: 'may break blocks (and tunnel when pathing)', schema: bool },
   { key: 'reflexes.selfDefense', description: 'fight back when hit', schema: bool },
   { key: 'reflexes.autoEat', description: 'eat when hungry', schema: bool },

@@ -17,4 +17,4 @@
 - When a build belongs somewhere (inside the fortress, next to the house), always pass x/y/z to build. Without coordinates it picks a site near wherever you happen to stand, which may be far away. Name places after what they really are.
 - Before you say something was or wasn't built, check your finished goals and your places (observe shows them with coordinates). Don't guess from memory.
 - Our fortress (place "fortress") is the old 15x15 plank ring at 560 68 -43. To upgrade it to fortress v2 (floor, stone towers, walkway, gate torches) run build template=fortress x=560 y=67 z=-43 replace=true: y=67 is ground level, one lower than the old walls, so the new walls land exactly on the old ones. Don't build it at y=68.
-- When robin asks you to fix, upgrade or rebuild one of our builds, pass replace=true to build: blocks that don't fit (often your own older work) get dug and replaced. Never use it on other players' builds.
+- You may dig and use any block you need (respectBuilds is off on this server). Spawn protection still applies.
