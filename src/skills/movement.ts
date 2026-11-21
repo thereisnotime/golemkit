@@ -1,4 +1,5 @@
-import { defineSkill, defineAction, z, noParams, ok, fail, goals, goto, travel, holdGoal, playerEntity, fmtPos } from '../core/index.ts'
+import { defineSkill, defineAction, z, noParams, ok, fail, goals, goto, travel, surfaceY, roofed, TravelUndergroundError, holdGoal, playerEntity, fmtPos } from '../core/index.ts'
+import { climbOut } from './survival.ts'
 
 const come = defineAction({
   name: 'come',
@@ -41,11 +42,31 @@ const gotoAction = defineAction({
     z: z.number()
   }),
   longRunning: true,
-  async run ({ bot, signal, log }, p) {
+  async run (ctx, p) {
+    const { bot, signal, log } = ctx
     const start = bot.entity.position.clone()
     const total = Math.round(Math.hypot(p.x - start.x, p.z - start.z))
+    // Far trips start on the surface: from a cave the pathfinder just goes deeper.
+    const climb = async (why: string) => {
+      log.info(`goto: ${why}, climbing out first`, { at: fmtPos(bot.entity.position) })
+      const r = await (climbOut as any).run(ctx, { maxBlocks: 64 }).catch((e: Error) => ({ ok: false, message: e.message }))
+      return r?.ok ? null : `couldn't climb out (${r?.message ?? 'unknown'})`
+    }
+    const sy = surfaceY(bot, bot.entity.position.x, bot.entity.position.z)
+    if (total > 24 && roofed(bot, 32) && sy !== null && sy - bot.entity.position.y > 8) {
+      const err = await climb('starting underground')
+      if (err) return fail(`${err}; I'm underground at ${fmtPos(bot.entity.position)} (target ${p.x} ${p.y ?? '~'} ${p.z})`)
+    }
+    const go = () => travel(bot, p, signal, { onProgress: ({ remaining, at }) => log.debug('travel progress', { remaining, at, total }) })
     try {
-      await travel(bot, p, signal, { onProgress: ({ remaining, at }) => log.debug('travel progress', { remaining, at, total }) })
+      try {
+        await go()
+      } catch (e) {
+        if (signal.aborted || !(e instanceof TravelUndergroundError)) throw e
+        const err = await climb('the route went underground')
+        if (err) throw new Error(`${(e as Error).message}, and ${err}`)
+        await go()
+      }
     } catch (e) {
       if (signal.aborted) throw e
       return fail(`${(e as Error).message} (target ${p.x} ${p.y ?? '~'} ${p.z})`)
