@@ -198,6 +198,77 @@ the same `retreat`/`flee` actions and the reflex always outranks the behaviour, 
 never pull the body two ways. `keep_fed` likewise leaves "eat what you carry" to the reflex
 (food < 15) and steps in below 14, or when health is low and food is under 18 (no regen).
 
+## Bodyguard
+
+`bodyguard` protects a player (default: the first owner online) without any LLM turns. Pax has
+it in its profile switched off; an owner turns it on with `!behavior_arm bodyguard` (or "guard
+me"), off with `!behavior_disarm bodyguard`, and tunes it with `!behavior_configure bodyguard
+range=20 warn=false`.
+
+```mermaid
+flowchart TB
+  T(["tick"]) --> ON{"player online?"}
+  ON -- no --> G["wait where they were last seen<br/>or go home (whenGone)"]
+  ON -- "yes, out of sight" --> C["walk to where they<br/>were last seen"]
+  ON -- "yes, in sight" --> W["warn in chat<br/>(rate limited)"]
+  W --> R{"threats to the player?<br/>ranked from the player"}
+  R -- "creeper within 6" --> F["fight it first"]
+  R -- "archer with a shot" --> A{"can reach it?"}
+  A -- yes --> F
+  A -- no --> B["stand in its line of fire<br/>behind a shield"]
+  R -- "diving phantom,<br/>mob coming for them,<br/>hurt them" --> F
+  R -- none --> Q{"player hurt,<br/>bot has spare food?"}
+  Q -- yes --> FD["toss food"]
+  Q -- no --> P["stand between the player<br/>and the nearest mob, or follow"]
+  F -- "outnumbered or about to die" --> E["reflexes / stay_safe:<br/>retreat, eat, pillar"]
+  classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
+  classDef r fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+  classDef v fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+  class T,G,C a
+  class ON,R,A,Q d
+  class W,P,FD g
+  class F,B v
+  class E r
+```
+
+- **Threats** are judged from the player: anything that hurt them (damage events name the source,
+  arrows the shooter), a creeper within 6 of them (always first), an archer with a clear line to
+  them inside `range`, a phantom diving at them, a mob inside `range` walking towards them or
+  looking at them, anything within 5 of them, and whatever attacks the bot. Neutral mobs
+  (endermen, piglins, wolves) only when they attack; players, pets, villagers, golems and named
+  mobs never. The fight itself is the [fight loop](/concepts/world#fighting) with `maxChase` set to
+  `range`, stopped early when a creeper comes up to the player or the target leads the bot away.
+- **Position**: with a mob around but nothing to fight, the bot stands on the line between the
+  player and the mob at the follow distance (at most halfway). Flyers are fought from next to
+  the player.
+- **Archers** it can't get to (on a ridge, across water) are blocked instead for 20 s: it stands
+  where it covers the arrow's line to the player and raises a shield (archers high up shoot
+  steeply, so the spot moves right next to the player; when no spot covers the line it closes in).
+- **Warnings** (`warn`): "creeper behind you", "2 zombies to your left", "skeleton on the ridge
+  east", "phantoms incoming". Melee mobs and creepers are relative to where the player looks,
+  archers by compass. At most one every 5 s, the same one (kind and direction) every 30 s. Public
+  chat, or whispers with `whisper: true`.
+- **Feeding** (`feed`): the server sends other players' health in entity metadata but never their
+  hunger, so it feeds by health only: at 10 or less, within 5 blocks, nothing close, at most
+  every 30 s, 1-2 of its best food, never below `keepFood` items for itself. It whispers what it
+  tossed. Where the server hides player health it doesn't feed at all.
+- **Night**: while it is armed and the player is online, `stay_safe` doesn't go home or dig in;
+  the reflexes don't [bunker](/concepts/world#phantoms-bunker) away from phantoms unless health is 6 or less. Surrounded (pillar),
+  low health (retreat) and the back-off to eat at 4 health still apply.
+- **Reflexes**: while `protect` holds the body the reflexes don't start `defend` over it (it fights
+  what attacks the bot too, ranked after threats to the player); when it isn't running they defend
+  the bot as usual. Priority level `behavior` (35) beats `follow_owner`/`guard_owner` and the LLM's
+  actions, so an armed bodyguard keeps the body while the player is in sight; arm it with
+  `priority: npc` to let the LLM work in between.
+- **Gone**: player out of sight but online: walk to where they were last seen (up to `catchUp`).
+  Offline: wait there (`whenGone: stay`) or go home (`whenGone: home`).
+
+The actions behind it are usable on their own: `protect` (the loop) and `feed_player`.
+`scripts/guard-test.ts` measures how often a player standing still at night gets hit with the
+bodyguard armed and with `follow_owner` only.
+
 ## Food: keep_fed, scouting and farm_setup
 
 `keep_fed` used to look only within its `radius`; near a busy spawn there is often nothing,
@@ -337,7 +408,7 @@ Keeps the bot alive: backs away from mobs at low health, pillars up when surroun
 | `avoidWater` | boolean | `true` | get out of water when hostiles are near and health is below 16 |
 | `homeAtNight` | boolean | `true` | go home at night if a home is set |
 | `homeRange` | number (2..64) | `8` | how close to home counts as home at night |
-| `shelterUnprepared` | boolean | `true` | at night without armour, a weapon or food and no home: dig in ([bunker](/concepts/world#phantoms-bunker)) until morning |
+| `shelterUnprepared` | boolean | `true` | at night without armour, a weapon or food and no home: dig in (bunker) until morning |
 
 ### `avoid_mobs`
 
@@ -376,6 +447,25 @@ Looks after food on its own: when hungry (or hurt and too hungry to heal) it eat
 | `scoutRadius` | number (32..512) | `200` | how far from home to scout |
 | `scoutAtNight` | boolean | `false` | also make far trips (scouting, known spots, its farm) at night |
 | `startFarm` | boolean | `true` | as a last resort, start a farm (start_farm) when it has none and has or can get seeds |
+
+### `bodyguard`
+
+*combat · priority behavior (35) · needs `protect` · uses `goto`, `go_home` when present*
+
+A real bodyguard for its owner (or a given player), no LLM needed: stays close and between them and danger, kills mobs that threaten them (creepers near them first, archers with a shot at them, diving phantoms, mobs coming for them or that hurt them), blocks arrows with a shield, warns them in chat, tosses them food when they look hurt, and stays with them at night instead of going home. Never attacks players, pets, villagers, golems or named mobs. Arm it when your owner says "guard me".
+
+| option | type | default | description |
+|---|---|---|---|
+| `player` | string |  | who to protect; default the first owner online |
+| `distance` | number (1..8) | `3` | follow distance, blocks |
+| `range` | number (6..32) | `16` | protect radius around the player, blocks |
+| `feed` | boolean | `true` | toss food to the player when their health is low (only if the server sends player health) |
+| `keepFood` | integer (0..64) | `4` | food items to keep for itself when feeding |
+| `warn` | boolean | `true` | warn the player in chat: "creeper behind you", "skeleton on the ridge east", "phantoms incoming" |
+| `chat` | boolean | `true` | short callouts (fed you, ...) |
+| `whisper` | boolean | `false` | send warnings as whispers instead of public chat |
+| `whenGone` | `stay` \| `home` | `"stay"` | player offline: wait where they were last seen (stay) or go home |
+| `catchUp` | number (16..256) | `48` | player online but out of sight: walk to where they were last seen, up to this far |
 
 ### `guard_owner`
 
