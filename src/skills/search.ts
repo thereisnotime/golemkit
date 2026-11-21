@@ -876,7 +876,10 @@ async function gatherOnce (ctx: Ctx, item: string, source: GatherSource, want: n
   }
   if (!agent.canDig) return 'digging is disabled for this bot'
   if (source.how === 'chop' && source.block) {
-    // one kind of wood: dig those logs (felling takes whatever tree is nearest)
+    // one kind of wood: dig those logs (felling takes whatever tree is nearest), only from trees
+    const onTrees = bot.findBlocks({ matching: ids(bot, [source.block]), maxDistance: 48, count: 64 })
+      .filter(p => { const sy = surfaceY(bot, p.x, p.z); return sy === null || sy - p.y <= 12 })
+    if (!onTrees.length) return `no ${source.block} on trees within 48 blocks`
     const r = await tidyStations(ctx, () => collectBlocks(ctx, source.block!, Math.min(64, want)))
     return r.message
   }
