@@ -106,6 +106,8 @@ export interface UserMessageInput {
   budgetNote?: string
   /** The active goal and plan (GoalStore.fmtPrompt), shown near the top. */
   goal?: string
+  /** Recently finished goals (GoalStore.fmtHistory). */
+  history?: string
 }
 
 export function describeTrigger (t: Trigger): string {
@@ -143,10 +145,11 @@ function describeGoalTrigger (t: Extract<Trigger, { kind: 'goal' }>): string {
   }
 }
 
-export function buildUserMessage ({ trigger, observation, recent, summary, notes, budgetNote, goal }: UserMessageInput): string {
+export function buildUserMessage ({ trigger, observation, recent, summary, notes, budgetNote, goal, history }: UserMessageInput): string {
   const parts: string[] = []
   parts.push(`## What happened\n${describeTrigger(trigger)}`)
   if (goal) parts.push(`## Your active goal\n${goal}`)
+  if (history) parts.push(`## Goals you finished recently (what you already did; trust this and your places over guesses)\n${history}`)
   parts.push(`## You right now\n${compactJson(observation)}`)
   if (summary) parts.push(`## Earlier (rolled up)\n${summary}`)
   parts.push(`## Recent chat and events (oldest first)\n${recent.length ? recent.map(fmtEvent).join('\n') : '(none)'}`)

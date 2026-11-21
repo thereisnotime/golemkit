@@ -235,7 +235,7 @@ export const navigation = () => defineSkill({
     return {
       home: home ? fmtPos(home) : null,
       homeDistance: home && sameDimension(bot, home) ? Math.round(distanceTo(bot, home)) : null,
-      places: Object.keys(getPlaces(agent))
+      places: Object.fromEntries(Object.entries(getPlaces(agent)).slice(0, 20).map(([k, v]) => [k, fmtPos(v)]))
     }
   }
 })

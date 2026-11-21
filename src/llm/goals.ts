@@ -105,6 +105,15 @@ export class GoalStore {
     return this.storage.get<FinishedGoal[]>(HISTORY_KEY, [])
   }
 
+  /** The last few finished goals (2 days), for the prompt: so "did you build X?" gets a true answer. */
+  fmtHistory (n = 4): string | undefined {
+    const since = this.now() - 48 * 3_600_000
+    const h = this.history().filter(g => g.at >= since).slice(-n)
+    if (!h.length) return undefined
+    const ago = (t: number) => { const m = Math.round((this.now() - t) / 60_000); return m < 90 ? `${m} min ago` : `${Math.round(m / 60)} h ago` }
+    return h.map(g => `- ${g.status} ${ago(g.at)}: ${g.text.slice(0, 120)}${g.result ? ` -> ${g.result.slice(0, 160)}` : ''}`).join('\n')
+  }
+
   private save (g: Goal): Goal {
     g.updatedAt = this.now()
     this.storage.set(GOAL_KEY, g)

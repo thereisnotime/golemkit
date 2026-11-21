@@ -521,6 +521,7 @@ export class LlmRuntime {
       summary: this.memory.summary,
       notes,
       goal: this.goals.fmtPrompt(),
+      history: this.goals.fmtHistory(),
       budgetNote: this.budget.turnsPerHour > 0 && spent.turns > this.budget.turnsPerHour * 0.8 ? 'Running low on thinking budget this hour: be brief, few tool calls.' : undefined
     })
     const player = chat?.from ?? (trigger.kind === 'event' || trigger.kind === 'goal' ? trigger.player : undefined)
