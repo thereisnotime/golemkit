@@ -337,7 +337,7 @@ Keeps the bot alive: backs away from mobs at low health, pillars up when surroun
 | `avoidWater` | boolean | `true` | get out of water when hostiles are near and health is below 16 |
 | `homeAtNight` | boolean | `true` | go home at night if a home is set |
 | `homeRange` | number (2..64) | `8` | how close to home counts as home at night |
-| `shelterUnprepared` | boolean | `true` | at night without armour, a weapon or food and no home: dig in (bunker) until morning |
+| `shelterUnprepared` | boolean | `true` | at night without armour, a weapon or food and no home: dig in ([bunker](/concepts/world#phantoms-bunker)) until morning |
 
 ### `avoid_mobs`
 

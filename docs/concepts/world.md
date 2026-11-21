@@ -174,7 +174,10 @@ flowchart TB
   weapon or food; without a home it digs in with `bunker` until morning (needs digging, not
   under a roof already).
 
-`scripts/fight-test.ts` measures kills, deaths and damage over a night on the live server.
+Two live benchmarks: `scripts/fight-test.ts` stands the bot outside for a night and counts kills,
+deaths and damage taken; `scripts/arena-test.ts` uses an op account to hand out the same gear
+after every death and summon the same waves of mobs (2 zombies, a skeleton, a spider, a creeper
+every other wave), so runs of different versions compare directly.
 
 ## Reflexes
 

@@ -8,4 +8,4 @@
 - [x] `stay_safe`: unprepared at night goes home sooner or bunkers
 - [x] Toggles `combat.crits`, `combat.strafe`, `combat.disengageToHeal`, `combat.autoArmor`, `combat.maxChase`
 - [x] Docs: world.md (fight loop diagram), live-config.md
-- [x] `scripts/fight-test.ts`, live runs before/after
+- [x] `scripts/fight-test.ts` and `scripts/arena-test.ts`, live runs before/after
