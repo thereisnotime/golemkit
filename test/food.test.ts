@@ -100,7 +100,7 @@ test('scout give-up: night, health, mobs, stuck, distance and time', () => {
   assert.equal(scoutStopReason(p), null)
   assert.match(String(scoutStopReason({ ...p, night: true })), /night/)
   assert.equal(scoutStopReason({ ...p, night: true }, { ...DEFAULT_SCOUT_LIMITS, atNight: true }), null)
-  assert.match(String(scoutStopReason({ ...p, health: 5 })), /health/)
+  assert.match(String(scoutStopReason({ ...p, health: 5, hostilesNear: 1 })), /health/)
   assert.match(String(scoutStopReason({ ...p, hostilesNear: 3 })), /mobs/)
   assert.match(String(scoutStopReason({ ...p, consecutiveFailures: 4 })), /stuck 4 times/)
   assert.match(String(scoutStopReason({ ...p, walked: 5000 })), /walked 5000 blocks/)
@@ -299,4 +299,11 @@ test('keep_fed: nothing in range, scouts, finds nothing, starts a farm and says 
   assert.match(r.message, /still hungry \(food 8\/20\)/)
   assert.match(r.message, /scouted 180 blocks east/)
   assert.match(r.message, /started a 9x9 wheat farm at 5 63 5/)
+})
+
+test('scouting at low health: allowed when nothing is around, stopped with mobs near', async () => {
+  const { scoutStopReason } = await import('../src/skills/foodPlan.ts')
+  const base = { night: false, health: 1, hostilesNear: 0, consecutiveFailures: 0, legs: 0, walked: 0, elapsedMs: 0 }
+  assert.equal(scoutStopReason(base as any), null, 'starving and alone: go find food')
+  assert.match(scoutStopReason({ ...base, hostilesNear: 1 } as any)!, /health is low/)
 })

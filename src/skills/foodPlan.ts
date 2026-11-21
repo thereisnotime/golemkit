@@ -94,7 +94,9 @@ export const DEFAULT_SCOUT_LIMITS: ScoutLimits = { maxLegs: 24, maxFailures: 4, 
 /** Why scouting should stop now, or null to keep going. */
 export function scoutStopReason (p: ScoutProgress, l: ScoutLimits = DEFAULT_SCOUT_LIMITS): string | null {
   if (p.night && !l.atNight) return 'night fell'
-  if (p.health <= l.minHealth) return `health is low (${Math.round(p.health)}/20)`
+  // Low health only stops scouting when something is around to hurt us: health won't come back
+  // without food, so refusing to scout at low health in a quiet daytime world is a deadlock.
+  if (p.health <= l.minHealth && p.hostilesNear > 0) return `health is low (${Math.round(p.health)}/20) with mobs near`
   if (p.hostilesNear >= 3) return 'too many mobs around'
   if (p.consecutiveFailures >= l.maxFailures) return `stuck ${p.consecutiveFailures} times in a row`
   if (p.legs >= l.maxLegs) return `walked ${p.legs} legs`
