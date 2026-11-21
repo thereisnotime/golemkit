@@ -120,7 +120,8 @@ const bunker = defineAction({
     untilDay: z.boolean().default(true).describe('stay until morning instead of until mobs leave')
   }),
   longRunning: true,
-  async run ({ bot, agent, signal, log }, { depth, maxMinutes, untilDay }) {
+  async run (ctx, { depth, maxMinutes, untilDay }) {
+    const { bot, agent, signal, log } = ctx
     if (!agent.canDig) return fail('digging is disabled for this bot')
     if (agent.protectedAreas.isProtected(bot.entity.position)) return fail("can't dig in here (protected area); move away first")
     const start = bot.entity.position.floored()
@@ -173,19 +174,21 @@ const bunker = defineAction({
     // Climb out: break the seal and pillar back up.
     const lid = bot.blockAt(cover)
     if (lid && lid.boundingBox === 'block') await digBlock(bot, lid, signal).catch(() => {})
-    let out = await agent.act('pillar', { height: dug }, { caller: { kind: 'system', name: 'bunker' } }).catch(() => null)
-    let how = 'climbed back out'
-    if (!out?.ok) {
-      // No blocks left to pillar with: let the pathfinder dig a staircase back to the surface.
+    // Climb out. Run pillar inline (agent.act from inside an action would preempt this very
+    // action), then check we're really back at the surface; if not, dig a staircase up.
+    const outside = () => bot.entity.position.y >= start.y - 0.2
+    await (pillar as any).run(ctx, { height: dug + 1 }).catch(() => null)
+    let how = 'pillared back up'
+    if (!outside()) {
       try {
         await goto(bot, new goals.GoalNear(start.x, start.y, start.z, 1), signal)
-        out = { ok: true, message: '' }
         how = 'dug a staircase out'
       } catch (e) {
         checkAborted(signal)
       }
     }
-    return ok(`sheltered ${dug} blocks down${sealed ? ' (sealed)' : ''} and ${out?.ok ? how : 'stayed in the hole (couldn\'t climb out)'}`)
+    const out = { ok: outside() }
+    return ok(`sheltered ${dug} blocks down${sealed ? ' (sealed)' : ''} and ${out.ok ? how : `am still in the hole at ${fmtPos(bot.entity.position)} (couldn't climb out)`}`)
   }
 })
 
