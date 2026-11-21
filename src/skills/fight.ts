@@ -269,6 +269,22 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
         bestAt = Date.now()
       }
 
+      // a lull: nothing close and hunger blocks regeneration
+      if (tactical && Date.now() - lastEat > 5000) {
+        const nearest = nearestHostileDist(bot)
+        if (shouldEatInLull({ health: bot.health, food: bot.food, nearestMob: nearest, hasFood: !!bestFood(bot), hasGoldenApple: bot.inventory.items().some(i => GOLDEN.test(i.name)) })) {
+          lastEat = Date.now()
+          if (mode === 'path') { bot.pathfinder.setGoal(null); mode = 'still' }
+          clearMoves(bot)
+          lowerShield()
+          await eatNow(bot, signal)
+          held = await equipForTarget(bot, target, flags)
+          lastSwing = Date.now()
+          bestAt = Date.now()
+          continue
+        }
+      }
+
       // ---------- flyers: hold position, track, swing when they dive, shoot otherwise ----------
       if (flying) {
         if (mode === 'path') { bot.pathfinder.setGoal(null); mode = 'still' }
@@ -293,6 +309,7 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
         if (/spider$/.test(target.name ?? '') && target.position.y - me.y > 1.5 && hd < 4) {
           if (mode === 'path') { bot.pathfinder.setGoal(null); mode = 'still' }
           clearMoves(bot)
+          bestAt = Date.now() // waiting on purpose, not stuck
           await bot.lookAt(target.position.offset(0, 0.4, 0), true).catch(() => {})
           await sleep(100, signal)
           continue
@@ -385,18 +402,6 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
         }
       } else if (decision !== 'sprint_hit') clearMoves(bot)
 
-      // a lull: nothing close and hunger blocks regeneration
-      if (tactical && Date.now() - lastEat > 5000) {
-        const nearest = nearestHostileDist(bot)
-        if (shouldEatInLull({ health: bot.health, food: bot.food, nearestMob: nearest, hasFood: !!bestFood(bot), hasGoldenApple: bot.inventory.items().some(i => GOLDEN.test(i.name)) })) {
-          lastEat = Date.now()
-          clearMoves(bot)
-          lowerShield()
-          await eatNow(bot, signal)
-          held = await equipForTarget(bot, target, flags)
-          lastSwing = Date.now()
-        }
-      }
       await sleep(50, signal)
     }
   } finally {

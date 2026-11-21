@@ -97,11 +97,16 @@ async function main (): Promise<void> {
   for (const name of ['keep_fed', 'farm_setup', 'stay_safe', 'follow_owner', 'collect_drops']) await step(bot, 'behavior_disarm', { name }).catch(() => null)
 
   if (mode === 'prep' || mode === 'armour') {
+    while (isNight(bot)) { log(`waiting for day: ${state(bot)}`); await pause(20_000) }
     await walkThere(bot)
     if (mode === 'prep') {
       await step(bot, 'upgrade_tools', { up_to: 'stone', kinds: ['pickaxe', 'sword'], prospect: false })
       const food = () => bot.bot.inventory.items().filter(i => /beef|porkchop|mutton|chicken|rabbit|bread|apple|cod|salmon|potato|carrot/.test(i.name)).reduce((n, i) => n + i.count, 0)
-      for (let i = 0; i < 4 && food() < 6; i++) await step(bot, 'hunt', { count: 2, radius: 48 })
+      for (let i = 0; i < 4 && food() < 6; i++) {
+        const r = await step(bot, 'hunt', { count: 2, radius: 48 })
+        if (!r.ok) await step(bot, 'find_food', { from: 'here', radius: 160, crops: false, maxMinutes: 6 })
+      }
+      await walkThere(bot)
     } else {
       await step(bot, 'upgrade_tools', { up_to: 'iron', armour: true, kinds: ['pickaxe', 'sword'] })
     }
