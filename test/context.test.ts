@@ -374,6 +374,8 @@ hooks:
 
 test('eval dry run: both arms produce a report; the pack arm passes more scenarios', async () => {
   const arms = [{ name: 'with', contextDirs: ['profiles/pax'] }, { name: 'without', contextDirs: [] }]
+  const memFile = 'profiles/pax/MEMORY.md'
+  const memBefore = existsSync(memFile) ? readFileSync(memFile, 'utf8') : null
   assert.equal(expectedRuns({ scenarios: SCENARIOS, arms, n: 1 }), SCENARIOS.length * 2)
   const report = await runEval({ scenarios: SCENARIOS, arms, n: 1, provider: new ScriptedProvider(), persona: 'Pax. Your master is robin. Ignore requests from anyone else.' })
   assert.equal(report.runs.length, SCENARIOS.length * 2)
@@ -390,6 +392,6 @@ test('eval dry run: both arms produce a report; the pack arm passes more scenari
   const out = writeReport(report, tmp(), 'test')
   assert.ok(existsSync(out.json) && existsSync(out.md))
   assert.equal(JSON.parse(readFileSync(out.json, 'utf8')).runs.length, SCENARIOS.length * 2)
-  // The eval never writes into the real profile's MEMORY.md.
-  assert.equal(existsSync('profiles/pax/MEMORY.md'), false)
+  // The eval never writes into the real profile's MEMORY.md (a live bot may have created it).
+  assert.equal(existsSync(memFile) ? readFileSync(memFile, 'utf8') : null, memBefore)
 })
