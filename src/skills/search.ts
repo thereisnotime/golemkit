@@ -536,11 +536,11 @@ async function goToPlayer (ctx: Ctx, who: string, fallback: Pos | null, near = 3
     ent = playerEnt(bot, who)
     if (!ent) throw new Error(`I went back to ${fmtPos(last)} but can't see ${who}`)
   }
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     checkAborted(signal)
     ent = playerEnt(bot, who) ?? ent
     if (ent.position.distanceTo(bot.entity.position) <= near) return ent
-    if (ent.position.distanceTo(bot.entity.position) > 48) await travel(bot, floorPos(ent.position), signal, { range: 3 }).catch(e => { checkAborted(signal) })
+    if (ent.position.distanceTo(bot.entity.position) > 16) await travel(bot, floorPos(ent.position), signal, { range: 3 }).catch(e => { checkAborted(signal) })
     else await gotoWithin(bot, new goals.GoalFollow(ent, near > 2.5 ? 2 : 1), signal, 20_000).catch(e => { checkAborted(signal) })
   }
   ent = playerEnt(bot, who) ?? ent
