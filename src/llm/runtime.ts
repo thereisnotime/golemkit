@@ -228,6 +228,15 @@ export class LlmRuntime {
 
   // ---------------------------------------------------------------- inputs
 
+  /** Players online besides us and `except`. */
+  private othersOnline (except: string): number {
+    try {
+      const map = (this.agent as any).bot?.players
+      if (!map) return 1 // unknown: don't assume we're alone
+      return Object.keys(map).filter(p => p !== this.agent.username && p !== except).length
+    } catch { return 1 }
+  }
+
   onChat (msg: ChatMessage): void {
     this.memory.push({ kind: msg.whisper ? 'whisper' : 'chat', from: msg.from, text: msg.message })
     const t = this.opts.triggers ?? {}
@@ -239,7 +248,10 @@ export class LlmRuntime {
     // Follow-ups in an ongoing conversation don't need the bot's name.
     const prefix = process.env.MC_PREFIX ?? '!'
     const conversationMs = listen === 'mention' ? 0 : (t.conversationMs ?? 90_000)
-    const inConversation = last > 0 && now - last < conversationMs && !msg.message.trim().startsWith(prefix)
+    // Alone with an owner (nobody else on the server but bots we can't tell apart): whatever they say
+    // in public chat is for us, as long as we listen beyond direct mentions.
+    const aloneWithOwner = listen !== 'mention' && this.agent.isOwner(msg.from) && this.othersOnline(msg.from) === 0
+    const inConversation = (aloneWithOwner || (last > 0 && now - last < conversationMs)) && !msg.message.trim().startsWith(prefix)
     if (inConversation && (!trigger || trigger.kind === 'chat' && trigger.addressed === false)) {
       trigger = { kind: 'chat', from: msg.from, message: msg.message.trim(), whisper: msg.whisper }
     }
