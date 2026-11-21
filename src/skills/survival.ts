@@ -124,6 +124,12 @@ const bunker = defineAction({
     if (!agent.canDig) return fail('digging is disabled for this bot')
     if (agent.protectedAreas.isProtected(bot.entity.position)) return fail("can't dig in here (protected area); move away first")
     const start = bot.entity.position.floored()
+    // Only worth it if we'll be able to seal the top: we carry a block, or the ground drops one
+    // by hand (dirt, sand...). Stone without a pickaxe drops nothing.
+    const top = bot.blockAt(start.offset(0, -1, 0))
+    const handDrops = /^(dirt|grass_block|coarse_dirt|rooted_dirt|mud|clay|sand|red_sand|snow_block|podzol|mycelium)$/.test(top?.name ?? '')
+    const pickaxe = bot.inventory.items().some(i => /_pickaxe$/.test(i.name))
+    if (!fillerBlock(bot) && !handDrops && !pickaxe) return fail(`no block to seal a shelter with and the ground here (${top?.name ?? 'unknown'}) won't give me one`)
     // Dig down under our feet, but never into liquid, air pockets or bedrock.
     let dug = 0
     for (let i = 1; i <= depth; i++) {
