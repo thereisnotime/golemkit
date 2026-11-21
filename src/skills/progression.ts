@@ -157,6 +157,9 @@ function ironStep (inv: Record<string, number>, nearby: Nearby, kinds: ToolKind[
   const nextNeed = kinds.length ? TOOL_SHAPE[kinds[0]!].head : ARMOUR[armour[0]!]!
   const raw = count(inv, ['raw_iron'])
   const missing = nextNeed - ingots
+  const what = kinds.length ? `an iron ${kinds[0]}` : `an ${armour[0]}`
+  // not enough raw iron for the next tool yet and more to be had: mine first, smelt once
+  if (raw > 0 && raw < missing && (nearby.ironOre || (prospect && stoneNear))) return { do: 'gather', item: 'raw_iron', count: missing - raw, why: `${what} (have ${raw} raw iron)` }
   if (raw > 0) {
     // smelt what we have (all of it: one furnace trip), needs a furnace and fuel
     if (!nearby.furnace && !inv.furnace) {
@@ -180,7 +183,6 @@ function ironStep (inv: Record<string, number>, nearby: Nearby, kinds: ToolKind[
     if (trees) return { do: 'gather', item: 'logs', count: want + 1, why: 'logs for charcoal' }
     return null
   }
-  const what = kinds.length ? `an iron ${kinds[0]}` : `an ${armour[0]}`
   if (nearby.ironOre && missing > 0) return { do: 'gather', item: 'raw_iron', count: missing, why: what }
   if (prospect && stoneNear && missing > 0) return { do: 'gather', item: 'raw_iron', count: missing, why: `${what} (no ore in sight: digging for some)` }
   return null
@@ -303,7 +305,7 @@ export async function upgradeTools (ctx: Ctx, opts: UpgradeRun = {}): Promise<Ac
     if (key === lastKey) { notes.push(`no progress on: ${describe(step)}`); break }
     lastKey = key
     log.debug('upgrade step', { step: describe(step) })
-    const r = await runUpgradeStep(ctx, step)
+    const r = await runUpgradeStep(ctx, step).catch(e => { checkAborted(ctx.signal); return fail((e as Error).message) })
     if (!r.ok) { notes.push(`${describe(step)} failed: ${r.message}`); break }
     done.push(r.message)
   }
