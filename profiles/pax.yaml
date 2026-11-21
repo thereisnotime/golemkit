@@ -51,3 +51,4 @@ behaviors:
   stay_safe: { retreatBelow: 0, avoidWater: false }   # stands its ground like the reflexes above;
                                                       # still pillars up when surrounded, goes home at night
   follow_owner: { player: robin, distance: 3 }   # stay with robin when there is nothing else to do
+  idle_antics: { everySeconds: [40, 120], chat: 0.15 }   # funny/strange stuff now and then when idle

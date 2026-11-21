@@ -424,6 +424,19 @@ Fidgets when there is nothing else to do: glances at nearby players or looks aro
 | `everySeconds` | number (2..120) | `8` | pause between glances |
 | `radius` | number (2..32) | `10` | look at players this close |
 
+### `idle_antics`
+
+*idle · priority idle (10)*
+
+When idle (standing around, nothing to do), now and then does something funny or strange: spins, crouch-dances, stares at the sky, hops, moonwalks, or mutters a line. Pure flavour; runs even while follow_owner is armed.
+
+| option | type | default | description |
+|---|---|---|---|
+| `everySeconds` | list | `[40,120]` | random pause between antics [min, max] |
+| `chat` | number (0..1) | `0.15` | chance an antic comes with a quip in chat (0 = never) |
+| `antics` | list of spin, crouch_dance, sky_stare, bob, victory_hop, head_shake, moonwalk, stare_contest |  | which antics to use; default all |
+| `quips` | list |  | custom chat lines |
+
 <!-- behaviors:end -->
 
 ## Writing your own
