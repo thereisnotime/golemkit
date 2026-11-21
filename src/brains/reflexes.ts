@@ -98,6 +98,16 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           void reflex('defend')
           return
         }
+        // Don't wait for the first hit: a creeper walking up (its blast is the hit) or a mob at arm's
+        // length gets fought now. Same defend action as when hurt.
+        if (selfDefense && bot.health > 0 && !busy && agent.getAction('defend') && !['defend', 'retreat', 'bunker', 'pillar'].includes(agent.currentAction?.name ?? '')) {
+          const t = threats(bot, 8)[0]
+          const d = t ? t.position.distanceTo(bot.entity.position) : Infinity
+          if (t && isHostile(t) && !FLYING.has(t.name ?? '') && (d <= 4 || (t.name === 'creeper' && d <= 7))) {
+            void reflex('defend')
+            return
+          }
+        }
         // wear armour (and a shield/totem) as soon as it's in the inventory: gear_up runs beside the current action
         if (combatCfg().autoArmor !== false && agent.getAction('gear_up') && !bot.currentWindow && Date.now() - gearTriedAt > 10_000 && hasGearUpgrade(gearPlan(bot))) {
           gearTriedAt = Date.now()
