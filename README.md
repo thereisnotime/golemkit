@@ -63,6 +63,7 @@ Self-sufficient NPCs (utility-AI brain, behaviours, `variants/villager.ts`): [do
 LLM-driven bots on your Claude / Codex subscription or an API (`variants/companion.ts`): [docs/guide/llm-brain.md](docs/guide/llm-brain.md).
 NPCs that run their own program and rewrite it with one LLM call when an owner teaches them (`variants/apprentice.ts`): [docs/guide/self-improver.md](docs/guide/self-improver.md).
 Per-profile rules, skills, memory and hooks, with an A/B eval: [docs/guide/context-pack.md](docs/guide/context-pack.md).
+What happened to each bot (deaths, items, actions, daily rollups, `!last_death`): [docs/guide/journal.md](docs/guide/journal.md).
 
 What each skill and action does, including `extendedSkills()` (crafting, chests, farming, woodcutting, building): [docs/skills.md](docs/skills.md).
 Scenes with several bots acting together (`variants/actor.ts`, `scenes/*.yaml`): [docs/guide/scenes.md](docs/guide/scenes.md).

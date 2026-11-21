@@ -199,6 +199,11 @@ function collectSecrets (extra: string[]): string[] {
   return [...out].sort((a, b) => b.length - a.length)
 }
 
+/** Replaces secrets from the environment (and configured extra strings) with ***. */
+export function redactSecrets (s: string): string {
+  return redact(s)
+}
+
 function redact (s: string): string {
   for (const secret of secrets) if (s.includes(secret)) s = s.split(secret).join('***')
   return s

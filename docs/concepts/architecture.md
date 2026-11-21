@@ -73,7 +73,8 @@ a new *session* with a fresh mineflayer `Bot`, and skills/brains get their `setu
 - rate-limited chat (`say`, `whisper`, `reply`), since vanilla kicks for spam
 - persistent storage (`agent.storage`, JSON under `data/bots/<username>/`)
 - `observe()`: a JSON snapshot of the bot and surroundings, extended by skills
-- events: `session`, `sessionEnd`, `chat`, `serverMessage`, `actionStart`, `actionEnd`
+- the event journal (`agent.journal`, JSONL under `data/bots/<username>/journal/`), see [Event journal](../guide/journal.md)
+- events: `session`, `sessionEnd`, `chat`, `serverMessage`, `actionStart`, `actionEnd`, `llmUsage`, `chatOut`, `protectedArea`
 
 ```mermaid
 stateDiagram-v2

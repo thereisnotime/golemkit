@@ -79,6 +79,20 @@ export const ProfileSchema = z.object({
     idleFidget: z.boolean().optional()
   })]).optional(),
   logging: LoggingSchema.optional(),
+  /** Event journal settings (docs/guide/journal.md); false turns it off. Lands in settings.journal. */
+  journal: z.union([z.literal(false), z.object({
+    enabled: z.boolean().optional(),
+    types: z.array(z.string()).optional(),
+    exclude: z.array(z.string()).optional(),
+    retentionDays: z.number().min(0).optional(),
+    rollupRetentionDays: z.number().min(0).optional(),
+    flushMs: z.number().min(100).optional(),
+    caps: z.record(z.string(), z.number().min(0)).optional(),
+    actions: z.object({ includeStatus: z.boolean().optional(), skip: z.array(z.string()).optional() }).optional(),
+    observe: z.boolean().optional(),
+    placeRegion: z.number().min(16).optional(),
+    summarize: z.union([z.boolean(), z.string(), z.object({ provider: z.string() }).passthrough()]).optional()
+  }).strict()]).optional(),
   /**
    * Context pack directory (AGENTS.md, USER.md, skills/, hooks.yaml, MEMORY.md...), see
    * docs/guide/context-pack.md. Default: the sibling directory profiles/<name>/ if it exists.
@@ -122,6 +136,7 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (profile.llm) settings.llm = { ...(settings.llm as object | undefined), ...profile.llm }
   if (profile.humanize !== undefined) settings.humanize = profile.humanize
   if (profile.reflexes) settings.reflexes = { ...(settings.reflexes as object | undefined), ...profile.reflexes }
+  if (profile.journal !== undefined) settings.journal = profile.journal === false ? false : { ...(settings.journal as object | undefined), ...profile.journal }
   if (profile.retry) settings.retry = { ...(settings.retry as object | undefined), ...profile.retry }
   const context = resolveContext(profile.context, name, file)
   if (context !== undefined) settings.context = context

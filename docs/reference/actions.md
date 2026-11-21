@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-13 skills, 40 actions.
+14 skills, 45 actions.
 
 ## building
 
@@ -66,6 +66,16 @@ Fight back against whatever hostile mob is closest (used by reflexes).
 *internal*
 
 No parameters.
+
+### `retreat`
+
+Back off from nearby hostile mobs (used by reflexes at low health).
+
+*internal*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `distance` | number (6..32) |  | `18` |  |
 
 ## containers
 
@@ -177,11 +187,11 @@ Mining and collecting blocks.
 
 ### `collect`
 
-Mine a number of blocks of one type nearby and pick up the drops. Needs digging enabled.
+Mine a number of blocks of one type nearby and pick up the drops. Skips protected areas (spawn): if everything nearby is protected it walks out of the zone first. Needs digging enabled.
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `block` | string | yes |  | block name, e.g. oak_log |
+| `block` | string | yes |  | block name, e.g. oak_log, dirt, cobblestone |
 | `count` | integer (1..64) |  | `1` |  |
 
 ## inventory
@@ -212,6 +222,54 @@ Hold an item in the main hand.
 | param | type | required | default | description |
 |---|---|---|---|---|
 | `item` | string | yes |  |  |
+
+## journal
+
+What happened to the bot: events, deaths, daily summaries, going back for dropped items.
+
+### `recall_events`
+
+What happened: recent journal events (deaths, damage, kills, items, chat, actions, players, places...). Filter by type, time, place, player or text.
+
+*non-exclusive · aliases: `events`, `journal`*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, connect, disconnect, llm_turn; or deaths, chat, items, blocks, players, combat, connections |
+| `since` | string |  |  | how far back: 30m, 1h, 2d, today, yesterday, a date (YYYY-MM-DD); default 24h |
+| `player` | string |  |  | only events involving this player |
+| `near` | string |  |  | only events near "x y z" or "x z", optionally with a radius as 4th number (default 32) |
+| `text` | string |  |  | only events whose details contain this text |
+| `limit` | integer (1..50) |  | `10` |  |
+| `fleet` | boolean |  | `false` | include the other bots on this server |
+
+### `last_death`
+
+Where and when the bot last died, what killed it, what it lost, and whether the drops may still be there.
+
+*non-exclusive · aliases: `death`, `where_died`*
+
+No parameters.
+
+### `history`
+
+Summary of a period from the journal rollups: online time, deaths, actions and failures, items, places, players. Period: today, yesterday, a date, 3h, or an hour range like 10-12.
+
+*non-exclusive · aliases: `summary`*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `period` | string |  | `"today"` | today | yesterday | YYYY-MM-DD | 1h, 6h | 10-12 (hours today) |
+
+### `goto_death`
+
+Walk back to where the bot last died to pick up its dropped items (they despawn 5 minutes after death).
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `pickup` | boolean |  | `true` | pick up dropped items there |
 
 ## movement
 

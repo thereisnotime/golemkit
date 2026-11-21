@@ -6,7 +6,7 @@ each one is for and how it behaves.
 
 Two bundles live in `src/skills/index.ts`:
 
-- `standardSkills()`: status, movement, combat, survival, inventory, gather.
+- `standardSkills()`: status, movement, combat, survival, inventory, gather, journal.
 - `extendedSkills()`: crafting, containers, farming, woodcutting, building, pickup.
 
 `navigation()` is exported on its own (the villager bot uses it).
@@ -64,6 +64,16 @@ Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actio
 | action | |
 |---|---|
 | `collect` *dig* | Mine N blocks of one type nearby and pick up the drops. |
+
+### journal
+See [Event journal](./guide/journal.md).
+
+| action | |
+|---|---|
+| `recall_events` *ne* | Recent journal events, filtered by type, time, place, player or text. |
+| `last_death` *ne* | Where and when it last died, the cause, what it lost, whether the drops may still be there. |
+| `history` *ne* | Summary of today, yesterday, a date or an hour range. |
+| `goto_death` | Walk back to the last death spot and pick up the drops. |
 
 ### navigation
 | action | |

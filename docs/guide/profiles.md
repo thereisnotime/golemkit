@@ -42,6 +42,9 @@ settings:                     # free-form, read with agent.settings
   home: [100, 64, -20]
 logging:                      # optional, same keys as the fleet `logging:` block
   level: info,Pax/llm=debug
+journal:                      # optional, event journal settings (on by default)
+  retentionDays: 14
+  exclude: [player_seen]
 ```
 
 | key | |
@@ -52,6 +55,7 @@ logging:                      # optional, same keys as the fleet `logging:` bloc
 | `llm` | LLM brain settings: provider, model, effort, login, token source, `listen`, `immersive`, aliases, budget |
 | `settings` | anything the variant's skills/brains read |
 | `logging` | applied when the profile is run on its own |
+| `journal` | event journal: types, caps, retention, optional LLM summary; `false` turns it off. See [Event journal](./journal) |
 | `context` | context pack dir (default: `profiles/<name>/` if it exists), see [Context packs](./context-pack) |
 
 ## LLM listening modes

@@ -1,0 +1,14 @@
+// Event journal: typed facts about what happens to each bot, rolled up and queryable.
+// See docs/guide/journal.md.
+export { Journal, ITEM_DESPAWN_MS, rollupEvents, type JournalOptions, type DeathView, type PeriodSummary } from './journal.ts'
+export { JournalCapture, maskChat, reasonText, inventoryCounts } from './capture.ts'
+export { resolveJournalConfig, DEFAULT_CAPS } from './config.ts'
+export { JOURNAL_TYPES, type JournalType, type JournalEvent, type JournalConfig, type SummarizeConfig, type Pos } from './types.ts'
+export { parseDeathMessage, parseAdvancement, type DeathInfo } from './deathMessages.ts'
+export { RateLimiter, InventoryTracker, DamageAggregator, BlockAggregator, countsDiff, type Counts } from './aggregate.ts'
+export { filterEvents, matchEvent, involvesPlayer, type JournalQuery } from './query.ts'
+export { buildDayRollup, buildSection, clusterPlaces, onlineMs, type DayRollup, type RollupSection, type PlaceCluster, type DeathRecord } from './rollup.ts'
+export { parseRange, dayKey, dayStart, ago, clock, type TimeRange } from './time.ts'
+export { fmtEvent, fmtSection, fmtRollup, fmtCounts, fmtNet, fmtDuration } from './format.ts'
+export { summarizeRollup, summaryInput, SUMMARY_SYSTEM } from './summary.ts'
+export { fleetQuery } from './fleet.ts'

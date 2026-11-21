@@ -25,6 +25,8 @@ import { ProtectedAreas, watchRefusedDigs } from './protection.ts'
 import { resolveRetry, actionAttempts, backoffMs, isRetryableResult, type RetryConfig } from './retry.ts'
 import { resolveHumanize, typingDelayMs, styleLine, holdStill, between, type HumanizeOptions } from './humanize.ts'
 import type { UsageSnapshot } from '../llm/usage.ts'
+import { Journal } from './journal/journal.ts'
+import { JournalCapture } from './journal/capture.ts'
 
 export interface ChatMessage {
   from: string
@@ -52,6 +54,10 @@ export type AgentEvents = {
   actionEnd: (info: ActionInfo, result: ActionResult) => void
   /** After every LLM turn (llm brain): that turn's usage plus session/today/all-time totals. */
   llmUsage: (snapshot: UsageSnapshot) => void
+  /** A chat line or whisper the bot actually sent (after the queue and humanize styling). */
+  chatOut: (msg: { to?: string, message: string }) => void
+  /** The server refused a block break here and the area is now avoided (see markProtected). */
+  protectedArea: (pos: { x: number, y: number, z: number }) => void
   stopped: () => void
 }
 
@@ -107,6 +113,9 @@ export class Agent extends TypedEmitter<AgentEvents> {
   private readonly registryCache: RegistryCache
   /** Areas where the server refuses block breaking (learned); the pathfinder won't dig there. */
   readonly protectedAreas: ProtectedAreas
+  /** Event journal (data/bots/<username>/journal/), see docs/guide/journal.md. */
+  readonly journal: Journal
+  private readonly journalCapture: JournalCapture
 
   private _bot: Bot | null = null
   private _fleet: Fleet | null = null
@@ -147,6 +156,8 @@ export class Agent extends TypedEmitter<AgentEvents> {
     this.protectedAreas = new ProtectedAreas(join('data', `protected-${server.host}-${server.port}.json`))
     this.skills = definition.skills
     this.brains = definition.brains
+    this.journal = new Journal({ dir: join(this.dataDir, 'journal'), settings: this.settings, log: this.log.child('journal'), bot: this.username })
+    this.journalCapture = new JournalCapture(this, this.journal)
 
     for (const skill of this.skills) {
       for (const action of skill.actions ?? []) this.registerAction(action)
@@ -389,6 +400,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
       if (to) bot.whisper(to, msg)
       else bot.chat(msg)
       this.logs.chat.info(to ? `-> ${to}: ${msg}` : `> ${msg}`)
+      this.emit('chatOut', { ...(to ? { to } : {}), message: msg })
     } catch (e) {
       this.logs.chat.warn(`chat failed: ${(e as Error).message}`)
     }
@@ -400,6 +412,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
    */
   markProtected (pos: { x: number, y: number, z: number }): void {
     if (!this.protectedAreas.add(pos)) return
+    this.emit('protectedArea', pos)
     this.log.info('server refuses block breaking here, not digging in this area anymore', { at: fmtPos(pos) })
     const bot = this._bot
     const goal = bot?.pathfinder?.goal
@@ -501,6 +514,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
     }
     this._bot?.quit()
     this.storage.flush()
+    this.journal.stop()
     this.emit('stopped')
   }
 
@@ -579,6 +593,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
         moves.exclusionAreasBreak.push(this.protectedAreas.breakCost)
         bot.pathfinder.setMovements(moves)
         cleanups.push(watchRefusedDigs(bot, (pos) => this.markProtected(pos)))
+        try { cleanups.push(this.journalCapture.session(bot)) } catch (e) { this.log.warn(`journal: ${(e as Error).message}`) }
 
         const chatTimer = setInterval(() => this.pumpChat(), 100)
         cleanups.push(() => clearInterval(chatTimer))

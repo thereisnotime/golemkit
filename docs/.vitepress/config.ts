@@ -29,6 +29,7 @@ export default withMermaid(defineConfig({
           { text: 'Self-improver', link: '/guide/self-improver' },
           { text: 'Context packs and evals', link: '/guide/context-pack' },
           { text: 'Logging', link: '/guide/logging' },
+          { text: 'Event journal', link: '/guide/journal' },
           { text: 'Scenes', link: '/guide/scenes' },
           { text: 'Deployment', link: '/guide/deployment' }
         ]

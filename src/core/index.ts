@@ -15,4 +15,10 @@ export { Storage } from './storage.ts'
 export { Fleet, Blackboard, type FleetMessage, type FleetEvents } from './fleet.ts'
 export { goals, Movements, goto, gotoTimed, travel, holdGoal, playerEntity, isHostile, FLYING, nearestHostile, itemName, fmtPos } from './helpers.ts'
 export { isModdedBlock, MODDED_BLOCK } from './modded.ts'
+export {
+  Journal, JournalCapture, resolveJournalConfig, fleetQuery, parseDeathMessage, parseAdvancement, parseRange,
+  fmtEvent, fmtSection, fmtRollup, fmtCounts, ago, buildDayRollup, buildSection, ITEM_DESPAWN_MS, JOURNAL_TYPES,
+  type JournalEvent, type JournalQuery, type JournalConfig, type JournalType, type DeathView, type DayRollup,
+  type RollupSection, type PeriodSummary, type DeathInfo
+} from './journal/index.ts'
 export { z } from 'zod'
