@@ -582,9 +582,15 @@ async function deliver (ctx: Ctx, who: string, items: Record<string, number>, fa
         if (left <= 0) break
         checkAborted(signal)
         const k = Math.min(stack.count, left)
-        await bot.toss(stack.type, null, k).catch(() => {})
-        left -= k
-        await sleep(150, signal)
+        // whole stacks with tossStack (what the drop action does); toss(type, n) only for part of one
+        try {
+          if (k === stack.count) await bot.tossStack(stack)
+          else await bot.toss(stack.type, null, k)
+          left -= k
+        } catch (e) {
+          ctx.log.debug('toss failed', { item: n, error: (e as Error).message })
+        }
+        await sleep(250, signal)
       }
     }
     const tossed = before - invCount(bot, has)
