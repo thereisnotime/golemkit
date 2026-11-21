@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-22 skills, 92 actions.
+22 skills, 93 actions.
 
 ## blueprint-library
 
@@ -184,12 +184,12 @@ Fighting hostile mobs, guarding players and hunting animals for food.
 
 ### `attack`
 
-Fight the nearest hostile mob, or a specific entity by id.
+Fight the most dangerous hostile mob nearby, or a specific entity by id. Never attacks players, villagers, golems, pets or named mobs.
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `entityId` | number |  |  | entity id; default nearest hostile mob |
-| `radius` | number |  | `16` |  |
+| `entityId` | number |  |  | entity id; default the most dangerous hostile mob nearby |
+| `radius` | number |  | `16` | how far to look for a target, in blocks |
 
 ### `guard`
 
@@ -204,7 +204,7 @@ Stay near a player and kill hostile mobs that come close to them, until stopped.
 
 ### `defend`
 
-Fight back against whatever hostile mob is closest (used by reflexes).
+Fight back against the hostile mobs around, most dangerous first (used by reflexes).
 
 *internal*
 
@@ -231,6 +231,14 @@ Hunt passive animals (cow, pig, sheep, chicken, rabbit, mooshroom) for food and 
 | `radius` | number (4..64) |  | `24` | how far to look, in blocks |
 | `pens` | boolean |  | `false` | also hunt animals inside fences (only your own farm) |
 | `keepAtLeast` | integer (0..32) |  | `0` | leave at least this many adults of each kind alive (sustainable herd) |
+
+### `gear_up`
+
+Put on the best armour in the inventory and put a totem of undying or a shield in the offhand.
+
+*non-exclusive*
+
+No parameters.
 
 ## config
 

@@ -31,6 +31,11 @@ can't change their own.
 | `combat.adaptiveWeapon` | on/off | best weapon per target (damage × speed, enchantments, one-hit finishers, axe vs shields) |
 | `combat.ranged` | on/off | bow/crossbow for flyers and targets out of reach, if it has arrows |
 | `combat.shield` | on/off | raise a shield against ranged mobs between swings |
+| `combat.crits` | on/off | jump and hit while falling for critical hits (×1.5), sprint into the first hit for knockback (default on) |
+| `combat.strafe` | on/off | keep spacing and circle melee mobs between swings, step back after a hit (default on) |
+| `combat.disengageToHeal` | on/off | at 4 health or less with food, back off briefly to eat and fight on; works with `retreatBelow 0` (default on) |
+| `combat.autoArmor` | on/off | wear the best armour in the inventory, shield or totem in the offhand (default on) |
+| `combat.maxChase` | 2–64 | stop chasing a mob this many blocks from where the fight started (default 16) |
 | `humanize.enabled` | on/off | player-like reaction and typing delays |
 | `humanize.typoRate` | 0–1 | chance of a typo per message |
 | `humanize.lowercase` | on/off | write chat in lower case |

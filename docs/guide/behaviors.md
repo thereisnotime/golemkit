@@ -324,9 +324,9 @@ behaviour also accepts `priority: idle | npc | behavior`.
 
 ### `stay_safe`
 
-*safety · priority behavior (35) · uses `retreat`, `flee`, `pillar`, `goto`, `go_home` when present*
+*safety · priority behavior (35) · uses `retreat`, `flee`, `pillar`, `goto`, `go_home`, `bunker` when present*
 
-Keeps the bot alive: backs away from mobs at low health, pillars up when surrounded (if it can place blocks), gets out of water when mobs are around, and heads home at night if a home is set. Arm it on any bot that roams.
+Keeps the bot alive: backs away from mobs at low health, pillars up when surrounded (if it can place blocks), gets out of water when mobs are around, heads home at night if a home is set (sooner when it has no armour, weapon or food), and without a home digs in for the night when it is unprepared. Arm it on any bot that roams.
 
 | option | type | default | description |
 |---|---|---|---|
@@ -337,6 +337,7 @@ Keeps the bot alive: backs away from mobs at low health, pillars up when surroun
 | `avoidWater` | boolean | `true` | get out of water when hostiles are near and health is below 16 |
 | `homeAtNight` | boolean | `true` | go home at night if a home is set |
 | `homeRange` | number (2..64) | `8` | how close to home counts as home at night |
+| `shelterUnprepared` | boolean | `true` | at night without armour, a weapon or food and no home: dig in (bunker) until morning |
 
 ### `avoid_mobs`
 
