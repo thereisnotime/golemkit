@@ -1,10 +1,14 @@
 // Live bodyguard test: how often a player standing still at night gets hit with the bot's
 // bodyguard behaviour armed, against follow_owner only.
 //   node scripts/guard-test.ts prep 900 -300            (day) both walk there, the bot makes a stone sword and hunts food
+//   node scripts/guard-test.ts gear 900 -300            (day) on the spot: hunt, feed_player, chop a tree, stone sword
+//   node scripts/guard-test.ts food 900 -300            (day) scout for animals, bring food back, feed the tester
+//   node scripts/guard-test.ts logs 900 -300            the tester drops its logs, the bot crafts a sword
 //   node scripts/guard-test.ts run 900 -300 5 guard,follow   (night) N minutes per phase, in this order
 // The bot is GUARD_BOT (default GuardTest), owned by GUARD_TESTER (default GuardTester), who
-// stands still (no self-defence; eats when it has food). Hits on the tester are counted from its
-// own health; results append to data/guard-test/results.jsonl.
+// stands still (no self-defence; eats when it has food). A hit is damage to the tester with a
+// source entity or a hostile within 5 blocks (not hunger or falls). Both walk without sprinting
+// (fights still sprint) so long walks don't starve them. Results append to data/guard-test/results.jsonl.
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { Agent, defineVariant, serverFromEnv, PRIORITY, fmtPos, goals, type ActionResult } from '../src/core/index.ts'
 import { standardSkills, extendedSkills, navigation, pickup } from '../src/skills/index.ts'
@@ -139,42 +143,6 @@ async function main (): Promise<void> {
     await walkThere(bot)
     await walkThere(tester, X + 2, Z + 2)
     log(`logs: bot ${state(bot)} | tester ${state(tester)}`)
-  } else if (mode === 'reset') {
-    // reset hunger without /kill: walk off a ledge (dying refills food), respawn at spawn, walk back without sprinting
-    const who = (process.env.GUARD_RESET || 'tester,bot').split(',').map(n => n === 'bot' ? bot : tester)
-    for (const a of who) {
-      const b = a.bot
-      const died = new Promise<void>(resolve => b.once('death', () => resolve()))
-      const me = b.entity.position.floored()
-      let edge: { at: any, dir: [number, number] } | null = null
-      const ground = (x: number, z: number, from: number) => { for (let y = from; y > from - 40; y--) { const bl = b.blockAt(me.clone().set(x, y, z)); const up = b.blockAt(me.clone().set(x, y + 1, z)); const up2 = b.blockAt(me.clone().set(x, y + 2, z)); if (bl && bl.boundingBox === 'block' && !/leaves/.test(bl.name) && up?.boundingBox === 'empty' && up2?.boundingBox === 'empty') return y } return -999 }
-      for (let r = 1; r <= 20 && !edge; r++) {
-        for (let dx = -r; dx <= r && !edge; dx++) for (let dz = -r; dz <= r && !edge; dz++) {
-          if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue
-          const gy = ground(me.x + dx, me.z + dz, me.y + 4)
-          if (gy < -900) continue
-          for (const [ux, uz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as [number, number][]) {
-            const ny = ground(me.x + dx + ux, me.z + dz + uz, gy + 1)
-            const liquid = b.blockAt(me.clone().set(me.x + dx + ux, ny + 1, me.z + dz + uz))?.name
-            if (ny > -900 && gy - ny >= Math.ceil(b.health) + 4 && liquid !== 'water' && [1, 2, 3].every(h => b.blockAt(me.clone().set(me.x + dx + ux, gy + h, me.z + dz + uz))?.boundingBox === 'empty')) { edge = { at: me.clone().set(me.x + dx, gy + 1, me.z + dz), dir: [ux, uz] }; break }
-          }
-        }
-      }
-      if (!edge) { log(`${a.username}: no ledge high enough nearby`); continue }
-      log(`${a.username}: ledge at ${fmtPos(edge.at)}, stepping off`)
-      try { await b.pathfinder.goto(new goals.GoalBlock(edge.at.x, edge.at.y, edge.at.z)) } catch (e) { log(`${a.username}: couldn't stand on the edge: ${(e as Error).message}`); continue }
-      log(`${a.username}: on the edge at ${fmtPos(b.entity.position)}`)
-      await b.lookAt(edge.at.offset(edge.dir[0] * 3 + 0.5, 0, edge.dir[1] * 3 + 0.5), true)
-      b.setControlState('forward', true)
-      b.setControlState('jump', true)
-      await Promise.race([died, pause(6000)])
-      b.setControlState('forward', false)
-      b.setControlState('jump', false)
-      await pause(5000)
-      log(`${a.username}: ${state(a)}`)
-    }
-    await Promise.all([walkThere(bot), walkThere(tester, X + 2, Z + 2)])
-    log(`reset: bot ${state(bot)} | tester ${state(tester)}`)
   } else if (mode === 'food') {
     // daytime: scout for animals, bring food back, feed the tester with feed_player
     const idle = async (a: Agent) => { for (let i = 0; i < 30 && a.currentAction; i++) await pause(1000) }
