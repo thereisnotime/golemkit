@@ -173,6 +173,35 @@ export class Agent extends TypedEmitter<AgentEvents> {
 
   // ---------------------------------------------------------------- settings / toggles
 
+  /**
+   * What the bot is and how it's set up, for observe() (settings.selfAware, on unless set to false):
+   * variant, profile, brains, LLM model and modes, the key toggles and which ones were changed in game.
+   * Armed behaviours come from the behaviours brain's own observe field.
+   */
+  selfSummary (): Record<string, unknown> {
+    const s = this.settings as Record<string, any>
+    const llm = s.llm ?? {}
+    const pick = (o: Record<string, unknown> | undefined, keys: string[]) =>
+      Object.fromEntries(keys.filter(k => o?.[k] !== undefined).map(k => [k, o![k]]))
+    return {
+      variant: this.definition.name,
+      ...(s.profileName ? { profile: s.profileName } : {}),
+      brains: this.brains.map(b => (b as { name?: string }).name).filter(Boolean),
+      owners: this.owners,
+      ...(llm.provider || llm.model ? { llm: pick(llm, ['provider', 'model', 'effort', 'listen', 'immersive', 'aliases']) } : {}),
+      settings: {
+        canDig: this.canDig,
+        respectBuilds: s.respectBuilds === true,
+        ...(s.building ? { building: s.building } : {}),
+        ...(s.reflexes ? { reflexes: pick(s.reflexes, ['selfDefense', 'autoEat', 'retreatBelow', 'waterFightAbove']) } : {}),
+        ...(s.combat ? { combat: s.combat } : {}),
+        ...(s.humanize?.enabled !== undefined ? { humanize: s.humanize.enabled } : {})
+      },
+      changedInGame: Object.keys(this.overrides()),
+      howToChange: 'owners: !config_list / !config_set <key> <value>; behaviours: !behavior_configure'
+    }
+  }
+
   /** Effective settings: profile/variant values with in-game overrides (config_set) on top. */
   get settings (): Record<string, unknown> {
     return this.mergedSettings
@@ -542,8 +571,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
     for (const i of bot.inventory.items()) inventory[itemName(i)] = (inventory[itemName(i)] ?? 0) + i.count
     const snapshot: Record<string, unknown> = {
       username: bot.username,
-      variant: this.definition.name,
-      ...((this.baseSettings as { profileName?: string }).profileName ? { profile: (this.baseSettings as { profileName?: string }).profileName } : {}),
+      ...(this.settings.selfAware === false ? {} : { self: this.selfSummary() }),
       position: fmtPos(pos),
       dimension: bot.game.dimension,
       // World spawn (compass target); context packs use it for "don't dig near spawn" rules.

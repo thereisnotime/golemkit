@@ -21,6 +21,7 @@ can't change their own.
 | key | type | what |
 |---|---|---|
 | `canDig` | on/off | may break blocks and tunnel while pathing |
+| `selfAware` | on/off | show the bot its own variant, profile, model, brains and settings every turn (default on) |
 | `respectBuilds` | on/off | leave blocks that look player-made alone when building (default off: the bot may dig and use anything it needs) |
 | `reflexes.selfDefense` | on/off | fight back when hit |
 | `reflexes.autoEat` | on/off | eat when hungry |

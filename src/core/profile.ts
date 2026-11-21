@@ -53,6 +53,8 @@ export const ProfileSchema = z.object({
   canDig: z.boolean().optional(),
   /** Leave blocks that look player-made alone (default off: the bot may dig and use anything it needs). */
   respectBuilds: z.boolean().optional(),
+  /** Show the bot its own variant/profile/model/settings each turn (default on). */
+  selfAware: z.boolean().optional(),
   persona: z.string().optional(),
   server: z.object({
     host: z.string().optional(),
@@ -156,6 +158,7 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   const profile = ProfileSchema.parse(YAML.parse(text))
   const settings: Record<string, unknown> = { ...profile.settings }
   if (profile.respectBuilds !== undefined) settings.respectBuilds = profile.respectBuilds
+  if (profile.selfAware !== undefined) settings.selfAware = profile.selfAware
   settings.profileName = name   // so the bot can tell which profile it is (observe: profile)
   if (profile.llm) settings.llm = { ...(settings.llm as object | undefined), ...profile.llm }
   if (profile.humanize !== undefined) settings.humanize = profile.humanize
