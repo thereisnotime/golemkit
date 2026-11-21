@@ -38,6 +38,9 @@ fleet bot entry / CLI flags.
 
 ## Profile keys
 
+Some of these can also be changed in game without a restart: see [Feature toggles](../guide/live-config).
+
+
 All optional except `variant`; see [Profiles](../guide/profiles).
 
 | key | what | guide |

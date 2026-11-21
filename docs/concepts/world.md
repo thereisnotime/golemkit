@@ -122,6 +122,25 @@ reflexes:
 
 Pax uses `retreatBelow: 0` and `waterFightAbove: 0`: it always fights back.
 
+## Phantoms: bunker
+
+Phantoms fly, so a bot without a weapon can't win against them. When phantoms attack at night
+and the bot is unarmed or hurt (and can dig, outside protected areas), reflexes run `bunker`:
+dig straight down 3 blocks, seal the hole with a dug block, wait for morning (or until the mobs
+leave), break out and pillar up. Players and LLMs can call `bunker` too.
+
+## Game modes
+
+Bots know their game mode (`gameMode` and a short `gameModeNote` in `observe()`) and notice
+when it changes (`gameModeChanged` event).
+
+| mode | what changes |
+|---|---|
+| survival | everything as described on this page |
+| creative | no hunger or damage: reflexes, `keep_fed` and `stay_safe` switch off; `creative_get` puts any item in the inventory; building takes items from the creative inventory instead of gathering |
+| adventure | hunger and damage apply; breaking/placing is limited by the game |
+| spectator | can only fly and watch |
+
 ## Where this shows up elsewhere
 
 - Deaths, damage and protected areas are recorded in the [journal](../guide/journal).

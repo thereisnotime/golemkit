@@ -10,6 +10,11 @@ const SKIP = new Set(['index.md', 'reference/actions.md'])
 
 /** term (regex source, case-insensitive) -> target. Longer/more specific terms first. */
 const TERMS: [string, string][] = [
+  ['feature toggles?', '/guide/live-config'],
+  ['config_set', '/guide/live-config'],
+  ['game modes?', '/concepts/world#game-modes'],
+  ['bunker', '/concepts/world#phantoms-bunker'],
+  ['idle_antics', '/guide/behaviors'],
   ['action lock', '/concepts/architecture#the-action-lock-and-priorities'],
   ['context packs?', '/guide/context-pack'],
   ['hooks\\.yaml', '/guide/context-pack'],

@@ -68,6 +68,7 @@ Details in [docs/concepts/architecture.md](docs/concepts/architecture.md) and
 The full docs live in [docs/](docs/) (guides, concepts, generated action reference). Browse
 them as a local site with `just docs` (dev server) or `just docs-build` (static HTML).
 
+Change settings in game without a restart (`!config_set`): [docs/guide/live-config.md](docs/guide/live-config.md).
 Profiles (instances, LLM listen modes, immersive mode, humanize, retries, proxy): [docs/guide/profiles.md](docs/guide/profiles.md).
 Movement, protected areas, combat and reflexes: [docs/concepts/world.md](docs/concepts/world.md).
 Self-sufficient NPCs (utility-AI brain, behaviours, `variants/villager.ts`): [docs/guide/npc-brain.md](docs/guide/npc-brain.md).

@@ -315,6 +315,20 @@ still goes through the rate-limited queue, actions still run at llm priority). W
 bridge only serves the brain's CLI provider during a turn. A fixed port with several bots in
 one fleet collides; leave it at 0 (random) there.
 
+## Teaching mods
+
+The `mods` skill tells a bot exactly what this server runs, from the NeoForge [registry sync](/concepts/neoforge#_4-modded-item-and-entity-names) and
+the learned channel list:
+
+- `mods`: installed mods with versions and item/block/mob counts (on mc02: create 6.0.8,
+  ars_nouveau, createdeco, create_sa, ars_additions, createdieselgenerators, createaddition, ...)
+- `mod_items mod=create query=press`: the exact item names a mod adds here
+- `creative_get item=create:mechanical_press`: in creative, put any item in the inventory to hand
+  over with `drop`
+
+The context pack rules tell the model to look these up before explaining a mod, so it teaches
+what's actually installed (with this server's item names) instead of guessing from memory.
+
 ## Writing an LLM bot
 
 ```ts

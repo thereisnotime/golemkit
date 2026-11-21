@@ -22,6 +22,7 @@ export default withMermaid(defineConfig({
           { text: 'Getting started', link: '/guide/getting-started' },
           { text: 'Running bots and fleets', link: '/guide/running' },
           { text: 'Profiles', link: '/guide/profiles' },
+          { text: 'Feature toggles (live config)', link: '/guide/live-config' },
           { text: 'Writing a variant', link: '/guide/writing-a-bot' },
           { text: 'Writing skills', link: '/guide/writing-skills' },
           { text: 'Writing brains', link: '/guide/writing-brains' },
