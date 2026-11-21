@@ -353,7 +353,7 @@ function compare (value: number | undefined, spec: number | string): boolean {
 }
 
 export function template (s: string, vars: Record<string, string | number>): string {
-  return s.replace(/\{(\w+)\}/g, (all, k: string) => (k in vars ? String(vars[k]) : all))
+  return s.replace(/\{(\w+)\}/g, (all, k: string) => (k in vars ? fmtVar(vars[k]) : all))
 }
 
 function substituteDeep (v: unknown, vars: Record<string, string | number>): unknown {
@@ -366,4 +366,9 @@ function substituteDeep (v: unknown, vars: Record<string, string | number>): unk
   if (Array.isArray(v)) return v.map(x => substituteDeep(x, vars))
   if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, substituteDeep(x, vars)]))
   return v
+}
+
+/** Numbers in chat templates: whole numbers as-is, anything else rounded ("6.1666" -> "6"). */
+function fmtVar (v: unknown): string {
+  return typeof v === 'number' && !Number.isInteger(v) ? String(Math.round(v)) : String(v)
 }
