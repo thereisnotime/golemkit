@@ -526,7 +526,7 @@ async function fetchTarget (ctx: Ctx, t: ResolvedTarget, at: Pos | null, count: 
 // ------------------------------------------------------------------ delivery
 
 /** Walks to the player (following if they move) and stays near them. Throws when they can't be found. */
-async function goToPlayer (ctx: Ctx, who: string, fallback: Pos | null): Promise<Entity> {
+async function goToPlayer (ctx: Ctx, who: string, fallback: Pos | null, near = 3.5): Promise<Entity> {
   const { bot, agent, signal } = ctx
   let ent = playerEnt(bot, who)
   if (!ent) {
@@ -539,9 +539,9 @@ async function goToPlayer (ctx: Ctx, who: string, fallback: Pos | null): Promise
   for (let i = 0; i < 4; i++) {
     checkAborted(signal)
     ent = playerEnt(bot, who) ?? ent
-    if (ent.position.distanceTo(bot.entity.position) <= 3.5) return ent
+    if (ent.position.distanceTo(bot.entity.position) <= near) return ent
     if (ent.position.distanceTo(bot.entity.position) > 48) await travel(bot, floorPos(ent.position), signal, { range: 3 }).catch(e => { checkAborted(signal) })
-    else await gotoWithin(bot, new goals.GoalFollow(ent, 2), signal, 20_000).catch(e => { checkAborted(signal) })
+    else await gotoWithin(bot, new goals.GoalFollow(ent, near > 2.5 ? 2 : 1), signal, 20_000).catch(e => { checkAborted(signal) })
   }
   ent = playerEnt(bot, who) ?? ent
   if (ent.position.distanceTo(bot.entity.position) > 6) throw new Error(`couldn't get close to ${who} (${Math.round(ent.position.distanceTo(bot.entity.position))} blocks away)`)
@@ -561,7 +561,8 @@ async function deliver (ctx: Ctx, who: string, items: Record<string, number>, fa
   const label = names.length === 1 ? names[0]! : 'items'
   if (!total) return { given: 0, pickedUp: 0, ok: false, message: 'nothing to hand over' }
   let ent: Entity
-  try { ent = await goToPlayer(ctx, who, fallback) } catch (e) { checkAborted(signal); return { given: 0, pickedUp: null, ok: false, message: (e as Error).message } }
+  // close enough that tossed items land within the player's pickup reach
+  try { ent = await goToPlayer(ctx, who, fallback, 2) } catch (e) { checkAborted(signal); return { given: 0, pickedUp: null, ok: false, message: (e as Error).message } }
   const has = (n: string) => names.includes(n)
   const before = invCount(bot, has)
   let picked = 0
@@ -574,7 +575,7 @@ async function deliver (ctx: Ctx, who: string, items: Record<string, number>, fa
   }
   bot.on('playerCollect', onCollect)
   try {
-    await bot.lookAt(ent.position.offset(0, 1.6, 0), true).catch(() => {})
+    await bot.lookAt(ent.position.offset(0, 1, 0), true).catch(() => {})
     for (const n of names) {
       let left = items[n]!
       for (const stack of bot.inventory.items().filter(i => itemName(i) === n)) {
