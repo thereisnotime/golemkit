@@ -30,7 +30,11 @@ export async function fight (bot: Bot, target: Entity, signal: AbortSignal, maxM
   // Flyers (phantoms...) can't be chased on foot: hold position, track them and swing when
   // they dive into reach. Ground mobs: follow and hit.
   const flying = FLYING.has(target.name ?? '')
-  if (!flying) bot.pathfinder.setGoal(new goals.GoalFollow(target, 2), true)
+  if (!flying) {
+    const mv = (bot.pathfinder as any).movements
+    if (mv) mv.allowSprinting = true
+    bot.pathfinder.setGoal(new goals.GoalFollow(target, 2), true)
+  }
   try {
     while ((target as any).isValid !== false && Date.now() - start < maxMs) {
       checkAborted(signal)
@@ -105,10 +109,14 @@ const defend = defineAction({
   internal: true,
   async run ({ bot, agent, signal }) {
     // Flyers hit and climb away, so look further for them.
+    // Flyers hit and climb away, and archers (skeletons...) shoot from ~16 blocks: look further for them.
     const mob = nearestHostile(bot, bot.entity.position, 6) ??
-      bot.nearestEntity(e => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20)
+      bot.nearestEntity(e => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20) ??
+      bot.nearestEntity(e => isHostile(e) && isRangedMob(e.name) && e.position.distanceTo(bot.entity.position) < 24)
     if (!mob) return fail('nothing to fight')
-    await fight(bot, mob, signal, FLYING.has(mob.name ?? '') ? 20000 : 10000, weaponFlags(agent))
+    // Archers back off while shooting: chase them longer (and sprint) instead of giving up after 10 s.
+    const long = FLYING.has(mob.name ?? '') || isRangedMob(mob.name)
+    await fight(bot, mob, signal, long ? 25000 : 10000, weaponFlags(agent))
     return ok(`fought ${mob.name}`)
   }
 })
