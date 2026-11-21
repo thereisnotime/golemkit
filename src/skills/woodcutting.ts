@@ -64,11 +64,13 @@ function scanTree (bot: Bot, start: Block): Tree | null {
   return { wood, base, logs }
 }
 
-function findTree (bot: Bot, radius: number): Tree | null {
+function findTree (bot: Bot, radius: number, skip: (p: Vec3) => boolean = () => false): Tree | null {
   const ids = Object.values(bot.registry.blocksByName).filter(b => woodType(b.name)).map(b => b.id)
-  const candidates = bot.findBlocks({ matching: ids, maxDistance: radius, count: 24 })
+  // Plenty of candidates: the nearest logs are often one tree, a wooden house or a protected spot.
+  const candidates = bot.findBlocks({ matching: ids, maxDistance: radius, count: 256 })
   const tried = new Set<string>()
   for (const p of candidates) {
+    if (skip(p)) continue
     const b = bot.blockAt(p)
     if (!b) continue
     const tree = scanTree(bot, b)
@@ -96,8 +98,31 @@ const chopTree = defineAction({
   aliases: ['chop'],
   async run ({ bot, agent, signal, log }, { radius, replant }): Promise<ActionResult> {
     if (!agent.canDig) return fail('digging is disabled for this bot')
-    const tree = findTree(bot, radius)
-    if (!tree) return fail(`no natural tree within ${radius} blocks`)
+    // Trees in areas where the server refuses breaking (spawn protection) are skipped; if a cut
+    // gets refused anyway, the area is remembered and the next tree is tried.
+    const skip = (p: Vec3) => agent.protectedAreas.isProtected(p)
+    let tree = findTree(bot, radius, skip)
+    for (let attempt = 0; tree && attempt < 3; attempt++) {
+      const base = bot.blockAt(tree.base)
+      if (!base) break
+      try {
+        if (!within(bot, tree.base)) await reachBlock(bot, tree.base, signal, 2, 12_000)
+        await equipAxe(bot, base)
+        await digBlock(bot, base, signal)
+        break // first log came off: this tree can be felled
+      } catch (e) {
+        checkAborted(signal)
+        if (!(e instanceof DigRefusedError)) break
+        agent.markProtected(tree.base)
+        log.debug('tree is in a protected area, trying another', { at: fmtPos(tree.base) })
+        tree = findTree(bot, radius, skip)
+      }
+    }
+    if (!tree) {
+      return fail(agent.protectedAreas.zones.length
+        ? `no tree I'm allowed to cut within ${radius} blocks (trees near spawn are protected); try further away`
+        : `no natural tree within ${radius} blocks`)
+    }
     log.debug('felling tree', { wood: tree.wood, at: fmtPos(tree.base), logs: tree.logs.length })
     const soil = bot.blockAt(tree.base.offset(0, -1, 0))?.name ?? ''
     const logName = bot.blockAt(tree.base)?.name ?? `${tree.wood}_log`

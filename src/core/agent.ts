@@ -21,6 +21,7 @@ import { solidifyUnknownBlocks } from './modded.ts'
 import { RegistryCache, applyModdedRegistries, type RegistrySnapshot } from './neoforge/registries.ts'
 import { fmtPos, itemName } from './helpers.ts'
 import type { Fleet } from './fleet.ts'
+import { ProtectedAreas, watchRefusedDigs } from './protection.ts'
 import { resolveHumanize, typingDelayMs, styleLine, holdStill, between, type HumanizeOptions } from './humanize.ts'
 import type { UsageSnapshot } from '../llm/usage.ts'
 
@@ -102,6 +103,8 @@ export class Agent extends TypedEmitter<AgentEvents> {
   private readonly reconnectDelayMs: number
   private readonly channels: ChannelStore
   private readonly registryCache: RegistryCache
+  /** Areas where the server refuses block breaking (learned); the pathfinder won't dig there. */
+  readonly protectedAreas: ProtectedAreas
 
   private _bot: Bot | null = null
   private _fleet: Fleet | null = null
@@ -138,6 +141,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
     this.reconnectDelayMs = opts.reconnectDelayMs ?? Number(process.env.MC_RECONNECT_DELAY_MS || 10000)
     this.channels = new ChannelStore(join('data', `channels-${server.host}-${server.port}.json`))
     this.registryCache = new RegistryCache(join('data', `registries-${server.host}-${server.port}.json`))
+    this.protectedAreas = new ProtectedAreas(join('data', `protected-${server.host}-${server.port}.json`))
     this.skills = definition.skills
     this.brains = definition.brains
 
@@ -368,6 +372,18 @@ export class Agent extends TypedEmitter<AgentEvents> {
     }
   }
 
+  /**
+   * Records that the server refused a block break here (spawn protection, a claim). The
+   * pathfinder stops planning digs in that area and re-plans right away.
+   */
+  markProtected (pos: { x: number, y: number, z: number }): void {
+    if (!this.protectedAreas.add(pos)) return
+    this.log.info('server refuses block breaking here, not digging in this area anymore', { at: fmtPos(pos) })
+    const bot = this._bot
+    const goal = bot?.pathfinder?.goal
+    if (bot && goal) bot.pathfinder.setMovements(bot.pathfinder.movements) // forces a re-plan with the new exclusion
+  }
+
   isOwner (player: string): boolean {
     return this.owners.length === 0 || this.owners.includes(player.toLowerCase())
   }
@@ -530,7 +546,9 @@ export class Agent extends TypedEmitter<AgentEvents> {
         const moves = new pf.Movements(bot)
         moves.canDig = this.canDig
         moves.allow1by1towers = false
+        moves.exclusionAreasBreak.push(this.protectedAreas.breakCost)
         bot.pathfinder.setMovements(moves)
+        cleanups.push(watchRefusedDigs(bot, (pos) => this.markProtected(pos)))
 
         const chatTimer = setInterval(() => this.pumpChat(), 100)
         cleanups.push(() => clearInterval(chatTimer))

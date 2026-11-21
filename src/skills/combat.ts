@@ -93,10 +93,34 @@ const defend = defineAction({
   }
 })
 
+const retreat = defineAction({
+  name: 'retreat',
+  description: 'Back off from nearby hostile mobs (used by reflexes at low health).',
+  params: z.object({ distance: z.number().min(6).max(32).default(18) }),
+  internal: true,
+  async run ({ bot, signal }, { distance }) {
+    const mob = nearestHostile(bot, bot.entity.position, distance)
+    if (!mob) return ok('nothing to back off from')
+    bot.pathfinder.setGoal(new goals.GoalInvert(new goals.GoalFollow(mob, distance)), true)
+    try {
+      const until = Date.now() + 12_000
+      while (Date.now() < until) {
+        checkAborted(signal)
+        if (!(mob as any).isValid || bot.entity.position.distanceTo(mob.position) >= distance) break
+        await sleep(400, signal)
+      }
+    } finally {
+      bot.pathfinder.setGoal(null)
+    }
+    const d = Math.round(bot.entity.position.distanceTo(mob.position))
+    return d >= distance - 2 ? ok(`backed off from ${mob.name}`) : fail(`couldn't get away from ${mob.name} (${d} blocks)`)
+  }
+})
+
 export const combat = () => defineSkill({
   name: 'combat',
   description: 'Fighting hostile mobs and guarding players.',
-  actions: [attack, guard, defend],
+  actions: [attack, guard, defend, retreat],
   observe: (_agent, bot) => {
     const mob = nearestHostile(bot, bot.entity.position, 16)
     return { nearestHostile: mob ? { name: mob.name, distance: Math.round(mob.position.distanceTo(bot.entity.position)) } : null }
