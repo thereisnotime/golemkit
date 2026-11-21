@@ -102,13 +102,17 @@ const chopTree = defineAction({
     // gets refused anyway, the area is remembered and the next tree is tried.
     const skip = (p: Vec3) => agent.protectedAreas.isProtected(p)
     let tree = findTree(bot, radius, skip)
+    let firstCut = 0
+    let logName = ''
     for (let attempt = 0; tree && attempt < 3; attempt++) {
       const base = bot.blockAt(tree.base)
       if (!base) break
+      logName = base.name // read before cutting, the block is air afterwards
       try {
         if (!within(bot, tree.base)) await reachBlock(bot, tree.base, signal, 2, 12_000)
         await equipAxe(bot, base)
         await digBlock(bot, base, signal)
+        firstCut = 1
         break // first log came off: this tree can be felled
       } catch (e) {
         checkAborted(signal)
@@ -125,8 +129,8 @@ const chopTree = defineAction({
     }
     log.debug('felling tree', { wood: tree.wood, at: fmtPos(tree.base), logs: tree.logs.length })
     const soil = bot.blockAt(tree.base.offset(0, -1, 0))?.name ?? ''
-    const logName = bot.blockAt(tree.base)?.name ?? `${tree.wood}_log`
-    let cut = 0
+    if (!logName) logName = `${tree.wood}_log`
+    let cut = firstCut
     let skipped = 0
     for (const p of tree.logs) {
       checkAborted(signal)
