@@ -1,4 +1,5 @@
 import type { Bot } from 'mineflayer'
+import type { ActionContext, ActionResult } from '../core/index.ts'
 import { defineSkill, defineAction, z, noParams, ok, fail, goals, goto, fmtPos, sleep, checkAborted, itemName } from '../core/index.ts'
 import { findItem, placeAt, digBlock, DigRefusedError } from './world.ts'
 
@@ -163,45 +164,87 @@ async function stairStep (ctx: any): Promise<boolean> {
   return false
 }
 
+/** Bots in the middle of climb_out (on their own or inside goto). Reflexes read it. */
+const climbingBots = new WeakSet<object>()
+
+/** Whether this bot is climbing out of a cave or pit right now. */
+export function isClimbingOut (bot: object): boolean {
+  return climbingBots.has(bot)
+}
+
+/** Where an attacker is, relative to the bot, for keepClimbing. */
+export interface ClimbThreat {
+  /** Horizontal distance in blocks. */
+  dist: number
+  /** Attacker's feet minus the bot's feet, in blocks (negative: below). */
+  dy: number
+  /** Shoots from afar (skeleton, pillager...) or flies. */
+  ranged: boolean
+  creeper?: boolean
+}
+
+/**
+ * While climbing out underground, is going on climbing the safer answer to an attack than
+ * stopping to fight? Yes unless a melee mob is right on us at our level (it would hit us all
+ * the way up) or a creeper is close. A mob below the pillar can't follow, and an archer in a
+ * cave loses its line of sight once the bot is up the shaft, while chasing it underground is
+ * how Pax died. Pure, for tests.
+ */
+export function keepClimbing (t: ClimbThreat): boolean {
+  if (t.creeper) return t.dist > 4 || t.dy <= -3
+  if (t.ranged) return true
+  if (t.dy <= -2) return true
+  return t.dist > 2.5
+}
+
 export const climbOut = defineAction({
   name: 'climb_out',
   description: 'Get out of a pit, shaft or cave straight up to open sky: dig the block above if needed, jump and place ' +
     'a block underneath, repeat. Without blocks it carves stair steps up into the wall instead.',
   params: z.object({ maxBlocks: z.number().int().min(1).max(64).default(32).describe('give up after rising this many blocks') }),
   async run (ctx, { maxBlocks }) {
-    const { bot, agent, signal } = ctx
-    const startY = Math.floor(bot.entity.position.y)
-    let fails = 0
-    while (Math.floor(bot.entity.position.y) - startY < maxBlocks) {
-      checkAborted(signal)
-      if (roofAbove(bot) === null && bot.blockAt(bot.entity.position.floored().offset(0, 1, 0))?.boundingBox !== 'block') {
-        // Open sky above: step off the pillar onto solid ground nearby if there is any.
-        return ok(`out in the open at ${fmtPos(bot.entity.position)} (rose ${Math.floor(bot.entity.position.y) - startY} blocks)`)
-      }
-      // Clear the two blocks above the head.
-      for (const dy of [1, 2]) {
-        const b = bot.blockAt(bot.entity.position.floored().offset(0, dy, 0))
-        if (b && b.boundingBox === 'block') {
-          if (!agent.canDig) return fail('a block is in the way above and I may not dig')
-          if (agent.protectedAreas.isProtected(b.position)) return fail('the way up is in a protected area')
-          if (/water|lava/.test(bot.blockAt(b.position.offset(0, 1, 0))?.name ?? '')) return fail(`liquid above at ${fmtPos(b.position)}; not digging into it`)
-          const tool = (bot.pathfinder as any).bestHarvestTool?.(b)
-          if (tool) await bot.equip(tool, 'hand').catch(() => {})
-          try { await digBlock(bot, b, signal) } catch (e) { checkAborted(signal); if (e instanceof DigRefusedError) return fail(e.message); fails++ }
-          await sleep(300, signal)
-        }
-      }
-      const r = fillerBlock(bot) ? await (pillar as any).run(ctx, { height: 1 }).catch(() => null) : null
-      if (!r?.ok) {
-        // No blocks (or the pillar failed): carve one stair step up into a wall instead.
-        if (await stairStep(ctx)) { fails = 0; continue }
-        if (++fails > 6) return fail(`couldn't climb further (no blocks to pillar and no wall I can carve steps into), at ${fmtPos(bot.entity.position)}`)
-        await sleep(400, signal)
-      }
+    climbingBots.add(ctx.bot)
+    try {
+      return await climbOutNow(ctx, maxBlocks)
+    } finally {
+      climbingBots.delete(ctx.bot)
     }
-    return fail(`rose ${maxBlocks} blocks and still no open sky, at ${fmtPos(bot.entity.position)}`)
   }
 })
+
+async function climbOutNow (ctx: ActionContext, maxBlocks: number): Promise<ActionResult> {
+  const { bot, agent, signal } = ctx
+  const startY = Math.floor(bot.entity.position.y)
+  let fails = 0
+  while (Math.floor(bot.entity.position.y) - startY < maxBlocks) {
+    checkAborted(signal)
+    if (roofAbove(bot) === null && bot.blockAt(bot.entity.position.floored().offset(0, 1, 0))?.boundingBox !== 'block') {
+      // Open sky above: step off the pillar onto solid ground nearby if there is any.
+      return ok(`out in the open at ${fmtPos(bot.entity.position)} (rose ${Math.floor(bot.entity.position.y) - startY} blocks)`)
+    }
+    // Clear the two blocks above the head.
+    for (const dy of [1, 2]) {
+      const b = bot.blockAt(bot.entity.position.floored().offset(0, dy, 0))
+      if (b && b.boundingBox === 'block') {
+        if (!agent.canDig) return fail('a block is in the way above and I may not dig')
+        if (agent.protectedAreas.isProtected(b.position)) return fail('the way up is in a protected area')
+        if (/water|lava/.test(bot.blockAt(b.position.offset(0, 1, 0))?.name ?? '')) return fail(`liquid above at ${fmtPos(b.position)}; not digging into it`)
+        const tool = (bot.pathfinder as any).bestHarvestTool?.(b)
+        if (tool) await bot.equip(tool, 'hand').catch(() => {})
+        try { await digBlock(bot, b, signal) } catch (e) { checkAborted(signal); if (e instanceof DigRefusedError) return fail(e.message); fails++ }
+        await sleep(300, signal)
+      }
+    }
+    const r = fillerBlock(bot) ? await (pillar as any).run(ctx, { height: 1 }).catch(() => null) : null
+    if (!r?.ok) {
+      // No blocks (or the pillar failed): carve one stair step up into a wall instead.
+      if (await stairStep(ctx)) { fails = 0; continue }
+      if (++fails > 6) return fail(`couldn't climb further (no blocks to pillar and no wall I can carve steps into), at ${fmtPos(bot.entity.position)}`)
+      await sleep(400, signal)
+    }
+  }
+  return fail(`rose ${maxBlocks} blocks and still no open sky, at ${fmtPos(bot.entity.position)}`)
+}
 
 const isNight = (bot: Bot) => { const t = bot.time.timeOfDay; return t >= 12_500 && t <= 23_500 }
 

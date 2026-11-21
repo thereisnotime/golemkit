@@ -1,4 +1,4 @@
-import { defineSkill, defineAction, z, noParams, ok, fail, goals, goto, travel, surfaceY, roofed, TravelUndergroundError, holdGoal, playerEntity, fmtPos } from '../core/index.ts'
+import { defineSkill, defineAction, z, noParams, ok, fail, goals, goto, travel, surfaceY, roofed, TravelUndergroundError, holdGoal, playerEntity, fmtPos, checkAborted } from '../core/index.ts'
 import { climbOut } from './survival.ts'
 
 const come = defineAction({
@@ -32,6 +32,9 @@ const follow = defineAction({
   }
 })
 
+/** Climbs per goto before giving up on getting out of a cave. */
+const CLIMB_ATTEMPTS = 2
+
 const gotoAction = defineAction({
   name: 'goto',
   description: 'Walk to block coordinates, any distance (long trips go in legs and can take minutes; ' +
@@ -47,10 +50,19 @@ const gotoAction = defineAction({
     const start = bot.entity.position.clone()
     const total = Math.round(Math.hypot(p.x - start.x, p.z - start.z))
     // Far trips start on the surface: from a cave the pathfinder just goes deeper.
+    // A fight that preempts the climb pauses it: the abort goes up as an abort (goto is
+    // long-running, so the action lock suspends and resumes it; the climb then picks up from
+    // wherever the bot is). Only a real failure is a failure, and that gets one more climb.
     const climb = async (why: string) => {
-      log.info(`goto: ${why}, climbing out first`, { at: fmtPos(bot.entity.position) })
-      const r = await (climbOut as any).run(ctx, { maxBlocks: 64 }).catch((e: Error) => ({ ok: false, message: e.message }))
-      return r?.ok ? null : `couldn't climb out (${r?.message ?? 'unknown'})`
+      let last = 'unknown'
+      for (let attempt = 0; attempt < CLIMB_ATTEMPTS; attempt++) {
+        log.info(`goto: ${why}, climbing out first`, { at: fmtPos(bot.entity.position), attempt: attempt + 1 })
+        const r = await (climbOut as any).run(ctx, { maxBlocks: 64 }).catch((e: Error) => ({ ok: false, message: e.message }))
+        checkAborted(signal)
+        if (r?.ok) return null
+        last = r?.message ?? 'unknown'
+      }
+      return `couldn't climb out (${last})`
     }
     const sy = surfaceY(bot, bot.entity.position.x, bot.entity.position.z)
     if (total > 24 && roofed(bot, 32) && sy !== null && sy - bot.entity.position.y > 8) {

@@ -2,7 +2,8 @@
 // eat when hungry. They run at reflex priority, so they briefly preempt everything else and
 // long-running actions (follow, guard) resume afterwards.
 import { defineBrain, PRIORITY, nearestHostile, isHostile, FLYING, needsSurvival } from '../core/index.ts'
-import { bestFood } from '../skills/survival.ts'
+import { bestFood, isClimbingOut, keepClimbing } from '../skills/survival.ts'
+import { isRangedMob } from '../skills/weapons.ts'
 import { threats } from '../skills/combat.ts'
 import { fightFood } from '../skills/fight.ts'
 import { gearPlan, hasGearUpgrade } from '../skills/gear.ts'
@@ -48,6 +49,16 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       const shouldRetreat = (mob: any) => !FLYING.has(mob.name ?? '') &&
         ((bot.health > 0 && bot.health <= cfg().retreatBelow) || (inWater(mob) && bot.health < cfg().waterFightAbove))
 
+      // Climbing out of a cave (climb_out, or goto starting underground): going on up beats
+      // stopping to fight unless a melee mob is right on us (keepClimbing). Fighting underground
+      // and chasing archers through caves is how a climb got cancelled and the bot died.
+      const climbingAway = (mob: any) => {
+        if (!mob || !isClimbingOut(bot)) return false
+        const p = bot.entity.position
+        const q = mob.position
+        return keepClimbing({ dist: Math.hypot(q.x - p.x, q.z - p.z), dy: q.y - p.y, ranged: isRangedMob(mob.name) || FLYING.has(mob.name ?? ''), creeper: mob.name === 'creeper' })
+      }
+
       const onHurt = (entity: any) => {
         if (!cfg().selfDefense || entity !== bot.entity || !needsSurvival(bot)) return
         // next tick: the combat skill notes who hit us first (neutral mobs count only then)
@@ -74,6 +85,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           }
           return
         }
+        if (climbingAway(mob)) return
         if (shouldRetreat(mob) && agent.getAction('retreat')) {
           if (cur !== 'retreat') void reflex('retreat')
           return
@@ -97,12 +109,13 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         const { selfDefense, autoEat, eatBelow, retreatBelow } = cfg()
         // Low health with a hostile close by: get away even before the next hit.
         const mob = selfDefense ? nearestHostile(bot, bot.entity.position, 6) : null
-        if (mob && !FLYING.has(mob.name ?? '') && bot.health > 0 && bot.health <= retreatBelow && agent.currentAction?.name !== 'retreat' && agent.getAction('retreat')) {
+        const climbing = climbingAway(mob)
+        if (mob && !climbing && !FLYING.has(mob.name ?? '') && bot.health > 0 && bot.health <= retreatBelow && agent.currentAction?.name !== 'retreat' && agent.getAction('retreat')) {
           void reflex('retreat')
           return
         }
         // retreatBelow 0 means stand ground, not die: at <= 4 health with food, defend backs off to eat (combat.disengageToHeal)
-        if (selfDefense && mob && bot.health <= 4 && combatCfg().disengageToHeal !== false && fightFood(bot) &&
+        if (selfDefense && mob && !climbing && bot.health <= 4 && combatCfg().disengageToHeal !== false && fightFood(bot) &&
             agent.currentAction?.name !== 'defend' && agent.getAction('defend')) {
           void reflex('defend')
           return
@@ -112,7 +125,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         if (selfDefense && bot.health > 0 && !busy && agent.getAction('defend') && !['defend', 'retreat', 'bunker', 'pillar'].includes(agent.currentAction?.name ?? '')) {
           const t = threats(bot, 8)[0]
           const d = t ? t.position.distanceTo(bot.entity.position) : Infinity
-          if (t && isHostile(t) && !FLYING.has(t.name ?? '') && (d <= 4 || (t.name === 'creeper' && d <= 7))) {
+          if (t && isHostile(t) && !FLYING.has(t.name ?? '') && (d <= 4 || (t.name === 'creeper' && d <= 7)) && !climbingAway(t)) {
             void reflex('defend')
             return
           }
