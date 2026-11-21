@@ -267,12 +267,14 @@ export function lookFor (agent: Agent, bot: Bot, t: ResolvedTarget, radius: numb
   }
   const matching = ids(bot, t.blocks)
   if (!matching.length) return null
+  // logs well under the surface are a mineshaft or a buried structure, not a tree
+  const logs = t.fetch === 'chop'
   const found = bot.findBlocks({
     matching,
     maxDistance: r,
     count: 64,
     ...(t.ripe ? { useExtraInfo: (b: Block) => isMature(b.name, (b.getProperties() as Record<string, unknown>).age) && cropAllowed(agent, bot, floorPos(b.position)) } : {})
-  })
+  }).filter(p => { if (!logs) return true; const sy = surfaceY(bot, p.x, p.z); return sy === null || sy - p.y <= 12 })
   if (!found.length) return null
   // prefer one outside protected areas (it can be fetched), but report the nearest either way
   const free = found.find(p => !agent.protectedAreas?.isProtected(p))
@@ -939,7 +941,10 @@ const bringItem = defineAction({
     let left = Math.min(have, p.count)
     for (const [k, v] of Object.entries(inventoryMap(bot))) { if (left > 0 && match(k)) { give[k] = Math.min(v, left); left -= give[k]! } }
     const d = await deliver(ctx, who, give, origin)
-    const msg = `${d.message}${how ? `; ${how}` : ''} (${Math.round((Date.now() - t0) / 1000)}s)`
+    // on success the last step says how it got them; on failure every step it tried
+    const steps = notes.filter(Boolean)
+    const detail = d.ok ? steps.slice(-1).join('') : how
+    const msg = `${d.message}${detail ? `; ${detail}` : ''} (${Math.round((Date.now() - t0) / 1000)}s)`
     checkAborted(signal)
     return d.ok && d.given >= p.count ? ok(msg, { given: d.given, pickedUp: d.pickedUp }) : fail(msg, { given: d.given, pickedUp: d.pickedUp })
   }
