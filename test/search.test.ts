@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import {
   resolveTarget, isResolveError, normalizeTarget, singulars, searchPhases, prospectable, villageVerdict, portalVerdict,
-  describeFind, gatherSource, bringSteps, ingredientFor, pickaxeFor, isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, itemOfBlock,
+  describeFind, gatherSource, bringSteps, ingredientFor, pickaxeFor, searchStopReason, isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, itemOfBlock,
   type RegistryNames, type ResolvedTarget, type BringState
 } from '../src/skills/searchPlan.ts'
 import { scoutWaypoints, scoutStopReason, nextWaypoint, DEFAULT_SCOUT_LIMITS, type ScoutProgress } from '../src/skills/foodPlan.ts'
@@ -154,6 +154,10 @@ test('scout: the spiral skips protected waypoints and stops by the food rules', 
   assert.match(scoutStopReason({ ...base, health: 5, hostilesNear: 1 }, limits)!, /health is low/)
   assert.equal(scoutStopReason({ ...base, health: 5 }, limits), null)
   assert.match(scoutStopReason({ ...base, elapsedMs: 8 * 60_000 }, limits)!, /8 minutes/)
+  // a search (unlike find_food) stops at critical health even with nothing around
+  assert.match(searchStopReason({ ...base, health: 3 }, limits)!, /critical/)
+  assert.equal(searchStopReason({ ...base, health: 5 }, limits), null)
+  assert.equal(searchStopReason({ ...base, night: true }, limits), 'night fell')
 })
 
 // ------------------------------------------------------------------ village and portal

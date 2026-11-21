@@ -3,7 +3,7 @@
 // nether portal, where bring_item gets an item from, how many items a toss really handed over,
 // whether owner drops can still be reached, and when to say how it is going. No mineflayer
 // here, so all of it is unit-tested; the actions live in search.ts.
-import { compass, type Pos, type XZ } from './foodPlan.ts'
+import { compass, scoutStopReason, DEFAULT_SCOUT_LIMITS, type Pos, type XZ, type ScoutProgress, type ScoutLimits } from './foodPlan.ts'
 
 // ------------------------------------------------------------------ names
 
@@ -285,6 +285,16 @@ export function searchPhases (t: ResolvedTarget, o: PhaseOptions): SearchPhase[]
   out.push('scout')
   if (t.ore && o.prospect && o.canDig && prospectable(t.ore, o.feetY)) out.push('prospect')
   return out
+}
+
+/**
+ * find_food's stop rules plus one: a search is never worth dying for, so health at 4 or below
+ * ends it even with nothing around (find_food keeps going then, since it is looking for food;
+ * a starving bot froze to death in powder snow on a search).
+ */
+export function searchStopReason (p: ScoutProgress, l: ScoutLimits = DEFAULT_SCOUT_LIMITS): string | null {
+  if (p.health <= 4) return `health is critical (${Math.round(p.health)}/20)`
+  return scoutStopReason(p, l)
 }
 
 // ------------------------------------------------------------------ structures

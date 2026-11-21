@@ -26,12 +26,12 @@ import { withdraw as withdrawAction, knownContainers, CONTAINER_RE } from './con
 import { moddedNames } from './mods.ts'
 import { offLimits, spawnOf, surfaceAt, topY, isNight, inOwnFarm, getFoodSpots } from './food.ts'
 import {
-  scoutWaypoints, scoutStopReason, nextWaypoint, sectorsText, sectorOf, rankSpots, DEFAULT_SCOUT_LIMITS,
+  scoutWaypoints, nextWaypoint, sectorsText, sectorOf, rankSpots, DEFAULT_SCOUT_LIMITS,
   type Pos, type Waypoint
 } from './foodPlan.ts'
 import {
   resolveTarget, isResolveError, searchPhases, villageVerdict, portalVerdict, describeFind, gatherSource, bringSteps,
-  isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, ORES, SMELTS, ingredientFor, pickaxeFor,
+  isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, ORES, SMELTS, ingredientFor, pickaxeFor, searchStopReason,
   type ResolvedTarget, type RegistryNames, type SearchPhase, type GatherSource
 } from './searchPlan.ts'
 
@@ -310,7 +310,7 @@ async function scout (ctx: Ctx, center: Pos, radius: number, maxMinutes: number,
   })
   while (true) {
     checkAborted(signal)
-    const stop = scoutStopReason(progress(), limits)
+    const stop = searchStopReason(progress(), limits)
     if (stop) { reason = stop; break }
     const i = nextWaypoint(wps, visited, blocked)
     if (i < 0) { reason = `covered every direction out to ${radius} blocks`; break }
@@ -332,7 +332,7 @@ async function scout (ctx: Ctx, center: Pos, radius: number, maxMinutes: number,
           seen = look()
           const y = bot.entity.position.y
           if (y < Math.min(start.y, sky ?? start.y) - 10 && roofAbove(bot, 32) !== null) { wentUnder = true; ctl.abort() }
-          if (seen || scoutStopReason(progress(), limits)) ctl.abort()
+          if (seen || searchStopReason(progress(), limits)) ctl.abort()
         }
       })
       consecutiveFailures = 0
