@@ -26,6 +26,9 @@ export { woodcutting } from './woodcutting.ts'
 export { building } from './building.ts'
 export { pickup, pickupNearby } from './pickup.ts'
 export { placeAt, reachBlock } from './world.ts'
+export { construction, buildStructure } from './construction.ts'
+export { materialsSkill, gatherMaterials, planWood } from './materials.ts'
+export { ensureTool, type ToolKind } from './toolkit.ts'
 
 import { crafting } from './crafting.ts'
 import { containers } from './containers.ts'
@@ -33,6 +36,8 @@ import { farming } from './farming.ts'
 import { woodcutting } from './woodcutting.ts'
 import { building } from './building.ts'
 import { pickup } from './pickup.ts'
+import { construction } from './construction.ts'
+import { materialsSkill } from './materials.ts'
 
-/** Extra skills on top of standardSkills(): crafting, containers, farming, woodcutting, building, pickup. */
-export const extendedSkills = () => [crafting(), containers(), farming(), woodcutting(), building(), pickup()]
+/** Extra skills on top of standardSkills(): crafting, containers, farming, woodcutting, building, construction, materials, pickup. */
+export const extendedSkills = () => [crafting(), containers(), farming(), woodcutting(), building(), construction(), materialsSkill(), pickup()]

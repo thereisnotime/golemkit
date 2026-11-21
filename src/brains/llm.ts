@@ -16,6 +16,7 @@ import type { MemoryOptions } from '../llm/memory.ts'
 import type { BotToolsOptions } from '../llm/tools.ts'
 import { contextFor, disposeContext, emitLlmBudgetExhausted } from '../context/handle.ts'
 import { skillTools } from '../context/skills.ts'
+import type { GoalOptions } from '../llm/goals.ts'
 
 export interface LlmBrainOptions {
   /** A provider instance, or a name: claude-subscription | codex | anthropic | opencode | openai. Default MC_LLM_PROVIDER or claude-subscription. */
@@ -40,6 +41,8 @@ export interface LlmBrainOptions {
   replyWithFinalText?: boolean
   /** Price overrides for cost estimates, USD per million tokens. */
   prices?: Record<string, Price>
+  /** Persistent goals and continuation limits (maxTurns, timeoutMin, ...). Profile: llm.goals. */
+  goals?: GoalOptions
 }
 
 // Every agent with an llm brain, for llmRuntime() and the llm_usage action.
@@ -62,6 +65,36 @@ export function llmFleetUsage (agent: Agent): { bots: number, session: UsageBuck
     allTime: sumBuckets(rts.map(r => r.usage.allTime))
   }
 }
+
+/** `!goal`: the LLM brain's active goal and plan. */
+export const goalStatusAction = defineAction({
+  name: 'goal',
+  description: 'Show the LLM brain\'s active goal and plan.',
+  params: noParams,
+  exclusive: false,
+  aliases: ['goal_status'],
+  run: ({ agent }) => {
+    const rt = allRuntimes.get(agent)
+    if (!rt) return fail('no LLM brain on this bot')
+    return ok(rt.goals.fmtPrompt()?.replace(/\n/g, ' | ') ?? 'no active goal')
+  }
+})
+
+/** `!goal_cancel`: drop the active goal (stops follow-up turns; the current action keeps going unless you also !stop). */
+export const goalCancelAction = defineAction({
+  name: 'goal_cancel',
+  description: 'Drop the LLM brain\'s active goal so it stops working on it.',
+  params: noParams,
+  exclusive: false,
+  run: ({ agent, caller }) => {
+    const rt = allRuntimes.get(agent)
+    if (!rt) return fail('no LLM brain on this bot')
+    const g = rt.goals.abandon(`cancelled by ${caller.name}`)
+    if (!g) return ok('no active goal')
+    agent.cancelActions(info => info.caller.kind === 'brain' && info.caller.name === 'llm', 'cancelled')
+    return ok(`dropped the goal: ${g.text}`)
+  }
+})
 
 /** `!llm_usage`: one-line token/cost summary. Registered on agents that run an llm brain. */
 export const llmUsageAction = defineAction({
@@ -124,13 +157,14 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
         mcp: opts.mcp,
         replyWithFinalText: opts.replyWithFinalText,
         prices: opts.prices,
+        goals: { ...opts.goals, ...(s.goals ?? {}) },
         onUsage: snapshot => agent.emit('llmUsage', snapshot),
         ...(ctx ? { context: () => ctx.promptContext() } : {}),
         onPause: reason => emitLlmBudgetExhausted(agent, reason)
       })
       runtimes.set(agent, rt)
       allRuntimes.set(agent, rt)
-      if (!agent.getAction(llmUsageAction.name)) agent.registerAction(llmUsageAction)
+      for (const a of [llmUsageAction, goalStatusAction, goalCancelAction]) if (!agent.getAction(a.name)) agent.registerAction(a)
       await rt.start()
       agent.on('chat', msg => rt.onChat(msg))
       agent.on('actionEnd', (info, result) => rt.onActionEnd(info, result))
@@ -141,6 +175,7 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
       if (!rt) return
       const spawnedAt = Date.now()
       let lastHurt = 0
+      rt.onSession()
 
       const onHurt = (entity: any) => {
         if (entity !== bot.entity || Date.now() - lastHurt < 60_000) return

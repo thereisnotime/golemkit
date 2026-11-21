@@ -1,0 +1,11 @@
+- [x] Goal store, goal tools and prompt section (src/llm/goals.ts, prompt.ts)
+- [x] Continuation: goal trigger, scheduling, idle backoff, reconnect (runtime.ts, brains/llm.ts)
+- [x] Guardrails: turn limit, timeout, repeated failures, budget reserve, !stop, !goal_cancel
+- [x] Profile `llm.goals` and companion/Pax configuration
+- [x] Blueprint format, validation and planning (src/skills/blueprint.ts) and five blueprints
+- [x] build and build_plan (src/skills/construction.ts)
+- [x] ensureTool and tool wiring in chop_tree, collect, break_block (src/skills/toolkit.ts)
+- [x] gather_materials (src/skills/materials.ts)
+- [x] Unit tests: blueprints, materials, ordering, resume, site, goals and continuation
+- [x] Live test on mc02 (scripts/build-test.ts)
+- [x] Docs: guide page, skills page, generated action reference

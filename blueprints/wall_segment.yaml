@@ -1,0 +1,16 @@
+# A straight wall, 7 long and 3 high (runs east-west as drawn). 21 blocks.
+name: wall_segment
+description: Straight wall 7 long and 3 high
+facing: south
+site: near
+roles:
+  wall:
+    default: cobblestone
+    accept: "^(cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_cobblestone|[a-z_]+_planks)$"
+    material: true
+palette:
+  "#": wall
+layers:
+  - ["#######"]
+  - ["#######"]
+  - ["#######"]

@@ -38,6 +38,7 @@ llm:                          # only for variants with an LLM brain
   aliases: [pax]
   conversationMs: 120000
   budget: { turnsPerHour: 60, tokensPerDay: 3000000 }
+  goals: { maxTurns: 30, timeoutMin: 30 }   # see guide/goals-and-building
 settings:                     # free-form, read with agent.settings
   home: [100, 64, -20]
 logging:                      # optional, same keys as the fleet `logging:` block
@@ -52,7 +53,7 @@ journal:                      # optional, event journal settings (on by default)
 | `variant` | required; a name in `variants/` or a path |
 | `username`, `persona`, `owners`, `canDig` | identity and permissions |
 | `server` | per-bot server override |
-| `llm` | [LLM brain](/guide/llm-brain) settings: provider, model, effort, login, token source, `listen`, `immersive`, aliases, budget |
+| `llm` | [LLM brain](/guide/llm-brain) settings: provider, model, effort, login, token source, `listen`, `immersive`, aliases, budget, [goals](/guide/goals-and-building) |
 | `reflexes` | eat/retreat thresholds, e.g. `retreatBelow: 0` to stand its ground ([details](../concepts/world#reflexes)) |
 | `retry`, `humanize`, `journal`, `context` | see the sections below and the linked guides |
 | `settings` | anything the variant's skills/brains read |

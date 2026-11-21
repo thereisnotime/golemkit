@@ -32,7 +32,17 @@ export const LlmProfileSchema = z.object({
   tickMs: z.number().optional(),
   ambientBatchMs: z.number().optional(),
   ambientMinGapMs: z.number().optional(),
-  budget: z.record(z.string(), z.number()).optional()
+  budget: z.record(z.string(), z.number()).optional(),
+  goals: z.object({
+    enabled: z.boolean().optional(),
+    maxTurns: z.number().int().min(1).optional().describe('continuation turns without hearing from the owner'),
+    timeoutMin: z.number().min(1).optional().describe('minutes a goal runs on its own without hearing from the owner'),
+    maxSameFailures: z.number().int().min(1).optional(),
+    continueDelayMs: z.number().optional(),
+    idleBaseMs: z.number().optional(),
+    idleMaxMs: z.number().optional(),
+    budgetReserve: z.number().min(0).max(1).optional()
+  }).optional().describe('persistent goals and continuation guardrails')
 }).passthrough()
 
 export const ProfileSchema = z.object({

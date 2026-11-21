@@ -11,6 +11,8 @@ import { BotTools, LLM_CALLER, type BotToolsOptions, type ToolAgent } from './to
 import type { LlmProvider, ToolCallRecord, TurnResult } from './types.ts'
 import { PriceTable, type Price } from './pricing.ts'
 import { UsageTracker, fmtTurn, fmtCost, fmtSummary, turnUsage, type TurnUsage, type UsageSnapshot } from './usage.ts'
+import { GoalStore, registerGoalTools, continuationDecision, idleDelay, failureSignature, type GoalOptions } from './goals.ts'
+import type { GoalTriggerReason } from './prompt.ts'
 
 export type RuntimeAgent = ToolAgent & Pick<Agent, 'isOwner' | 'storage' | 'definition'>
 
@@ -80,6 +82,8 @@ export interface RuntimeOptions {
   context?: () => PromptContext | undefined
   /** Called once when turns pause because a budget ran out (hooks: llmBudgetExhausted). */
   onPause?: (reason: string) => void
+  /** Persistent goals and continuation (goals.ts). Profile: llm.goals. */
+  goals?: GoalOptions
 }
 
 export interface TurnReport {
@@ -99,6 +103,8 @@ export class LlmRuntime {
   readonly budget: Budget
   readonly usage: UsageTracker
   readonly prices: PriceTable
+  /** The active goal (persistent) and its continuation guardrails. */
+  readonly goals: GoalStore
   /** Why turns are paused (budget exhausted), or null. */
   paused: string | null = null
   private pauseAnnounced = false
@@ -130,6 +136,8 @@ export class LlmRuntime {
     this.usage = new UsageTracker(agent.username, agent.storage)
     this.prices = new PriceTable(opts.prices)
     this.budget = new Budget(opts.limits, { today: () => this.usage.today })
+    this.goals = new GoalStore(agent.storage, opts.goals)
+    registerGoalTools(this.tools, this.goals, what => this.log.info(`goal ${what}`, { goal: this.goals.active?.text }))
     const l = opts.limits ?? {}
     this.limits = {
       maxTurns: l.maxTurns ?? 8,
@@ -146,7 +154,8 @@ export class LlmRuntime {
       persona: this.opts.persona ?? this.agent.definition.persona,
       immersive: this.opts.immersive,
       rules: this.opts.rules,
-      context: this.opts.context?.()
+      context: this.opts.context?.(),
+      goals: true
     })
   }
 
@@ -162,10 +171,16 @@ export class LlmRuntime {
       else this.log.debug('MCP bridge started', { url: this.bridge.url })
     }
     this.log.info(`LLM brain ready: ${this.provider.name}${this.unavailable ? ' (unavailable)' : ''}`, { provider: this.provider.name, model: this.provider.model, billing: this.provider.billing })
+    const goal = this.goals.active
+    if (goal) this.log.info(`active goal: ${goal.text}`, { steps: goal.steps.length, paused: goal.paused })
+    this.goalTimer = setInterval(() => this.goalIdleCheck(), 5000)
+    this.goalTimer.unref()
   }
 
   async stop (): Promise<void> {
     this.stopped = true
+    if (this.goalTimer) clearInterval(this.goalTimer)
+    if (this.goalWake) clearTimeout(this.goalWake)
     this.queue.length = 0
     this.current?.abort()
     await this.bridge?.close()
@@ -186,7 +201,8 @@ export class LlmRuntime {
       billing: this.provider.billing,
       paused: this.paused,
       today: { turns: t.turns, tokens: t.inputTokens + t.outputTokens, cost: fmtCost(t, this.provider.billing) },
-      lastTurn: this.usage.last ? fmtTurn(this.usage.last) : null
+      lastTurn: this.usage.last ? fmtTurn(this.usage.last) : null,
+      goal: this.goals.observeField()
     }
   }
 
@@ -209,6 +225,9 @@ export class LlmRuntime {
     }
     if (!trigger) return
     if (trigger.kind === 'chat' && trigger.addressed === false) return this.overheard(msg.from, trigger.message)
+    // The owner spoke: renew the goal's autonomous limits and lift a pause (they may have answered).
+    const goal = this.goals.active
+    if (goal && (goal.owner ? goal.owner === msg.from : this.agent.isOwner(msg.from))) this.goals.touchOwner()
     const pending = this.queue.find((q): q is Extract<Trigger, { kind: 'chat' }> => q.kind === 'chat' && q.from === msg.from)
     if (pending) {
       // Coalesce: one pending turn per player, with everything they said since.
@@ -258,9 +277,105 @@ export class LlmRuntime {
     // outcome. Not when it was preempted/replaced/stopped (that's someone else's doing).
     const def = this.agent.actionCatalog().find(a => a.name === info.name)
     const interrupted = /^(preempted|replaced|stopped|session ended|died|cancelled)/.test(result.message)
+    this.lastActionEndAt = Date.now()
+    const goal = this.goals.active
+    if (goal) {
+      // An owner's !stop ends the goal too (the model stopping its own action doesn't).
+      if (info.name === 'stop' && info.caller.kind === 'player') {
+        this.goals.abandon(`stopped by ${info.caller.name}`)
+        this.log.info('goal dropped: owner said stop', { by: info.caller.name })
+        return
+      }
+      if (mine && !result.ok && !interrupted) {
+        const n = this.goals.recordFailure(failureSignature(info.name, result.message))
+        if (n > 1) this.log.debug('repeated failure during goal', { action: info.name, times: n })
+      }
+      // Continue with the next step once this one is over (also covers long-running actions).
+      if (mine && !interrupted) this.scheduleGoal('actionDone', line, this.goals.opts.continueDelayMs)
+      return
+    }
     if (mine && def?.longRunning && !interrupted && (this.opts.triggers?.reportLongActions ?? true)) {
       this.enqueue({ kind: 'event', event: 'actionDone', detail: line, ...(info.player ? { player: info.player } : {}) })
     }
+  }
+
+  // ---------------------------------------------------------------- goals
+
+  private goalTimer: NodeJS.Timeout | null = null
+  private goalWake: NodeJS.Timeout | null = null
+  private goalWakeAt = 0
+  private lastActionEndAt = 0
+
+  /** The bot (re)connected: carry on with an active goal after a moment. */
+  onSession (): void {
+    if (this.goals.active) this.scheduleGoal('resume', 'reconnected', 8000)
+  }
+
+  /** Asks for a continuation turn in `delayMs` (an earlier request wins). */
+  scheduleGoal (reason: GoalTriggerReason, detail?: string, delayMs = 0): void {
+    if (this.stopped || !this.goals.active) return
+    const at = Date.now() + delayMs
+    if (this.goalWake && this.goalWakeAt <= at) return
+    if (this.goalWake) clearTimeout(this.goalWake)
+    this.goalWakeAt = at
+    this.goalWake = setTimeout(() => {
+      this.goalWake = null
+      this.tryContinue(reason, detail)
+    }, delayMs)
+    this.goalWake.unref()
+  }
+
+  /** Starts a continuation turn if the guardrails allow it; pauses the goal and tells the owner when one trips. */
+  tryContinue (reason: GoalTriggerReason, detail?: string): boolean {
+    const goal = this.goals.active
+    if (!goal || this.stopped) return false
+    const d = continuationDecision(goal, this.goals.opts, {
+      now: Date.now(),
+      busy: this.busy || this.queue.length > 0,
+      acting: !!this.agent.currentAction,
+      connected: (this.agent as { connected?: boolean }).connected !== false,
+      budgetBlocked: this.budget.blocked(),
+      hour: this.budget.hour(),
+      limits: { turnsPerHour: this.budget.turnsPerHour, tokensPerHour: this.budget.tokensPerHour }
+    })
+    if (d.go) {
+      this.enqueue({ kind: 'goal', reason, ...(detail ? { detail } : {}), ...(goal.owner ? { player: goal.owner } : {}) })
+      return true
+    }
+    if ('stop' in d) {
+      this.goals.pause(d.stop)
+      this.log.info(`goal paused: ${d.stop}`, { goal: goal.text })
+      this.enqueue({ kind: 'goal', reason: 'stop', detail: d.stop, ...(goal.owner ? { player: goal.owner } : {}) })
+    } else {
+      this.log.trace(`goal waits: ${d.wait}`)
+    }
+    return false
+  }
+
+  /** Every few seconds: if a goal is active and nothing has happened for a while, nudge it (backoff grows with stalled turns). */
+  private goalIdleCheck (): void {
+    const goal = this.goals.active
+    if (!goal || goal.paused || this.goalWake || this.busy || this.queue.length || this.agent.currentAction) return
+    const quietFor = Date.now() - Math.max(this.lastTurnAt, this.lastActionEndAt)
+    if (quietFor >= idleDelay(goal.stalls, this.goals.opts)) this.tryContinue('idle')
+  }
+
+  /** After each turn: count continuation turns, then line up the next one. */
+  private afterTurn (report: TurnReport, startedAt: number): void {
+    const goal = this.goals.active
+    if (!goal) return
+    if (report.trigger.kind === 'goal' && report.trigger.reason !== 'stop') {
+      const acted = report.calls.some(c => c.ok && !NON_PROGRESS_TOOLS.has(c.name))
+      const touched = goal.updatedAt >= startedAt && report.calls.some(c => c.ok && c.name === 'update_goal')
+      this.goals.recordTurn(acted || touched)
+    }
+    if (report.skipped || report.error) return
+    const g = this.goals.active
+    if (!g || g.paused) return
+    // Something still running (a long action we started, a player command): its actionEnd continues.
+    if (this.agent.currentAction) return
+    const progress = g.stalls === 0
+    this.scheduleGoal('continue', undefined, progress ? this.goals.opts.continueDelayMs : idleDelay(g.stalls, this.goals.opts))
   }
 
   /** Something happened in the world. Recorded in memory; starts a turn if that event is enabled. */
@@ -317,10 +432,13 @@ export class LlmRuntime {
       return
     }
     this.busy = true
+    const startedAt = Date.now()
     try {
       const report = await this.runTurn(next)
       this.reports.push(report)
       if (this.reports.length > 20) this.reports.shift()
+      this.busy = false
+      try { this.afterTurn(report, startedAt) } catch (e) { this.log.warn(`goal follow-up: ${(e as Error).message}`) }
     } finally {
       this.busy = false
       void this.pump()
@@ -354,7 +472,8 @@ export class LlmRuntime {
       this.pauseAnnounced = false
     }
 
-    const query = chat ? chat.message : trigger.kind === 'event' ? trigger.detail : ''
+    const goalText = this.goals.active?.text
+    const query = chat ? chat.message : trigger.kind === 'event' ? trigger.detail : trigger.kind === 'goal' ? (goalText ?? '') : ''
     const system = this.systemPrompt
     // With a context pack, MEMORY.md is in the system prompt; only add notes if it was cut short there.
     const memoryInPrompt = !!this.opts.context?.()?.memoryInPrompt
@@ -366,12 +485,17 @@ export class LlmRuntime {
       recent: this.memory.recent(20),
       summary: this.memory.summary,
       notes,
+      goal: this.goals.fmtPrompt(),
       budgetNote: this.budget.turnsPerHour > 0 && spent.turns > this.budget.turnsPerHour * 0.8 ? 'Running low on thinking budget this hour: be brief, few tool calls.' : undefined
     })
-    const player = chat?.from ?? (trigger.kind === 'event' ? trigger.player : undefined)
+    const player = chat?.from ?? (trigger.kind === 'event' || trigger.kind === 'goal' ? trigger.player : undefined)
+    const goalNow = this.goals.active
+    const replyTo = chat
+      ? { from: chat.from, whisper: chat.whisper }
+      : trigger.kind === 'goal' && goalNow?.owner ? { from: goalNow.owner, whisper: !!goalNow.whisper } : undefined
     this.tools.begin({
       player,
-      replyTo: chat ? { from: chat.from, whisper: chat.whisper } : undefined,
+      replyTo,
       maxToolCalls: this.limits.maxToolCalls,
       maxChatMessages: this.limits.maxChatMessages
     })
@@ -422,6 +546,16 @@ export class LlmRuntime {
       if (chat.whisper) this.agent.whisper(chat.from, text)
       else this.agent.say(text)
       this.memory.push({ kind: 'self', text })
+    }
+    // A goal finished in a turn where the model didn't chat: the owner still hears the result.
+    if (result && goalNow && !this.goals.active && scope && scope.chatCount === 0 && replyTo) {
+      const last = this.goals.history().at(-1)
+      const text = (result.text.trim() || (last ? `${last.status === 'done' ? 'done' : 'stopped'}: ${last.result}` : '')).replace(/\s+/g, ' ').slice(0, 400)
+      if (text) {
+        if (replyTo.whisper) this.agent.whisper(replyTo.from, text)
+        else this.agent.say(text)
+        this.memory.push({ kind: 'self', text })
+      }
     }
     if (result) this.log.trace('response', { text: result.text, detail: result.detail })
     this.log.info(`llm turn: ${fmtTurn(usage)}`, {
@@ -482,8 +616,12 @@ export class LlmRuntime {
   }
 }
 
+/** Tools that don't move a goal forward on their own (looking and talking). */
+const NON_PROGRESS_TOOLS = new Set(['observe', 'reply', 'say', 'whisper', 'recent_chat', 'recall', 'remember', 'goal_status', 'inventory', 'build_plan', 'pos', 'hp'])
+
 function describe (t: Trigger): string {
   if (t.kind === 'chat') return `${t.whisper ? 'whisper' : 'chat'} from ${t.from}`
   if (t.kind === 'tick') return `tick: ${t.reason}`
+  if (t.kind === 'goal') return `goal: ${t.reason}`
   return `event: ${t.event}`
 }

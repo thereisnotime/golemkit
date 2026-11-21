@@ -34,7 +34,8 @@ chat / events / timer ──► LlmRuntime ──► provider.run(turn) ──�
 ```
 
 - **BotTools** (`src/llm/tools.ts`) is the tool set: every non-internal action plus
-  `observe`, `reply`, `say`, `whisper`, `recent_chat`, `remember`, `recall`. API providers call
+  `observe`, `reply`, `say`, `whisper`, `recent_chat`, `remember`, `recall`, and the goal
+  tools (`set_goal`, `update_goal`, `complete_goal`, `abandon_goal`, `goal_status`). API providers call
   it in-process; CLI agents reach it through the **MCP bridge** (`src/llm/mcp.ts`), a
   streamable-HTTP MCP server on `127.0.0.1` with a random port and a bearer token.
 - Actions run with `caller: { kind: 'brain', name: 'llm' }` at `PRIORITY.llm` (30): above NPC
@@ -208,6 +209,14 @@ time per bot; up to 3 triggers queue, chat ahead of ticks and events, and severa
 from the same player while a turn runs are merged into one.
 
 Set `--owners` (or `MC_OWNERS`) on public servers: every trigger spends tokens.
+
+## Goals
+
+Requests that take more than one turn become a [persistent goal](/guide/goals-and-building#goals) with a plan. The active goal is
+shown at the top of every prompt, survives restarts, and the brain keeps starting follow-up
+turns until it's done, within limits that renew whenever the owner talks. Configure with
+`llm.goals` (`maxTurns`, `timeoutMin`, `maxSameFailures`, ...). See
+[Goals and building](./goals-and-building.md).
 
 ## Memory
 

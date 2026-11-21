@@ -10,15 +10,28 @@ export type Goal = InstanceType<typeof pf.goals.GoalBlock> | any
 /** pathfinder.goto that stops when the signal aborts. */
 export async function goto (bot: Bot, goal: Goal, signal: AbortSignal): Promise<void> {
   if (signal.aborted) throw new ActionAbortedError()
-  const onAbort = () => bot.pathfinder.stop()
+  let force: NodeJS.Timeout | undefined
+  let onAbort = () => {}
+  // pathfinder.stop() only settles goto() at the next path node. When the pathfinder is wedged
+  // (a goal set but no movement, seen live) that never happens, so clear the goal after a grace.
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => {
+      bot.pathfinder.stop()
+      force = setTimeout(() => {
+        try { bot.pathfinder.setGoal(null) } catch {}
+        reject(new ActionAbortedError())
+      }, 2000)
+    }
+  })
   signal.addEventListener('abort', onAbort, { once: true })
   try {
-    await bot.pathfinder.goto(goal)
+    await Promise.race([bot.pathfinder.goto(goal), aborted])
   } catch (e) {
     if (signal.aborted) throw new ActionAbortedError()
     throw e
   } finally {
     signal.removeEventListener('abort', onAbort)
+    if (force) clearTimeout(force)
   }
   if (signal.aborted) throw new ActionAbortedError()
 }

@@ -7,7 +7,8 @@ each one is for and how it behaves.
 Two bundles live in `src/skills/index.ts`:
 
 - `standardSkills()`: status, movement, combat, survival, inventory, gather, [journal](/guide/journal).
-- `extendedSkills()`: crafting, containers, farming, woodcutting, building, pickup.
+- `extendedSkills()`: crafting, containers, farming, woodcutting, building, construction,
+  materials, pickup.
 
 `navigation()` is exported on its own (the villager bot uses it).
 
@@ -69,7 +70,7 @@ Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actio
 ### gather
 | action | |
 |---|---|
-| `collect` *dig* | Mine N blocks of one type nearby and pick up the drops. |
+| `collect` *dig* | Mine N blocks of one type nearby and pick up the drops. Equips the best tool; for stone and ores it crafts a pickaxe of the needed tier first when the inventory allows. Skips blocks it can't reach and protected areas. |
 
 ### journal
 See [Event journal](./guide/journal.md).
@@ -102,8 +103,8 @@ See [Event journal](./guide/journal.md).
 | `smelt` | Smelt N items in a furnace within 32 blocks (or one placed from the inventory). Picks fuel (coal, charcoal, planks, logs, sticks; never the input), polls the output once a second and takes results until done, the furnace stops burning, or ~10 s per item passes. |
 
 Recipes come from minecraft-data, not the server (its recipe packet carries modded items and
-is skipped), so modded recipes aren't craftable. Only the item itself is crafted, not its
-ingredients.
+is skipped), so modded recipes aren't craftable. `craft` only makes the item itself, not its
+ingredients; `gather_materials` does the whole chain for wooden things.
 
 ### containers
 | action | |
@@ -127,7 +128,7 @@ Harvest and plant don't change terrain, so they work with digging off. Observe h
 ### woodcutting
 | action | |
 |---|---|
-| `chop_tree` *dig* | Fell the nearest natural tree of any wood type: cut its logs bottom-up with the best axe, skip logs out of reach, pick up drops and plant a matching sapling on the stump's soil. |
+| `chop_tree` *dig* | Fell the nearest natural tree of any wood type: cut its logs bottom-up with the best axe, skip logs out of reach, pick up drops and plant a matching sapling on the stump's soil. Crafts a wooden axe first when there is none and the inventory has the wood (`make_axe`). |
 
 A "natural tree" is a connected group of logs with at least three non-persistent leaves
 attached. Player-placed leaves are persistent, so log walls, cabins and log piles are left
@@ -141,6 +142,21 @@ how many were out of reach.
 | action | |
 |---|---|
 | `place_block` | Place a block from the inventory at x y z against any solid neighbour (never a chest, door or other block that would open/toggle, never a modded block). |
+| `break_block` *dig* | Break the block at x y z with the best tool, crafting a pickaxe first for stone and ores when it can. Refuses containers unless `force`. |
+
+### construction
+| action | |
+|---|---|
+| `build` | Build a whole structure from a [blueprint](/guide/goals-and-building#blueprint-format) (`hut`, `shelter`, `wall_segment`, `platform`, `tower`): picks a flat, natural site near whoever asked, outside protected areas and spawn, refuses if the footprint has player-made blocks, places floor, walls, roof, torch and door, skips blocks already right (re-running resumes on the same site) and reports the real count. `gather=true` gathers missing materials first. Long-running. |
+| `build_plan` *ne* | Without a template, lists the blueprints; with one, where it would go and its materials vs the inventory. |
+
+Blueprints are YAML in `blueprints/`. Observe hook: `build` (the structure in progress). See
+[Goals and building](./guide/goals-and-building.md) for the format.
+
+### materials
+| action | |
+|---|---|
+| `gather_materials` *dig* | Get everything for a shopping list (`{"planks": 80, "door": 1}`, generic names mean any wood) or a blueprint (`template=hut`): fells trees (crafting a wooden axe as soon as it has wood), crafts planks, sticks, tables, doors, tools, torches (with coal), mines cobblestone, dirt, sand, gravel. Reports what is still missing and why. Long-running. |
 
 ### pickup
 | action | |
@@ -154,6 +170,11 @@ Observe hook: `droppedItemsNearby`.
 `src/skills/world.ts` and `pickup.ts` export the pieces the extended skills are built from:
 `placeAt(bot, item, pos, signal)`, `reachBlock(bot, pos, signal)`,
 `pickupNearby(bot, signal, opts)`, `findFreeSpot(bot)`, `findItem`, `countItem`, `vec`.
+
+Actions that need other actions' work inside their own lock call the shared bodies directly
+(calling `agent.act` from inside an action would replace it): `craftItem` (crafting.ts),
+`fellTree` (woodcutting.ts), `collectBlocks` (gather.ts), `gatherMaterials` (materials.ts),
+`buildStructure` (construction.ts) and `ensureTool(bot, signal, kind)` (toolkit.ts).
 
 ## Trying actions on a live server
 

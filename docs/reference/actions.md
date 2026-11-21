@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-14 skills, 48 actions.
+16 skills, 51 actions.
 
 ## building
 
@@ -26,7 +26,7 @@ Place a block from the inventory at x y z. Needs a solid block next to that spot
 
 ### `break_block`
 
-Break (mine) the block at x y z with the best tool in the inventory. Needs digging enabled. Refuses chests and other containers unless force=true.
+Break (mine) the block at x y z with the best tool in the inventory (crafts a pickaxe first for stone and ores when it can). Needs digging enabled. Refuses chests and other containers unless force=true.
 
 | param | type | required | default | description |
 |---|---|---|---|---|
@@ -87,6 +87,41 @@ Hunt passive animals (cow, pig, sheep, chicken, rabbit, mooshroom) for food and 
 | `count` | integer (1..8) |  | `1` | how many to kill |
 | `radius` | number (4..64) |  | `24` | how far to look, in blocks |
 | `pens` | boolean |  | `false` | also hunt animals inside fences (only your own farm) |
+
+## construction
+
+Building structures from blueprints.
+
+### `build`
+
+Build a whole structure from a blueprint: hut (small 5x5 wooden house with door, roof and torch), shelter (emergency 3x3 box around the bot), wall_segment, platform, tower. Picks a flat, clear spot near whoever asked (never in protected areas or over player builds), levels small bumps, places floor, walls, roof, then torch and door, and skips blocks that are already right, so calling it again resumes an interrupted build. gather=true first chops trees and crafts whatever is missing. Reports how many blocks it placed. Use build_plan to check materials first.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `template` | string | yes |  | blueprint name: hut, shelter, wall_segment, platform, tower (build_plan lists all) |
+| `x` | number |  |  | centre of the footprint; omit to pick a spot near the player |
+| `y` | number |  |  | level of the floor (layer 0); default the ground there + 1 |
+| `z` | number |  |  |  |
+| `facing` | `north` \| `east` \| `south` \| `west` |  |  | side the entrance faces; default towards the player |
+| `material` | string |  |  | main block, e.g. spruce_planks or cobblestone; default whatever fits that the bot has most of |
+| `gather` | boolean |  | `false` | gather missing materials first (chop trees, craft planks and a door) |
+
+### `build_plan`
+
+What a blueprint needs vs what the bot carries, and where it would go. Without a template, lists the blueprints.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `template` | string |  |  |  |
+| `material` | string |  |  |  |
+| `x` | number |  |  |  |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
+| `facing` | `north` \| `east` \| `south` \| `west` |  |  |  |
 
 ## containers
 
@@ -198,11 +233,11 @@ Mining and collecting blocks.
 
 ### `collect`
 
-Mine a number of blocks of one type nearby and pick up the drops. Skips protected areas (spawn): if everything nearby is protected it walks out of the zone first. Needs digging enabled.
+Mine a number of blocks of one type nearby and pick up the drops, with the right tool (crafts a pickaxe first for stone and ores when it can). Skips protected areas (spawn): if everything nearby is protected it walks out of the zone first. Needs digging enabled.
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `block` | string | yes |  | block name, e.g. oak_log, dirt, cobblestone |
+| `block` | string | yes |  | block name, e.g. oak_log, dirt, stone, cobblestone |
 | `count` | integer (1..64) |  | `1` |  |
 
 ## inventory
@@ -281,6 +316,23 @@ Walk back to where the bot last died to pick up its dropped items (they despawn 
 | param | type | required | default | description |
 |---|---|---|---|---|
 | `pickup` | boolean |  | `true` | pick up dropped items there |
+
+## materials
+
+Gathering and crafting everything a job needs.
+
+### `gather_materials`
+
+Get the materials for a job in one go: chops as many trees as needed (crafting a wooden axe first), turns logs into planks and sticks, crafts wooden items (doors, crafting tables, chests, tools, torches if there is coal) and mines simple blocks (cobblestone, dirt, sand, gravel). Give either items, e.g. {"planks": 80, "door": 1} ("planks", "log", "door" mean any wood), or template="hut" for everything a blueprint needs. Prefer this over many chop_tree/craft calls. Needs digging enabled to chop or mine.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `items` | object |  |  | item -> count, e.g. {"oak_planks": 64, "stick": 8, "door": 1} |
+| `template` | string |  |  | blueprint name (see build_plan) to gather everything it needs |
+| `material` | string |  |  | with template: the main block to use, e.g. spruce_planks or cobblestone |
+| `radius` | integer (8..64) |  | `32` | how far to look for trees and blocks |
 
 ## movement
 
@@ -526,7 +578,7 @@ Felling trees.
 
 ### `chop_tree`
 
-Fell the nearest natural tree (any wood type): cut the logs it can reach, pick up the drops and plant a sapling. Needs digging enabled.
+Fell the nearest natural tree (any wood type): cut the logs it can reach, pick up the drops and plant a sapling. Crafts a wooden axe first if there is none and the inventory has the wood. Needs digging enabled. For "get N planks/logs" or materials for a build, prefer gather_materials, which chops as many trees as needed.
 
 *aliases: `chop`*
 
@@ -534,6 +586,7 @@ Fell the nearest natural tree (any wood type): cut the logs it can reach, pick u
 |---|---|---|---|---|
 | `radius` | number (4..64) |  | `32` | how far to look for a tree, in blocks |
 | `replant` | boolean |  | `true` | plant a sapling of the same kind afterwards if the bot has one |
+| `make_axe` | boolean |  | `true` | craft a wooden axe first when there is none and there is wood for it |
 
 ## behaviors (brain)
 

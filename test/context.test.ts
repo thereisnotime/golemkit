@@ -116,7 +116,7 @@ test('the shipped pax pack loads cleanly against the companion catalog', async (
   const pack = loadContextPack(['profiles/pax'], { catalog: names, memoryFile: false })
   assert.deepEqual(pack.warnings, [])
   assert.ok(pack.text.rules && pack.text.user)
-  assert.deepEqual(pack.skills.map(s => s.name), ['come-to-me', 'gather-wood'])
+  assert.deepEqual(pack.skills.map(s => s.name), ['build-house', 'come-to-me', 'gather-wood'])
   assert.ok(pack.hooks.length >= 2)
 })
 

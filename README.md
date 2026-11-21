@@ -73,6 +73,7 @@ Movement, protected areas, combat and reflexes: [docs/concepts/world.md](docs/co
 Self-sufficient NPCs (utility-AI brain, behaviours, `variants/villager.ts`): [docs/guide/npc-brain.md](docs/guide/npc-brain.md).
 LLM-driven bots on your Claude / Codex subscription or an API (`variants/companion.ts`): [docs/guide/llm-brain.md](docs/guide/llm-brain.md).
 Armable behaviours (keep_fed, stay_safe, follow_owner, guard_area...) that owners and LLMs switch on and that run between turns: [docs/guide/behaviors.md](docs/guide/behaviors.md).
+Goals that LLM bots work through on their own, and building structures from YAML blueprints: [docs/guide/goals-and-building.md](docs/guide/goals-and-building.md).
 NPCs that run their own program and rewrite it with one LLM call when an owner teaches them (`variants/apprentice.ts`): [docs/guide/self-improver.md](docs/guide/self-improver.md).
 Per-profile rules, skills, memory and hooks, with an A/B eval: [docs/guide/context-pack.md](docs/guide/context-pack.md).
 What happened to each bot (deaths, items, actions, daily rollups, `!last_death`): [docs/guide/journal.md](docs/guide/journal.md).

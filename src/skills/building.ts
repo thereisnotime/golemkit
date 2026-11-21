@@ -1,5 +1,6 @@
 import { defineSkill, defineAction, z, ok, fail, fmtPos } from '../core/index.ts'
 import { vec, placeAt, findItem, reachBlock, digBlock, DigRefusedError } from './world.ts'
+import { ensureTool, equipFor, minTierFor, needsTool, toolKindFor } from './toolkit.ts'
 
 const placeBlock = defineAction({
   name: 'place_block',
@@ -26,7 +27,7 @@ const placeBlock = defineAction({
 
 const breakBlock = defineAction({
   name: 'break_block',
-  description: 'Break (mine) the block at x y z with the best tool in the inventory. Needs digging enabled. ' +
+  description: 'Break (mine) the block at x y z with the best tool in the inventory (crafts a pickaxe first for stone and ores when it can). Needs digging enabled. ' +
     'Refuses chests and other containers unless force=true.',
   params: z.object({
     x: z.number().int(),
@@ -41,9 +42,10 @@ const breakBlock = defineAction({
     if (!block || block.name === 'air' || block.name === 'cave_air') return fail(`nothing to break at ${fmtPos(pos)}`)
     if (block.name === 'bedrock' || block.hardness === null || block.hardness < 0) return fail(`${block.name} can't be broken`)
     if (!force && /chest|barrel|shulker_box|furnace|hopper|dispenser|dropper/.test(block.name)) return fail(`${block.name} looks like storage; pass force=true to break it`)
+    // Stone and ores drop nothing by hand: make a pickaxe first when the inventory allows.
+    if (needsTool(block)) await ensureTool(bot, signal, toolKindFor(block) ?? 'pickaxe', { minTier: minTierFor(bot.registry, block) }).catch(() => {})
     await reachBlock(bot, pos, signal)
-    const tool = (bot.pathfinder as any).bestHarvestTool?.(block)
-    if (tool) await bot.equip(tool, 'hand').catch(() => {})
+    await equipFor(bot, block)
     try {
       await digBlock(bot, block, signal)
     } catch (e) {

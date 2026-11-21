@@ -77,7 +77,7 @@ export class BotTools implements ToolHost {
       actionTimeoutMs: opts.actionTimeoutMs ?? 30_000,
       startGraceMs: opts.startGraceMs ?? 1500,
       maxChatChars: opts.maxChatChars ?? 400,
-      exclude: opts.exclude ?? ['llm_usage'],
+      exclude: opts.exclude ?? ['llm_usage', 'goal', 'goal_cancel'],
       priority: opts.priority ?? PRIORITY.llm
     }
     this.external = opts.allowOutsideTurn ? { maxToolCalls: Infinity, maxChatMessages: Infinity, calls: [], chatCount: 0 } : null
@@ -174,10 +174,13 @@ export class BotTools implements ToolHost {
 
   // ------------------------------------------------------------ builtins
 
+  /** Adds a built-in tool (not an action): goals.ts uses this for set_goal and friends. */
+  define (name: string, description: string, schema: z.ZodObject, run: Builtin['run']): void {
+    this.builtins.set(name, { spec: { name, description, inputSchema: cleanSchema(z.toJSONSchema(schema, { io: 'input' }) as Record<string, unknown>) }, schema, run })
+  }
+
   private defineBuiltins (): void {
-    const add = (name: string, description: string, schema: z.ZodObject, run: Builtin['run']) => {
-      this.builtins.set(name, { spec: { name, description, inputSchema: cleanSchema(z.toJSONSchema(schema, { io: 'input' }) as Record<string, unknown>) }, schema, run })
-    }
+    const add = this.define.bind(this)
     const text = z.string().min(1).describe('what to say; keep it short, it is Minecraft chat')
 
     add('observe', 'Look around: position, health, food, time, inventory, nearby players and mobs, current action.', z.object({}), () => {

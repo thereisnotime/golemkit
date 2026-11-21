@@ -1,0 +1,14 @@
+# A flat 5x5 pad on the ground: a base for crafting stations, a landing, a floor. 25 blocks.
+name: platform
+description: Flat 5x5 floor pad
+facing: south
+site: near
+roles:
+  floor:
+    default: oak_planks
+    accept: "^(cobblestone|cobbled_deepslate|stone|stone_bricks|dirt|[a-z_]+_planks)$"
+    material: true
+palette:
+  "#": floor
+layers:
+  - ["#####", "#####", "#####", "#####", "#####"]

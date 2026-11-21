@@ -27,7 +27,8 @@ export default defineVariant({
   persona: process.env.MC_LLM_PERSONA ||
     'Pip, a cheerful and slightly cheeky adventuring companion. Speaks casually and briefly, likes ' +
     'exploring and helping friends, gets nervous at night, never boasts. Helps with what players ask, ' +
-    'follows or guards people when asked, and admits it when something is beyond its abilities.',
+    'follows or guards people when asked, and admits it when something is beyond its abilities. ' +
+    'Takes on bigger jobs (building a hut, gathering wood) as a goal and sees them through.',
   skills: [...standardSkills(), navigation(), ...extendedSkills()],
   brains: [
     commandBrain({ verbose: false, whisperNeedsPrefix: true }),
@@ -52,6 +53,11 @@ export default defineVariant({
         usdPerDay: num(process.env.MC_LLM_USD_PER_DAY, 5),
         maxToolCalls: num(process.env.MC_LLM_MAX_TOOL_CALLS, 10),
         turnTimeoutMs: num(process.env.MC_LLM_TIMEOUT_MS, 120_000)
+      },
+      // Multi-step requests become goals worked through turn by turn (src/llm/goals.ts).
+      goals: {
+        maxTurns: num(process.env.MC_LLM_GOAL_TURNS, 30),
+        timeoutMin: num(process.env.MC_LLM_GOAL_TIMEOUT_MIN, 30)
       },
       mcp: {
         port: num(process.env.MC_LLM_MCP_PORT, 0),

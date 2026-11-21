@@ -19,6 +19,8 @@ const TERMS: [string, string][] = [
   ['armable behaviou?rs', '/guide/behaviors'],
   ['armed behaviou?rs', '/guide/behaviors'],
   ['keep_fed', '/guide/behaviors'],
+  ['persistent goals?', '/guide/goals-and-building#goals'],
+  ['blueprints?', '/guide/goals-and-building#blueprint-format'],
   ['NPC brain', '/guide/npc-brain'],
   ['LLM brain', '/guide/llm-brain'],
   ['scene brain', '/guide/scenes'],

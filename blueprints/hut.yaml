@@ -1,0 +1,43 @@
+# Small one-room wooden house: 5x5 floor, two-high plank walls with a door gap and two
+# windows, flat roof, a torch inside and a door. 78 planks + 1 door (+ optional torch and
+# 2 glass panes; without glass the windows stay open).
+name: hut
+description: Small 5x5 one-room house with a door, a flat roof and a torch inside
+facing: south            # the door side, as drawn below
+site: near
+roles:
+  wall: { default: oak_planks, accept: "_planks$", material: true }
+  door: { default: oak_door, accept: "_door$", kind: door }
+  window: { default: glass_pane, accept: "glass", optional: true }
+  light: { default: torch, accept: "^(wall_)?torch$", kind: attachment, optional: true }
+palette:
+  "#": wall
+  D: door
+  W: window
+  T: light
+  ".": air
+layers:
+  # y=0 floor (sits on the ground)
+  - ["#####",
+     "#####",
+     "#####",
+     "#####",
+     "#####"]
+  # y=1 walls, door gap in the south wall, torch in the north-west corner
+  - ["#####",
+     "#T..#",
+     "#...#",
+     "#...#",
+     "##D##"]
+  # y=2 walls with a window east and west; above the door is left to the door's top half
+  - ["#####",
+     "#...#",
+     "W...W",
+     "#...#",
+     "## ##"]
+  # y=3 flat roof
+  - ["#####",
+     "#####",
+     "#####",
+     "#####",
+     "#####"]

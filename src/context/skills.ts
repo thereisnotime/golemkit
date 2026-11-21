@@ -72,7 +72,7 @@ export function loadSkills (dir: string): Skill[] {
 }
 
 /** LLM built-in tools (src/llm/tools.ts) a skill may name besides catalog actions. */
-export const BUILTIN_TOOLS = ['observe', 'reply', 'say', 'whisper', 'recent_chat', 'remember', 'recall', 'list_skills', 'read_skill']
+export const BUILTIN_TOOLS = ['observe', 'reply', 'say', 'whisper', 'recent_chat', 'remember', 'recall', 'list_skills', 'read_skill', 'set_goal', 'update_goal', 'complete_goal', 'abandon_goal', 'goal_status']
 
 /** Warnings for skill actions that aren't in the bot's catalog (or built-in tools). */
 export function validateSkills (skills: Skill[], catalog: string[]): string[] {

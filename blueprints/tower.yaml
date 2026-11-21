@@ -1,0 +1,24 @@
+# Small lookout tower: hollow 3x3 shaft, 5 high, a doorway at the bottom, a capped top with
+# corner posts and a torch. 51 blocks + torch.
+name: tower
+description: Small 3x3 lookout tower, 7 high, with a doorway and corner posts
+facing: south
+site: near
+roles:
+  wall:
+    default: cobblestone
+    accept: "^(cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_cobblestone|[a-z_]+_planks)$"
+    material: true
+  light: { default: torch, accept: "^(wall_)?torch$", kind: attachment, optional: true }
+palette:
+  "#": wall
+  T: light
+  ".": air
+layers:
+  - ["###", "#.#", "#.#"]
+  - ["###", "#.#", "#.#"]
+  - ["###", "#.#", "###"]
+  - ["###", "#.#", "###"]
+  - ["###", "#.#", "###"]
+  - ["###", "###", "###"]
+  - ["# #", " T ", "# #"]

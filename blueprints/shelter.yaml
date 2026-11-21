@@ -1,0 +1,18 @@
+# Emergency box around the bot's feet: 3x3, two high, roofed, no door. Dirt, cobblestone
+# or planks, whatever the bot has most of. 25 blocks.
+name: shelter
+description: Emergency 3x3 box of dirt, cobblestone or planks around the bot
+facing: south
+site: here               # centred on where the bot stands
+roles:
+  wall:
+    default: dirt
+    accept: "^(dirt|coarse_dirt|cobblestone|cobbled_deepslate|stone|andesite|diorite|granite|deepslate|netherrack|sandstone|[a-z_]+_planks)$"
+    material: true
+palette:
+  "#": wall
+  ".": air
+layers:
+  - ["###", "#.#", "###"]
+  - ["###", "#.#", "###"]
+  - ["###", "###", "###"]
