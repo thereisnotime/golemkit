@@ -218,9 +218,14 @@ export class GoalStore {
   resumeIfOwnerSilent (): boolean {
     const g = this.active
     if (g?.paused === 'waiting for the owner' && g.owner && !this.isOnline(g.owner)) {
+      // Offline owner: no point waiting, but don't spin: 1 min gap, max 3 times (shared with ownerWaitMin).
+      if ((g.selfResumes ?? 0) >= 3 || this.now() - (g.pausedAt ?? g.updatedAt) < 60_000) return false
+      const failing = Object.entries(g.failures).filter(([, n]) => n >= this.opts.maxSameFailures).map(([sig]) => sig.split(':')[0])
       delete g.paused
       delete g.pausedAt
-      g.notes.push(`${g.owner} is offline: don't ask them or wait for them; decide yourself`)
+      g.selfResumes = (g.selfResumes ?? 0) + 1
+      g.notes.push(`${g.owner} is offline: don't ask them or wait for them; decide yourself` +
+        (failing.length ? `. Stop retrying ${failing.join(', ')} the same way: do a different step or a different approach` : ''))
       g.notes = g.notes.slice(-12)
       this.save(g)
       return true

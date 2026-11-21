@@ -716,10 +716,16 @@ test('goal does not wait for an owner who is offline', async () => {
   const { GoalStore } = await import('../src/llm/goals.ts')
   const mem: Record<string, unknown> = {}
   const st = { get: (k: string) => mem[k], set: (k: string, v: unknown) => { mem[k] = v }, delete: (k: string) => { delete mem[k] } } as any
-  const g = new GoalStore(st, {}, () => 1_000_000)
+  let now = 1_000_000
+  const g = new GoalStore(st, {}, () => now)
   g.isOnline = () => false
   g.set('build', ['a'], 'robin')
   g.update({ wait: true })
+  assert.equal(g.resumeIfOwnerSilent(), false, 'waits a minute first')
+  now += 61_000
   assert.equal(g.resumeIfOwnerSilent(), true)
+  for (let i = 0; i < 2; i++) { g.update({ wait: true }); now += 61_000; assert.equal(g.resumeIfOwnerSilent(), true) }
+  g.update({ wait: true }); now += 61_000
+  assert.equal(g.resumeIfOwnerSilent(), false, 'gives up after 3 until the owner is back')
   assert.match(g.fmtPrompt()!, /NOT on the server/)
 })
