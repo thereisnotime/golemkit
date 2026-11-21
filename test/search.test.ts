@@ -191,6 +191,7 @@ test('portal: lit portal, an empty 4x5 frame without corners, and loose obsidian
 test('describeFind: coordinates, distance and direction, depth for buried blocks', () => {
   const s = describeFind({ x: 100, y: 30, z: 0, what: 'iron ore', count: 3 }, { x: 0, y: 64, z: 0 }, 'you', 70)
   assert.equal(s, '3 iron ore at 100 30 0, 100 blocks east of you (40 below the surface)')
+  assert.match(describeFind({ x: 5, y: 40, z: 0, what: 'iron ore', count: 64, capped: true }, null, 'you'), /^64\+ iron ore at 5 40 0$/)
   assert.match(describeFind({ x: 1, y: 64, z: 1, what: 'water' }, { x: 0, y: 64, z: 0 }, 'you'), /right by you/)
   assert.match(describeFind({ x: 0, y: 64, z: -50, what: 'sheep', count: 2 }, { x: 0, y: 64, z: 0 }, 'where I started'), /50 blocks north of where I started/)
 })

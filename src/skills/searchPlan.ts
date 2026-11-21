@@ -361,11 +361,11 @@ export function portalVerdict (obsidian: readonly Pos[], portalBlocks = 0): { po
 
 // ------------------------------------------------------------------ reporting a find
 
-export interface FoundInfo extends Pos { what: string, count?: number }
+export interface FoundInfo extends Pos { what: string, count?: number, /** The search stopped counting at `count`. */ capped?: boolean }
 
 /** "3 iron ore at 120 40 -30, 85 blocks north-east of you (12 below the surface)". */
 export function describeFind (f: FoundInfo, from: Pos | null, fromName: string, surfaceY?: number | null): string {
-  const what = f.count && f.count > 1 ? `${f.count} ${f.what}` : f.what
+  const what = f.count && f.count > 1 ? `${f.count}${f.capped ? '+' : ''} ${f.what}` : f.what
   const where = `at ${Math.floor(f.x)} ${Math.floor(f.y)} ${Math.floor(f.z)}`
   let rel = ''
   if (from) {

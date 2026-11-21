@@ -162,7 +162,7 @@ function registryNames (agent: Agent, bot: Bot): RegistryNames {
   }
 }
 
-interface Sighting extends Pos { what: string, count: number, note?: string }
+interface Sighting extends Pos { what: string, count: number, capped?: boolean, note?: string }
 
 const ids = (bot: Bot, names: readonly string[]) => names.map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
 const dist = (a: { x: number, z: number }, b: { x: number, z: number }) => Math.hypot(a.x - b.x, a.z - b.z)
@@ -263,7 +263,7 @@ export function lookFor (agent: Agent, bot: Bot, t: ResolvedTarget, radius: numb
   const r = Math.min(radius, 96)
   if (t.liquid) {
     const src = liquidSources(bot, t.blocks[0]!, r).filter(b => !offLimits(agent, bot, b.position, 0))
-    return src.length ? { ...floorPos(src[0]!.position), what: t.label, count: src.length } : null
+    return src.length ? { ...floorPos(src[0]!.position), what: t.label, count: 1 } : null
   }
   const matching = ids(bot, t.blocks)
   if (!matching.length) return null
@@ -278,7 +278,7 @@ export function lookFor (agent: Agent, bot: Bot, t: ResolvedTarget, radius: numb
   const free = found.find(p => !agent.protectedAreas?.isProtected(p))
   const at = free ?? found[0]!
   const name = bot.blockAt(at)?.name ?? t.blocks[0]!
-  return { ...floorPos(at), what: t.ore ? `${name.replace(/_/g, ' ')}` : t.label, count: found.length, ...(free ? {} : { note: 'in a protected area' }) }
+  return { ...floorPos(at), what: t.ore ? `${name.replace(/_/g, ' ')}` : t.label, count: found.length, capped: found.length >= 64, ...(free ? {} : { note: 'in a protected area' }) }
 }
 
 // ------------------------------------------------------------------ the spiral scout (find_food's, generalised)
@@ -616,7 +616,7 @@ async function findEngine (ctx: Ctx, t: ResolvedTarget, o: FindOptions): Promise
     const ref = ownerAt ?? origin
     const refName = ownerAt ? 'you' : 'where I started'
     const sy = t.kind === 'block' && !t.liquid ? surfaceY(bot, at.x, at.z) : null
-    const text = describeFind({ ...at, what: s.what, count: s.count }, ref, refName, sy) + (s.note ? ` (${s.note})` : '')
+    const text = describeFind({ ...at, what: s.what, count: s.count, capped: s.capped }, ref, refName, sy) + (s.note ? ` (${s.note})` : '')
     say(`found ${text}`, true)
     const parts = [`${how}: ${text}, remembered as found:${t.key}`]
     let fetched: Record<string, number> = {}

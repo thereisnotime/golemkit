@@ -1,6 +1,6 @@
 // Live test of find_target, bring_item and fetch_drops on a real server.
 //   node scripts/search-test.ts where                         where the bot and the tester are
-//   node scripts/search-test.ts walk -2700 1000               both walk to x/z (the tester stops a few blocks off)
+//   node scripts/search-test.ts walk 205 165 234 333          both walk to each x/z in turn (the tester stops a few blocks off)
 //   node scripts/search-test.ts run 'find_target {"target":"iron"}' 'bring_item {"item":"bread","count":2}'
 //                                                              runs actions as if the tester asked, one after the other
 //   node scripts/search-test.ts tidy                          drops what the tester was given and lists the bot's own chests
@@ -85,14 +85,26 @@ async function main (): Promise<void> {
     log(state(bot))
     log(state(tester))
     if (mode === 'walk') {
-      const [x, z] = args.map(Number)
-      await Promise.all([
-        (async () => { for (let i = 0; i < 10; i++) { while (bot.currentAction) await pause(2000); if ((await act(bot, 'goto', { x, z }, false)).ok) break; await pause(3000) } })(),
-        (async () => { for (let i = 0; i < 6; i++) { if ((await act(tester, 'goto', { x: x! + 4, z: z! + 3 }, false)).ok) break; await pause(3000) } })()
-      ])
+      // waypoints: x z [x z ...], walked in order (a detour round a lake the straight line drowns in)
+      const pts = args.map(Number)
+      for (let k = 0; k + 1 < pts.length; k += 2) {
+        const x = pts[k]!
+        const z = pts[k + 1]!
+        await Promise.all([
+          (async () => { for (let i = 0; i < 10; i++) { while (bot.currentAction) await pause(2000); if ((await act(bot, 'goto', { x, z }, false)).ok) break; await pause(3000) } })(),
+          (async () => { for (let i = 0; i < 6; i++) { if ((await act(tester, 'goto', { x: x + 4, z: z + 3 }, false)).ok) break; await pause(3000) } })()
+        ])
+      }
       log(state(bot))
       log(state(tester))
     } else if (mode === 'run') {
+      // scouting is by day: wait for the morning (up to 10 min) unless told not to
+      const night = () => { const t = bot.bot.time.timeOfDay; return t >= 12_542 && t <= 23_459 }
+      if (process.env.SEARCH_NO_WAIT !== 'true' && night()) {
+        log(`night (time ${bot.bot.time.timeOfDay}), waiting for the morning`)
+        const until = Date.now() + 10 * 60_000
+        while (night() && Date.now() < until) await pause(5000)
+      }
       await joinUp(bot, tester)
       for (const spec of args) {
         const i = spec.indexOf(' ')
