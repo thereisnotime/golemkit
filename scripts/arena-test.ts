@@ -118,35 +118,37 @@ async function main (): Promise<void> {
   let wave = 0
   let lastWave = 0
   while (Date.now() < until) {
-    await pause(2000)
-    if (!live(bot) || !live(dir)) continue // kicked (timeouts under load): the agent reconnects
-    if (died) {
-      died = false
-      await pause(2500) // respawn
-      await kit()
-      await cmd(`/tp ${BOT} ${spot.x} ${spot.y} ${spot.z}`)
-      lifeStart = Date.now()
-      continue
-    }
-    const alive = Object.values(bot.bot.entities).filter((e: any) => e.type === 'hostile' && e.position.distanceTo(spot) < 40).length
-    if (Date.now() - lastWave > 40_000 && alive < 6) {
-      lastWave = Date.now()
-      wave++
-      const helmet = `{Tags:["${TAG}"],ArmorItems:[{},{},{},{id:"minecraft:leather_helmet",count:1}]}`
-      const mobs: [string, string][] = [['zombie', helmet], ['zombie', helmet], ['skeleton', helmet], ['spider', `{Tags:["${TAG}"]}`]]
-      if (wave % 2 === 0) mobs.push(['creeper', `{Tags:["${TAG}"]}`])
-      for (const [m, nbt] of mobs) {
-        const a = Math.random() * Math.PI * 2
-        const r = 7 + Math.random() * 4
-        await cmd(`/summon minecraft:${m} ${(spot.x + Math.cos(a) * r).toFixed(1)} ${spot.y + 1} ${(spot.z + Math.sin(a) * r).toFixed(1)} ${nbt}`)
-        stats.summoned++
+    try {
+      await pause(2000)
+      if (!live(bot) || !live(dir)) continue // kicked (timeouts under load): the agent reconnects
+      if (died) {
+        died = false
+        await pause(2500) // respawn
+        await kit()
+        await cmd(`/tp ${BOT} ${spot.x} ${spot.y} ${spot.z}`)
+        lifeStart = Date.now()
+        continue
       }
-      log(`wave ${wave}: ${mobs.map(m => m[0]).join(', ')} (${alive} already there)`)
-    }
-    // wandered off (chase, retreat): come back after a while like a bot heading home
-    if (!bot.currentAction && bot.bot.entity.position.distanceTo(spot) > 6) {
-      void bot.act('goto', { x: spot.x, y: spot.y, z: spot.z }, { caller: { kind: 'system', name: 'arena' }, priority: PRIORITY.player })
-    }
+      const alive = Object.values(bot.bot.entities).filter((e: any) => e.type === 'hostile' && e.position.distanceTo(spot) < 40).length
+      if (Date.now() - lastWave > 40_000 && alive < 6) {
+        lastWave = Date.now()
+        wave++
+        const helmet = `{Tags:["${TAG}"],ArmorItems:[{},{},{},{id:"minecraft:leather_helmet",count:1}]}`
+        const mobs: [string, string][] = [['zombie', helmet], ['zombie', helmet], ['skeleton', helmet], ['spider', `{Tags:["${TAG}"]}`]]
+        if (wave % 2 === 0) mobs.push(['creeper', `{Tags:["${TAG}"]}`])
+        for (const [m, nbt] of mobs) {
+          const a = Math.random() * Math.PI * 2
+          const r = 7 + Math.random() * 4
+          await cmd(`/summon minecraft:${m} ${(spot.x + Math.cos(a) * r).toFixed(1)} ${spot.y + 1} ${(spot.z + Math.sin(a) * r).toFixed(1)} ${nbt}`)
+          stats.summoned++
+        }
+        log(`wave ${wave}: ${mobs.map(m => m[0]).join(', ')} (${alive} already there)`)
+      }
+      // wandered off (chase, retreat): come back after a while like a bot heading home
+      if (!bot.currentAction && bot.bot.entity.position.distanceTo(spot) > 6) {
+        void bot.act('goto', { x: spot.x, y: spot.y, z: spot.z }, { caller: { kind: 'system', name: 'arena' }, priority: PRIORITY.player })
+      }
+    } catch (e) { log(`loop: ${(e as Error).message}`) } // disconnected mid-step: the agent reconnects
   }
   measuring = false
   await waitLive(bot)
