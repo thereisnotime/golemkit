@@ -691,3 +691,23 @@ test("listen 'all' batches overheard chat into one turn and never echoes final t
   assert.equal(p.inputs.length, 2, 'a mention is still immediate')
   await rt.stop()
 })
+
+test('goal goes on alone when the owner stays silent', async () => {
+  const { GoalStore } = await import('../src/llm/goals.ts')
+  let now = 1_000_000
+  const mem: Record<string, unknown> = {}
+  const st = { get: (k: string) => mem[k], set: (k: string, v: unknown) => { mem[k] = v }, delete: (k: string) => { delete mem[k] } } as any
+  const g = new GoalStore(st, { ownerWaitMin: 15 }, () => now)
+  g.set('build a thing', ['a', 'b'], 'robin')
+  g.update({ wait: true })
+  assert.equal(g.resumeIfOwnerSilent(), false, 'too early')
+  now += 16 * 60_000
+  assert.equal(g.resumeIfOwnerSilent(), true)
+  assert.equal(g.active!.paused, undefined)
+  assert.match(g.active!.notes.at(-1)!, /didn't answer/)
+  for (let i = 0; i < 2; i++) { g.update({ wait: true }); now += 16 * 60_000; assert.equal(g.resumeIfOwnerSilent(), true) }
+  g.update({ wait: true }); now += 16 * 60_000
+  assert.equal(g.resumeIfOwnerSilent(), false, 'max 3 times until the owner talks')
+  g.touchOwner(); g.update({ wait: true }); now += 16 * 60_000
+  assert.equal(g.resumeIfOwnerSilent(), true, 'owner talking resets the count')
+})

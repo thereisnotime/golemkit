@@ -29,6 +29,10 @@ export interface Goal {
   deadlineAt: number
   /** Why continuation is paused (waiting for the owner, stuck, limit); cleared when the owner talks. */
   paused?: string
+  /** When it started waiting for the owner (for ownerWaitMin). */
+  pausedAt?: number
+  /** Times it went on by itself after the owner didn't answer (since the owner last talked). */
+  selfResumes?: number
   /** Identical failure signatures since the owner last talked. */
   failures: Record<string, number>
   /** Continuation turns in a row without progress (drives the idle backoff). */
@@ -40,6 +44,8 @@ export interface FinishedGoal { text: string, status: 'done' | 'abandoned' | 're
 export interface GoalOptions {
   /** Continue goals on their own. Default true. */
   enabled?: boolean
+  /** After asking the owner and hearing nothing for this many minutes, go on with what it can do itself (0 = wait forever). Default 15. Up to 3 times per owner reply. */
+  ownerWaitMin?: number
   /** Continuation turns allowed without hearing from the owner. Default 40. */
   maxTurns?: number
   /** Minutes a goal may run on its own without hearing from the owner. Default 45. */
@@ -61,6 +67,7 @@ export type ResolvedGoalOptions = Required<GoalOptions>
 export function resolveGoalOptions (o: GoalOptions = {}): ResolvedGoalOptions {
   return {
     enabled: o.enabled ?? true,
+    ownerWaitMin: o.ownerWaitMin ?? 15,
     maxTurns: o.maxTurns ?? 40,
     timeoutMin: o.timeoutMin ?? 45,
     maxSameFailures: o.maxSameFailures ?? 3,
@@ -161,7 +168,7 @@ export class GoalStore {
       changes.push(`added ${add.length} step${add.length === 1 ? '' : 's'}`)
     }
     if (u.note) { g.notes = [...g.notes, u.note.trim().slice(0, 200)].slice(-8); changes.push('noted') }
-    if (u.wait) { g.paused = 'waiting for the owner'; changes.push('waiting for the owner, continuation paused') }
+    if (u.wait) { g.paused = 'waiting for the owner'; g.pausedAt = this.now(); changes.push('waiting for the owner, continuation paused') }
     if (u.resume && g.paused) { delete g.paused; changes.push('resumed') }
     g.stalls = 0
     this.save(g)
@@ -180,6 +187,8 @@ export class GoalStore {
     g.failures = {}
     g.stalls = 0
     delete g.paused
+    delete g.pausedAt
+    delete g.selfResumes
     this.save(g)
   }
 
@@ -200,6 +209,21 @@ export class GoalStore {
     g.failures[sig] = (g.failures[sig] ?? 0) + 1
     this.save(g)
     return g.failures[sig]
+  }
+
+  /** Owner silent for ownerWaitMin while we wait for them: go on by ourselves (max 3 times). Returns true if resumed. */
+  resumeIfOwnerSilent (): boolean {
+    const g = this.active
+    const mins = this.opts.ownerWaitMin
+    if (!g || g.paused !== 'waiting for the owner' || !mins) return false
+    if ((g.selfResumes ?? 0) >= 3 || this.now() - (g.pausedAt ?? g.updatedAt) < mins * 60_000) return false
+    delete g.paused
+    delete g.pausedAt
+    g.selfResumes = (g.selfResumes ?? 0) + 1
+    g.notes.push(`${g.owner ?? 'the owner'} didn't answer for ${mins} min: carry on with what you can do yourself (other tools, other steps); don't ask the same thing again`)
+    g.notes = g.notes.slice(-12)
+    this.save(g)
+    return true
   }
 
   pause (reason: string): void {

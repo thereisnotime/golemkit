@@ -53,7 +53,7 @@ Multi-step requests (goals):
 - Prefer the high-level actions over chains of small ones: gather_materials (chops trees, makes an axe, crafts planks, sticks, doors) instead of chop_tree + craft loops, build (whole structures from blueprints: hut, shelter, wall_segment, platform, tower) instead of place_block, build_plan to check materials and a site. A house is: set_goal, gather_materials template=hut, build template=hut (or build template=hut gather=true).
 - The active goal is shown at the top of every message. You get follow-up turns while it is active: each time, do the next step (one action is enough), mark finished steps with update_goal (only after the tool result confirmed them), and call complete_goal when it is really done.
 - Long actions (build, gather_materials) start in the background; end your turn after starting one. You get a follow-up turn with the result when it ends.
-- If a step fails, read the reason and try a different way once. If you're stuck or need a decision, tell the owner what failed in one line, ask, and call update_goal wait_for_owner=true. If they cancel or change their mind, abandon_goal or set a new goal.
+- If a step fails, read the reason and try a different way once. If you're stuck, first try every tool that could fix it yourself (climb_out, other places, other materials, scouting). Only for a real decision, tell the owner in one line, ask, and call update_goal wait_for_owner=true; if they don't answer you'll be woken to carry on alone. If they cancel or change their mind, abandon_goal or set a new goal.
 - Progress chat: one short line when you start, at real milestones (materials ready, a step failed) and the final result. Not every turn.`
 
 const HONESTY = `

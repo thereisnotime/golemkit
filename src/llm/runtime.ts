@@ -369,6 +369,7 @@ export class LlmRuntime {
 
   /** Every few seconds: if a goal is active and nothing has happened for a while, nudge it (backoff grows with stalled turns). */
   private goalIdleCheck (): void {
+    if (this.goals.resumeIfOwnerSilent()) this.log.info('owner silent; going on with the goal by myself')
     const goal = this.goals.active
     if (!goal || goal.paused || this.goalWake || this.busy || this.queue.length || this.agent.currentAction) return
     const quietFor = Date.now() - Math.max(this.lastTurnAt, this.lastActionEndAt)

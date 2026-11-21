@@ -41,6 +41,7 @@ can't change their own.
 | `llm.budget.turnsPerHour` / `tokensPerHour` / `tokensPerDay` | number | LLM budgets |
 | `llm.budget.maxToolCalls` | number | tool calls per turn |
 | `llm.goals.maxTurns` / `timeoutMin` | number | how long goals run on their own |
+| `llm.goals.ownerWaitMin` | minutes | after asking the owner, go on alone if no answer (0 = wait forever; default 15) |
 | `retry.actions.<action>` | 0–10 | extra attempts after a failed action |
 
 Behaviours have their own live commands: `!behavior_arm`, `!behavior_configure`,
