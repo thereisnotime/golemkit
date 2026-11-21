@@ -972,7 +972,9 @@ const fetchDrops = defineAction({
     const at = given ?? death?.pos ?? null
     if (!at) return fail(death ? `I saw ${who} die (${death.message}) but not where; tell me the coordinates` : `I don't know where ${who} died; tell me x y z`)
     if (death?.dim && bot.game?.dimension && death.dim !== bot.game.dimension && !given) return fail(`${who} died in ${death.dim}`)
-    const diedAt = death?.at ?? Date.now()
+    // a death record only dates the drops when it happened where we're going
+    const dated = death && (!given || (death.pos && dist(death.pos, given) <= 16)) ? death : null
+    const diedAt = dated?.at ?? Date.now()
     const trip = dropsTrip({ diedAt, now: Date.now(), distance: dist(bot.entity.position, at) })
     if (!trip.go && !p.try_anyway) return fail(`${trip.why}; not going (try_anyway=true to go anyway: items only age while someone keeps the area loaded)`)
     const say = reporter(ctx, who)

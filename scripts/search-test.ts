@@ -3,6 +3,7 @@
 //   node scripts/search-test.ts walk 205 165 234 333          both walk to each x/z in turn (the tester stops a few blocks off)
 //   node scripts/search-test.ts run 'find_target {"target":"iron"}' 'bring_item {"item":"bread","count":2}'
 //                                                              runs actions as if the tester asked, one after the other
+//   node scripts/search-test.ts drops                         the bot drops what it holds, walks off and fetches it back (fetch_drops with x y z)
 //   node scripts/search-test.ts tidy                          drops what the tester was given and lists the bot's own chests
 // The bot is SEARCH_BOT (default FindTest), owned by SEARCH_TESTER (default FindTester), who
 // stands next to it and receives what it brings. Data lives in data/search-test.
@@ -125,6 +126,16 @@ async function main (): Promise<void> {
         log(state(bot))
         log(state(tester))
       }
+    } else if (mode === 'drops') {
+      // stand-in for a death: the bot drops what it carries here, walks off 20 blocks, then fetches it back for the tester
+      await joinUp(bot, tester)
+      const p = bot.bot.entity.position.floored()
+      if (!bot.bot.inventory.items().length) { log('the bot carries nothing to drop'); return }
+      await act(bot, 'drop', { item: 'all' }, false)
+      await act(bot, 'goto', { x: p.x + 20, z: p.z }, false)
+      await act(bot, 'fetch_drops', { player: TESTER, x: p.x, y: p.y, z: p.z })
+      log(state(bot))
+      log(state(tester))
     } else if (mode === 'tidy') {
       log(`own chests: ${JSON.stringify(ownChests(bot))}`)
       log(`places: ${JSON.stringify(bot.storage.get('places', {}))}`)
