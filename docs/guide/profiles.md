@@ -39,6 +39,8 @@ llm:                          # only for variants with an LLM brain
   conversationMs: 120000
   budget: { turnsPerHour: 60, tokensPerDay: 3000000 }
   goals: { maxTurns: 30, timeoutMin: 30 }   # see guide/goals-and-building
+intents:                      # plain-language commands without the LLM (guide/intents)
+  mode: first                 # fallback (default) | first | off
 settings:                     # free-form, read with agent.settings
   home: [100, 64, -20]
 logging:                      # optional, same keys as the fleet `logging:` block

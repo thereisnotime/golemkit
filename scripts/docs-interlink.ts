@@ -33,6 +33,8 @@ const TERMS: [string, string][] = [
   ['schematics?', '/guide/blueprints#import'],
   ['blueprint capture', '/guide/blueprints#capture'],
   ['blueprints?', '/guide/goals-and-building#blueprint-format'],
+  ['intents brain', '/guide/intents'],
+  ['plain-language commands', '/guide/intents'],
   ['NPC brain', '/guide/npc-brain'],
   ['LLM brain', '/guide/llm-brain'],
   ['scene brain', '/guide/scenes'],

@@ -29,6 +29,7 @@ export default withMermaid(defineConfig({
           { text: 'NPC brain', link: '/guide/npc-brain' },
           { text: 'Behaviours', link: '/guide/behaviors' },
           { text: 'LLM brain', link: '/guide/llm-brain' },
+          { text: 'Plain-language commands', link: '/guide/intents' },
           { text: 'Goals and building', link: '/guide/goals-and-building' },
           { text: 'Roads and stairs', link: '/guide/roads' },
           { text: 'Tool progression and gathering', link: '/guide/progression' },

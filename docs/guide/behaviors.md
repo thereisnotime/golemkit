@@ -669,3 +669,6 @@ npcMode:                 # profile key; false turns it off
 
 A quota pause is kept in storage, so reconnects and restarts don't start failing turns, and the
 bot's `observe()` (`self.mode`) says it's in NPC mode. `!` commands work the whole time.
+
+In NPC mode owners can still steer the bot in plain chat ("pax guard me", "pax start farming"):
+the [intents brain](/guide/intents) arms and disarms behaviours without the LLM. See [plain-language commands](./intents).

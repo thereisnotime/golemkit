@@ -49,6 +49,7 @@ can't change their own.
 | `llm.budget.maxToolCalls` | number | tool calls per turn |
 | `llm.goals.maxTurns` / `timeoutMin` | number | how long goals run on their own |
 | `llm.goals.ownerWaitMin` | minutes | after asking the owner, go on alone if no answer (0 = wait forever; default 15) |
+| `intents.mode` | fallback / first / off | plain-language commands without the LLM: only while it's down, simple requests always, or never (see [plain-language commands](./intents)) |
 | `pathfinder.thinkTimeoutMs` | 1000–60000 | how long the pathfinder may plan one path (default 10000); raise on a loaded machine, see [tool progression](./progression#speed) |
 | `building` | library / creative / ask | reuse a saved [blueprint](/guide/goals-and-building#blueprint-format), design a new one, or let the owner pick (see [Blueprint libraries](./blueprints#building-policy)) |
 | `build.creativeMethod` | auto / hand / commands | how a creative bot builds: hand = block by block like a player (auto means hand), commands = `/fill` and `/setblock` when it is op (each command shows to other ops as an admin message); survival always builds by hand (see [creative builds](./goals-and-building#creative-mode)) |

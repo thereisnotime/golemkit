@@ -219,6 +219,10 @@ from the same player while a turn runs are merged into one.
 
 Set `--owners` (or `MC_OWNERS`) on public servers: every trigger spends tokens.
 
+Without the LLM (quota used up, budget out) the [intents brain](/guide/intents) still understands simple requests
+like "pax follow me"; with `intents.mode: first` it takes those even while the LLM is up and
+saves the turn. Each line goes to exactly one of them. See [plain-language commands](./intents).
+
 ## Goals
 
 Requests that take more than one turn become a [persistent goal](/guide/goals-and-building#goals) with a plan. The active goal is
