@@ -19,6 +19,9 @@ const collect = defineAction({
       if (!target) break
       try {
         await goto(bot, new goals.GoalLookAtBlock(target.position, bot.world), signal)
+        // Best tool for the block (axe for logs, pickaxe for stone...), if we have one.
+        const tool = (bot.pathfinder as any).bestHarvestTool?.(target)
+        if (tool && bot.heldItem?.type !== tool.type) await bot.equip(tool, 'hand').catch(() => {})
         await digBlock(bot, target, signal)
         got++
       } catch (e) {
