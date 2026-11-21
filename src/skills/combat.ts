@@ -35,10 +35,18 @@ export async function fight (bot: Bot, target: Entity, signal: AbortSignal, maxM
     if (mv) mv.allowSprinting = true
     bot.pathfinder.setGoal(new goals.GoalFollow(target, 2), true)
   }
+  // Stuck chasing (no path to it, e.g. a skeleton up a slope): standing still while it shoots us is
+  // the worst option. If we haven't got closer for 3 s and it's out of reach, stop and say so.
+  let bestDist = Infinity
+  let bestAt = Date.now()
   try {
     while ((target as any).isValid !== false && Date.now() - start < maxMs) {
       checkAborted(signal)
       const dist = bot.entity.position.distanceTo(target.position)
+      if (!flying) {
+        if (dist < bestDist - 0.5) { bestDist = dist; bestAt = Date.now() }
+        else if (dist > REACH + 0.5 && Date.now() - bestAt > 3000) return false
+      }
       // A creeper whose fuse is lit (it swells, ~1.5 s): get away now, finish it after the fizzle.
       if (target.name === 'creeper' && creeperFuseLit(target) && dist < 5) {
         bot.pathfinder.setGoal(new goals.GoalInvert(new goals.GoalFollow(target, 7)), true)
@@ -150,8 +158,14 @@ const defend = defineAction({
     if (!mob) return fail('nothing to fight')
     // Archers back off while shooting: chase them longer (and sprint) instead of giving up after 10 s.
     const long = FLYING.has(mob.name ?? '') || isRangedMob(mob.name)
-    await fight(bot, mob, signal, long ? 25000 : 10000, weaponFlags(agent))
-    return ok(`fought ${mob.name}`)
+    const killed = await fight(bot, mob, signal, long ? 25000 : 10000, weaponFlags(agent))
+    if (!killed && isRangedMob(mob.name) && (mob as any).isValid !== false) {
+      // Couldn't get to the archer: get out of its line of fire instead of standing there.
+      bot.pathfinder.setGoal(new goals.GoalInvert(new goals.GoalFollow(mob, 20)), true)
+      try { await sleep(4000, signal) } finally { bot.pathfinder.setGoal(null) }
+      return ok(`couldn't reach the ${mob.name}; backed out of its line of fire`)
+    }
+    return ok(`${killed ? 'killed' : 'fought'} ${mob.name}`)
   }
 })
 
