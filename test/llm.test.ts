@@ -743,3 +743,14 @@ test('proxy metrics: parse Prometheus text and keep what changed per turn', asyn
   assert.deepEqual(await m.delta(), { cave_requests_total: 2 })
   assert.equal(ProxyMetrics.forBase('http://127.0.0.1:8787/v1').url, 'http://127.0.0.1:8787/metrics')
 })
+
+test('quota errors pause until the reset time', async () => {
+  const { quotaUntil } = await import('../src/llm/runtime.ts')
+  const now = new Date('2026-11-21T16:03:00').getTime()
+  const t = quotaUntil("turn failed: You've hit your weekly limit · resets 12pm (Europe/Sofia)", now)!
+  assert.equal(new Date(t).getHours(), 12)
+  assert.ok(t > now && t - now < 24 * 3_600_000, 'next 12:00, tomorrow')
+  assert.equal(quotaUntil('usage limit reached, try again in 20 minutes', now), now + 20 * 60_000)
+  assert.equal(quotaUntil('quota exceeded', now), now + 3_600_000)
+  assert.equal(quotaUntil('socket hang up', now), null)
+})

@@ -112,6 +112,8 @@ export class LlmRuntime {
   /** Why turns are paused (budget exhausted), or null. */
   paused: string | null = null
   private pauseAnnounced = false
+  /** Provider quota used up until this time (ms); no turns before it. */
+  private quotaUntil = 0
   bridge: McpHttpBridge | null = null
   /** Set when provider.check() failed; turns are skipped. */
   unavailable: string | null = null
@@ -518,7 +520,7 @@ export class LlmRuntime {
   async runTurn (trigger: Trigger): Promise<TurnReport> {
     const chat = trigger.kind === 'chat' ? trigger : null
     if (this.unavailable) return { trigger, calls: [], skipped: this.unavailable }
-    const blocked = this.budget.blocked()
+    const blocked = this.budget.blocked() ?? (this.quotaUntil > Date.now() ? `provider quota used up until ${new Date(this.quotaUntil).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}` : null)
     if (blocked) {
       // Pause: log once, tell the first person who talks to the bot once, then stay quiet until it lifts.
       if (!this.paused) {
@@ -608,6 +610,15 @@ export class LlmRuntime {
         // player needs to hear about. Goals continue on their own; otherwise the work stands.
         this.log.info('turn hit its step limit after acting', { provider: this.provider.name, calls: this.tools.active?.calls.length })
         error = undefined
+      } else if (quotaUntil(error) !== null) {
+        // Subscription or API quota used up ("weekly limit", "usage limit ... resets 12pm"): every
+        // further turn would fail the same way, so pause until the reset (or an hour if unknown).
+        const until = quotaUntil(error)!
+        this.quotaUntil = until
+        const when = new Date(until).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+        this.log.warn(`provider quota used up; LLM paused until ${when}`, { provider: this.provider.name, error: error.slice(0, 160) })
+        try { this.opts.onPause?.(`provider quota: ${error.slice(0, 120)}`) } catch {}
+        if (chat) this.notice(chat, `my LLM quota is used up until ${when}; my reflexes, behaviours and !commands still work`)
       } else {
         this.log.warn(`turn failed: ${error}`, { provider: this.provider.name })
         if (chat) this.notice(chat, acted ? "I got partway and lost the thread; say 'continue' or check !goal" : 'my LLM call failed just now, try again in a bit (or use !commands)')
@@ -705,4 +716,26 @@ function describe (t: Trigger): string {
   if (t.kind === 'tick') return `tick: ${t.reason}`
   if (t.kind === 'goal') return `goal: ${t.reason}`
   return `event: ${t.event}`
+}
+
+/**
+ * When a provider error means the quota is used up, the time it resets (ms), else null.
+ * "You've hit your weekly limit · resets 12pm (Europe/Sofia)", "usage limit reached ... resets at 3:00 PM",
+ * "rate_limit_error ... try again in 20 minutes". Unknown reset time: an hour from now.
+ */
+export function quotaUntil (error: string, now = Date.now()): number | null {
+  if (!/(weekly|daily|monthly|usage|session) limit|hit your limit|quota (exceeded|used)|out of (credits|quota)|credit balance is too low/i.test(error)) return null
+  const mins = /try again in (\d+) ?min/i.exec(error)
+  if (mins) return now + Number(mins[1]) * 60_000
+  const at = /resets?(?: at)? (\d{1,2})(?::(\d\d))? ?(am|pm)?/i.exec(error)
+  if (at) {
+    let h = Number(at[1]) % 12
+    if (at[3]?.toLowerCase() === 'pm') h += 12
+    if (!at[3] && Number(at[1]) >= 12) h = Number(at[1])
+    const d = new Date(now)
+    d.setHours(h, Number(at[2] ?? 0), 0, 0) // local time (the CLI reports the user's zone)
+    if (d.getTime() <= now) d.setDate(d.getDate() + 1)
+    return d.getTime()
+  }
+  return now + 3_600_000
 }
