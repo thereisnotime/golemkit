@@ -52,8 +52,15 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
   let leftZone = false
   while (got < count && misses < 3) {
     checkAborted(signal)
-    const found = bot.findBlocks({ matching: matchIds, maxDistance: 48, count: 64 })
-    const target = found.map(p => bot.blockAt(p)).find(b => b && allowed(b.position))
+    const found = bot.findBlocks({ matching: matchIds, maxDistance: 48, count: 256 })
+    // Cheapest first: blocks already in reach at or above our feet (no pathing at all), then exposed ones (air next to them: reachable without long dig-paths), then buried.
+    const candidates = found.map(p => bot.blockAt(p)).filter((b): b is NonNullable<typeof b> => !!b && allowed(b.position))
+    const exposed = (b: { position: any }) => [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]
+      .some(([dx, dy, dz]) => { const n = bot.blockAt(b.position.offset(dx, dy, dz)); return !n || n.boundingBox === 'empty' })
+    const feetY = Math.floor(bot.entity.position.y)
+    // Never pick blocks below our feet as "in reach": that digs a shaft straight down (caves, lava).
+    const target = candidates.find(b => b.position.y >= feetY && bot.canDigBlock(b) && b.position.offset(0.5, 0.5, 0.5).distanceTo(bot.entity.position.offset(0, 1.6, 0)) <= 4.5) ??
+      candidates.find(exposed) ?? candidates[0]
     if (!target) {
       // Everything around is protected (or we're standing in a protected zone): walk out once and look again.
       const out = !leftZone && (found.length || agent.protectedAreas.isProtected(bot.entity.position)) ? exitPoint(agent, bot.entity.position) : null
@@ -64,7 +71,8 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
       continue
     }
     try {
-      await gotoWithin(bot, new goals.GoalLookAtBlock(target.position, bot.world), signal, 20_000)
+      const inReach = bot.canDigBlock(target) && target.position.offset(0.5, 0.5, 0.5).distanceTo(bot.entity.position.offset(0, 1.6, 0)) <= 4.5
+      if (!inReach) await gotoWithin(bot, new goals.GoalLookAtBlock(target.position, bot.world), signal, 20_000)
       await equipFor(bot, target) // best tool for the block (axe for logs, pickaxe for stone...)
       await digBlock(bot, target, signal)
       got++
@@ -86,6 +94,7 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
   if (drop) await goto(bot, new goals.GoalBlock(drop.position.x, drop.position.y, drop.position.z), signal).catch(() => {})
   if (got) return ok(`${toolNote}collected ${got} ${block}${got < count ? ` (wanted ${count})` : ''}`)
   if (refusals) return fail(`every ${block} I tried is in a protected area; tell me where digging is allowed`)
+  if (skip.size) return fail(`found ${block} but couldn't get to any of it (${skip.size} tried: paths timed out or blocked); try from another spot`)
   return fail(`no ${block} I'm allowed to dig within 48 blocks`)
 }
 
