@@ -33,7 +33,7 @@ llm:
   budget:
     turnsPerHour: 60
     tokensPerHour: 600000
-    tokensPerDay: 8000000
+    tokensPerDay: 20000000
     maxToolCalls: 40
     maxTurns: 30              # model round trips per turn (8 was too few for multi-step work)
   goals:                      # persistent goals: follow-up turns until the job is done
