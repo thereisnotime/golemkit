@@ -122,6 +122,14 @@ const gotoDeath = defineAction({
     if (!d?.pos) return fail('no death with a position recorded')
     if (d.dim && bot.game.dimension !== d.dim) return fail(`died in ${d.dim}, I'm in ${bot.game.dimension}`)
     const note = d.itemsMayRemain ? '' : ' (the drops are probably gone by now)'
+    // Died there (or very near) more than once in the last 10 minutes: it's a trap (mobs in a cave,
+    // lava...). Don't walk back into it; the items aren't worth another death.
+    const recent = agent.journal.query({ types: ['death'], since: Date.now() - 10 * 60_000, limit: 0 })
+      .filter(e => e.pos && Math.hypot(e.pos.x - d.pos!.x, e.pos.y - d.pos!.y, e.pos.z - d.pos!.z) < 12)
+    if (recent.length >= 2) {
+      return fail(`died ${recent.length} times near ${fmtPos(d.pos)} in the last 10 minutes (${d.message ?? d.cause ?? 'unknown cause'}); not going back there. Re-make what I lost instead`)
+    }
+    if (!d.itemsMayRemain) return fail(`the drops at ${fmtPos(d.pos)} are probably gone by now (over 5 minutes); not worth the trip`)
     try {
       await travel(bot, d.pos, signal, { range: 2 })
     } catch (e) {
