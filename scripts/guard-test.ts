@@ -167,6 +167,7 @@ async function main (): Promise<void> {
   } else if (mode === 'gear') {
     // the bot on the spot: food for both (hunt, then feed_player), wood and a sword
     const idle = async (a: Agent) => { for (let i = 0; i < 30 && a.currentAction; i++) await pause(1000) }
+    if (far(bot) > 50 || far(tester) > 50) await Promise.all([walkThere(bot), walkThere(tester, X + 2, Z + 2)])
     await step(tester, 'pickup_items', { radius: 16 }).catch(() => null)
     for (let i = 0; i < 6 && bot.bot.inventory.items().filter(it => /beef|porkchop|mutton|chicken|rabbit$|cooked_rabbit/.test(it.name)).reduce((n, it) => n + it.count, 0) < 6; i++) { await idle(bot); const r = await step(bot, 'hunt', { count: 3, radius: 64 }); if (!r.ok && r.message.startsWith('no animal')) break }
     await idle(bot)
