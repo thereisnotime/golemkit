@@ -233,12 +233,15 @@ export const BLUEPRINTS_DIR = fileURLToPath(new URL('../../blueprints/', import.
  * directories override earlier ones by blueprint name. Missing directories and broken files
  * are reported in `errors`, not thrown.
  */
+/** A *.yaml file that holds a blueprint: everything but blueprints/sources.yaml (the fetch list). */
+export const isBlueprintFile = (f: string) => /\.ya?ml$/.test(f) && f !== 'sources.yaml'
+
 export function loadBlueprints (dirs: string | string[] = [BLUEPRINTS_DIR]): { blueprints: Map<string, Blueprint>, errors: string[] } {
   const blueprints = new Map<string, Blueprint>()
   const errors: string[] = []
   for (const dir of Array.isArray(dirs) ? dirs : [dirs]) {
     if (!existsSync(dir)) { errors.push(`no blueprints directory at ${dir}`); continue }
-    for (const f of readdirSync(dir).filter(f => /\.ya?ml$/.test(f)).sort()) {
+    for (const f of readdirSync(dir).filter(isBlueprintFile).sort()) {
       try {
         const bp = parseBlueprint(readFileSync(join(dir, f), 'utf8'), f)
         blueprints.set(bp.name, bp)
@@ -541,6 +544,12 @@ const NATURAL = [
 /** Blocks the world generates (ground, plants, leaves). Anything else counts as player-made. Logs are not natural here: trees are left standing. */
 export function isNaturalBlock (name: string): boolean {
   return NATURAL.some(re => re.test(name))
+}
+
+/** Ground cover, plants, crops and leaves: what a structure file carries from its surroundings (not stone or sand, which builds use). */
+export function isGroundOrPlant (name: string): boolean {
+  return NATURAL[0]!.test(name) || NATURAL[5]!.test(name) || NATURAL[6]!.test(name) || NATURAL[7]!.test(name) ||
+    /^(grass|wheat|carrots|potatoes|beetroots|melon_stem|pumpkin_stem|attached_melon_stem|attached_pumpkin_stem|nether_wart|potted_[a-z_]+|[a-z_]+_sapling)$/.test(name)
 }
 
 /** Plants and snow that break instantly and are in the way of a structure. */

@@ -9,7 +9,7 @@ import { createRequire } from 'node:module'
 import { gunzipSync } from 'node:zlib'
 import YAML from 'yaml'
 import nbt from 'prismarine-nbt'
-import { validStateValue, facingToward, kindForBlock, itemForBlock, parseBlueprint, type BlockState, type Facing } from './blueprint.ts'
+import { validStateValue, facingToward, kindForBlock, itemForBlock, parseBlueprint, isGroundOrPlant, type BlockState, type Facing } from './blueprint.ts'
 
 /** One block type in a structure: a namespaced name and its state properties. */
 export interface PaletteEntry { name: string, state?: BlockState }
@@ -24,8 +24,10 @@ export interface Structure {
   depth: number
   palette: PaletteEntry[]
   grid: Int32Array
-  /** Where it came from: "sponge v2", "litematica (2 regions)", "structure", "world". */
+  /** Where it came from: "sponge v2", "litematica (2 regions)", "structure", "mcedit (legacy)", "world". */
   format: string
+  /** Things the reader had to guess or leave out (unknown legacy ids...), passed on to the import. */
+  warnings?: string[]
 }
 
 export const DONT_CARE = -1
@@ -76,6 +78,8 @@ const MAX_UNZIPPED = 64 * 1024 * 1024
 /** Reads a .schem, .litematic or structure .nbt (gzipped or not) into a Structure. Throws a readable Error. */
 export async function readSchematic (buf: Buffer): Promise<Structure> {
   let root: any
+  if (buf.length > 8 && buf.readUInt32BE(0) === AXIOM_MAGIC) return readAxiom(buf)
+  if (buf.subarray(0, 4).toString('latin1') === 'PK\x03\x04') throw new Error('it is a zip archive; take the schematic out of it first')
   if (buf[0] === 0x1f && buf[1] === 0x8b) {
     // unzip here, with a cap, so a small file can't inflate into gigabytes
     try { buf = gunzipSync(buf, { maxOutputLength: MAX_UNZIPPED }) } catch (e) { throw new Error(`can't unzip it (${(e as Error).message.slice(0, 80)})`) }
@@ -86,11 +90,17 @@ export async function readSchematic (buf: Buffer): Promise<Structure> {
   } catch (e) {
     throw new Error(`not an NBT file (${(e as Error).message.slice(0, 80)})`)
   }
+  return readSchematicNbt(root)
+}
+
+/** Picks the reader by the NBT content (the file extension is never trusted). */
+export function readSchematicNbt (root: any): Structure {
   if (root?.Regions) return readLitematic(root)
   if (Array.isArray(root?.blocks) && Array.isArray(root?.size)) return readStructureNbt(root)
   const s = root?.Schematic ?? root
   if (s && (s.Palette || s.Blocks?.Palette || s.BlockData)) return readSponge(s)
-  throw new Error('unknown format: expected a Sponge .schem, a Litematica .litematic or a structure .nbt')
+  if (s && Array.isArray(s.Blocks) && Array.isArray(s.Data) && s.Width !== undefined) return readLegacySchematic(s)
+  throw new Error('unknown format: expected a Sponge/WorldEdit .schem, a legacy MCEdit .schematic, a Litematica .litematic or a structure .nbt')
 }
 
 function checkVolume (w: number, h: number, d: number): void {
@@ -152,8 +162,9 @@ export function readStructureNbt (root: any): Structure {
   return out
 }
 
-function toEntry (e: { Name: string, Properties?: Record<string, unknown> }): PaletteEntry {
-  const out: PaletteEntry = { name: String(e.Name) }
+function toEntry (e: { Name?: string, id?: string, Properties?: Record<string, unknown> }): PaletteEntry {
+  // a few mod structure files write the block name as "id"
+  const out: PaletteEntry = { name: String(e.Name ?? e.id) }
   if (e.Properties && Object.keys(e.Properties).length) out.state = Object.fromEntries(Object.entries(e.Properties).map(([k, v]) => [k, String(v)]))
   return out
 }
@@ -213,6 +224,209 @@ export function readLitematic (root: any): Structure {
   return out
 }
 
+// ------------------------------------------------------------------ legacy MCEdit / WorldEdit 6 / Schematica
+
+/**
+ * Pre-1.13 numeric ids to 1.21 names. The id:data -> flattened table is minecraft-data's
+ * pc/common/legacy.json (PrismarineJS, generated from Mojang's 1.13 data fixer); 1.12.2's
+ * blocks.json gives the old name -> id map that Schematica files need. Only names renamed after
+ * 1.13 are fixed up here.
+ */
+let legacyData: { blocks: Record<string, string>, oldIds: Map<string, number> } | null = null
+function legacyTable () {
+  if (!legacyData) {
+    try {
+      const req = createRequire(createRequire(import.meta.url).resolve('mineflayer'))
+      const blocks = req('minecraft-data/minecraft-data/data/pc/common/legacy.json').blocks as Record<string, string>
+      const old = req('minecraft-data')('1.12.2')
+      legacyData = { blocks, oldIds: new Map(Object.values(old.blocksByName as Record<string, { name: string, id: number }>).map(b => [b.name, b.id])) }
+    } catch (e) {
+      throw new Error(`can't load the legacy block table from minecraft-data (${(e as Error).message.slice(0, 80)})`)
+    }
+  }
+  return legacyData
+}
+
+/** Names that changed after 1.13 (legacy.json is the 1.13 flattening). */
+const LEGACY_RENAME: Record<string, string> = { grass: 'short_grass', sign: 'oak_sign', wall_sign: 'oak_wall_sign', grass_path: 'dirt_path' }
+
+/** One legacy id + data value as a 1.21 palette entry, or null when the id is unknown. */
+export function legacyBlock (id: number, data: number): PaletteEntry | null {
+  const t = legacyTable().blocks
+  const str = t[`${id}:${data}`] ?? t[`${id}:0`]
+  if (!str) return null
+  const e = parseBlockString(str)
+  let name = bare(e.name)
+  // 1.13's stone_slab (smooth stone texture) became smooth_stone_slab in 1.14
+  if (name === 'stone_slab' && (id === 43 || id === 44) && (data & 7) === 0) name = 'smooth_stone_slab'
+  name = LEGACY_RENAME[name] ?? name
+  const out: PaletteEntry = { name }
+  if (e.state) {
+    const st = { ...e.state }
+    // the table guesses outer_right for every stair; the real shape follows from the neighbours
+    if (/_stairs$/.test(name)) delete st.shape
+    if (Object.keys(st).length) out.state = st
+  }
+  return out
+}
+
+const DOOR_OR_TALL = /(_door|^sunflower|^lilac|^rose_bush|^peony|^tall_grass|^large_fern)$/
+
+/**
+ * MCEdit / WorldEdit 6 / Schematica `.schematic` (Minecraft before 1.13): Width/Height/Length,
+ * Blocks (low 8 bits of the id) with AddBlocks (or Add: high 4 bits, two per byte, even index
+ * in the low nibble) and Data (4-bit values), order (y * length + z) * width + x. Schematica's
+ * SchematicaMapping (name -> id in this file) is honoured. Ids the table doesn't know are left
+ * out with a warning. The upper half of doors and tall plants takes its type (and a door its
+ * facing) from the lower half, as the old format stored it only there.
+ */
+export function readLegacySchematic (s: any): Structure {
+  const w = Number(s.Width) & 0xffff
+  const h = Number(s.Height) & 0xffff
+  const d = Number(s.Length) & 0xffff
+  checkVolume(w, h, d)
+  const materials = String(s.Materials ?? 'Alpha')
+  if (materials !== 'Alpha') throw new Error(`"${materials}" schematics (other than Java edition "Alpha") aren't supported`)
+  const ids: number[] = s.Blocks
+  const data: number[] = s.Data
+  const add: number[] | undefined = Array.isArray(s.AddBlocks) ? s.AddBlocks : Array.isArray(s.Add) ? s.Add : undefined
+  const n = w * h * d
+  if (ids.length < n || data.length < n) throw new Error(`block data is short: ${Math.min(ids.length, data.length)} of ${n} blocks`)
+  const table = legacyTable()
+  // Schematica: ids in the file are its own, the mapping gives the name for each
+  let remap: Map<number, { vanilla?: number, modded?: string }> | null = null
+  if (s.SchematicaMapping && typeof s.SchematicaMapping === 'object') {
+    remap = new Map()
+    for (const [name, id] of Object.entries(s.SchematicaMapping as Record<string, number>)) {
+      const [ns, path] = name.includes(':') ? name.split(':') as [string, string] : ['minecraft', name]
+      const vanilla = ns === 'minecraft' ? table.oldIds.get(path) : undefined
+      remap.set(Number(id), vanilla !== undefined ? { vanilla } : { modded: ns === 'minecraft' ? path : name })
+    }
+  }
+  const out = emptyStructure(w, h, d, remap ? 'schematica (legacy)' : 'mcedit (legacy)')
+  const cache = new Map<string, number>()
+  const byKey = new Map<number, number>()
+  const unknown = new Map<number, number>()
+  const modded = new Set<string>()
+  for (let i = 0; i < n; i++) {
+    let id = ids[i]! & 0xff
+    if (add && (i >> 1) < add.length) id |= ((i & 1) === 0 ? add[i >> 1]! & 0x0f : (add[i >> 1]! & 0xf0) >> 4) << 8
+    const dv = data[i]! & 0x0f
+    let vid = id
+    if (remap) {
+      const m = remap.get(id)
+      if (m?.modded) {
+        modded.add(m.modded)
+        out.grid[i] = paletteIndex(out, { name: m.modded.includes(':') ? m.modded : `legacy:${m.modded}` }, cache)
+        continue
+      }
+      if (m?.vanilla === undefined) { if (id !== 0) unknown.set(id, (unknown.get(id) ?? 0) + 1); continue }
+      vid = m.vanilla
+    }
+    const key = (vid << 4) | dv
+    let idx = byKey.get(key)
+    if (idx === undefined) {
+      const e = legacyBlock(vid, dv)
+      idx = e ? paletteIndex(out, e, cache) : DONT_CARE
+      byKey.set(key, idx)
+    }
+    if (idx === DONT_CARE) { unknown.set(vid, (unknown.get(vid) ?? 0) + 1); continue }
+    out.grid[i] = idx
+  }
+  // upper halves: name (and door facing/open) from the half below
+  const fixed = new Map<string, { up: number, low: number }>()
+  for (let y = 1; y < h; y++) {
+    for (let z = 0; z < d; z++) {
+      for (let x = 0; x < w; x++) {
+        const at = cellIndex(out, x, y, z)
+        const up = out.palette[out.grid[at]!]
+        if (!up || up.state?.half !== 'upper' || !DOOR_OR_TALL.test(up.name)) continue
+        const belowIdx = out.grid[cellIndex(out, x, y - 1, z)]!
+        const low = out.palette[belowIdx]
+        if (!low || low.state?.half !== 'lower' || !DOOR_OR_TALL.test(low.name)) continue
+        const k = `${out.grid[at]}/${belowIdx}`
+        let pair = fixed.get(k)
+        if (!pair) {
+          // a door's hinge is only in the upper half, everything else only in the lower one
+          const door = /_door$/.test(low.name)
+          const hinge = up.state.hinge ?? low.state.hinge ?? 'left'
+          const upper: BlockState = door ? { ...low.state, half: 'upper', hinge } : { half: 'upper' }
+          const lower: BlockState = door ? { ...low.state, hinge } : low.state
+          pair = { up: paletteIndex(out, { name: low.name, state: upper }, cache), low: paletteIndex(out, { name: low.name, state: lower }, cache) }
+          fixed.set(k, pair)
+        }
+        out.grid[at] = pair.up
+        out.grid[cellIndex(out, x, y - 1, z)] = pair.low
+      }
+    }
+  }
+  const warnings: string[] = []
+  if (unknown.size) warnings.push(`unknown legacy block ids left out: ${[...unknown].slice(0, 8).map(([id, c]) => `${id} (${c}x)`).join(', ')}`)
+  if (modded.size) warnings.push(`Schematica mapping names blocks from mods (no state kept): ${[...modded].slice(0, 6).join(', ')}`)
+  if (Array.isArray(s.TileEntities) && s.TileEntities.length) warnings.push('tile entities (chest contents, sign text, bed colours, skull types) are not imported')
+  if (warnings.length) out.warnings = warnings
+  return out
+}
+
+// ------------------------------------------------------------------ Axiom .bp
+
+export const AXIOM_MAGIC = 0x0ae5bb36
+
+/**
+ * Axiom blueprint (.bp): int magic 0x0AE5BB36, then length-prefixed header NBT (name, author,
+ * block count; not compressed), a length-prefixed PNG thumbnail, and length-prefixed gzipped
+ * NBT whose BlockRegion list holds 16x16x16 sections ({X, Y, Z} in section units, BlockStates
+ * {palette, data}) packed like 1.16+ chunk sections: max(4, ceil(log2(palette))) bits, entries
+ * never span two longs, order (y * 16 + z) * 16 + x. Layout as read by PiTheGuy/SchemConvert.
+ */
+export async function readAxiom (buf: Buffer): Promise<Structure> {
+  let o = 4
+  const chunk = (what: string) => {
+    if (o + 4 > buf.length) throw new Error(`axiom blueprint cut short before the ${what}`)
+    const n = buf.readInt32BE(o)
+    if (n < 0 || o + 4 + n > buf.length) throw new Error(`axiom blueprint: broken ${what} length`)
+    const out = buf.subarray(o + 4, o + 4 + n)
+    o += 4 + n
+    return out
+  }
+  const header = chunk('header')
+  chunk('thumbnail')
+  let data = chunk('block data')
+  let name = ''
+  try { name = String(nbt.simplify((await nbt.parse(header, 'big')).parsed).Name ?? '') } catch {}
+  try { data = gunzipSync(data, { maxOutputLength: MAX_UNZIPPED }) } catch (e) { throw new Error(`axiom blueprint: can't unzip the blocks (${(e as Error).message.slice(0, 80)})`) }
+  const root = nbt.simplify((await nbt.parse(data, 'big')).parsed)
+  const regions: any[] = root.BlockRegion
+  if (!Array.isArray(regions) || !regions.length) throw new Error('axiom blueprint without block regions')
+  const xs = regions.map(r => Number(r.X)); const ys = regions.map(r => Number(r.Y)); const zs = regions.map(r => Number(r.Z))
+  const lo = { x: Math.min(...xs), y: Math.min(...ys), z: Math.min(...zs) }
+  const w = (Math.max(...xs) - lo.x + 1) * 16
+  const h = (Math.max(...ys) - lo.y + 1) * 16
+  const d = (Math.max(...zs) - lo.z + 1) * 16
+  checkVolume(w, h, d)
+  const out = emptyStructure(w, h, d, 'axiom')
+  const cache = new Map<string, number>()
+  for (const r of regions) {
+    const pal: any[] = r.BlockStates?.palette
+    if (!Array.isArray(pal) || !pal.length) throw new Error(`axiom section ${r.X} ${r.Y} ${r.Z} has no palette`)
+    const map = pal.map(e => paletteIndex(out, toEntry(e), cache))
+    const bits = BigInt(Math.max(4, Math.ceil(Math.log2(pal.length))))
+    const perLong = Math.floor(64 / Number(bits))
+    const longs = Array.isArray(r.BlockStates.data) ? (r.BlockStates.data as [number, number][]).map(toU64) : null
+    if (pal.length > 1 && (!longs || longs.length * perLong < 4096)) throw new Error(`axiom section ${r.X} ${r.Y} ${r.Z}: block states are short`)
+    const mask = (1n << bits) - 1n
+    const bx = (Number(r.X) - lo.x) * 16; const by = (Number(r.Y) - lo.y) * 16; const bz = (Number(r.Z) - lo.z) * 16
+    for (let i = 0; i < 4096; i++) {
+      const v = longs ? Number((longs[Math.floor(i / perLong)]! >> (BigInt(i % perLong) * bits)) & mask) : 0
+      const idx = map[v]
+      if (idx === undefined) throw new Error(`axiom section ${r.X} ${r.Y} ${r.Z}: palette id ${v} out of range`)
+      out.grid[cellIndex(out, bx + (i & 15), by + (i >> 8), bz + ((i >> 4) & 15))] = idx
+    }
+  }
+  if (name) out.format = `axiom (${name})`
+  return out
+}
+
 // ------------------------------------------------------------------ crop / trim / limits
 
 const bare = (name: string) => name.replace(/^minecraft:/, '')
@@ -221,7 +435,7 @@ export const isAirName = (name: string) => /^(minecraft:)?(air|cave_air|void_air
 
 /** Blocks that are never placed: kept out of the blueprint (with a warning when they matter). */
 const SKIP_SILENT = /^(structure_void)$/
-const SKIP_WARN = /^(water|lava|bubble_column|fire|soul_fire|piston_head|moving_piston|barrier|light|jigsaw|structure_block|command_block|chain_command_block|repeating_command_block|nether_portal|end_portal|end_gateway|frosted_ice|modded_block)$/
+const SKIP_WARN = /^(water|lava|bubble_column|fire|soul_fire|piston_head|moving_piston|barrier|light|jigsaw|spawner|trial_spawner|vault|structure_block|command_block|chain_command_block|repeating_command_block|nether_portal|end_portal|end_gateway|frosted_ice|modded_block)$/
 
 export type BlockClass = 'air' | 'skip' | 'block'
 
@@ -253,6 +467,7 @@ export function cropStructure (s: Structure, b: Box): Structure {
   if (x2 < x1 || y2 < y1 || z2 < z1) throw new Error(`crop box ${b.x1} ${b.y1} ${b.z1} ${b.x2} ${b.y2} ${b.z2} is outside the ${s.width}x${s.height}x${s.depth} structure`)
   const out = emptyStructure(x2 - x1 + 1, y2 - y1 + 1, z2 - z1 + 1, s.format)
   out.palette = s.palette
+  if (s.warnings) out.warnings = s.warnings
   for (let y = y1; y <= y2; y++) for (let z = z1; z <= z2; z++) for (let x = x1; x <= x2; x++) out.grid[cellIndex(out, x - x1, y - y1, z - z1)] = s.grid[cellIndex(s, x, y, z)]!
   return out
 }
@@ -386,6 +601,15 @@ export function isVanillaBlockOrItem (name: string): boolean {
   return r.blocks.size === 0 || r.blocks.has(bare(name)) || r.items.has(bare(name))
 }
 
+/** Block names that changed between versions, old (or newer) name -> the 1.21.1 one. */
+const RENAMED: Record<string, string> = { grass: 'short_grass', grass_path: 'dirt_path', iron_chain: 'chain', sign: 'oak_sign', wall_sign: 'oak_wall_sign' }
+
+/** A name the registry doesn't know, mapped to its 1.21.1 spelling when that one is known. */
+function renamed (name: string, known: (n: string) => boolean): string {
+  const to = RENAMED[name]
+  return to && !known(name) && known(to) ? to : name
+}
+
 /**
  * Writes a structure as blueprint YAML. Blocks become plain palette entries with their
  * placeable state; air becomes "." (must be clear) unless `air` is false; water, portals,
@@ -396,7 +620,7 @@ export function isVanillaBlockOrItem (name: string): boolean {
  */
 export function structureToYaml (input: Structure, opts: ToBlueprintOptions): BlueprintText {
   const s = trimStructure(input)
-  const warnings: string[] = []
+  const warnings: string[] = [...(input.warnings ?? [])]
   const known = opts.knownBlock ?? isVanillaBlock
   const cls = s.palette.map(classify)
   const used = new Set<number>()
@@ -412,7 +636,7 @@ export function structureToYaml (input: Structure, opts: ToBlueprintOptions): Bl
       continue
     }
     const src = s.palette[i]!
-    const e: PaletteEntry = { name: bare(src.name) }
+    const e: PaletteEntry = { name: renamed(bare(src.name), known) }
     const st = cleanState(e.name, src.state)
     if (st) e.state = st
     const k = stateKey(e)
@@ -562,7 +786,33 @@ export function captureStructure (blockAt: (x: number, y: number, z: number) => 
 
 // ------------------------------------------------------------------ import
 
+/** Ground cover a bot can't pick up as it is (it drops dirt, or needs silk touch or a hoe). */
+const GROUND_TO_DIRT = /^(grass_block|coarse_dirt|podzol|rooted_dirt|mycelium|dirt_path|farmland|moss_block)$/
+
+/**
+ * Structure files from mods and datapacks carry the ground and plants around a building. Ground
+ * cover (grass, paths, podzol, farmland...) becomes dirt, so whatever stands on it is still
+ * supported; plants, crops and leaves become "don't care". Returns the copy and what changed.
+ */
+export function dropTerrain (s: Structure): { s: Structure, dropped: string[], dirt: string[] } {
+  const drop = s.palette.map(e => !GROUND_TO_DIRT.test(bare(e.name)) && isGroundOrPlant(bare(e.name)) && bare(e.name) !== 'dirt')
+  const toDirt = s.palette.map(e => GROUND_TO_DIRT.test(bare(e.name)))
+  if (!drop.some(Boolean) && !toDirt.some(Boolean)) return { s, dropped: [], dirt: [] }
+  const out: Structure = { ...s, palette: s.palette.slice(), grid: s.grid.slice() }
+  const dirtIdx = toDirt.some(Boolean) ? paletteIndex(out, { name: 'minecraft:dirt' }) : -1
+  const dropped = new Set<string>()
+  const dirt = new Set<string>()
+  for (let i = 0; i < out.grid.length; i++) {
+    const p = out.grid[i]!
+    if (p < 0 || p >= drop.length) continue
+    if (drop[p]) { dropped.add(bare(s.palette[p]!.name)); out.grid[i] = DONT_CARE } else if (toDirt[p]) { dirt.add(bare(s.palette[p]!.name)); out.grid[i] = dirtIdx }
+  }
+  return { s: out, dropped: [...dropped], dirt: [...dirt] }
+}
+
 export interface ImportOptions extends ToBlueprintOptions {
+  /** false: ground cover becomes dirt, plants, crops and leaves are left out (dropTerrain). Default true: kept as they are. */
+  terrain?: boolean
   /** Refuse above this many placed blocks (after crop and trim). */
   maxBlocks: number
   /** Keep only this box (local coordinates of the file, 0 0 0 = lowest north-west corner). */
@@ -574,6 +824,14 @@ export interface ImportOptions extends ToBlueprintOptions {
  * crop suggestion when it's over), convert, and parse the result once so it surely loads.
  */
 export function importStructure (input: Structure, opts: ImportOptions): BlueprintText {
+  if (opts.terrain === false) {
+    const t = dropTerrain(input)
+    const notes: string[] = []
+    const list = (a: string[]) => `${a.slice(0, 8).join(', ')}${a.length > 8 ? ` and ${a.length - 8} more` : ''}`
+    if (t.dropped.length) notes.push(`left out plants and leaves: ${list(t.dropped)}`)
+    if (t.dirt.length) notes.push(`ground cover made dirt: ${list(t.dirt)}`)
+    input = notes.length ? { ...t.s, warnings: [...(t.s.warnings ?? []), ...notes] } : t.s
+  }
   const s = opts.crop ? cropStructure(input, opts.crop) : input
   const b = blockBounds(s)
   if (!b) throw new Error('no blocks to place in it (only air or blocks the bot never places)')
