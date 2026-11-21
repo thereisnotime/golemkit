@@ -204,6 +204,15 @@ export class JournalCapture {
     })
 
     // death and respawn
+    // The server empties the inventory before the death event arrives (and the tracker's baseline
+    // follows it), so keep our own recent snapshot of what we carried.
+    let lastCarried: { at: number, items: Record<string, number> } = { at: 0, items: {} }
+    const carryTimer = setInterval(() => {
+      if (dead) return
+      const now = inventoryCounts(bot)
+      if (Object.keys(now).length) lastCarried = { at: Date.now(), items: now }
+    }, 1000)
+    offs.push(() => clearInterval(carryTimer))
     let deathTimer: NodeJS.Timeout | null = null
     on(bot, 'death', () => {
       if (dead) return
@@ -211,6 +220,7 @@ export class JournalCapture {
       const ts = Date.now()
       const at = here()
       let carried = inventoryCounts(bot)
+      if (!Object.keys(carried).length && Date.now() - lastCarried.at < 5000) carried = lastCarried.items
       if (!Object.keys(carried).length) carried = inv.baseline
       const action = this.current ?? this.agent.currentAction?.name ?? null
       for (const d of damage.poll(ts, true)) writeDamage(d)

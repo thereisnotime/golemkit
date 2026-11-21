@@ -99,7 +99,13 @@ export const hooksBrain = (opts: HooksBrainOptions = {}) => {
       }
       // What we carried just before dying (the inventory is already empty by the death event).
       let carried = 0
-      const countItems = () => { try { carried = bot.inventory.items().reduce((n, i) => n + i.count, 0) } catch {} }
+      let carriedAt = 0
+      const countItems = () => {
+        try {
+          const n = bot.inventory.items().reduce((a, i) => a + i.count, 0)
+          if (n > 0 || Date.now() - carriedAt > 5000) { carried = n; carriedAt = Date.now() } // keep a recent non-empty count: the server empties the inventory just before the death event
+        } catch {}
+      }
       const carryTimer = setInterval(countItems, 2000)
       const onDeath = () => {
         const pos = bot.entity ? fmtPos(bot.entity.position) : 'unknown position'
