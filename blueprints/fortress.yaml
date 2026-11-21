@@ -8,6 +8,7 @@
 # place: existing plank walls count as done, and towers, floor and walkway are added.
 name: fortress
 description: Walled fort 17x17 with stone corner towers, battlements, a walkway with a ladder, a stone floor and a gate with torches
+meta: { tags: [defence, fortress, wall, stone], author: mc-buddy }
 facing: south            # the gate side, as drawn
 site: near
 meta: { tags: [defence, fort, walls, stone], style: medieval, author: mc-buddy, version: 2 }

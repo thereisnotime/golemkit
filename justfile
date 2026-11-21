@@ -97,6 +97,17 @@ llm-status *args:
 llm-eval *args:
     @node --env-file-if-exists=.env scripts/llm-eval.ts {{args}}
 
+# Print a blueprint as text (top view, layers, materials); no name lists them all
+[group('blueprints')]
+blueprint-preview name="" *args:
+    @node scripts/blueprint-preview.ts {{name}} {{args}}
+
+# Convert a .schem / .litematic / .nbt into a blueprint (--bot <name> or --out <dir> to save, else print)
+[group('blueprints')]
+blueprint-import file *args:
+    @echo "{{BOLD}}{{CYAN}}==> importing {{file}}{{NORMAL}}"
+    node scripts/blueprint-import.ts "{{file}}" {{args}}
+
 # Build the container image (podman)
 [group('deploy')]
 image tag="mc-buddy":
