@@ -35,3 +35,6 @@ llm:
     maxToolCalls: 40
 retry:
   actions: { goto: 1, chop_tree: 1 }
+reflexes:
+  retreatBelow: 0             # stand its ground: always fight back, never back off
+  waterFightAbove: 0

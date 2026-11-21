@@ -58,9 +58,9 @@ export class ScriptedProvider implements LlmProvider {
 
     const health = Number(obs.health ?? 20)
     const inv: Record<string, number> = obs.inventory ?? {}
-    if (health < 8 && has(/health is below 8/i)) {
+    if (health < 8 && has(/health is below 8|at low health/i)) {
       if (Object.keys(inv).some(k => /bread|beef|apple|porkchop|potato|carrot/.test(k) && inv[k]! > 0)) await call('eat')
-      await reply(`backing off for a moment, health is ${health}/20`)
+      await reply(`eating and holding off on long trips, health is ${health}/20`)
       return this.result(turn, results, out, roundTrips)
     }
 

@@ -50,6 +50,14 @@ export const ProfileSchema = z.object({
   }).optional(),
   llm: LlmProfileSchema.optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
+  /** Reflex tuning: { selfDefense, autoEat, eatBelow, retreatBelow (0 = never retreat), waterFightAbove }. */
+  reflexes: z.object({
+    selfDefense: z.boolean().optional(),
+    autoEat: z.boolean().optional(),
+    eatBelow: z.number().optional(),
+    retreatBelow: z.number().optional(),
+    waterFightAbove: z.number().optional()
+  }).optional(),
   /** Retry policies (actions, llm, reconnect); see core/retry.ts. */
   retry: z.object({
     actions: z.record(z.string(), z.number().int().min(0).max(10)).optional(),
@@ -113,6 +121,7 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   const settings: Record<string, unknown> = { ...profile.settings }
   if (profile.llm) settings.llm = { ...(settings.llm as object | undefined), ...profile.llm }
   if (profile.humanize !== undefined) settings.humanize = profile.humanize
+  if (profile.reflexes) settings.reflexes = { ...(settings.reflexes as object | undefined), ...profile.reflexes }
   if (profile.retry) settings.retry = { ...(settings.retry as object | undefined), ...profile.retry }
   const context = resolveContext(profile.context, name, file)
   if (context !== undefined) settings.context = context

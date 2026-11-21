@@ -16,7 +16,7 @@ hooks:
     below: 8
     once: session            # say it once per session, not on every dip
     do:
-      - say: "backing off, low health ({health}/20)"
+      - say: "low health ({health}/20), still fighting"
 
   - id: death-report
     on: death

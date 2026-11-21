@@ -15,13 +15,15 @@ export interface ReflexOptions {
   waterFightAbove?: number
 }
 
-export const reflexes = (opts: ReflexOptions = {}) => {
-  const { selfDefense = true, autoEat = true, eatBelow = 15, retreatBelow = 8, waterFightAbove = 14 } = opts
+export const reflexes = (defaults: ReflexOptions = {}) => {
   const caller = { kind: 'reflex', name: 'reflexes' } as const
 
   return defineBrain({
     name: 'reflexes',
     session (agent, bot) {
+      // Profile `reflexes:` (settings.reflexes) overrides the variant's defaults.
+      const opts: ReflexOptions = { ...defaults, ...(agent.settings.reflexes as ReflexOptions | undefined) }
+      const { selfDefense = true, autoEat = true, eatBelow = 15, retreatBelow = 8, waterFightAbove = 14 } = opts
       let busy = false
       const reflex = async (action: string) => {
         if (busy) return
