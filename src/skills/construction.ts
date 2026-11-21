@@ -12,11 +12,11 @@ import { vec, digBlock, DigRefusedError, gotoWithin, isReplaceable, findItem } f
 import { equipFor, inventoryCounts, ensureTool } from './toolkit.ts'
 import {
   rotate, placeCells, bounds, facingToward, facingsToward, pickFacing, resolveRoles, materials, fmtMaterials, orderCells, diffCells,
-  cellState, chooseSite, isNaturalBlock, isSoftBlock, roleAccepts, solidCells, fillCells, pickTheme, renderBlueprint, FACINGS, WOODS,
+  cellState, chooseSite, isNaturalBlock, isSoftBlock, roleAccepts, solidCells, fillCells, pickTheme, renderBlueprint, pickNearby, FACINGS, WOODS,
   type Blueprint, type Column, type Facing, type Pos, type ResolvedRole, type WorldCell, type BlockState
 } from './blueprint.ts'
-import { checkCell, fixFor, familyOf, summarize, skipReason, finishDespiteUnreachable, UNREACHABLE, type QualityRow } from './blockstate.ts'
-import { placeBlockState, toggleBlock, reachToDig, NotPlaceableYet } from './placement.ts'
+import { checkCell, fixFor, familyOf, summarize, skipReason, finishDespiteUnreachable, underForeignRoof, distToBlock, UNREACHABLE, EYE, type QualityRow } from './blockstate.ts'
+import { placeBlockState, toggleBlock, reachToDig, newStandMemory, NotPlaceableYet, PLACE_REACH, type StandMemory } from './placement.ts'
 import { gatherMaterials, wantsForRoles, type RoleWants } from './materials.ts'
 import { isCreative, takeFromCreative } from './creative.ts'
 import { libraryDirs, loadLibrary } from './blueprint-library.ts'
@@ -45,6 +45,11 @@ export function ownBlocks (agent: Pick<Agent, 'storage'>): { has: (p: Pos) => bo
 /** Default keep-out radius around the world spawn (vanilla spawn protection is 16). */
 export const SPAWN_KEEP_OUT = 24
 const SITE_RADIUS = 10
+/** Placement starts once the bot is this close to the footprint (horizontally), and gives up beyond SITE_FAR. */
+const SITE_NEAR = 6
+const SITE_FAR = 12
+/** Pathfinder search limit while building (cost over the straight-line distance): stand spots are close. */
+const BUILD_SEARCH_RADIUS = 32
 /** Blocks used to fill dips under a floor (site preparation). */
 const FILL_ITEMS = ['dirt', 'coarse_dirt', 'cobblestone', 'cobbled_deepslate', 'andesite', 'diorite', 'granite', 'gravel']
 
@@ -275,19 +280,41 @@ export interface BuildParams extends PlanInput { gather: boolean, path?: boolean
 
 type BuildCtx = Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log' | 'player'>
 
+/** A cell close enough to place into from where the bot stands now (and the bot isn't in it). */
+function cellInReach (bot: Bot, c: Pos): boolean {
+  const p = bot.entity.position
+  const feet = { x: Math.floor(p.x), y: Math.floor(p.y + 0.01), z: Math.floor(p.z) }
+  if (feet.x === c.x && feet.z === c.z && (feet.y === c.y || feet.y + 1 === c.y)) return false
+  return distToBlock({ x: p.x, y: p.y + EYE, z: p.z }, c) <= PLACE_REACH - 0.8
+}
+
+/** Horizontal distance from a point to a box (0 inside). */
+function distToBox (p: { x: number, z: number }, box: { min: Pos, max: Pos }): number {
+  const dx = Math.max(box.min.x - p.x, 0, p.x - (box.max.x + 1))
+  const dz = Math.max(box.min.z - p.z, 0, p.z - (box.max.z + 1))
+  return Math.hypot(dx, dz)
+}
+
 /** Fills dips under the floor with dirt or cobblestone, whatever the bot carries. Optional: returns how many. */
-async function prepareGround (ctx: BuildCtx, fills: Pos[]): Promise<{ filled: number, short: number }> {
+async function prepareGround (ctx: BuildCtx, fills: Pos[], stands: StandMemory): Promise<{ filled: number, short: number }> {
   const { bot, signal, log } = ctx
   let filled = 0
   let short = 0
   let fails = 0
-  for (const f of fills) {
+  const todo = [...fills]
+  const solid = (p: Pos) => !isReplaceable(blockName(bot, p))
+  const ready = (f: Pos) => solid({ x: f.x, y: f.y - 1, z: f.z }) || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => solid({ x: f.x + dx!, y: f.y, z: f.z + dz! }))
+  for (let i = 0; i < todo.length; i++) {
     checkAborted(signal)
+    // the lowest dips first (todo is sorted by y), nearest one in reach first within a level
+    const j = pickNearby(todo, i, f => String(f.y), ready, f => cellInReach(bot, f), f => bot.entity.position.distanceTo(vec(bot, f.x + 0.5, f.y, f.z + 0.5)))
+    if (j !== i) todo.splice(i, 0, ...todo.splice(j, 1))
+    const f = todo[i]!
     if (!isReplaceable(blockName(bot, f))) continue
     const item = FILL_ITEMS.find(i => findItem(bot, i))
     if (!item || fails >= 2) { short++; continue }
     try {
-      await placeBlockState(bot, item, vec(bot, f.x, f.y, f.z), undefined, signal, { log })
+      await placeBlockState(bot, item, vec(bot, f.x, f.y, f.z), undefined, signal, { log, stands })
       filled++
       fails = 0
     } catch (e) {
@@ -389,6 +416,7 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
     log.info('gathering materials before building', { need: fmtMaterials(rows) })
     const g = await gatherMaterials(ctx, want.required, { optional: want.optional, fallbacks: want.fallbacks, theme })
     gatherNote = isCreative(bot) ? `${g.message}; ` : `gathered first (${g.message}); `
+    log.info('materials gathered', { ok: g.ok, result: g.message })
     checkAborted(signal)
     await travel(bot, { x: origin.x, y: origin.y, z: origin.z }, signal, { range: 3 }).catch(e => { checkAborted(signal); log.debug('travel back to site', { error: (e as Error).message }) })
     theme = params.theme ?? theme ?? pickTheme(inventoryCounts(bot)) ?? undefined
@@ -401,12 +429,31 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
     return fail(`${gatherNote}can't start the ${bp.name}: ${fmtMaterials(rows)}. Use gather_materials template=${bp.name}, or build with gather=true`)
   }
 
+  // Placement walks are short on purpose (a few seconds each), so be at the site first. A travel
+  // back from gathering that stopped far off used to leave every block to time out on its own.
+  const box = bounds(bp, origin)
+  if (!isCreative(bot) && distToBox(bot.entity.position, box) > SITE_NEAR) {
+    const p = bot.entity.position
+    const tx = Math.min(Math.max(Math.floor(p.x), box.min.x - 2), box.max.x + 2)
+    const tz = Math.min(Math.max(Math.floor(p.z), box.min.z - 2), box.max.z + 2)
+    await travel(bot, { x: tx, z: tz }, signal, { range: 3 }).catch(e => { checkAborted(signal); log.debug('travel to site', { error: (e as Error).message }) })
+    const away = distToBox(bot.entity.position, box)
+    if (away > SITE_FAR) {
+      save(already)
+      return fail(`${gatherNote}couldn't get to the ${bp.name} site at ${fmtPos(origin)}: stopped ${Math.round(away)} blocks away at ${fmtPos(bot.entity.position)}. Calling build again resumes it`)
+    }
+  }
+
   save(already)
-  const unguard = guardBox(bot, bounds(bp, origin))
-  // placement paths are short but the machine may be busy: give the pathfinder longer to think
-  const pf = bot.pathfinder as { thinkTimeout?: number } | undefined
+  const unguard = guardBox(bot, box)
+  // placement paths are short but the machine may be busy: give the pathfinder longer to think,
+  // but keep its search near (an unreachable spot otherwise explores the whole area until the
+  // think timeout); the walk itself has a short budget per stand spot (placement.ts)
+  const pf = bot.pathfinder as { thinkTimeout?: number, searchRadius?: number } | undefined
   const thinkBefore = pf?.thinkTimeout
+  const radiusBefore = pf?.searchRadius
   if (pf && (thinkBefore ?? 0) < 15_000) pf.thinkTimeout = 15_000
+  if (pf && (radiusBefore ?? -1) < 0) pf.searchRadius = BUILD_SEARCH_RADIUS
   let placed = 0
   let dug = 0
   let fixed = 0
@@ -418,6 +465,24 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
   const errors: string[] = []
   const unreachable = new Set<string>()
   const key = (p: Pos) => `${p.x},${p.y},${p.z}`
+  // where (not) to stand, shared by every placement of this build: failed spots aren't tried
+  // again, the inside of other structures in the footprint (a hut) is ruled out, and cells
+  // still to build are avoided when there is a choice
+  const planKeys = new Set(cells.map(key))
+  const solidKeys = new Set(solidCells(cells).map(key))
+  const insideCache = new Map<string, boolean>()
+  const stands = newStandMemory({
+    inside: p => {
+      const k = key(p)
+      let v = insideCache.get(k)
+      if (v === undefined) {
+        v = underForeignRoof(q => bot.blockAt(vec(bot, q.x, q.y, q.z)), p, q => planKeys.has(key(q)), isNaturalBlock)
+        insideCache.set(k, v)
+      }
+      return v
+    },
+    unbuilt: p => solidKeys.has(key(p)) && isReplaceable(at(p))
+  })
   const noteFail = (c: Pos, e: unknown) => {
     const msg = (e as Error).message
     errors.push(`${msg} at ${fmtPos(c)}`)
@@ -439,7 +504,7 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
     if (state === 'dig' || state === 'clear') {
       const b = bot.blockAt(vec(bot, c.x, c.y, c.z))
       if (b && !isReplaceable(b.name)) {
-        await reachToDig(bot, b.position, signal, log)
+        await reachToDig(bot, b.position, signal, log, stands)
         await equipFor(bot, b)
         await digBlock(bot, b, signal)
         dug++
@@ -452,7 +517,7 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
       if (!isReplaceable(above)) {
         const b = bot.blockAt(vec(bot, c.x, c.y + 1, c.z))
         if (!b || !agent.canDig || (respectsBuilds(agent) && !isNaturalBlock(b.name) && !own.has(b.position))) { errors.push(`no headroom for the door at ${fmtPos(c)} (${above})`); return 'failed' }
-        await reachToDig(bot, b.position, signal, log)
+        await reachToDig(bot, b.position, signal, log, stands)
         await equipFor(bot, b)
         await digBlock(bot, b, signal)
         dug++
@@ -462,7 +527,7 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
       await gotoWithin(bot, new goals.GoalNear(f.x, f.y, f.z, 1), signal, 20_000).catch(e => { checkAborted(signal); log.debug('door approach', { error: (e as Error).message }) })
     }
     try {
-      const res = await placeBlockState(bot, pick!.item, vec(bot, c.x, c.y, c.z), relax ? undefined : pick!.state, signal, { accepts: n => roleAccepts(r!, n), canDig: agent.canDig, log })
+      const res = await placeBlockState(bot, pick!.item, vec(bot, c.x, c.y, c.z), relax ? undefined : pick!.state, signal, { accepts: n => roleAccepts(r!, n), canDig: agent.canDig, log, stands })
       own.add(c)
       if (pick!.fallback) usedFallback.set(c.role, pick!.item)
       if (!res.ok) log.debug('placed with a wrong state', { at: fmtPos(c), item: pick!.item, wrong: res.check.hard.join(','), via: res.via })
@@ -476,7 +541,7 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
   try {
     // 1. site preparation: fill dips under the floor (clutter in the footprint is dug as cells come up)
     if (planned.fills.length) {
-      prep = await prepareGround(ctx, planned.fills)
+      prep = await prepareGround(ctx, planned.fills, stands)
       if (prep.filled || prep.short) log.info('site prepared', { filled: prep.filled, short: prep.short })
     }
 
@@ -487,7 +552,7 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
     // doors go in at the very end, after the retries and the quality pass: a closed door is a wall to the
     // pathfinder, so anything still missing inside would be out of reach once it's in
     const isDoor = (c: WorldCell) => !c.passive && roles[c.role]?.kind === 'door'
-    const ordered = orderCells([...clearing, ...diff.dig, ...diff.place], roles, solidAt)
+    const ordered = orderCells([...clearing, ...diff.dig, ...diff.place], roles, solidAt, solidAt)
     const doors = ordered.filter(isDoor)
     const todo = ordered.filter(c => !isDoor(c))
     // resuming with the door already in: take it out so the bot can get in and out, it goes back in at the end
@@ -495,7 +560,7 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
       for (const d of diff.done.filter(isDoor)) {
         const b = bot.blockAt(vec(bot, d.x, d.y, d.z))
         if (!b || !roleAccepts(roles[d.role]!, b.name)) continue
-        await reachToDig(bot, b.position, signal, log).catch(e => { checkAborted(signal) })
+        await reachToDig(bot, b.position, signal, log, stands).catch(e => { checkAborted(signal) })
         await digBlock(bot, b, signal).catch(e => { checkAborted(signal); log.debug('could not take the door out', { error: (e as Error).message }) })
         await sleep(300, signal)
         doors.push(d)
@@ -508,7 +573,21 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
     const retried = new Set<WorldCell>()
     let deferred: WorldCell[] = []
     let retryPassStarted = false
+    // batching: within a layer, whatever is ready (something to click) and in reach from where the
+    // bot stands goes first, so it walks only when nothing near is left (a floor spreads from the
+    // part already laid instead of zigzagging across the site)
+    const groupOf = (c: WorldCell) => {
+      const kind = c.role === 'air' || c.passive ? 'air' : roles[c.role]?.kind ?? 'block'
+      return `${retried.has(c) ? 'retry:' : ''}${kind === 'block' ? `block:${c.y}` : kind}`
+    }
+    const readyOf = (c: WorldCell) => {
+      if (c.role === 'air' || c.passive || cellState(c, at(c), roles, agent.canDig, mine(c)) !== 'place') return true
+      return [[0, -1, 0], [0, 1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]].some(([dx, dy, dz]) => solidAt({ x: c.x + dx!, y: c.y + dy!, z: c.z + dz! }))
+    }
+    const distOf = (c: WorldCell) => bot.entity.position.distanceTo(vec(bot, c.x + 0.5, c.y, c.z + 0.5))
     for (let i = 0; i < todo.length; i++) {
+      const j = pickNearby(todo, i, groupOf, readyOf, c => cellInReach(bot, c), distOf)
+      if (j !== i) todo.splice(i, 0, ...todo.splice(j, 1))
       const c = todo[i]!
       checkAborted(signal)
       if (retried.has(c) && !retryPassStarted) { retryPassStarted = true; await sleep(800, signal) }
@@ -557,7 +636,8 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
     }
 
     // 3. quality check: every block and its state; fix what's off, once
-    fixed = await qualityFix(ctx, cells.filter(c => !isDoor(c)), roles, errors)
+    // (blocks that already failed twice for reach aren't tried a third time: they're reported)
+    fixed = await qualityFix(ctx, cells.filter(c => !isDoor(c)), roles, errors, stands, unreachable)
 
     // 4. the door, from outside, then its own check
     for (const d of doors) {
@@ -565,10 +645,11 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
       const r = await placeCell(d, false).catch(e => { checkAborted(signal); noteFail(d, e); return 'failed' as const })
       if (r === 'done') placed++
     }
-    fixed += await qualityFix(ctx, cells.filter(isDoor), roles, errors)
+    fixed += await qualityFix(ctx, cells.filter(isDoor), roles, errors, stands, unreachable)
   } finally {
     unguard()
     if (pf && thinkBefore !== undefined) pf.thinkTimeout = thinkBefore
+    if (pf && radiusBefore !== undefined) pf.searchRadius = radiusBefore
   }
 
   const rowsQ = qualityRows(bot, cells, roles)
@@ -611,7 +692,9 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
     return ok(`${gatherNote}built a ${bp.name} ${where}: ${sum.built}/${total} blocks${counts}${tail}${pathNote}`, data)
   }
   const why = outOf.size ? `out of ${[...outOf].join(', ')}` : errors.slice(0, 2).join('; ') || 'stopped'
-  return fail(`${gatherNote}built ${sum.built}/${total} blocks of the ${bp.name} ${where}${counts}, ${sum.missingRequired} required still missing: ${why}${tail}. Calling build again resumes it`, data)
+  const stuck = missingKeys.filter(k => unreachable.has(k)).length
+  const stuckNote = stuck ? ` (${stuck} of them unreachable from anywhere I could stand)` : ''
+  return fail(`${gatherNote}built ${sum.built}/${total} blocks of the ${bp.name} ${where}${counts}, ${sum.missingRequired} required still missing${stuckNote}: ${why}${tail}. Calling build again resumes it`, { ...data, unreachable: missingKeys.filter(k => unreachable.has(k)) })
 }
 
 /** Every planned block checked against the world. */
@@ -625,12 +708,15 @@ function qualityRows (bot: Bot, cells: WorldCell[], roles: Record<string, Resolv
 }
 
 /** One fix per wrong block: place what's missing, toggle an open/closed mismatch, break and re-place a wrong facing. */
-async function qualityFix (ctx: BuildCtx, cells: WorldCell[], roles: Record<string, ResolvedRole>, errors: string[]): Promise<number> {
+async function qualityFix (ctx: BuildCtx, cells: WorldCell[], roles: Record<string, ResolvedRole>, errors: string[], stands?: StandMemory, unreachable?: Set<string>): Promise<number> {
   const { bot, agent, signal, log } = ctx
   let fixed = 0
-  const ordered = orderCells(solidCells(cells), roles)
+  // what stands now seeds the order, so a missing floor block comes after a neighbour to click
+  const solidAt = (p: Pos) => !isReplaceable(blockName(bot, p))
+  const ordered = orderCells(solidCells(cells), roles, solidAt, solidAt)
   for (const c of ordered) {
     checkAborted(signal)
+    if (unreachable?.has(`${c.x},${c.y},${c.z}`)) continue
     const r = roles[c.role]!
     const p = vec(bot, c.x, c.y, c.z)
     const b = bot.blockAt(p)
@@ -642,12 +728,12 @@ async function qualityFix (ctx: BuildCtx, cells: WorldCell[], roles: Record<stri
       if (action === 'toggle') { await toggleBlock(bot, p, signal); fixed++; continue }
       if (!pick) continue
       if (action === 'replace' && b) {
-        await reachToDig(bot, b.position, signal, log)
+        await reachToDig(bot, b.position, signal, log, stands)
         await equipFor(bot, b)
         await digBlock(bot, b, signal)
         await sleep(200, signal)
       }
-      const res = await placeBlockState(bot, pick.item, p, pick.state, signal, { accepts: n => roleAccepts(r, n), canDig: agent.canDig, log })
+      const res = await placeBlockState(bot, pick.item, p, pick.state, signal, { accepts: n => roleAccepts(r, n), canDig: agent.canDig, log, stands })
       if (res.ok) fixed++
     } catch (e) {
       checkAborted(signal)

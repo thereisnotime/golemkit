@@ -12,12 +12,12 @@ import { vec, findItem, isPlaceFace, isReplaceable, gotoWithin, digBlock } from 
 import { equipFor } from './toolkit.ts'
 import { isCreative, flyNear } from './creative.ts'
 import {
-  planPlacement, checkCell, rankStands, distToBlock, blockNameFor, familyOf, DIR_VEC, EYE,
+  planPlacement, checkCell, rankStands, standCandidatesIn, standKey, distToBlock, blockNameFor, familyOf, DIR_VEC, EYE,
   type BlockState, type CellCheck, type Dir, type PlacementOption, type StandCandidate, type Facing
 } from './blockstate.ts'
 
 /** The server allows 4.5 blocks to the clicked block's nearest point, plus a little slack. */
-const PLACE_REACH = 4.6
+export const PLACE_REACH = 4.6
 
 /** Nothing to click that gives the wanted state yet (a log with no neighbour along its axis). Try again later. */
 export class NotPlaceableYet extends Error {
@@ -45,24 +45,36 @@ function envAt (bot: Bot, pos: Vec3) {
   }
 }
 
-/** Free spots to stand around a target: solid below, room for the body. */
-function standCandidates (bot: Bot, target: Vec3, radius = 4): StandCandidate[] {
-  const out: StandCandidate[] = []
-  const passable = (p: Vec3) => {
-    const b = bot.blockAt(p)
-    return !!b && b.boundingBox === 'empty' && b.name !== 'water' && b.name !== 'lava' && !/door|fire/.test(b.name)
-  }
-  for (let dx = -radius; dx <= radius; dx++) {
-    for (let dz = -radius; dz <= radius; dz++) {
-      for (let dy = -5; dy <= 1; dy++) {
-        const p = target.offset(dx, dy, dz)
-        const below = bot.blockAt(p.offset(0, -1, 0))
-        if (!below || below.boundingBox !== 'block' || /fence|wall|_bed$/.test(below.name)) continue
-        if (passable(p) && passable(p.offset(0, 1, 0))) out.push(P(p))
-      }
-    }
-  }
-  return out
+/** Free spots to stand around a target: solid below, room for the body (see standCandidatesIn). */
+function standCandidates (bot: Bot, target: Vec3, inside?: (p: { x: number, y: number, z: number }) => boolean, radius = 4): StandCandidate[] {
+  return standCandidatesIn(p => bot.blockAt(vec(bot, p.x, p.y, p.z)), P(target), { radius, inside })
+}
+
+/**
+ * Time to walk to a stand spot: a short budget (a few blocks away is a few seconds; an
+ * unreachable spot otherwise eats the whole pathfinder think timeout), a bit more when further.
+ */
+export function standPathMs (distance: number): number {
+  return Math.round(Math.min(STAND_PATH_MAX_MS, STAND_PATH_BASE_MS + distance * 250))
+}
+const STAND_PATH_BASE_MS = 4000
+const STAND_PATH_MAX_MS = 8000
+/** Stand spots tried per reference block before giving up on it. */
+const STANDS_PER_REF = 3
+
+/**
+ * Remembers what a build learned about standing spots, shared by every placement of one build:
+ * spots that couldn't be reached, which spots to rule out (inside other structures) and which
+ * cells are still to be built (standing there gets in the way later).
+ */
+export interface StandMemory {
+  failed: Set<string>
+  inside?: (p: { x: number, y: number, z: number }) => boolean
+  unbuilt?: (p: { x: number, y: number, z: number }) => boolean
+}
+
+export function newStandMemory (opts: Omit<StandMemory, 'failed'> = {}): StandMemory {
+  return { failed: new Set(), ...opts }
 }
 
 /** The cells the new block will fill (two for doors and beds): the bot must not stand there. */
@@ -77,40 +89,50 @@ function footprint (item: string, state: BlockState | undefined, pos: Vec3): { x
   return cells
 }
 
-/** Walks to a spot from which the reference block is in reach. False when none is reachable. */
-async function standFor (bot: Bot, refPos: Vec3, target: Vec3, occupied: { x: number, y: number, z: number }[], signal: AbortSignal, log?: Logger): Promise<boolean> {
+const eyeOf = (bot: Bot) => { const p = bot.entity.position; return { x: p.x, y: p.y + EYE, z: p.z } }
+const feetOf = (bot: Bot) => { const p = bot.entity.position; return { x: Math.floor(p.x), y: Math.floor(p.y + 0.01), z: Math.floor(p.z) } }
+const inCells = (here: { x: number, y: number, z: number }, occupied: { x: number, y: number, z: number }[]) =>
+  occupied.some(o => o.x === here.x && o.z === here.z && (o.y === here.y || o.y === here.y + 1))
+
+/** The reference block is in reach from where the bot stands now, and it isn't standing in the cells to fill. */
+function reachableFromHere (bot: Bot, refPos: Vec3, occupied: { x: number, y: number, z: number }[]): boolean {
+  return !inCells(feetOf(bot), occupied) && distToBlock(eyeOf(bot), P(refPos)) <= PLACE_REACH - 0.2
+}
+
+/**
+ * Walks to a spot from which the reference block is in reach. False when none is reachable.
+ * Each spot gets a short path budget; a spot that fails goes into `memory.failed` and isn't
+ * tried again in this build. The last resort is a short walk towards the target.
+ */
+async function standFor (bot: Bot, refPos: Vec3, target: Vec3, occupied: { x: number, y: number, z: number }[], signal: AbortSignal, log?: Logger, memory?: StandMemory): Promise<boolean> {
+  if (reachableFromHere(bot, refPos, occupied)) return true
   const me = bot.entity.position
-  const here = { x: Math.floor(me.x), y: Math.floor(me.y + 0.01), z: Math.floor(me.z) }
-  const eye = { x: me.x, y: me.y + EYE, z: me.z }
-  const inCell = occupied.some(o => o.x === here.x && o.z === here.z && (o.y === here.y || o.y === here.y + 1))
-  if (!inCell && distToBlock(eye, P(refPos)) <= PLACE_REACH - 0.2) return true
-  const ranked = rankStands(standCandidates(bot, target), P(refPos), occupied, P(me), PLACE_REACH - 0.2)
+  const ranked = rankStands(standCandidates(bot, target, memory?.inside), P(refPos), occupied, P(me), PLACE_REACH - 0.2,
+    { target: P(target), failed: memory?.failed, unbuilt: memory?.unbuilt })
   if (isCreative(bot)) {
     // creative: fly there, no scaffolding needed (a spot in the air next to the target when nothing stands)
     const c = ranked[0]
     const dest = c ? vec(bot, 0, 0, 0).set(c.x + 0.5, c.y, c.z + 0.5) : flySpot(bot, target, occupied)
     if (await flyNear(bot, dest, signal)) {
-      const p = bot.entity.position
-      if (distToBlock({ x: p.x, y: p.y + EYE, z: p.z }, P(refPos)) <= PLACE_REACH) return true
+      if (distToBlock(eyeOf(bot), P(refPos)) <= PLACE_REACH) return true
     }
   }
-  for (const c of ranked.slice(0, 4)) {
+  for (const c of ranked.slice(0, STANDS_PER_REF)) {
     checkAborted(signal)
+    const ms = standPathMs(bot.entity.position.distanceTo(vec(bot, c.x + 0.5, c.y, c.z + 0.5)))
+    const t0 = Date.now()
     try {
-      await gotoWithin(bot, new goals.GoalBlock(c.x, c.y, c.z), signal, 15_000)
-      const p = bot.entity.position
-      if (distToBlock({ x: p.x, y: p.y + EYE, z: p.z }, P(refPos)) <= PLACE_REACH) return true
+      await gotoWithin(bot, new goals.GoalBlock(c.x, c.y, c.z), signal, ms)
+      if (distToBlock(eyeOf(bot), P(refPos)) <= PLACE_REACH) return true
     } catch (e) {
       checkAborted(signal)
-      log?.debug('placement: stand spot unreachable', { at: `${c.x} ${c.y} ${c.z}`, error: (e as Error).message })
+      memory?.failed.add(standKey(c))
+      log?.debug('placement: stand spot unreachable', { at: `${c.x} ${c.y} ${c.z}`, ms: Date.now() - t0, error: (e as Error).message })
     }
   }
-  // last resort: anywhere near the target, then check the reach
-  await gotoWithin(bot, new goals.GoalNear(target.x, target.y, target.z, 2), signal, 15_000).catch(e => { checkAborted(signal) })
-  const p = bot.entity.position
-  const now = { x: Math.floor(p.x), y: Math.floor(p.y + 0.01), z: Math.floor(p.z) }
-  const blocked = occupied.some(o => o.x === now.x && o.z === now.z && (o.y === now.y || o.y === now.y + 1))
-  return !blocked && distToBlock({ x: p.x, y: p.y + EYE, z: p.z }, P(refPos)) <= PLACE_REACH
+  // last resort: a short walk towards the target, then check the reach
+  await gotoWithin(bot, new goals.GoalNear(target.x, target.y, target.z, 2), signal, STAND_PATH_BASE_MS).catch(() => { checkAborted(signal) })
+  return !inCells(feetOf(bot), occupied) && distToBlock(eyeOf(bot), P(refPos)) <= PLACE_REACH
 }
 
 /** A free point in the air beside a target (creative flying), outside the cells being filled. */
@@ -157,6 +179,10 @@ export interface PlaceStateOptions {
   /** May break a wrongly placed block to try again. */
   canDig?: boolean
   log?: Logger
+  /** Shared by the placements of one build: failed stand spots, spots to rule out. */
+  stands?: StandMemory
+  /** Walk to at most this many reference blocks (others only if in reach from where the bot ends up). Default 2. */
+  maxWalks?: number
 }
 
 /**
@@ -171,7 +197,12 @@ export async function placeBlockState (bot: Bot, item: string, pos: Vec3, state:
   const blockName = blockNameFor(item, state)
   const accepts = opts.accepts ?? ((n: string) => n === blockName)
   const occupied = footprint(item, state, pos)
-  let options = planPlacement(item, state, envAt(bot, pos))
+  // every option gives the wanted state: the ones whose clicked block is in reach from here go first
+  const fromHere = (o: PlacementOption) => { const d = DIR_VEC[o.ref]; return reachableFromHere(bot, pos.offset(d.x, d.y, d.z), occupied) }
+  const hereFirst = (opts: PlacementOption[]) => [...opts.filter(fromHere), ...opts.filter(o => !fromHere(o))]
+  let options = hereFirst(planPlacement(item, state, envAt(bot, pos)))
+  let walks = 0
+  const maxWalks = opts.maxWalks ?? 2
   if (!options.length) throw new NotPlaceableYet(`nothing to place ${item}${state ? ` [${Object.entries(state).map(([k, v]) => `${k}=${v}`).join(',')}]` : ''} against yet`)
   const read = (): CellCheck => {
     const b = bot.blockAt(pos)
@@ -186,7 +217,13 @@ export async function placeBlockState (bot: Bot, item: string, pos: Vec3, state:
     checkAborted(signal)
     const v = DIR_VEC[opt.ref]
     const refPos = pos.offset(v.x, v.y, v.z)
-    if (!await standFor(bot, refPos, pos, occupied, signal, opts.log)) { lastError = new Error(`can't get within reach of ${item} at ${pos.x} ${pos.y} ${pos.z}`); continue }
+    const unreachable = () => { lastError = new Error(`can't get within reach of ${item} at ${pos.x} ${pos.y} ${pos.z}`) }
+    if (!reachableFromHere(bot, refPos, occupied)) {
+      // walking to a stand spot is the slow part: only for the first few options
+      if (walks >= maxWalks) { unreachable(); continue }
+      walks++
+      if (!await standFor(bot, refPos, pos, occupied, signal, opts.log, opts.stands)) { unreachable(); continue }
+    }
     const it = findItem(bot, item)
     if (!it) throw new Error(`no ${item} in inventory`)
     await bot.equip(it, 'hand')
@@ -217,7 +254,7 @@ export async function placeBlockState (bot: Bot, item: string, pos: Vec3, state:
     await equipFor(bot, b)
     await digBlock(bot, b, signal)
     await sleep(200, signal)
-    options = planPlacement(item, state, envAt(bot, pos))
+    options = hereFirst(planPlacement(item, state, envAt(bot, pos)))
     if (i + 1 >= options.length) i = -1 // only one way: same option once more
   }
   if (last.status === 'missing' && lastError) throw lastError
@@ -228,8 +265,8 @@ export async function placeBlockState (bot: Bot, item: string, pos: Vec3, state:
  * Walks to a spot from which a block can be dug (no line of sight needed, only reach), using
  * the same stand-spot search as placing. Throws when none is reachable.
  */
-export async function reachToDig (bot: Bot, pos: Vec3, signal: AbortSignal, log?: Logger): Promise<void> {
-  if (!await standFor(bot, pos, pos, [], signal, log)) throw new Error(`can't get within reach of ${pos.x} ${pos.y} ${pos.z}`)
+export async function reachToDig (bot: Bot, pos: Vec3, signal: AbortSignal, log?: Logger, stands?: StandMemory): Promise<void> {
+  if (!await standFor(bot, pos, pos, [], signal, log, stands)) throw new Error(`can't get within reach of ${pos.x} ${pos.y} ${pos.z}`)
 }
 
 /** Uses a door, trapdoor or gate once (to open or close it). */

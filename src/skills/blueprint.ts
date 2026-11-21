@@ -441,9 +441,12 @@ export function fmtMaterials (rows: MaterialRow[]): string {
  * Placement order: clear "air" cells first, then solid blocks layer by layer (floor, walls,
  * roof), each layer starting from cells with support below and spreading to neighbours (a
  * roof goes in from the walls inwards), then attachments (torches) and doors last.
- * `groundBelow` says whether the world has a solid block under a bottom-layer cell.
+ * `groundBelow` says whether the world has a solid block under a bottom-layer cell. `solidNow`
+ * (optional) says what is solid in the world right now: a cell next to one (or on one) is a
+ * seed too, so a partly built layer (a resumed build, the quality pass, a floor around an
+ * existing hut) carries on from what stands instead of from cells with nothing to click.
  */
-export function orderCells<T extends { x: number, y: number, z: number, role: string, passive?: boolean }> (cells: T[], roles: Record<string, { kind: Role['kind'] }>, groundBelow?: (p: Pos) => boolean): T[] {
+export function orderCells<T extends { x: number, y: number, z: number, role: string, passive?: boolean }> (cells: T[], roles: Record<string, { kind: Role['kind'] }>, groundBelow?: (p: Pos) => boolean, solidNow?: (p: Pos) => boolean): T[] {
   const kind = (c: T) => (c.passive ? 'passive' : c.role === 'air' ? 'air' : roles[c.role]?.kind ?? 'block')
   const air = cells.filter(c => kind(c) === 'air').sort((a, b) => b.y - a.y || a.z - b.z || a.x - b.x)
   const blocks = cells.filter(c => kind(c) === 'block')
@@ -454,7 +457,9 @@ export function orderCells<T extends { x: number, y: number, z: number, role: st
   for (const y of [...new Set(blocks.map(c => c.y))].sort((a, b) => a - b)) {
     const layer = blocks.filter(c => c.y === y).sort((a, b) => a.z - b.z || (a.z % 2 ? b.x - a.x : a.x - b.x))
     // The bottom layer stands on the ground, except over dips: those go in from a neighbour.
-    const supported = (c: T) => (y === minY ? !groundBelow || groundBelow({ x: c.x, y: y - 1, z: c.z }) : false) || solid.has(key({ x: c.x, y: y - 1, z: c.z }))
+    const touching = (c: T) => !!solidNow && (solidNow({ x: c.x, y: y - 1, z: c.z }) ||
+      ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).some(([dx, dz]) => solidNow({ x: c.x + dx, y, z: c.z + dz })))
+    const supported = (c: T) => (y === minY ? !groundBelow || groundBelow({ x: c.x, y: y - 1, z: c.z }) : false) || solid.has(key({ x: c.x, y: y - 1, z: c.z })) || touching(c)
     const seeds = layer.filter(supported)
     const done = new Set<string>()
     const queue = [...seeds]
@@ -476,6 +481,30 @@ export function orderCells<T extends { x: number, y: number, z: number, role: st
   const furnish = cells.filter(c => kind(c) === 'furnish')
   const doors = cells.filter(c => kind(c) === 'door')
   return [...air, ...out, ...attachments, ...furnish, ...doors]
+}
+
+/**
+ * Batching: which pending cell to place next, as an index into `todo` at or after `from`. Only
+ * cells of the same group as todo[from] (the same layer, say) are considered, so the layer
+ * order holds. Among those that are ready (something to click), one in reach from where the
+ * bot stands wins, nearest first; otherwise the nearest ready one. With nothing ready, `from`.
+ */
+export function pickNearby<T> (todo: T[], from: number, group: (c: T) => string, ready: (c: T) => boolean, inReach: (c: T) => boolean, dist: (c: T) => number, window = 400): number {
+  const first = todo[from]
+  if (first === undefined) return from
+  if (ready(first) && inReach(first)) return from
+  const g = group(first)
+  let best = -1
+  let bestReach = false
+  let bestD = Infinity
+  for (let j = from; j < todo.length && j < from + window; j++) {
+    const c = todo[j]!
+    if (group(c) !== g || !ready(c)) continue
+    const r = inReach(c)
+    const d = dist(c)
+    if ((r && !bestReach) || (r === bestReach && d < bestD)) { best = j; bestReach = r; bestD = d }
+  }
+  return best < 0 ? from : best
 }
 
 // ------------------------------------------------------------------ resume / world diff

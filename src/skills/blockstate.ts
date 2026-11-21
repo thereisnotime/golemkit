@@ -419,9 +419,95 @@ export function skipReason (item: string): string {
 
 // ------------------------------------------------------------------ where to stand
 
-export interface StandCandidate { x: number, y: number, z: number }
+export interface StandCandidate {
+  x: number, y: number, z: number
+  /** No open side at feet and head level: a pocket (under a floor, in a cave) the pathfinder can only reach by digging. */
+  sealed?: boolean
+}
 
-/** Distance from a point to the nearest point of a unit block (what the server's reach check measures). */
+/** What else the stand ranking weighs, besides reach and the bot's distance. */
+export interface StandRankOptions {
+  /** The cell being placed (its level counts, not the clicked block's). Default: the clicked block. */
+  target?: { x: number, y: number, z: number }
+  /** Spots that already failed in this build ("x,y,z"): never tried again. */
+  failed?: Set<string>
+  /** Cells of the structure still to be built: standing in one works, but it's in the way later. */
+  unbuilt?: (p: { x: number, y: number, z: number }) => boolean
+}
+
+/** The two things stand-spot search reads about a block. */
+export interface StandBlock { name: string, boundingBox: string }
+
+/**
+ * Spots a bot can stand on around `target` (feet positions): a full block below (not a fence,
+ * wall or bed), two passable blocks for the body, no liquid, fire or door. `inside` excludes
+ * spots in other structures (a hut standing in the footprint: its inside is only reachable
+ * through its door, if at all). Each spot says whether it is sealed (no open side).
+ */
+export function standCandidatesIn (at: (p: { x: number, y: number, z: number }) => StandBlock | null | undefined, target: { x: number, y: number, z: number }, opts: { radius?: number, inside?: (p: { x: number, y: number, z: number }) => boolean } = {}): StandCandidate[] {
+  const radius = opts.radius ?? 4
+  const P = (x: number, y: number, z: number) => ({ x, y, z })
+  const passable = (x: number, y: number, z: number) => {
+    const b = at(P(x, y, z))
+    return !!b && b.boundingBox === 'empty' && b.name !== 'water' && b.name !== 'lava' && !/door|fire/.test(b.name)
+  }
+  const floor = (x: number, y: number, z: number) => {
+    const b = at(P(x, y, z))
+    return !!b && b.boundingBox === 'block' && !/fence|wall|_bed$/.test(b.name)
+  }
+  const out: StandCandidate[] = []
+  for (let dx = -radius; dx <= radius; dx++) {
+    for (let dz = -radius; dz <= radius; dz++) {
+      for (let dy = -5; dy <= 2; dy++) {
+        const x = target.x + dx
+        const y = target.y + dy
+        const z = target.z + dz
+        if (!floor(x, y - 1, z) || !passable(x, y, z) || !passable(x, y + 1, z)) continue
+        if (opts.inside?.(P(x, y, z))) continue
+        // open: some side to walk to at the same level, or a step up/down onto
+        const open = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).some(([sx, sz]) =>
+          (passable(x + sx, y, z + sz) && passable(x + sx, y + 1, z + sz)) ||
+          (passable(x + sx, y + 1, z + sz) && passable(x + sx, y + 2, z + sz) && passable(x, y + 2, z)))
+        out.push(open ? P(x, y, z) : { ...P(x, y, z), sealed: true })
+      }
+    }
+  }
+  return out
+}
+
+/**
+ * Is `p` inside a structure that isn't part of the plan: a solid block that isn't natural and
+ * isn't one of the plan's cells within a few blocks overhead (a roof). Spots under our own
+ * roof-in-progress stay allowed; the inside of a player's hut doesn't.
+ */
+export function underForeignRoof (at: (p: { x: number, y: number, z: number }) => StandBlock | null | undefined, p: { x: number, y: number, z: number }, isPlanCell: (p: { x: number, y: number, z: number }) => boolean, isNatural: (name: string) => boolean, height = 5): boolean {
+  for (let dy = 2; dy <= height; dy++) {
+    const q = { x: p.x, y: p.y + dy, z: p.z }
+    const b = at(q)
+    if (!b || b.boundingBox !== 'block') continue
+    if (isPlanCell(q) || isNatural(b.name) || /leaves/.test(b.name)) return false
+    return true
+  }
+  return false
+}
+
+/** Key of a stand spot in a failed-spot cache. */
+export const standKey = (p: { x: number, y: number, z: number }) => `${p.x},${p.y},${p.z}`
+
+/**
+ * Cost of standing at `c` (lower is better): the distance from the bot (height counts more,
+ * since climbing or dropping is where paths go wrong), plus penalties for standing below the
+ * target's level, in a sealed pocket, or inside a cell still to be built.
+ */
+export function standCost (c: StandCandidate, target: { x: number, y: number, z: number }, bot: { x: number, y: number, z: number }, unbuilt?: StandRankOptions['unbuilt']): number {
+  let d = Math.hypot(c.x + 0.5 - bot.x, (c.y - bot.y) * 1.5, c.z + 0.5 - bot.z)
+  const below = target.y - c.y
+  if (below > 0) d += below * 1.5
+  if (c.sealed) d += 6
+  if (unbuilt && (unbuilt(c) || unbuilt({ x: c.x, y: c.y + 1, z: c.z }))) d += 4
+  return d
+}
+
 export function distToBlock (p: { x: number, y: number, z: number }, b: { x: number, y: number, z: number }): number {
   const dx = Math.max(b.x - p.x, 0, p.x - (b.x + 1))
   const dy = Math.max(b.y - p.y, 0, p.y - (b.y + 1))
@@ -433,13 +519,15 @@ export const EYE = 1.62
 
 /**
  * Picks spots (feet positions) to place from: the clicked block within `reach` of the eyes,
- * not inside the cells the block will fill, nearest to the bot first.
+ * not inside the cells the block will fill, not a spot that already failed; cheapest first
+ * (see standCost: near the bot, at or above the target's level, open, out of the way).
  */
-export function rankStands (cands: StandCandidate[], refBlock: { x: number, y: number, z: number }, occupied: { x: number, y: number, z: number }[], bot: { x: number, y: number, z: number }, reach = 4.4): StandCandidate[] {
+export function rankStands (cands: StandCandidate[], refBlock: { x: number, y: number, z: number }, occupied: { x: number, y: number, z: number }[], bot: { x: number, y: number, z: number }, reach = 4.4, opts: StandRankOptions = {}): StandCandidate[] {
   const blocked = (c: StandCandidate) => occupied.some(o => o.x === c.x && o.z === c.z && (o.y === c.y || o.y === c.y + 1))
+  const target = opts.target ?? refBlock
   return cands
-    .filter(c => !blocked(c) && distToBlock({ x: c.x + 0.5, y: c.y + EYE, z: c.z + 0.5 }, refBlock) <= reach)
-    .map(c => ({ c, d: Math.hypot(c.x + 0.5 - bot.x, (c.y - bot.y) * 1.5, c.z + 0.5 - bot.z) }))
+    .filter(c => !blocked(c) && !opts.failed?.has(standKey(c)) && distToBlock({ x: c.x + 0.5, y: c.y + EYE, z: c.z + 0.5 }, refBlock) <= reach)
+    .map(c => ({ c, d: standCost(c, target, bot, opts.unbuilt) }))
     .sort((a, b) => a.d - b.d)
     .map(x => x.c)
 }
