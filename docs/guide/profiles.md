@@ -53,6 +53,8 @@ journal:                      # optional, event journal settings (on by default)
 | `username`, `persona`, `owners`, `canDig` | identity and permissions |
 | `server` | per-bot server override |
 | `llm` | LLM brain settings: provider, model, effort, login, token source, `listen`, `immersive`, aliases, budget |
+| `reflexes` | eat/retreat thresholds, e.g. `retreatBelow: 0` to stand its ground ([details](../concepts/world#reflexes)) |
+| `retry`, `humanize`, `journal`, `context` | see the sections below and the linked guides |
 | `settings` | anything the variant's skills/brains read |
 | `logging` | applied when the profile is run on its own |
 | `journal` | event journal: types, caps, retention, optional LLM summary; `false` turns it off. See [Event journal](./journal) |

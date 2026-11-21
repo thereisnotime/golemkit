@@ -30,6 +30,9 @@ Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actio
 | `say` *ne* | Say something in public chat. |
 
 ### movement
+
+- `goto` handles any distance: long trips go in legs through loaded chunks and run in the background ([details](concepts/world#long-distance-travel)).
+
 | action | |
 |---|---|
 | `come` | Walk to a player (default: whoever asked). |
@@ -40,6 +43,9 @@ Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actio
 | `jump` *ne* | Jump once. |
 
 ### combat
+
+- `retreat` (internal): back off from hostiles, used by reflexes at low health. Flying mobs are fought in place, not chased ([details](concepts/world#hostile-mobs)).
+
 | action | |
 |---|---|
 | `attack` | Fight the nearest hostile mob, or an entity by id. |
@@ -129,6 +135,9 @@ alone. Very tall trees (big spruce, jungle) leave their upper logs standing; the
 how many were out of reach.
 
 ### building
+
+- `break_block x y z [force]`: break one block with the best tool; refuses storage blocks unless `force`; fails clearly (and teaches the bot the zone) in protected areas.
+
 | action | |
 |---|---|
 | `place_block` | Place a block from the inventory at x y z against any solid neighbour (never a chest, door or other block that would open/toggle, never a modded block). |

@@ -6,6 +6,7 @@ export default withMermaid(defineConfig({
   title: 'mc-buddy',
   description: 'Minecraft bot framework for NeoForge servers',
   cleanUrls: true,
+  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }]],
   lastUpdated: false,
   srcExclude: ['**/README.md'],
   themeConfig: {
@@ -39,6 +40,7 @@ export default withMermaid(defineConfig({
         items: [
           { text: 'Architecture', link: '/concepts/architecture' },
           { text: 'Variants, profiles, fleets', link: '/concepts/variants-profiles' },
+          { text: 'Movement, protection, combat', link: '/concepts/world' },
           { text: 'NeoForge support', link: '/concepts/neoforge' }
         ]
       },

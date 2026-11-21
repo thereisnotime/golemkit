@@ -25,7 +25,7 @@ just run buddy --username Helper --owners robin
 just fleet fleet.yaml   # several bots in one process (see fleets/example.yaml)
 ```
 
-## Writing a bot
+## Writing a variant
 
 ```ts
 // variants/guard.ts
@@ -50,15 +50,26 @@ The pieces:
 - **Brains** decide what to do: chat commands, reflexes, NPC loops, LLMs. Several run at once
   and share the body through action priorities (player > LLM > NPC, reflexes preempt and
   resume).
-- **Bots** pick skills, brains, persona and settings.
+- **Variants** (`variants/*.ts`) pick skills, brains and default persona: what kind of bot.
+- **Profiles** (`profiles/*.yaml`) are saved instances of a variant: username, owners, server,
+  LLM model/login, reflexes, retries, humanize, journal, plus an optional context pack
+  (`profiles/<name>/`: AGENTS.md, USER.md, MEMORY.md, skills, hooks).
+- **Fleets** (`fleets/*.yaml`) run several profiles/variants in one process, across servers.
 
-Details in [docs/concepts/architecture.md](docs/concepts/architecture.md).
+Core mechanisms every bot gets: long-distance travel, learned protected areas, hostile/flyer
+aware combat with tunable reflexes, a journal of what happened, retries, rate-limited
+(optionally humanized) chat, and per-component logging.
+
+Details in [docs/concepts/architecture.md](docs/concepts/architecture.md) and
+[docs/concepts/world.md](docs/concepts/world.md).
 
 ## Docs
 
 The full docs live in [docs/](docs/) (guides, concepts, generated action reference). Browse
 them as a local site with `just docs` (dev server) or `just docs-build` (static HTML).
 
+Profiles (instances, LLM listen modes, immersive mode, humanize, retries, proxy): [docs/guide/profiles.md](docs/guide/profiles.md).
+Movement, protected areas, combat and reflexes: [docs/concepts/world.md](docs/concepts/world.md).
 Self-sufficient NPCs (utility-AI brain, behaviours, `variants/villager.ts`): [docs/guide/npc-brain.md](docs/guide/npc-brain.md).
 LLM-driven bots on your Claude / Codex subscription or an API (`variants/companion.ts`): [docs/guide/llm-brain.md](docs/guide/llm-brain.md).
 NPCs that run their own program and rewrite it with one LLM call when an owner teaches them (`variants/apprentice.ts`): [docs/guide/self-improver.md](docs/guide/self-improver.md).

@@ -22,11 +22,13 @@ flowchart TB
     direction TB
     subgraph agent["Agent (one per bot)"]
       direction TB
-      BR["Brains<br/>command · reflexes · npc · scene · llm · self"]
-      LOCK{{"Action lock<br/>priorities"}}
-      SK["Skills → actions<br/>movement · combat · crafting · farming · ..."]
+      BR["Brains<br/>command · reflexes · hooks · npc · scene · llm · self"]
+      CTX["Context pack<br/>AGENTS · USER · MEMORY · skills · hooks"]
+      LOCK{{"Action lock<br/>priorities · retries"}}
+      SK["Skills → actions<br/>movement/travel · combat · crafting · farming · journal · ..."]
       CHAT["Chat queue<br/>rate limit · humanize"]
-      ST[("Storage<br/>data/bots/…")]
+      ST[("Storage + journal<br/>data/bots/…")]
+      PA[("Protected areas<br/>per server")]
     end
     BUS["Fleet bus + blackboard<br/>(per server)"]
   end
@@ -41,7 +43,9 @@ flowchart TB
   BR -->|"agent.act()"| LOCK --> SK --> MF
   BR --> CHAT --> MF
   BR <-.-> BUS
-  BR -.->|"llm / self brains"| LLM
+  CTX -.-> BR
+  BR -.->|"llm / self brains<br/>(proxy optional)"| LLM
+  SK -.-> PA
   MF --> NF --> SRV
   agent --- ST
 
@@ -52,9 +56,9 @@ flowchart TB
   classDef lib fill:#dcfce7,stroke:#16a34a,color:#14532d
   classDef ext fill:#fef3c7,stroke:#d97706,color:#78350f
   class CLI,PROF,FLEET run
-  class BR,CHAT brain
+  class BR,CHAT,CTX brain
   class LOCK lock
-  class SK,ST,BUS skill
+  class SK,ST,BUS,PA skill
   class MF,NF lib
   class LLM,SRV ext
 ```
@@ -69,10 +73,13 @@ fleets pick who, where and how many.
 a new *session* with a fresh mineflayer `Bot`, and skills/brains get their `setup()` /
 `session()` hooks called again. The agent owns:
 
-- the action registry and the **action lock** (`act()`)
-- rate-limited chat (`say`, `whisper`, `reply`), since vanilla kicks for spam
+- the action registry and the **action lock** (`act()`), with [retries](../guide/profiles#retries)
+- rate-limited chat (`say`, `whisper`, `reply`), since vanilla kicks for spam, optionally
+  [humanized](../guide/profiles#humanize-player-like-timing)
 - persistent storage (`agent.storage`, JSON under `data/bots/<username>/`)
-- `observe()`: a JSON snapshot of the bot and surroundings, extended by skills
+- the [journal](../guide/journal) (`agent.journal`): typed facts about what happened, with rollups
+- learned [protected areas](./world#protected-areas) (`agent.protectedAreas`) per server
+- `observe()`: a JSON snapshot of the bot and surroundings, extended by skills and brains
 - the event journal (`agent.journal`, JSONL under `data/bots/<username>/journal/`), see [Event journal](../guide/journal.md)
 - events: `session`, `sessionEnd`, `chat`, `serverMessage`, `actionStart`, `actionEnd`, `llmUsage`, `chatOut`, `protectedArea`
 
