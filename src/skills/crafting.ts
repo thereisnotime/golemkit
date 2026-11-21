@@ -2,6 +2,8 @@ import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
 import { defineSkill, defineAction, z, ok, fail, sleep, checkAborted, fmtPos, itemName, type ActionResult } from '../core/index.ts'
 import { reachBlock, placeAt, findFreeSpot, findItem, countItem } from './world.ts'
+import { makeRoom, dropsNear } from './efficiency.ts'
+import { pickupNearby } from './pickup.ts'
 
 const TABLE_SEARCH = 16
 const FURNACE_SEARCH = 32
@@ -111,6 +113,10 @@ export async function craftItem (bot: Bot, signal: AbortSignal, item: string, co
     await reachBlock(bot, table.position, signal)
   }
 
+  // A full inventory makes mineflayer toss the crafted item (or the cursor stack) on the ground.
+  const inputs = new Set(recipes[0].delta.filter(d => d.count < 0).map(d => bot.registry.items[d.id]?.name ?? ''))
+  const thrown = await makeRoom(bot, 2, new Set([item, ...inputs]))
+  const dropsBefore = dropsNear(bot, 3)
   const before = countItem(bot, item)
   let runs = craftsNeeded(count, recipes[0].result.count)
   while (runs > 0) {
@@ -125,8 +131,15 @@ export async function craftItem (bot: Bot, signal: AbortSignal, item: string, co
     await sleep(SETTLE_MS, signal)
     runs--
   }
+  // anything that fell out while crafting (no room in the model) goes straight back in
+  let recovered = 0
+  if ([...dropsNear(bot, 3)].some(id => !dropsBefore.has(id))) {
+    await sleep(300, signal)
+    recovered = await pickupNearby(bot, signal, { radius: 4, maxMs: 4000 })
+  }
   const made = countItem(bot, item) - before
-  const note = placed && table ? ` (put a crafting table at ${fmtPos(table.position)})` : ''
+  const extra = [thrown ? `threw away ${thrown} to make room` : '', recovered ? `picked ${recovered} dropped items back up` : ''].filter(Boolean).join(', ')
+  const note = (placed && table ? ` (put a crafting table at ${fmtPos(table.position)})` : '') + (extra ? ` (${extra})` : '')
   if (made <= 0) return fail(`could not craft ${item}${note}`)
   return made >= count ? ok(`crafted ${made} ${item}${note}`) : ok(`crafted ${made} of ${count} ${item}, ran out of ingredients${note}`)
 }
@@ -155,11 +168,21 @@ export async function smeltItem (bot: Bot, signal: AbortSignal, log: { debug: (m
   let furnaceBlock = bot.findBlock({ matching: bot.registry.blocksByName.furnace.id, maxDistance: FURNACE_SEARCH })
   if (!furnaceBlock) {
     if (!findItem(bot, 'furnace')) return fail('no furnace nearby and none in the inventory')
-    const spot = findFreeSpot(bot)
-    if (!spot) return fail('no room to put down a furnace')
-    await placeAt(bot, 'furnace', spot, signal)
-    furnaceBlock = bot.blockAt(spot)
-    if (furnaceBlock?.name !== 'furnace') return fail('could not place a furnace')
+    // a spot can be refused (a mob standing there, a block update race): try a few
+    let why = 'no room to put down a furnace'
+    for (let i = 0; i < 3 && furnaceBlock?.name !== 'furnace'; i++) {
+      const spot = findFreeSpot(bot)
+      if (!spot) break
+      try {
+        await placeAt(bot, 'furnace', spot, signal)
+      } catch (e) {
+        checkAborted(signal)
+        why = (e as Error).message
+        await sleep(400, signal)
+      }
+      furnaceBlock = bot.blockAt(spot)
+    }
+    if (!furnaceBlock || furnaceBlock.name !== 'furnace') return fail(`could not place a furnace: ${why}`)
     placed = furnaceBlock.position
   }
   await reachBlock(bot, furnaceBlock.position, signal)
@@ -189,6 +212,7 @@ export async function smeltItem (bot: Bot, signal: AbortSignal, log: { debug: (m
 
     let taken = 0
     let idle = 0
+    let empty = 0
     const deadline = Date.now() + toSmelt * 10_500 + 15_000
     while (taken < toSmelt && Date.now() < deadline) {
       await sleep(1000, signal)
@@ -200,12 +224,18 @@ export async function smeltItem (bot: Bot, signal: AbortSignal, log: { debug: (m
         idle = 0
         continue
       }
-      if (!furnace.inputItem()) break
+      // the window model can lag right after putInput: only give up after a few empty looks
+      if (!furnace.inputItem()) { if (++empty >= 4) break; continue }
+      empty = 0
       idle = furnace.progress > 0 || furnace.fuel > 0 ? 0 : idle + 1
       if (idle >= 5) { log.debug('furnace stopped burning', { taken, of: toSmelt }); break }
     }
-    if (!taken) return fail(`nothing came out of the furnace (is ${item} smeltable?)`, data)
-    return taken >= count ? ok(`smelted ${taken} ${item}`, data) : ok(`smelted ${taken} of ${count} ${item}`, data)
+    const last = furnace.outputItem()
+    if (last) { taken += last.count; await furnace.takeOutput().catch(() => {}) }
+    const left = furnace.inputItem()
+    const inFurnace = left && taken < toSmelt ? ` (${left.count} ${itemName(left)} still in the furnace at ${fmtPos(furnaceBlock.position)})` : ''
+    if (!taken) return fail(`nothing came out of the furnace (is ${item} smeltable?)${inFurnace}`, data)
+    return taken >= count ? ok(`smelted ${taken} ${item}`, data) : ok(`smelted ${taken} of ${count} ${item}${inFurnace}`, data)
   } finally {
     furnace.close()
   }

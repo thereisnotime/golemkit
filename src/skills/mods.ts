@@ -85,7 +85,7 @@ const modItems = defineAction({
   }
 })
 
-const creativeGet = defineAction({
+export const creativeGet = defineAction({
   name: 'creative_get',
   description: 'Creative mode only: put any item (vanilla or modded, exact name) into your inventory, e.g. to show or hand ' +
     'it to a player with drop, or to build without gathering.',

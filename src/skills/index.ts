@@ -31,6 +31,8 @@ export { construction, buildStructure } from './construction.ts'
 export { materialsSkill, gatherMaterials, planWood } from './materials.ts'
 export { ensureTool, type ToolKind } from './toolkit.ts'
 export { food, startFarm, getFarms, getFoodSpots, type Farm } from './food.ts'
+export { progressionSkill, nextToolUpgrade, upgradeTools, autoUpgrade, type UpgradeStep, type Nearby } from './progression.ts'
+export { mineStone, planStep, digHazard } from './mining.ts'
 
 import { crafting } from './crafting.ts'
 import { containers } from './containers.ts'
@@ -41,8 +43,9 @@ import { pickup } from './pickup.ts'
 import { construction } from './construction.ts'
 import { materialsSkill } from './materials.ts'
 import { food } from './food.ts'
+import { progressionSkill } from './progression.ts'
 
-/** Extra skills on top of standardSkills(): crafting, containers, farming, food, woodcutting, building, construction, materials, pickup. */
-export const extendedSkills = () => [crafting(), containers(), farming(), food(), woodcutting(), building(), construction(), materialsSkill(), pickup()]
+/** Extra skills on top of standardSkills(): crafting, containers, farming, food, woodcutting, building, construction, materials, progression, pickup. */
+export const extendedSkills = () => [crafting(), containers(), farming(), food(), woodcutting(), building(), construction(), materialsSkill(), progressionSkill(), pickup()]
 export { modsSkill, installedMods } from './mods.ts'
 export { config } from './config.ts'

@@ -231,10 +231,21 @@ export class Agent extends TypedEmitter<AgentEvents> {
     return keys.length
   }
 
+  /**
+   * Pathfinder planning budget. The library default (5 s) fails with "Took to long to decide
+   * path" on a loaded machine, where each 40 ms think slice gets fewer ticks; 10 s by default,
+   * `pathfinder.thinkTimeoutMs` in settings or live via config_set.
+   */
+  private applyPathfinderSettings (bot: any): void {
+    const ms = Number(getPath(this.settings, 'pathfinder.thinkTimeoutMs'))
+    bot.pathfinder.thinkTimeout = Number.isFinite(ms) && ms >= 1000 ? ms : 10_000
+  }
+
   private applyToggles (key: string): void {
     this.recomputeSettings()
     const bot = this._bot as any
     if (bot?.pathfinder?.movements && (key === 'canDig' || key === '*')) bot.pathfinder.movements.canDig = this.canDig
+    if (bot?.pathfinder && (key.startsWith('pathfinder') || key === '*')) this.applyPathfinderSettings(bot)
     this.log.info(`setting changed: ${key}`, { overrides: this.overrides() })
     this.emit('settingsChanged', key)
   }
@@ -669,8 +680,11 @@ export class Agent extends TypedEmitter<AgentEvents> {
         const moves = new pf.Movements(bot)
         moves.canDig = this.canDig
         moves.allow1by1towers = false
+        moves.allowSprinting = true // explicit: travel sprints
+        moves.allowParkour = true
         moves.exclusionAreasBreak.push(this.protectedAreas.breakCost)
         bot.pathfinder.setMovements(moves)
+        this.applyPathfinderSettings(bot)
         cleanups.push(watchRefusedDigs(bot, (pos) => this.markProtected(pos)))
         try { cleanups.push(this.journalCapture.session(bot)) } catch (e) { this.log.warn(`journal: ${(e as Error).message}`) }
 

@@ -158,9 +158,10 @@ export class DigRefusedError extends Error {
  * bot.dig that notices when the server refuses the break. A refused dig (spawn protection,
  * claims) is answered with a block update carrying the old state; mineflayer ignores that and
  * marks the block as air locally anyway. We watch for it, put the real state back into our
- * world and throw DigRefusedError.
+ * world and throw DigRefusedError. `settleMs` is how long to wait for that answer (shorter in
+ * tunnels, where many blocks are dug in a row and the agent-wide refusal watcher still runs).
  */
-export async function digBlock (bot: Bot, block: Block, signal: AbortSignal): Promise<void> {
+export async function digBlock (bot: Bot, block: Block, signal: AbortSignal, settleMs = 250): Promise<void> {
   const pos = block.position
   let refused: number | null = null
   const onChange = (d: any) => {
@@ -178,7 +179,7 @@ export async function digBlock (bot: Bot, block: Block, signal: AbortSignal): Pr
       signal.removeEventListener('abort', onAbort)
     }
     checkAborted(signal)
-    await sleep(250, signal)
+    await sleep(settleMs, signal)
   } finally {
     bot._client.removeListener('block_change', onChange)
   }

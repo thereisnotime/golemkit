@@ -18,6 +18,8 @@ import { digBlock, gotoWithin } from './world.ts'
 import { ensurePlanks, ensureSticks, ensureTool, inventoryCounts, planksFor, bestToolIn, TOOL_SHAPE, type ToolKind } from './toolkit.ts'
 import { materials, pickTheme, WOODS, type ResolvedRole } from './blueprint.ts'
 import { remainingWants } from './construction.ts'
+import { autoUpgrade, gatherStone, pickBuildMaterial } from './progression.ts'
+import { makeRoom } from './efficiency.ts'
 import { isCreative, takeFromCreative } from './creative.ts'
 
 /**
@@ -349,7 +351,7 @@ async function ensureCoal (ctx: Ctx, need: number, radius: number, notes: string
 }
 
 /** Planks to burn, so coal and charcoal stay for torches. */
-function plankFuel (bot: Bot): string | undefined {
+export function plankFuel (bot: Bot): string | undefined {
   return Object.entries(inventoryCounts(bot)).filter(([k]) => /_planks$/.test(k)).sort((a, b) => b[1] - a[1])[0]?.[0]
 }
 
@@ -434,6 +436,9 @@ export async function gatherMaterials (ctx: Ctx, wants: Record<string, number>, 
   const haveFurnace = () => furnaceId !== undefined && !!bot.findBlock({ matching: furnaceId, maxDistance: 32 })
   const notes: string[] = []
   const placedFurnaces: { x: number, y: number, z: number }[] = []
+  const t0 = Date.now()
+  // cheap tool upgrades first (stone tools once a wooden pickaxe exists): every later dig is faster
+  const upNote = agent.canDig ? await autoUpgrade(ctx) : ''
   const planNow = () => planWood(all, inventoryCounts(bot), { haveTable: haveTable(), haveFurnace: haveFurnace() })
 
   // 1. wood: chop until the plan has enough logs
@@ -445,6 +450,10 @@ export async function gatherMaterials (ctx: Ctx, wants: Record<string, number>, 
   while (plan.logsToChop > 0 && trees < maxTrees && misses < 2) {
     checkAborted(signal)
     log.debug('gather: chopping', { logsToChop: plan.logsToChop, trees })
+    // a full inventory leaves the logs on the ground: throw junk out first, stop if that isn't enough
+    const thrown = await makeRoom(bot, 3, new Set(Object.keys(all)))
+    if (thrown) notes.push(`threw away ${thrown} to make room`)
+    if (bot.inventory.emptySlotCount() === 0) { notes.push('inventory full, stopped chopping'); break }
     const r = await fellTree(ctx, { radius, replant: true, makeAxe: plan.makeAxe })
     if (r.ok) { trees++; misses = 0 } else { misses++; notes.push(r.message) }
     if (!r.ok && /no (natural )?tree|allowed to cut|disabled/.test(r.message)) break
@@ -462,6 +471,13 @@ export async function gatherMaterials (ctx: Ctx, wants: Record<string, number>, 
   // 3. mined blocks: cobblestone (a pickaxe is made first), dirt, sand, gravel
   for (const [item, want] of Object.entries({ ...plan.mine })) {
     const base = countWant(item, inventoryCounts(bot))
+    if (item === 'cobblestone' || item === 'stone') {
+      // the whole amount in one strip mine (stone tools after the first 3), not 64 at a time
+      checkAborted(signal)
+      const r = await gatherStone(ctx, want)
+      if (!r.ok || countWant(item, inventoryCounts(bot)) - base < want) notes.push(r.message)
+      continue
+    }
     for (const source of MINE_SOURCES[item] ?? []) {
       const left = want - (countWant(item, inventoryCounts(bot)) - base)
       if (left <= 0) break
@@ -537,13 +553,15 @@ export async function gatherMaterials (ctx: Ctx, wants: Record<string, number>, 
   const missingOpt = short(opts.optional ?? {})
   const unsupported = planWood(wants, inv).unsupported.filter(k => countWant(k, inv) < (wants[k] ?? 0))
   const why = [...new Set(notes)].slice(0, 3).join('; ')
-  const treeNote = trees ? `felled ${trees} tree${trees === 1 ? '' : 's'}, ` : ''
+  const secs = Math.round((Date.now() - t0) / 1000)
+  const treeNote = `${upNote}${trees ? `felled ${trees} tree${trees === 1 ? '' : 's'}, ` : ''}`
   const have = `have ${Object.keys(wants).map(k => `${countWant(k, inv)}/${wants[k]} ${k}`).join(', ')}`
   const optNote = missingOpt.length ? `; no ${missingOpt.join(', ')} (optional${why && !missingReq.length ? `: ${why}` : ''})` : ''
-  const data = { have: Object.fromEntries(Object.keys(all).map(k => [k, countWant(k, inv)])), trees, skipped: missingOpt }
-  if (!missingReq.length) return ok(`${treeNote}${have}${optNote}${fbNote}`, data)
+  const data = { have: Object.fromEntries(Object.keys(all).map(k => [k, countWant(k, inv)])), trees, skipped: missingOpt, ms: Date.now() - t0 }
+  log.info('gathered', { secs, trees, have: JSON.stringify(data.have) })
+  if (!missingReq.length) return ok(`${treeNote}${have}${optNote}${fbNote} in ${secs}s`, data)
   const cant = unsupported.length ? `; I can't make ${unsupported.join(', ')} myself` : ''
-  return fail(`${treeNote}${have}; still missing ${missingReq.join(', ')}${cant}${why ? ` (${why})` : ''}${optNote}${fbNote}`, data)
+  return fail(`${treeNote}${have}; still missing ${missingReq.join(', ')}${cant}${why ? ` (${why})` : ''}${optNote}${fbNote} after ${secs}s`, data)
 }
 
 /**
@@ -618,6 +636,11 @@ const gatherAction = defineAction({
     let optional: Record<string, number> = {}
     let fallbacks: Record<string, Record<string, number>> = {}
     let note = ''
+    if (template && !material) {
+      // No material named: pick the cheaper one here (cobblestone with few trees, planks without a pickaxe).
+      const pick = pickBuildMaterial(ctx, template)
+      if (pick) { material = pick.material; note = pick.why }
+    }
     if (template) {
       // Only what is still missing at the site (a half-built house needs less).
       const w = remainingWants(ctx, template, material, theme)
@@ -625,7 +648,7 @@ const gatherAction = defineAction({
       wants = { ...w.required, ...wants }
       optional = w.optional
       fallbacks = w.fallbacks
-      note = w.note
+      note = [note, w.note].filter(Boolean).join('; ')
     }
     if (!Object.keys(wants).length && !Object.keys(optional).length) return template ? ok(`nothing to gather: ${note || `the ${template} is complete`}`) : fail('nothing to gather: give items or a template')
     const r = await gatherMaterials(ctx, wants, { radius, optional, fallbacks, theme })

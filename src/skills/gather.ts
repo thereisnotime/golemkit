@@ -2,6 +2,10 @@ import type { ActionContext, ActionResult } from '../core/index.ts'
 import { defineSkill, defineAction, z, ok, fail, goals, goto, travel, checkAborted } from '../core/index.ts'
 import { digBlock, DigRefusedError, gotoWithin } from './world.ts'
 import { ensureTool, equipFor, minTierFor, needsTool, toolKindFor } from './toolkit.ts'
+import { pickupNearby } from './pickup.ts'
+import { mineStone } from './mining.ts'
+import { autoUpgrade } from './progression.ts'
+import { perMinute } from './efficiency.ts'
 
 /** A point 32 blocks outside the nearest protected zone, on the bot's side of it. */
 function exitPoint (agent: any, pos: { x: number, z: number }): { x: number, z: number } | null {
@@ -25,9 +29,15 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
   if (!agent.canDig) return fail('digging is disabled for this bot')
   const type = bot.registry.blocksByName[block]
   if (!type) return fail(`unknown block ${block}`)
+  // Stone: a safe staircase/strip mine beats pathing to buried blocks (and stone tools first).
+  if ((block === 'cobblestone' || block === 'stone') && count > 2) {
+    const up = await autoUpgrade({ bot, agent, signal, log })
+    const r = await mineStone({ bot, agent, signal, log }, count, block === 'stone' ? { item: 'cobblestone' } : {})
+    return up ? { ...r, message: `${up}${r.message}` } : r
+  }
   // Things you get from a different block in the world: cobblestone from stone, dirt from grass.
   const SOURCES: Record<string, string[]> = {
-    cobblestone: ['stone', 'cobblestone'],
+    cobblestone: ['stone'], // never placed cobblestone: that is somebody's build
     cobbled_deepslate: ['deepslate', 'cobbled_deepslate'],
     dirt: ['dirt', 'grass_block', 'coarse_dirt', 'rooted_dirt'],
     flint: ['gravel'],
@@ -50,6 +60,7 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
   let refusals = 0
   let misses = 0
   let leftZone = false
+  const t0 = Date.now()
   while (got < count && misses < 3) {
     checkAborted(signal)
     const found = bot.findBlocks({ matching: matchIds, maxDistance: 48, count: 256 })
@@ -90,9 +101,11 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
       misses++
     }
   }
-  const drop = bot.nearestEntity(e => e.name === 'item' && e.position.distanceTo(bot.entity.position) < 8)
-  if (drop) await goto(bot, new goals.GoalBlock(drop.position.x, drop.position.y, drop.position.z), signal).catch(() => {})
-  if (got) return ok(`${toolNote}collected ${got} ${block}${got < count ? ` (wanted ${count})` : ''}`)
+  // every drop, not just the nearest one: blocks dug from a distance leave their item behind
+  const picked = got ? await pickupNearby(bot, signal, { radius: 10, maxMs: 12_000 }).catch(e => { checkAborted(signal); return 0 }) : 0
+  const rate = got ? `, ${perMinute(got, Date.now() - t0)}/min` : ''
+  log.debug('collected', { block, got, picked, perMin: perMinute(got, Date.now() - t0) })
+  if (got) return ok(`${toolNote}collected ${got} ${block}${got < count ? ` (wanted ${count})` : ''}${rate}`)
   if (refusals) return fail(`every ${block} I tried is in a protected area; tell me where digging is allowed`)
   if (skip.size) return fail(`found ${block} but couldn't get to any of it (${skip.size} tried: paths timed out or blocked); try from another spot`)
   return fail(`no ${block} I'm allowed to dig within 48 blocks`)
