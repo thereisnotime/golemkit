@@ -5,3 +5,4 @@ export { sceneBrain, sceneSkill, scene, b, defineScene, type SceneBrainOptions }
 export { llmBrain, llmRuntime, llmFleetUsage, llmUsageAction, type LlmBrainOptions } from './llm.ts'
 export { selfImprover, type SelfImproverOptions } from './self/index.ts'
 export { hooksBrain, HOOKS_CALLER, type HooksBrainOptions } from './hooks.ts'
+export { behaviorsBrain, defaultBehaviorRegistry, defineBehavior, BehaviorRegistry, type BehaviorsBrainOptions, type BehaviorDefinition } from './behaviors/index.ts'

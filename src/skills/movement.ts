@@ -93,8 +93,25 @@ const jump = defineAction({
   }
 })
 
+const lookAround = defineAction({
+  name: 'look_around',
+  description: 'Glance around: at a nearby player now and then, otherwise a random direction (idle fidget).',
+  params: z.object({ radius: z.number().min(1).max(32).default(10).describe('look at players within this distance') }),
+  exclusive: false,
+  internal: true,
+  async run ({ bot }, { radius }) {
+    const near = bot.nearestEntity(e => e.type === 'player' && e.position.distanceTo(bot.entity.position) < radius)
+    if (near && Math.random() < 0.6) {
+      await bot.lookAt(near.position.offset(0, near.height ?? 1.6, 0))
+      return ok(`glanced at ${near.username ?? 'a player'}`)
+    }
+    await bot.look(bot.entity.yaw + (Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 0.6)
+    return ok('looked around')
+  }
+})
+
 export const movement = () => defineSkill({
   name: 'movement',
   description: 'Walking around: come, follow, goto.',
-  actions: [come, follow, gotoAction, gotoPlayer, lookAt, jump]
+  actions: [come, follow, gotoAction, gotoPlayer, lookAt, jump, lookAround]
 })

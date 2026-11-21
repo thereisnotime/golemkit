@@ -5,7 +5,7 @@
 import { defineBrain, defineAction, noParams, ok, fail, type Agent } from '../../core/index.ts'
 import { NpcController, INTERRUPT_ACTION, type NpcOptions } from './controller.ts'
 
-export { NpcController, INTERRUPT_ACTION, type NpcOptions } from './controller.ts'
+export { NpcController, INTERRUPT_ACTION, type NpcOptions, type BehaviorStats } from './controller.ts'
 export { Blackboard, type Needs, type Facts, type BlackboardOptions } from './blackboard.ts'
 export { decide, best, failureCooldown, type Decision, type Scored, type SelectOptions } from './select.ts'
 export { NpcYield, type Behavior, type BehaviorContext, type NpcContext, type NpcHook } from './types.ts'

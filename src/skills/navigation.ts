@@ -206,9 +206,13 @@ const gotoPlace = defineAction({
 const flee = defineAction({
   name: 'flee',
   description: 'Run away from the nearest hostile mob until it is a safe distance away.',
-  params: z.object({ distance: z.number().min(4).max(32).default(16).describe('how far to get from the mob') }),
-  async run ({ bot, signal }, { distance }) {
-    const mob = nearestHostile(bot, bot.entity.position, distance)
+  params: z.object({
+    distance: z.number().min(4).max(32).default(16).describe('how far to get from the mob'),
+    entityId: z.number().int().optional().describe('run from this mob instead of the nearest hostile one')
+  }),
+  async run ({ bot, signal }, { distance, entityId }) {
+    const picked = entityId !== undefined ? bot.entities[entityId] : undefined
+    const mob = picked && picked.type !== 'player' ? picked : nearestHostile(bot, bot.entity.position, distance)
     if (!mob) return ok('nothing to flee from')
     const away = new goals.GoalInvert(new goals.GoalFollow(mob, distance))
     const done = await gotoWithin(bot, away, signal, 15000).catch(() => false)

@@ -16,8 +16,9 @@ export const INTERRUPT_ACTION = 'npc_interrupt'
 export interface NpcOptions extends SelectOptions, BlackboardOptions {
   /** Caller name for act() and the log tag. Default 'npc'. */
   name?: string
-  behaviors: Behavior[]
-  hooks?: NpcHook[]
+  /** The behaviours, or a function returning the current set (re-read every tick, for armable sets). */
+  behaviors: Behavior[] | (() => Behavior[])
+  hooks?: NpcHook[] | (() => NpcHook[])
   /** Tick interval. Default 1500 ms. */
   tickMs?: number
   /** Default PRIORITY.npc. */
@@ -42,6 +43,18 @@ interface Stats {
   failures: number
   cooldownUntil: number
   last?: string
+  lastAt?: number
+}
+
+/** Public view of one behaviour's run history (for status actions). */
+export interface BehaviorStats {
+  runs: number
+  failures: number
+  /** Seconds until it may run again, 0 when ready. */
+  cooldown: number
+  /** "ok: ...", "fail: ...", "aborted: ...", "yield: ..." of the last run. */
+  last: string | null
+  lastAt: number | null
 }
 
 interface RunningEntry {
@@ -49,7 +62,14 @@ interface RunningEntry {
   controller: AbortController
   startedAt: number
   score: number
+  priority: number
   done: Promise<void>
+}
+
+interface Holder {
+  /** "kind:name" */
+  label: string
+  priority: number
 }
 
 export class NpcController {
@@ -66,6 +86,8 @@ export class NpcController {
   private readonly stats = new Map<string, Stats>()
   private running: RunningEntry | null = null
   private pausedUntil = 0
+  /** Behaviours at or below this priority stay paused until pausedUntil. */
+  private pausedLevel = 0
   private yieldedTo: string | null = null
   private lastScores: Scored[] = []
   private ticking = false
@@ -82,17 +104,58 @@ export class NpcController {
     this.caller = { kind: 'brain', name: this.name }
     this.backoff = { ...DEFAULT_BACKOFF, ...opts.backoffMs }
     this.bb = new Blackboard(agent, opts)
-    const names = new Set<string>()
-    for (const b of opts.behaviors) {
-      if (names.has(b.name)) throw new Error(`duplicate NPC behaviour "${b.name}"`)
-      names.add(b.name)
-      this.stats.set(b.name, { runs: 0, failures: 0, cooldownUntil: 0 })
-    }
+    if (Array.isArray(opts.behaviors)) this.checkNames(opts.behaviors)
+    this.behaviors()
     if ((opts.autoHome ?? true) && bot.entity && !getHome(agent)) {
       const p = bot.entity.position
       setHome(agent, { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z), dimension: bot.game?.dimension })
       this.log.info(`home set to spawn ${Math.floor(p.x)} ${Math.floor(p.y)} ${Math.floor(p.z)}`)
     }
+  }
+
+  private checkNames (list: Behavior[]): void {
+    const names = new Set<string>()
+    for (const b of list) {
+      if (names.has(b.name)) throw new Error(`duplicate NPC behaviour "${b.name}"`)
+      names.add(b.name)
+    }
+  }
+
+  /** The current behaviour set (static, or re-read from the options function). */
+  behaviors (): Behavior[] {
+    const list = typeof this.opts.behaviors === 'function' ? this.opts.behaviors() : this.opts.behaviors
+    for (const b of list) if (!this.stats.has(b.name)) this.stats.set(b.name, { runs: 0, failures: 0, cooldownUntil: 0 })
+    return list
+  }
+
+  private hooks (): NpcHook[] {
+    const h = this.opts.hooks
+    return (typeof h === 'function' ? h() : h) ?? []
+  }
+
+  private prio (b: Behavior): number {
+    return b.priority ?? this.priority
+  }
+
+  /** Run history of one behaviour, or null if it never was in the set. */
+  statsFor (name: string): BehaviorStats | null {
+    const st = this.stats.get(name)
+    if (!st) return null
+    const now = this.now()
+    return {
+      runs: st.runs,
+      failures: st.failures,
+      cooldown: st.cooldownUntil > now ? Math.ceil((st.cooldownUntil - now) / 1000) : 0,
+      last: st.last ?? null,
+      lastAt: st.lastAt ?? null
+    }
+  }
+
+  /** Stops the running behaviour if it is `name` (or any, without a name), e.g. after disarming it. */
+  cancel (name?: string, reason = 'cancelled'): boolean {
+    if (!this.running || (name && this.running.behavior.name !== name)) return false
+    this.abortRunning(reason, true)
+    return true
   }
 
   /** Name of the running behaviour, if any. */
@@ -109,24 +172,49 @@ export class NpcController {
     return { agent: this.agent, bot: this.bot, bb: this.bb, log: this.log, now, current: this.current }
   }
 
-  /** Who other than us holds the body at our priority or above, as "kind:name". */
-  private foreignHolder (): string | null {
+  /** Who other than us holds the body, at any priority. */
+  private foreign (): Holder | null {
     const cur = this.agent.currentAction
     if (!cur) return null
     if (cur.caller.kind === 'brain' && cur.caller.name === this.name) return null
-    if (cur.priority < this.priority) return null
-    return `${cur.caller.kind}:${cur.caller.name}`
+    return { label: `${cur.caller.kind}:${cur.caller.name}`, priority: cur.priority }
   }
 
-  private yieldTo (holder: string, now: number): void {
+  /** Who other than us holds the body at `priority` or above, as "kind:name". */
+  private foreignHolder (priority = this.priority): Holder | null {
+    const h = this.foreign()
+    return h && h.priority >= priority ? h : null
+  }
+
+  /** True while one of our own actions holds the body above `priority`. */
+  private ownAbove (priority: number): boolean {
+    const cur = this.agent.currentAction
+    return !!cur && cur.caller.kind === 'brain' && cur.caller.name === this.name && cur.priority > priority
+  }
+
+  /** Whether a behaviour at this priority must stay out of the way right now. */
+  private blocked (priority: number, holder: Holder | null, now: number): boolean {
+    if (holder && holder.priority >= priority) return true
+    return now < this.pausedUntil && this.pausedLevel >= priority
+  }
+
+  /** Backs off from `holder` for the configured time; behaviours above its priority keep going. */
+  private yieldTo (holder: string, now: number, priority?: number): void {
     const kind = holder.split(':')[0] as Caller['kind']
     const ms = this.backoff[kind] ?? this.backoff.player
+    const level = priority ?? this.running?.priority ?? this.priority
+    this.pausedLevel = now < this.pausedUntil ? Math.max(this.pausedLevel, level) : level
     this.pausedUntil = Math.max(this.pausedUntil, now + ms)
     if (this.yieldedTo !== holder) {
       this.log.debug(`backing off: body held by ${holder}`)
       this.yieldedTo = holder
     }
-    if (this.running) this.abortRunning('yield', false)
+    if (this.running && this.running.priority <= level) {
+      this.abortRunning('yield', false)
+      // a long-running action of ours that was preempted would be resumed by the agent later,
+      // without a behaviour behind it; drop it, the behaviour starts it again after the back-off
+      this.agent.cancelActions?.(i => i.caller.kind === 'brain' && i.caller.name === this.name && i.priority <= level, 'yield')
+    }
   }
 
   private abortRunning (reason: string, interruptAction: boolean): void {
@@ -137,14 +225,15 @@ export class NpcController {
     // Our action may still hold the body; replace it with a no-op at the same priority.
     if (interruptAction && this.agent.currentAction?.caller.kind === 'brain' &&
         this.agent.currentAction.caller.name === this.name && this.agent.getAction(INTERRUPT_ACTION)) {
-      void this.agent.act(INTERRUPT_ACTION, {}, { caller: this.caller, priority: this.priority })
+      void this.agent.act(INTERRUPT_ACTION, {}, { caller: this.caller, priority: r.priority })
     }
   }
 
-  scoreAll (ctx: NpcContext): Scored[] {
-    return this.opts.behaviors.map(b => {
+  scoreAll (ctx: NpcContext, isBlocked: (priority: number) => boolean = () => false): Scored[] {
+    return this.behaviors().map(b => {
       const st = this.stats.get(b.name)!
       if (ctx.now < st.cooldownUntil) return { name: b.name, score: 0 }
+      if (isBlocked(this.prio(b))) return { name: b.name, score: 0 }
       if (b.requires?.some(a => !this.agent.getAction(a))) return { name: b.name, score: 0 }
       let score = 0
       try {
@@ -164,19 +253,23 @@ export class NpcController {
       const now = this.now()
       this.bb.update(this.bot)
       const ctx = this.context(now)
-      for (const hook of this.opts.hooks ?? []) {
+      for (const hook of this.hooks()) {
         try { hook(ctx) } catch (e) { this.log.debug(`hook: ${(e as Error).message}`) }
       }
 
-      const holder = this.foreignHolder()
-      if (holder) return this.yieldTo(holder, now)
-      if (now < this.pausedUntil) return
-      if (this.yieldedTo) {
+      const list = this.behaviors()
+      const lowest = list.reduce((m, b) => Math.min(m, this.prio(b)), this.priority)
+      const highest = list.reduce((m, b) => Math.max(m, this.prio(b)), this.priority)
+      const holder = this.foreignHolder(lowest)
+      if (holder) this.yieldTo(holder.label, now, holder.priority)
+      if (holder && holder.priority >= highest) return
+      if (!holder && now < this.pausedUntil && this.pausedLevel >= highest) return
+      if (!holder && now >= this.pausedUntil && this.yieldedTo) {
         this.log.debug(`resuming after ${this.yieldedTo}`)
         this.yieldedTo = null
       }
 
-      this.lastScores = this.scoreAll(ctx)
+      this.lastScores = this.scoreAll(ctx, p => this.blocked(p, holder, now))
       const running = this.running ? { name: this.running.behavior.name, startedAt: this.running.startedAt } : null
       const d = decide(this.lastScores, running, now, this.opts)
       switch (d.kind) {
@@ -200,10 +293,11 @@ export class NpcController {
   }
 
   private start (name: string, score: number, now: number): void {
-    const behavior = this.opts.behaviors.find(b => b.name === name)!
+    const behavior = this.behaviors().find(b => b.name === name)!
     const controller = new AbortController()
     const signal = controller.signal
     const st = this.stats.get(name)!
+    const priority = this.prio(behavior)
     st.runs++
 
     const bctx: BehaviorContext = {
@@ -212,21 +306,24 @@ export class NpcController {
       wait: (ms) => sleep(ms, signal),
       act: async (action, params = {}) => {
         checkAborted(signal)
-        const holder = this.foreignHolder()
-        if (holder) throw new NpcYield(holder)
-        const res = await this.agent.act(action, params, { caller: this.caller, priority: this.priority })
+        const holder = this.foreignHolder(priority)
+        if (holder) throw new NpcYield(holder.label, holder.priority)
+        // our own interrupt (or the last behaviour's action) may still hold the body at a higher
+        // priority for a moment after a switch; wait for it instead of backing off from ourselves
+        for (let i = 0; i < 20 && this.ownAbove(priority); i++) await sleep(50, signal)
+        const res = await this.agent.act(action, params, { caller: this.caller, priority })
         if (signal.aborted) throw new ActionAbortedError(String(signal.reason ?? 'aborted'))
         if (!res.ok) {
-          const h = this.foreignHolder()
-          if (h) throw new NpcYield(h)
-          if (res.message.startsWith('busy')) throw new NpcYield(parseBusy(res.message))
+          const h = this.foreignHolder(priority)
+          if (h) throw new NpcYield(h.label, h.priority)
+          if (res.message.startsWith('busy') && !res.message.endsWith(`(brain ${this.name})`)) throw new NpcYield(parseBusy(res.message))
           if (FOREIGN_STOP.has(res.message)) throw new NpcYield('player:unknown')
         }
         return res
       }
     }
 
-    const entry: RunningEntry = { behavior, controller, startedAt: now, score, done: Promise.resolve() }
+    const entry: RunningEntry = { behavior, controller, startedAt: now, score, priority, done: Promise.resolve() }
     entry.done = (async () => {
       let outcome: 'ok' | 'fail' | 'aborted' | 'yield' = 'ok'
       let detail = ''
@@ -243,7 +340,7 @@ export class NpcController {
         if (e instanceof NpcYield) {
           outcome = 'yield'
           detail = e.message
-          this.yieldTo(e.holder, this.now())
+          this.yieldTo(e.holder, this.now(), e.priority ?? priority)
         } else if (signal.aborted || e instanceof ActionAbortedError) {
           outcome = 'aborted'
           detail = String(signal.reason ?? 'aborted')
@@ -264,6 +361,7 @@ export class NpcController {
         this.log.debug(`${name} failed (${detail}), cooling down ${Math.round(cd / 1000)}s`)
       }
       st.last = `${outcome}: ${detail}`
+      st.lastAt = end
       if (this.running === entry) this.running = null
     })()
     this.running = entry
@@ -281,7 +379,7 @@ export class NpcController {
     return {
       behavior: r?.behavior.name ?? null,
       runningFor: r ? Math.round((now - r.startedAt) / 1000) : 0,
-      paused: now < this.pausedUntil ? { seconds: Math.ceil((this.pausedUntil - now) / 1000), by: this.yieldedTo } : null,
+      paused: now < this.pausedUntil ? { seconds: Math.ceil((this.pausedUntil - now) / 1000), by: this.yieldedTo, upTo: this.pausedLevel } : null,
       scores: [...this.lastScores].sort((a, b) => b.score - a.score).slice(0, 6)
         .map(s => ({ name: s.name, score: Math.round(s.score) })),
       cooldowns: Object.fromEntries([...this.stats].filter(([, s]) => s.cooldownUntil > now)

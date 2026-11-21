@@ -1,6 +1,7 @@
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
 import { defineSkill, defineAction, z, noParams, ok, fail, goals, playerEntity, nearestHostile, isHostile, FLYING, sleep, checkAborted } from '../core/index.ts'
+import { pickupNearby } from './pickup.ts'
 
 const REACH = 3.2
 const WEAPONS = ['netherite_sword', 'diamond_sword', 'iron_sword', 'stone_sword', 'golden_sword', 'wooden_sword',
@@ -125,10 +126,109 @@ const retreat = defineAction({
   }
 })
 
+/** Passive animals the bot may hunt for food. Pets, horses, villagers etc. are never on it. */
+export const HUNTABLE = ['cow', 'pig', 'sheep', 'chicken', 'rabbit', 'mooshroom'] as const
+
+/** The parts of an entity the hunt filter looks at (a mineflayer Entity has all of them). */
+export interface HuntCandidate {
+  id: number
+  name?: string
+  type?: string
+  username?: string
+  metadata?: unknown[]
+  /** mineflayer stores a leash holder (attach_entity) here. */
+  vehicle?: unknown
+}
+
+function meta (e: HuntCandidate, keys: string[] | undefined, key: string, fallback: number): unknown {
+  const i = keys?.indexOf(key) ?? -1
+  return e.metadata?.[i >= 0 ? i : fallback]
+}
+
+/**
+ * Why an entity must not be hunted, or null when it may. Only listed passive animals; never
+ * players, villagers, pets (anything with an owner or the tamed flag), named (name tag) or
+ * leashed animals, and babies (they drop nothing).
+ */
+export function huntRefusal (e: HuntCandidate, opts: { animals?: readonly string[], metadataKeys?: string[], babies?: boolean } = {}): string | null {
+  const animals = opts.animals ?? HUNTABLE
+  if (e.type === 'player' || e.username) return 'player'
+  const name = e.name ?? ''
+  if (!animals.includes(name) || !(HUNTABLE as readonly string[]).includes(name)) return 'not a huntable animal'
+  if (e.type && e.type !== 'animal') return 'not an animal'
+  const keys = opts.metadataKeys
+  const customName = meta(e, keys, 'custom_name', 2)
+  if (customName !== undefined && customName !== null && customName !== '') return 'named'
+  if (e.vehicle) return 'leashed'
+  const owner = meta(e, keys, 'owneruuid', -1)
+  if (owner) return 'tamed'
+  const flags = keys?.includes('flags') ? meta(e, keys, 'flags', -1) : undefined
+  if (typeof flags === 'number' && (flags & 0x04)) return 'tamed'
+  if (!opts.babies && meta(e, keys, 'baby', 16) === true) return 'baby'
+  return null
+}
+
+/** True if a fence or fence gate is within `r` blocks: animals there are probably someone's farm. */
+function inPen (bot: Bot, e: Entity, r = 3): boolean {
+  const base = e.position.floored()
+  for (let dx = -r; dx <= r; dx++) {
+    for (let dz = -r; dz <= r; dz++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const b = bot.blockAt(base.offset(dx, dy, dz))
+        if (b && /(_fence|_fence_gate|_wall)$/.test(b.name)) return true
+      }
+    }
+  }
+  return false
+}
+
+const hunt = defineAction({
+  name: 'hunt',
+  description: 'Hunt passive animals (cow, pig, sheep, chicken, rabbit, mooshroom) for food and pick up the drops. ' +
+    'Never touches pets, named, tamed or leashed animals, babies, villagers or players, and by default leaves fenced animals alone.',
+  params: z.object({
+    animal: z.enum(HUNTABLE).optional().describe('which animal; default the nearest huntable one'),
+    count: z.number().int().min(1).max(8).default(1).describe('how many to kill'),
+    radius: z.number().min(4).max(64).default(24).describe('how far to look, in blocks'),
+    pens: z.boolean().default(false).describe('also hunt animals inside fences (only your own farm)')
+  }),
+  async run ({ bot, agent, signal, log }, { animal, count, radius, pens }) {
+    const animals = animal ? [animal] : HUNTABLE
+    const skipped = new Set<number>()
+    const total = () => bot.inventory.items().reduce((n, i) => n + i.count, 0)
+    const before = total()
+    let killed = 0
+    const names: string[] = []
+    while (killed < count) {
+      checkAborted(signal)
+      const target = bot.nearestEntity(e => {
+        if (skipped.has(e.id) || e.position.distanceTo(bot.entity.position) > radius) return false
+        const keys = (bot.registry as any).entitiesByName?.[e.name ?? '']?.metadataKeys as string[] | undefined
+        if (huntRefusal(e as HuntCandidate, { animals, metadataKeys: keys })) return false
+        if (agent.protectedAreas.isProtected(e.position)) return false
+        return pens || !inPen(bot, e)
+      })
+      if (!target) break
+      log.debug('hunting', { animal: target.name, id: target.id })
+      const dead = await fight(bot, target, signal, 25_000)
+      if (!dead) { skipped.add(target.id); continue }
+      killed++
+      names.push(target.name ?? 'animal')
+      await sleep(400, signal)
+      await pickupNearby(bot, signal, { radius: 6, maxMs: 8000 })
+    }
+    if (!killed) return fail(`no animal I may hunt within ${radius} blocks${animal ? ` (${animal})` : ''}`)
+    await sleep(500, signal) // drops can arrive a moment after the last pickup walk
+    const picked = Math.max(0, total() - before)
+    const tally = [...new Set(names)].map(n => `${names.filter(x => x === n).length} ${n}`).join(', ')
+    return ok(`hunted ${tally}, picked up ${picked} item${picked === 1 ? '' : 's'}`)
+  }
+})
+
 export const combat = () => defineSkill({
   name: 'combat',
-  description: 'Fighting hostile mobs and guarding players.',
-  actions: [attack, guard, defend, retreat],
+  description: 'Fighting hostile mobs, guarding players and hunting animals for food.',
+  actions: [attack, guard, defend, retreat, hunt],
   observe: (_agent, bot) => {
     const mob = nearestHostile(bot, bot.entity.position, 16)
     return { nearestHostile: mob ? { name: mob.name, distance: Math.round(mob.position.distanceTo(bot.entity.position)) } : null }

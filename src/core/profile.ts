@@ -94,6 +94,12 @@ export const ProfileSchema = z.object({
     summarize: z.union([z.boolean(), z.string(), z.object({ provider: z.string() }).passthrough()]).optional()
   }).strict()]).optional(),
   /**
+   * Armed behaviours (behaviors brain): `{ name: true | false | { enabled?, ...options } }`.
+   * Lands in settings.behaviors; names and options are checked against the behaviour registry
+   * when the profile is run (src/brains/behaviors). See docs/guide/behaviors.md.
+   */
+  behaviors: z.record(z.string(), z.union([z.boolean(), z.null(), z.record(z.string(), z.unknown())])).optional(),
+  /**
    * Context pack directory (AGENTS.md, USER.md, skills/, hooks.yaml, MEMORY.md...), see
    * docs/guide/context-pack.md. Default: the sibling directory profiles/<name>/ if it exists.
    * false turns it off. Lands in settings.context as absolute paths.
@@ -138,6 +144,7 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (profile.reflexes) settings.reflexes = { ...(settings.reflexes as object | undefined), ...profile.reflexes }
   if (profile.journal !== undefined) settings.journal = profile.journal === false ? false : { ...(settings.journal as object | undefined), ...profile.journal }
   if (profile.retry) settings.retry = { ...(settings.retry as object | undefined), ...profile.retry }
+  if (profile.behaviors) settings.behaviors = { ...(settings.behaviors as object | undefined), ...profile.behaviors }
   const context = resolveContext(profile.context, name, file)
   if (context !== undefined) settings.context = context
   return {

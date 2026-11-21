@@ -24,6 +24,12 @@ export const PRIORITY = {
   /** Scene choreography (src/brains/scene): above NPC routines, below LLM/player/reflex. */
   scene: 25,
   llm: 30,
+  /**
+   * Armed behaviours that look after the bot's own needs (keep_fed, stay_safe; see
+   * src/brains/behaviors). Above the LLM so a model that forgets to eat still gets fed,
+   * below hooks (40), players and reflexes.
+   */
+  behavior: 35,
   player: 50,
   reflex: 60,
   system: 100

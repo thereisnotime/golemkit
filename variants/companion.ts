@@ -10,9 +10,13 @@
 // defaults. A context pack (profiles/<name>/: AGENTS.md, USER.md, skills/, hooks.yaml,
 // MEMORY.md) is loaded automatically. See docs/guide/llm-brain.md, docs/guide/profiles.md
 // and docs/guide/context-pack.md.
+//
+// The behaviours brain keeps keep_fed and stay_safe armed, so the companion feeds itself and
+// backs off at low health between LLM turns. The model (and owners, with !behavior_arm) can
+// arm more: follow_owner, guard_area, farm_loop... See docs/guide/behaviors.md.
 import { defineVariant } from '../src/core/index.ts'
 import { standardSkills, extendedSkills, navigation } from '../src/skills/index.ts'
-import { commandBrain, reflexes, llmBrain, hooksBrain } from '../src/brains/index.ts'
+import { commandBrain, reflexes, llmBrain, hooksBrain, behaviorsBrain } from '../src/brains/index.ts'
 
 const num = (v: string | undefined, d: number) => (v && !Number.isNaN(Number(v)) ? Number(v) : d)
 
@@ -29,6 +33,7 @@ export default defineVariant({
     commandBrain({ verbose: false, whisperNeedsPrefix: true }),
     reflexes(),
     hooksBrain(), // runs the context pack's hooks.yaml (profiles/<name>/), no-op without one
+    behaviorsBrain({ defaults: { keep_fed: true, stay_safe: true } }), // a profile's behaviors: block merges over these
     llmBrain({
       provider: process.env.MC_LLM_PROVIDER || 'claude-subscription',
       triggers: {

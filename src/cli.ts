@@ -10,6 +10,7 @@ import { parseArgs } from 'node:util'
 import { Agent, Fleet, serverFromEnv, createLogger, configureLogging, installCrashHandlers, type BotDefinition, type InstanceOptions, type ServerConfig } from './core/index.ts'
 import { parseFleetFile, resolveUsername } from './core/fleetFile.ts'
 import { loadProfile, mergeOptions, PROFILES_DIR, type LoadedProfile } from './core/profile.ts'
+import { validateBehaviorConfig, defaultBehaviorRegistry } from './brains/behaviors/index.ts'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const VARIANTS_DIR = join(ROOT, 'variants')
@@ -31,7 +32,15 @@ interface Target { def: BotDefinition, profile: LoadedProfile | null }
 /** A name is a profile if profiles/<name>.yaml exists, otherwise a variant. */
 async function resolveTarget (name: string): Promise<Target> {
   const profile = loadProfile(name, join(ROOT, PROFILES_DIR))
-  if (profile) return { def: await loadVariant(profile.profile.variant), profile }
+  if (profile) {
+    const def = await loadVariant(profile.profile.variant)
+    if (profile.profile.behaviors) {
+      // fail before connecting: unknown behaviour names and bad options are config errors
+      validateBehaviorConfig(profile.profile.behaviors, defaultBehaviorRegistry(), `${profile.file}: behaviors`)
+      if (!def.brains.some(b => b.name === 'behaviors')) log.warn(`${profile.file} sets behaviors but variant ${def.name} has no behaviorsBrain(); they will not run`)
+    }
+    return { def, profile }
+  }
   return { def: await loadVariant(name), profile: null }
 }
 

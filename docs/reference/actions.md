@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-14 skills, 45 actions.
+14 skills, 48 actions.
 
 ## building
 
@@ -37,7 +37,7 @@ Break (mine) the block at x y z with the best tool in the inventory. Needs diggi
 
 ## combat
 
-Fighting hostile mobs and guarding players.
+Fighting hostile mobs, guarding players and hunting animals for food.
 
 ### `attack`
 
@@ -76,6 +76,17 @@ Back off from nearby hostile mobs (used by reflexes at low health).
 | param | type | required | default | description |
 |---|---|---|---|---|
 | `distance` | number (6..32) |  | `18` |  |
+
+### `hunt`
+
+Hunt passive animals (cow, pig, sheep, chicken, rabbit, mooshroom) for food and pick up the drops. Never touches pets, named, tamed or leashed animals, babies, villagers or players, and by default leaves fenced animals alone.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `animal` | `cow` \| `pig` \| `sheep` \| `chicken` \| `rabbit` \| `mooshroom` |  |  | which animal; default the nearest huntable one |
+| `count` | integer (1..8) |  | `1` | how many to kill |
+| `radius` | number (4..64) |  | `24` | how far to look, in blocks |
+| `pens` | boolean |  | `false` | also hunt animals inside fences (only your own farm) |
 
 ## containers
 
@@ -332,6 +343,16 @@ Jump once.
 
 No parameters.
 
+### `look_around`
+
+Glance around: at a nearby player now and then, otherwise a random direction (idle fidget).
+
+*non-exclusive · internal*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `radius` | number (1..32) |  | `10` | look at players within this distance |
+
 ## navigation
 
 Home, wandering and named places.
@@ -413,6 +434,7 @@ Run away from the nearest hostile mob until it is a safe distance away.
 | param | type | required | default | description |
 |---|---|---|---|---|
 | `distance` | number (4..32) |  | `16` | how far to get from the mob |
+| `entityId` | integer (-9007199254740991..9007199254740991) |  |  | run from this mob instead of the nearest hostile one |
 
 ## pickup
 
@@ -469,7 +491,7 @@ Say something in public chat.
 
 ## survival
 
-Eating and sleeping.
+Eating, sleeping and emergency pillars.
 
 ### `eat`
 
@@ -489,6 +511,15 @@ Get out of bed.
 
 No parameters.
 
+### `pillar`
+
+Emergency escape: jump and place blocks underneath to stand on a pillar out of reach of mobs. Uses dirt/cobblestone/planks from the inventory.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `height` | integer (1..8) |  | `3` | how many blocks to rise |
+| `item` | string |  |  | block to use; default the most plentiful dirt/cobblestone/planks |
+
 ## woodcutting
 
 Felling trees.
@@ -503,3 +534,67 @@ Fell the nearest natural tree (any wood type): cut the logs it can reach, pick u
 |---|---|---|---|---|
 | `radius` | number (4..64) |  | `32` | how far to look for a tree, in blocks |
 | `replant` | boolean |  | `true` | plant a sapling of the same kind afterwards if the bot has one |
+
+## behaviors (brain)
+
+Registered by `behaviorsBrain()`, see [Behaviours](../guide/behaviors.md).
+
+### `behavior_list`
+
+List the behaviours this bot can arm: armed behaviours keep running on their own between your turns (keep_fed finds and eats food, stay_safe backs off at low health, follow_owner, guard_area, farm_loop...). Pass a name for its options and defaults.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `name` | string |  |  | one behaviour to explain in detail |
+
+### `behavior_status`
+
+Show which behaviours are armed, their options, what is running now, last outcomes and cooldowns.
+
+*non-exclusive*
+
+No parameters.
+
+### `behavior_arm`
+
+Arm a behaviour so it keeps running on its own, without further turns, until disarmed (it survives restarts). Arm keep_fed so you look after your own food, stay_safe to back off at low health, follow_owner or guard_owner to stay with your owner, guard_area to defend a spot, farm_loop / chop_wood_loop for ongoing chores. Prefer this over doing an ongoing job turn by turn.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `name` | string | yes |  | behaviour name from behavior_list, e.g. keep_fed |
+| `options` | any |  |  | options as an object, e.g. {"below": 10}; in chat as key=value pairs, e.g. below=10 animals=cow,pig |
+
+### `behavior_disarm`
+
+Switch an armed behaviour off (stops it now if it is running). It stays off across restarts.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `name` | string | yes |  | behaviour name from behavior_list, e.g. keep_fed |
+
+### `behavior_configure`
+
+Change the options of a behaviour (armed or not) without arming or disarming it, e.g. keep_fed below=10.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `name` | string | yes |  | behaviour name from behavior_list, e.g. keep_fed |
+| `options` | any |  |  | options as an object, e.g. {"below": 10}; in chat as key=value pairs, e.g. below=10 animals=cow,pig |
+
+### `behavior_reset`
+
+Forget runtime arm/disarm/configure changes and go back to the profile's behaviours (one, or all without a name).
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `name` | string |  |  | behaviour to reset; default all |

@@ -176,7 +176,7 @@ export interface ActionCatalog {
  */
 export const DEFAULT_DENY = [
   'attack', 'guard', 'defend', 'chop_tree', 'till', 'place_block', 'drop', 'stop', 'say',
-  'craft', 'smelt', 'deposit', 'withdraw', 'llm_usage', 'npc_status', 'npc_interrupt'
+  'craft', 'smelt', 'deposit', 'withdraw', 'llm_usage', 'npc_status', 'npc_interrupt', 'hunt', 'pillar'
 ]
 
 export interface CatalogPolicy {

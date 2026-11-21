@@ -51,6 +51,16 @@ function remember (agent: Agent, block: Block, items: Item[]): Record<string, nu
   return contents
 }
 
+/** Containers the bot has looked into this run, with what it saw (newest first). */
+export function knownContainers (agent: Agent): { x: number, y: number, z: number, block: string, contents: Record<string, number>, at: number }[] {
+  const m = seen.get(agent)
+  if (!m) return []
+  return [...m.entries()].map(([pos, v]) => {
+    const [x, y, z] = pos.split(' ').map(Number) as [number, number, number]
+    return { x, y, z, ...v }
+  }).sort((a, b) => b.at - a.at)
+}
+
 function findContainer (bot: Bot, at?: { x?: number, y?: number, z?: number }): Block | string {
   if (at && at.x !== undefined && at.y !== undefined && at.z !== undefined) {
     const b = bot.blockAt(vec(bot, at.x, at.y, at.z))

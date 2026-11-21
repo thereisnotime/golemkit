@@ -134,6 +134,7 @@ Only one exclusive action runs at a time. Callers have priorities (`PRIORITY` in
 | npc | 20 |
 | [scene](/guide/scenes) | 25 |
 | llm | 30 |
+| behavior (armed survival behaviours) | 35 |
 | player | 50 |
 | reflex | 60 |
 | system | 100 |
@@ -198,6 +199,8 @@ Several brains run at once and negotiate through priorities. Shipped:
 - `commandBrain()` maps chat to actions: every action is a command; positional args in schema
   order, `key=value` works, last string param takes the rest of the line.
 - `reflexes()` handles self-defence and auto-eat at reflex priority.
+- `behaviorsBrain()` runs armed behaviours (keep_fed, stay_safe, follow_owner...) that owners,
+  LLMs and hooks switch on at runtime. See [Behaviours](../guide/behaviors.md).
 - `npcBrain()` keeps NPCs busy on their own: scored behaviours at npc priority, backs off for
   players, LLMs and [reflexes](/concepts/world#reflexes). See [NPC brain](../guide/npc-brain.md).
 - `sceneBrain()` lets several bots act out scenes together (see [Scenes](../guide/scenes.md)).

@@ -59,6 +59,7 @@ journal:                      # optional, event journal settings (on by default)
 | `logging` | applied when the profile is run on its own |
 | `journal` | [event journal](/guide/journal): types, caps, retention, optional LLM summary; `false` turns it off. See [Event journal](./journal) |
 | `context` | [context pack](/guide/context-pack) dir (default: `profiles/<name>/` if it exists), see [Context packs](./context-pack) |
+| `behaviors` | armed behaviours for the behaviours brain: `{ name: true \| false \| { enabled?, ...options } }`, checked against the registry when the profile is run, see [Behaviours](./behaviors) |
 
 ## LLM listening modes
 

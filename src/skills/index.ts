@@ -1,6 +1,6 @@
 export { movement } from './movement.ts'
-export { combat, fight, equipBestWeapon } from './combat.ts'
-export { survival, bestFood } from './survival.ts'
+export { combat, fight, equipBestWeapon, huntRefusal, HUNTABLE } from './combat.ts'
+export { survival, bestFood, fillerBlock } from './survival.ts'
 export { inventorySkill } from './inventory.ts'
 export { status } from './status.ts'
 export { gather } from './gather.ts'

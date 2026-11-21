@@ -49,6 +49,12 @@ export interface Behavior {
   failureCooldownMs?: number
   /** Ceiling for the failure back-off. Default 120000. */
   maxFailureCooldownMs?: number
+  /**
+   * Priority this behaviour acts at, overriding the brain's (PRIORITY.npc by default). A
+   * behaviour above whoever holds the body keeps running instead of backing off, e.g. an
+   * armed keep_fed at PRIORITY.behavior (35) still runs while an LLM (30) holds the body.
+   */
+  priority?: number
 }
 
 /** Runs every tick before scoring: updates custom needs, or does cheap side effects (chat). */
@@ -57,9 +63,12 @@ export type NpcHook = (ctx: NpcContext) => void
 /** Thrown by BehaviorContext.act when another caller owns the body. */
 export class NpcYield extends Error {
   readonly holder: string
-  constructor (holder: string) {
+  /** Priority of the holder, when known. */
+  readonly priority: number | undefined
+  constructor (holder: string, priority?: number) {
     super(`body taken by ${holder}`)
     this.name = 'NpcYield'
     this.holder = holder
+    this.priority = priority
   }
 }
