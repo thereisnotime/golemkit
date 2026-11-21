@@ -245,8 +245,17 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
     let steps = 0
     let turns = 0
     let reachedStone = false
-    while (progress() < count && steps < (opts.maxSteps ?? 48)) {
+    let sweeps = 0
+    while (steps < (opts.maxSteps ?? 48)) {
       checkAborted(signal)
+      if (progress() >= count) {
+        // enough broken, but drops lag or lie behind us: sweep, then mine on only for what is really missing
+        if (got() >= count || sweeps >= 4) break
+        sweeps++
+        await pickupNearby(bot, signal, { radius: 8, maxMs: 10_000 })
+        yielded = got()
+        if (got() >= count) break
+      }
       if (bot.inventory.emptySlotCount() === 0) await makeRoom(bot, 2, new Set([item]))
       if (bot.inventory.emptySlotCount() === 0) { stopped = 'inventory full'; break }
       reachedStone ||= inStoneLayer(at, feet, dir)
@@ -297,7 +306,7 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
     }
     if (!stopped && progress() < count && steps >= (opts.maxSteps ?? 48)) stopped = `stopped after ${steps} steps`
     // drops land in the tunnel; one short sweep for the ones that didn't fly to us
-    await pickupNearby(bot, signal, { radius: 5, maxMs: 4000 })
+    await pickupNearby(bot, signal, { radius: 8, maxMs: 10_000 })
     if (opts.returnUp !== false && feet0.y - bot.entity.position.y > 2) {
       await gotoWithin(bot, new goals.GoalNear(feet0.x, feet0.y, feet0.z, 1), signal, 30_000).catch(e => { checkAborted(signal); log.debug('mine: no way back up', { error: (e as Error).message }) })
     }

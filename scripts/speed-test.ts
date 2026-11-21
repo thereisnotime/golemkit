@@ -35,16 +35,17 @@ agent.once('session', async () => {
   await new Promise(r => setTimeout(r, 4000))
   const bot = agent.bot
   log(`spawned at ${JSON.stringify(agent.observe().position)} mode ${bot.game.gameMode}, inventory ${JSON.stringify(inventoryCounts(bot))}`)
-  if (process.env.SPEED_KEEP_INV !== 'true') {
-    for (const it of bot.inventory.items()) await bot.tossStack(it).catch(() => {})
-    log(`emptied inventory: ${JSON.stringify(inventoryCounts(bot))}`)
-  }
   // night mobs end runs early: wait for morning like build-test does
   const night = () => { const t = bot.time.timeOfDay; return t > 12500 && t < 23200 }
   if (night() && process.env.SPEED_NO_WAIT !== 'true') {
     log(`night (time ${bot.time.timeOfDay}), waiting up to 10 min for morning`)
     const until = Date.now() + 10 * 60_000
     while (night() && Date.now() < until) await new Promise(res => setTimeout(res, 5000))
+  }
+  // toss right before leaving, or the bot picks it all up again while it waits
+  if (process.env.SPEED_KEEP_INV !== 'true') {
+    for (const it of bot.inventory.items()) await bot.tossStack(it).catch(() => {})
+    log(`emptied inventory: ${JSON.stringify(inventoryCounts(bot))}`)
   }
   const r = await act('goto', { x: Number(xs), z: Number(zs) })
   log(`goto: ${r.message}`)

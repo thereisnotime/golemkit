@@ -85,6 +85,31 @@ async function getTable (bot: Bot, signal: AbortSignal): Promise<{ table: Block,
   return { table, placed: true }
 }
 
+const withTimeout = <T>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<void>(resolve => setTimeout(resolve, ms))])
+
+/**
+ * Asks the server for the real inventory state, then moves anything left in the 2x2 crafting
+ * grid (slots 1-4) or on the cursor back into the inventory. Returns how many stacks it moved.
+ */
+export async function emptyCraftGrid (bot: Bot): Promise<number> {
+  const sync = (bot as any)._syncWindow as ((w: unknown) => Promise<void>) | undefined
+  if (sync) await withTimeout(sync(bot.inventory).catch(() => {}), 3000)
+  let moved = 0
+  try {
+    for (const slot of [1, 2, 3, 4]) {
+      if (!bot.inventory.slots[slot]) continue
+      await bot.clickWindow(slot, 0, 1) // shift-click back into the inventory
+      moved++
+    }
+    if (bot.inventory.selectedItem) {
+      const empty = bot.inventory.firstEmptyInventorySlot()
+      if (empty !== null) { await bot.clickWindow(empty, 0, 0); moved++ }
+    }
+  } catch {}
+  if (moved && sync) await withTimeout(sync(bot.inventory).catch(() => {}), 3000)
+  return moved
+}
+
 /**
  * Crafts `count` of an item from the inventory (the craft action's body, for other actions to
  * reuse inside their own lock). Uses a nearby crafting table or puts one down when needed.
@@ -131,6 +156,10 @@ export async function craftItem (bot: Bot, signal: AbortSignal, item: string, co
     await sleep(SETTLE_MS, signal)
     runs--
   }
+  // 2x2 crafts in the inventory: mineflayer never re-syncs that window, and a lagging server can
+  // leave the ingredient stack in the crafting grid while the model shows it gone (seen live:
+  // 15 logs "vanished" until a later window close returned them). Sync and empty the grid.
+  const gridBack = table ? 0 : await emptyCraftGrid(bot)
   // anything that fell out while crafting (no room in the model) goes straight back in
   let recovered = 0
   if ([...dropsNear(bot, 3)].some(id => !dropsBefore.has(id))) {
@@ -138,7 +167,7 @@ export async function craftItem (bot: Bot, signal: AbortSignal, item: string, co
     recovered = await pickupNearby(bot, signal, { radius: 4, maxMs: 4000 })
   }
   const made = countItem(bot, item) - before
-  const extra = [thrown ? `threw away ${thrown} to make room` : '', recovered ? `picked ${recovered} dropped items back up` : ''].filter(Boolean).join(', ')
+  const extra = [thrown ? `threw away ${thrown} to make room` : '', gridBack ? `took ${gridBack} stacks back out of the crafting grid` : '', recovered ? `picked ${recovered} dropped items back up` : ''].filter(Boolean).join(', ')
   const note = (placed && table ? ` (put a crafting table at ${fmtPos(table.position)})` : '') + (extra ? ` (${extra})` : '')
   if (made <= 0) return fail(`could not craft ${item}${note}`)
   return made >= count ? ok(`crafted ${made} ${item}${note}`) : ok(`crafted ${made} of ${count} ${item}, ran out of ingredients${note}`)
