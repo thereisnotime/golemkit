@@ -343,7 +343,6 @@ export async function buildRoad (ctx: Ctx, route: RouteCell[], geo: RoadGeometry
 /** /fill and /setblock (creative, op). Returns false when the bot has no rights (nothing sent but the probe). */
 async function buildWithCommands (ctx: Ctx, geo: RoadGeometry, report: RoadBuildReport): Promise<boolean> {
   const { bot, agent, signal, log } = ctx
-  const own = ownBlocks(agent)
   const forbidden = forbiddenFor(agent, bot)
   const nameAt = (x: number, y: number, z: number) => bot.blockAt(vec(bot, x, y, z))?.name ?? 'air'
   const clear: { x: number, y: number, z: number }[] = []
@@ -389,7 +388,6 @@ async function buildWithCommands (ctx: Ctx, geo: RoadGeometry, report: RoadBuild
 /** Block by block like a player (survival, or creative hand), row by row from the start. */
 async function buildByHand (ctx: Ctx, route: RouteCell[], geo: RoadGeometry, opts: BuildOptions, report: RoadBuildReport, pauseMs: number): Promise<void> {
   const { bot, agent, signal, log } = ctx
-  const own = ownBlocks(agent)
   const forbidden = forbiddenFor(agent, bot)
   const creative = isCreative(bot)
   // materials for what isn't there yet
@@ -491,7 +489,7 @@ async function buildByHand (ctx: Ctx, route: RouteCell[], geo: RoadGeometry, opt
     await placeOne(b).catch(e => { checkAborted(signal); log.debug('road: late block failed', { at: fmtPos(b), error: (e as Error).message }) })
   }
   if (stop) report.notes.push(`stopped: ${stop}`)
-  own.save()
+
 }
 
 // ------------------------------------------------------------------ results and records
@@ -575,7 +573,7 @@ const buildRoadAction = defineAction({
     'flat landings at turns, switchbacks on steep slopes, a base filled down to the ground, head-room cut, wall railings where the drop beside it is 2 or more, ' +
     'never through buildings, trees or protected areas, joining existing roads at T-junctions. From the bot (or from_x/from_z, or `from` = a saved place or player) ' +
     'to x y z (or `to`). A point next to a door starts or ends straight out of that door. dry_run=true only plans and lists the materials. ' +
-    'redo=<id> builds a removed road again. Survival gathers stone bricks first; creative builds by hand or with commands.',
+    'redo (a road id from road_list) builds a removed road again. Survival gathers stone bricks first; creative builds by hand or with commands.',
   params: z.object({
     x: z.number().optional().describe('target x'),
     y: z.number().optional().describe('target walking height (default the ground there + 1)'),
@@ -731,7 +729,7 @@ function roadGroups (t: RoadTerrain): { x: number, z: number }[][] {
 const removeRoad = defineAction({
   name: 'remove_road',
   description: 'Take out a road this bot built (road_list shows them): breaks the blocks it placed (only where they are still its blocks) and, in creative, ' +
-    'puts back the ground it dug away. build_road redo=<id> builds it again.',
+    'puts back the ground it dug away. build_road with redo set to its id builds it again.',
   params: z.object({
     id: z.number().int().optional().describe('road id; default the last one built'),
     restore: z.boolean().default(true).describe('creative: put back the natural blocks that were dug out for it'),
@@ -759,7 +757,7 @@ const removeRoad = defineAction({
       const run = await runCommands(agent, cmds, signal, log)
       if (!run.noRights) {
         commands = run.sent
-        removed = mine.filter(([x, y, zz]) => isReplaceable(bot.blockAt(vec(bot, x, y, zz))?.name)).length
+        removed = mine.filter(([x, y, zz, n]) => bot.blockAt(vec(bot, x, y, zz))?.name !== n).length
         restored = restore.filter(([x, y, zz, n]) => bot.blockAt(vec(bot, x, y, zz))?.name === n).length
       }
     }
