@@ -53,7 +53,11 @@ async function both (): Promise<{ bot: Agent, tester: Agent }> {
   const bot = new Agent(variant, server, { username: BOT, dataDir: DATA, canDig: true, owners: [TESTER] })
   const tester = new Agent(testerVariant, server, { username: TESTER, dataDir: `${DATA}-tester` })
   bot.on('chatOut', (m: { to?: string, message: string }) => log(`bot says${m.to ? ` to ${m.to}` : ''}> ${m.message}`))
-  bot.on('actionEnd', (info: any, r: ActionResult) => { if (info.caller?.kind === 'reflex') log(`reflex ${info.name}: ${r.message}`) })
+  // reflexes, and long-running actions resumed after a reflex preempted them (their result never reaches act())
+  bot.on('actionEnd', (info: any, r: ActionResult) => {
+    if (info.caller?.kind === 'reflex') log(`reflex ${info.name}: ${r.message}`)
+    else if (info.resumed || /^(find_target|bring_item|fetch_drops)$/.test(info.name)) log(`ended ${info.name}${info.resumed ? ' (resumed)' : ''}: ${r.ok ? 'OK' : 'FAIL'} ${r.message}`)
+  })
   await connect(bot)
   await connect(tester)
   // an idle bot left standing in water sinks and drowns (FindTest did at a goto target): keep heads up
@@ -110,9 +114,14 @@ async function main (): Promise<void> {
         const i = spec.indexOf(' ')
         const name = i < 0 ? spec : spec.slice(0, i)
         const params = i < 0 ? {} : JSON.parse(spec.slice(i + 1))
-        while (bot.currentAction) await pause(1000)
-        await joinUp(bot, tester)
-        await act(bot, name, params)
+        for (let i = 0; i < 4; i++) {
+          while (bot.currentAction) await pause(1000)
+          await joinUp(bot, tester)
+          const r = await act(bot, name, params)
+          if (!/^busy/.test(r.message)) break
+          await pause(3000)
+        }
+        while (bot.currentAction) await pause(1000) // a preempted long action resumes on its own
         log(state(bot))
         log(state(tester))
       }

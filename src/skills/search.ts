@@ -132,6 +132,48 @@ function setup (agent: Agent, bot: Bot): () => void {
   }
 }
 
+// ------------------------------------------------------------------ air
+
+/** Below this much air (of 20) a walk is stopped and the bot swims up. */
+const LOW_AIR = 12
+
+/**
+ * travel() with a drowning guard: the pathfinder happily walks along lake beds, and a bot that
+ * runs out of air there dies (FindTest drowned twice like this on mc02). When the air runs low
+ * the walk stops, the bot swims straight up until it can breathe, and this throws.
+ */
+async function safeTravel (bot: Bot, target: { x: number, y?: number, z: number }, signal: AbortSignal, opts: Parameters<typeof travel>[3] = {}): Promise<void> {
+  const ctl = new AbortController()
+  let drowning = false
+  const air = () => (bot as { oxygenLevel?: number }).oxygenLevel ?? 20
+  const watch = setInterval(() => { if (air() < LOW_AIR) { drowning = true; ctl.abort() } }, 400)
+  try {
+    await travel(bot, target, AbortSignal.any([signal, ctl.signal]), opts)
+  } catch (e) {
+    checkAborted(signal)
+    if (!drowning) throw e
+  } finally {
+    clearInterval(watch)
+  }
+  if (!drowning) return
+  await surface(bot, signal)
+  throw new Error(`ran low on air under water at ${fmtPos(bot.entity.position)}, swam up`)
+}
+
+/** Swims straight up until the bot has air again (or 15 s pass). */
+async function surface (bot: Bot, signal: AbortSignal): Promise<void> {
+  try { bot.pathfinder?.setGoal(null) } catch {}
+  const until = Date.now() + 15_000
+  bot.setControlState('jump', true)
+  try {
+    while (Date.now() < until && ((bot as { oxygenLevel?: number }).oxygenLevel ?? 20) < 20) await sleep(250, signal)
+    // a bit more so the head is well clear of the water
+    await sleep(800, signal)
+  } finally {
+    bot.setControlState('jump', false)
+  }
+}
+
 // ------------------------------------------------------------------ progress
 
 /** Milestone messages to the asker, rate limited (important ones always go out). */
@@ -321,7 +363,7 @@ async function scout (ctx: Ctx, center: Pos, radius: number, maxMinutes: number,
     const ctl = new AbortController()
     const leg = AbortSignal.any([signal, ctl.signal])
     try {
-      await travel(bot, sky !== null ? { x: w.x, y: sky, z: w.z } : top ? { x: w.x, y: top.position.y + 1, z: w.z } : { x: w.x, z: w.z }, leg, {
+      await safeTravel(bot, sky !== null ? { x: w.x, y: sky, z: w.z } : top ? { x: w.x, y: top.position.y + 1, z: w.z } : { x: w.x, z: w.z }, leg, {
         range: 8,
         stepTimeoutMs: 45_000,
         onProgress: () => {
@@ -472,7 +514,7 @@ async function fetchTarget (ctx: Ctx, t: ResolvedTarget, at: Pos | null, count: 
   const { bot, agent, signal } = ctx
   if (!t.fetch || !t.item) return { got: 0, message: `${t.label} isn't something I can bring` }
   if (at && dist(bot.entity.position, at) > 16) {
-    try { await travel(bot, at, signal, { range: 4 }) } catch (e) { checkAborted(signal); return { got: 0, message: `couldn't get to it (${(e as Error).message})` } }
+    try { await safeTravel(bot, at, signal, { range: 4 }) } catch (e) { checkAborted(signal); return { got: 0, message: `couldn't get to it (${(e as Error).message})` } }
   }
   const match = matcher(t.item)
   const start = invCount(bot, match)
@@ -513,7 +555,7 @@ async function goToPlayer (ctx: Ctx, who: string, fallback: Pos | null): Promise
   if (!ent) {
     const last = seenAt(agent, bot, who) ?? fallback
     if (!last) throw new Error(`I can't see ${who} and don't know where they are`)
-    await travel(bot, last, signal, { range: 3 }).catch(e => { checkAborted(signal) })
+    await safeTravel(bot, last, signal, { range: 3 }).catch(e => { checkAborted(signal) })
     ent = playerEnt(bot, who)
     if (!ent) throw new Error(`I went back to ${fmtPos(last)} but can't see ${who}`)
   }
@@ -521,7 +563,7 @@ async function goToPlayer (ctx: Ctx, who: string, fallback: Pos | null): Promise
     checkAborted(signal)
     ent = playerEnt(bot, who) ?? ent
     if (ent.position.distanceTo(bot.entity.position) <= 3.5) return ent
-    if (ent.position.distanceTo(bot.entity.position) > 48) await travel(bot, floorPos(ent.position), signal, { range: 3 }).catch(e => { checkAborted(signal) })
+    if (ent.position.distanceTo(bot.entity.position) > 48) await safeTravel(bot, floorPos(ent.position), signal, { range: 3 }).catch(e => { checkAborted(signal) })
     else await gotoWithin(bot, new goals.GoalFollow(ent, 2), signal, 20_000).catch(e => { checkAborted(signal) })
   }
   ent = playerEnt(bot, who) ?? ent
@@ -633,7 +675,7 @@ async function findEngine (ctx: Ctx, t: ResolvedTarget, o: FindOptions): Promise
     }
     if (o.go) {
       if (!o.bring && dist(bot.entity.position, at) > 4) {
-        try { await travel(bot, t.kind === 'block' && t.ore ? { x: at.x, z: at.z } : at, signal, { range: 3 }); parts.push(`I'm there now (${fmtPos(bot.entity.position)})`) } catch (e) { checkAborted(signal); parts.push(`couldn't walk all the way (${(e as Error).message})`) }
+        try { await safeTravel(bot, t.kind === 'block' && t.ore ? { x: at.x, z: at.z } : at, signal, { range: 3 }); parts.push(`I'm there now (${fmtPos(bot.entity.position)})`) } catch (e) { checkAborted(signal); parts.push(`couldn't walk all the way (${(e as Error).message})`) }
       } else parts.push(`staying here at ${fmtPos(bot.entity.position)}`)
     } else if (o.who) {
       if (o.deliver && Object.keys(fetched).length) {
@@ -669,7 +711,7 @@ async function findEngine (ctx: Ctx, t: ResolvedTarget, o: FindOptions): Promise
         const ctl = new AbortController()
         let seen: Sighting | null = null
         try {
-          await travel(bot, p, AbortSignal.any([signal, ctl.signal]), { range: 6, onProgress: () => { seen = look(); if (seen) ctl.abort() } })
+          await safeTravel(bot, p, AbortSignal.any([signal, ctl.signal]), { range: 6, onProgress: () => { seen = look(); if (seen) ctl.abort() } })
         } catch (e) { checkAborted(signal); if (!ctl.signal.aborted) log.debug('find_target: remembered spot unreachable', { at: fmtPos(p), error: (e as Error).message }) }
         seen ??= look()
         if (seen) return found(seen, `at a spot I remembered`)
@@ -786,7 +828,7 @@ async function obtain (ctx: Ctx, item: string, want: number, depth: number, say:
         if (missing() <= 0) break
         say(`checking my chest at ${fmtPos(c.pos)}`)
         try {
-          if (dist(bot.entity.position, c.pos) > 32) await travel(bot, c.pos, signal, { range: 3 })
+          if (dist(bot.entity.position, c.pos) > 32) await safeTravel(bot, c.pos, signal, { range: 3 })
           const r = await (withdrawAction as any).run(ctx, { item, count: missing(), ...c.pos }) as ActionResult
           notes.push(`chest ${fmtPos(c.pos)}: ${r.message}`)
         } catch (e) { checkAborted(signal); notes.push(`chest ${fmtPos(c.pos)}: ${(e as Error).message}`) }
@@ -966,7 +1008,7 @@ const fetchDrops = defineAction({
     say(`going for your things at ${fmtPos(at)}, ${trip.why}`, true)
     const before = inventoryMap(bot)
     try {
-      await travel(bot, at, signal, { range: 3, onProgress: (i) => say(`${i.remaining} blocks to go`) })
+      await safeTravel(bot, at, signal, { range: 3, onProgress: (i) => say(`${i.remaining} blocks to go`) })
     } catch (e) {
       checkAborted(signal)
       if (dist(bot.entity.position, at) > 12) return fail(`couldn't get to ${fmtPos(at)}: ${(e as Error).message}`)
