@@ -357,9 +357,9 @@ test('path safety: no .., absolute paths or symlinks out of a library folder', (
 test('learned library: write, rename, delete; never shadows a shipped name; meta is stamped', () => {
   const dataDir = tmp()
   const dirs = libraryDirs({ settings: {}, dataDir })
-  assert.deepEqual(dirs.map(d => d.kind), ['shipped', 'learned'])
+  assert.deepEqual(dirs.map(d => d.kind), ['shipped', 'shipped', 'learned'], 'blueprints/ and blueprints/library/, then learned')
   assert.equal(dirs[0]!.dir, BLUEPRINTS_DIR)
-  const dir = dirs[1]!.dir
+  const dir = dirs[2]!.dir
   const yaml = withMeta(GOOD, { tags: ['house'], source: 'designed', created: '2026-11-21', size: [3, 3, 4] })
   assert.match(yaml, /source: designed/)
   writeLearned(dir, 'tiny_hut', yaml)

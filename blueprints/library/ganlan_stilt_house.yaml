@@ -1,0 +1,149 @@
+name: ganlan_stilt_house
+description: "ganlan stilt house: house on stilts; oak logs, spruce, deepslate tile stairs"
+facing: south
+site: near
+meta:
+  tags: [ house, hut, stilts ]
+  author: Silicon23
+  source: https://github.com/Silicon23/MoreChineseStructures
+  url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/data/mcs/structure/village/ganlan/buildings/ganlan_house_4.nbt
+  license: MIT
+  sha256: fe3bc324180efddc1f3f758929bbfad3293fe6cb8c753670a88fbcda96995306
+  created: 2026-11-21
+  size: [ 9, 10, 8 ]
+  blocks: 295
+  materials: { deepslate_tile_stairs: 82, spruce_trapdoor: 72, oak_log: 67, spruce_planks: 29, spruce_fence_gate: 21, deepslate_tiles: 9 }
+roles:
+  wood_log: { default: oak_log, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_(log|wood)$", wood: true }
+  wood_planks: { default: spruce_planks, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_planks$", wood: true }
+  wood_trapdoor: { default: spruce_trapdoor, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_trapdoor$", wood: true }
+  wood_fence_gate: { default: spruce_fence_gate, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence_gate$", wood: true }
+  wood_fence: { default: spruce_fence, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence$", wood: true }
+  wood_door: { default: spruce_door, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_door$", wood: true, kind: door }
+  wood_pressure_plate: { default: spruce_pressure_plate, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_pressure_plate$", wood: true }
+palette:
+  "L": {"role":"wood_log","state":{"axis":"y"}}
+  "P": {"role":"wood_planks"}
+  "l": {"role":"wood_log","state":{"axis":"x"}}
+  "A": {"role":"wood_log","state":{"axis":"z"}}
+  "D": {"block":"deepslate_tiles"}
+  "T": {"role":"wood_trapdoor","state":{"facing":"south","half":"top","open":"false"}}
+  "t": {"role":"wood_trapdoor","state":{"facing":"north","half":"top","open":"false"}}
+  "B": {"role":"wood_trapdoor","state":{"facing":"west","half":"top","open":"false"}}
+  "F": {"role":"wood_fence_gate","state":{"facing":"east","open":"false"}}
+  "f": {"role":"wood_fence_gate","state":{"facing":"west","open":"false"}}
+  "C": {"role":"wood_fence_gate","state":{"facing":"north","open":"false"}}
+  "E": {"role":"wood_fence_gate","state":{"facing":"south","open":"false"}}
+  "G": {"role":"wood_fence"}
+  "d": {"role":"wood_door","state":{"facing":"north","half":"lower","open":"false","hinge":"right"}}
+  "H": {"block":"lantern","state":{"hanging":"false"}}
+  "I": {"role":"wood_trapdoor","state":{"facing":"east","half":"bottom","open":"true"}}
+  "J": {"role":"wood_trapdoor","state":{"facing":"south","half":"bottom","open":"true"}}
+  "K": {"role":"wood_trapdoor","state":{"facing":"north","half":"bottom","open":"true"}}
+  "p": {"role":"wood_pressure_plate"}
+  "M": {"role":"wood_door","state":{"facing":"north","half":"upper","open":"false","hinge":"right"}}
+  "N": {"role":"wood_trapdoor","state":{"facing":"west","half":"bottom","open":"true"}}
+  "O": {"block":"deepslate_tile_stairs","state":{"facing":"east","half":"bottom","shape":"straight"}}
+  "Q": {"block":"deepslate_tile_slab","state":{"type":"top"}}
+  "R": {"block":"deepslate_tile_stairs","state":{"facing":"west","half":"bottom","shape":"straight"}}
+  "S": {"block":"deepslate_tile_stairs","state":{"facing":"west","half":"top","shape":"inner_right"}}
+  "U": {"block":"deepslate_tile_stairs","state":{"facing":"west","half":"top","shape":"straight"}}
+  "V": {"block":"deepslate_tile_stairs","state":{"facing":"north","half":"top","shape":"straight"}}
+  "W": {"block":"deepslate_tile_stairs","state":{"facing":"north","half":"bottom","shape":"straight"}}
+  "X": {"block":"deepslate_tile_stairs","state":{"facing":"east","half":"top","shape":"inner_left"}}
+  "Y": {"block":"deepslate_tile_stairs","state":{"facing":"east","half":"top","shape":"straight"}}
+  "Z": {"block":"deepslate_tile_slab","state":{"type":"bottom"}}
+  "a": {"block":"lantern","state":{"hanging":"true"}}
+  "g": {"block":"gray_bed","state":{"facing":"north","part":"head"}}
+  "b": {"block":"gray_bed","state":{"facing":"north","part":"foot"}}
+  "c": {"block":"barrel","state":{"facing":"north","open":"false"}}
+  ".": air
+layers:
+  # y=0
+  - [".LBBBBBL.",
+     ".TTTTTTT.",
+     ".TTTTTtt.",
+     ".TTTTTtt.",
+     ".TtTTTtt.",
+     ".tTttttt.",
+     ".ttTTttt.",
+     ".tTtTTtt.",
+     ".LBBBBBL.",
+     ".... ...."]
+  # y=1
+  - [".LCCCCCL.",
+     ".F.....F.",
+     ".fLlllLF.",
+     ".FPgGcPF.",
+     ".fPb .PF.",
+     ".fP..HPF.",
+     ".FLldlLF.",
+     ".F.....f.",
+     ".LEG.GEL.",
+     "........."]
+  # y=2
+  - [".L.....L.",
+     ".........",
+     "..LJJJL..",
+     "..I.p.N..",
+     "..I...N..",
+     "..I...N..",
+     "..LKMKL..",
+     ".........",
+     ".L.....L.",
+     "........."]
+  # y=3
+  - ["OL.....LR",
+     "OA.....AR",
+     "OALPPPLAR",
+     "OAP...PAR",
+     "OAP...PAR",
+     "OAP...PAR",
+     "OALPPPLAR",
+     "OA.....AR",
+     "OL.....LR",
+     "...QQQ..."]
+  # y=4
+  - [".O.....R.",
+     ".O.....R.",
+     ".OLlllLR.",
+     ".OA...AR.",
+     ".OA...AR.",
+     ".OA...AR.",
+     ".OLlllLR.",
+     ".OSVVVXR.",
+     ".OUWWWYR.",
+     "........."]
+  # y=5
+  - ["..O...R..",
+     "..O...R..",
+     "..OPLPR..",
+     "..OP.PR..",
+     "..OPaPR..",
+     "..OP.PR..",
+     "..OKLKR..",
+     "..OZZZR..",
+     "..O...R..",
+     "........."]
+  # y=6
+  - ["...O.R...",
+     "...O.R...",
+     "...OLR...",
+     "...OPR...",
+     "...OPR...",
+     "...OPR...",
+     "...OLR...",
+     "...O.R...",
+     "...O.R...",
+     "........."]
+  # y=7
+  - ["....D....",
+     "....D....",
+     "....D....",
+     "....D....",
+     "....D....",
+     "....D....",
+     "....D....",
+     "....D....",
+     "....D....",
+     "........."]

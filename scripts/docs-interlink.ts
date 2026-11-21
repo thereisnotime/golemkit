@@ -26,6 +26,7 @@ const TERMS: [string, string][] = [
   ['keep_fed', '/guide/behaviors'],
   ['persistent goals?', '/guide/goals-and-building#goals'],
   ['blueprint librar(?:y|ies)', '/guide/blueprints'],
+  ['WorldEdit', '/guide/worldedit'],
   ['learned blueprints?', '/guide/blueprints#libraries'],
   ['building policy', '/guide/blueprints#building-policy'],
   ['schematic import', '/guide/blueprints#import'],

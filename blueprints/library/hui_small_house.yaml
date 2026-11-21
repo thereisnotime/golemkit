@@ -1,0 +1,105 @@
+name: hui_small_house
+description: "hui small house: Hui-style village house; deepslate tile slabs, smooth quartz, andesite"
+facing: west
+site: near
+meta:
+  tags: [ house, small ]
+  author: Silicon23
+  source: https://github.com/Silicon23/MoreChineseStructures
+  url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/data/mcs/structure/village/hui/plains_small_house_1.nbt
+  license: MIT
+  sha256: 40b59d400652ff07aa8ee91ab207bc85af799eb4c6ad166e1efd5bba213732cb
+  created: 2026-11-21
+  size: [ 7, 7, 7 ]
+  blocks: 164
+  materials: { deepslate_tile_slab: 55, smooth_quartz: 41, andesite: 20, polished_andesite: 14, calcite: 8, spruce_fence: 7 }
+roles:
+  wood_door: { default: jungle_door, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_door$", wood: true, kind: door }
+  wood_stairs: { default: spruce_stairs, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_stairs$", wood: true }
+  wood_fence: { default: spruce_fence, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence$", wood: true }
+  wood_trapdoor: { default: jungle_trapdoor, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_trapdoor$", wood: true }
+  wood_pressure_plate: { default: spruce_pressure_plate, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_pressure_plate$", wood: true }
+palette:
+  "A": {"block":"andesite"}
+  "a": {"block":"polished_andesite"}
+  "Q": {"block":"smooth_quartz"}
+  "C": {"block":"calcite"}
+  "W": {"block":"white_concrete"}
+  "S": {"block":"stripped_spruce_log","state":{"axis":"y"}}
+  "w": {"block":"white_concrete_powder"}
+  "D": {"block":"deepslate_tile_slab","state":{"type":"double"}}
+  "B": {"block":"polished_andesite_slab","state":{"type":"bottom"}}
+  "d": {"role":"wood_door","state":{"facing":"east","half":"lower","open":"false","hinge":"right"}}
+  "s": {"role":"wood_stairs","state":{"facing":"north","half":"bottom","shape":"straight"}}
+  "F": {"role":"wood_fence"}
+  "E": {"role":"wood_stairs","state":{"facing":"east","half":"bottom","shape":"straight"}}
+  "T": {"role":"wood_trapdoor","state":{"facing":"east","half":"bottom","open":"true"}}
+  "G": {"role":"wood_door","state":{"facing":"east","half":"upper","open":"false","hinge":"right"}}
+  "t": {"role":"wood_trapdoor","state":{"facing":"east","half":"bottom","open":"false"}}
+  "P": {"role":"wood_pressure_plate"}
+  "H": {"role":"wood_trapdoor","state":{"facing":"south","half":"bottom","open":"true"}}
+  "I": {"role":"wood_trapdoor","state":{"facing":"north","half":"bottom","open":"true"}}
+  "L": {"block":"lantern","state":{"hanging":"false"}}
+  "J": {"block":"deepslate_tile_slab","state":{"type":"top"}}
+  "K": {"block":"deepslate_tile_slab","state":{"type":"bottom"}}
+  "g": {"block":"gray_bed","state":{"facing":"east","part":"foot"}}
+  "M": {"block":"gray_bed","state":{"facing":"east","part":"head"}}
+  "b": {"block":"barrel","state":{"facing":"north","open":"false"}}
+  ".": air
+layers:
+  # y=0
+  - [".AAAAA.",
+     ".AaaaA.",
+     "BAaaaA.",
+     " Aa aA.",
+     "BAaaaA.",
+     ".AaaaA.",
+     ".AAAAA."]
+  # y=1
+  - [".QCQQC.",
+     ".C.gMQ.",
+     ".Q..SQ.",
+     ".d...Q.",
+     ".Ws..Q.",
+     ".QFEbw.",
+     ".QWQCC."]
+  # y=2
+  - [".QQHCQ.",
+     ".T...Q.",
+     ".Q..LF.",
+     ".G...F.",
+     ".Q...F.",
+     ".tP..Q.",
+     ".CQIWQ."]
+  # y=3
+  - [".QQQQQ.",
+     "JQ...QJ",
+     ".Q...F.",
+     "JQ...FJ",
+     ".Q...F.",
+     "JQ...QJ",
+     ".QCQQQ."]
+  # y=4
+  - ["KDQQQDK",
+     ".KJ.JK.",
+     "KDJ.JDK",
+     ".KJ.JK.",
+     "KDJ.JDK",
+     ".KJ.JK.",
+     "KDQQwDK"]
+  # y=5
+  - ["..KDK..",
+     "...D...",
+     "..KDK..",
+     "...D...",
+     "..KDK..",
+     "...D...",
+     "..KDK.."]
+  # y=6
+  - ["...K...",
+     ".......",
+     ".......",
+     ".......",
+     ".......",
+     ".......",
+     "...K..."]

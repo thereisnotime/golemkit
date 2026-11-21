@@ -65,6 +65,8 @@ export const ProfileSchema = z.object({
   llm: LlmProfileSchema.optional(),
   /** Building policy: library (reuse a saved blueprint), creative (design one), ask (the owner picks). Lands in settings.building. */
   building: z.enum(['library', 'creative', 'ask']).optional(),
+  /** WorldEdit: true/false forces it on/off (no detection); an object sets { enabled, maxBlocks, ownersOnly, replyMs }. Lands in settings.worldedit. */
+  worldedit: z.union([z.boolean(), z.object({ enabled: z.boolean().optional(), maxBlocks: z.number().int().min(1).optional(), ownersOnly: z.boolean().optional(), replyMs: z.number().int().min(200).max(20_000).optional() })]).optional(),
   /** Extra blueprint folders (relative to the profile), added to settings.build.blueprintDirs. */
   blueprints: z.union([z.string(), z.array(z.string())]).optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
@@ -167,6 +169,7 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (profile.retry) settings.retry = { ...(settings.retry as object | undefined), ...profile.retry }
   if (profile.behaviors) settings.behaviors = { ...(settings.behaviors as object | undefined), ...profile.behaviors }
   if (profile.building) settings.building = profile.building
+  if (profile.worldedit !== undefined) settings.worldedit = { ...(settings.worldedit as object | undefined), ...(typeof profile.worldedit === 'boolean' ? { enabled: profile.worldedit } : profile.worldedit) }
   if (profile.blueprints) {
     const build = (settings.build ?? {}) as { blueprintDirs?: string | string[] }
     settings.build = { ...build, blueprintDirs: [...[build.blueprintDirs ?? []].flat(), ...[profile.blueprints].flat().map(d => resolveDir(d, file))] }

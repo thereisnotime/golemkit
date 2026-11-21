@@ -1,0 +1,102 @@
+name: mvs_horse_pen
+description: mvs horse pen (structure)
+facing: south
+site: near
+meta:
+  tags: [ farm, pen, animals ]
+  author: FinnDog_123 (Moog's Mods)
+  source: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+  url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/horse_pen.nbt
+  license: LGPL-3.0
+  sha256: 2c3f9907896d698cd14ef954cb792feae8cd7bcb012a75ca76c59b07b4a0744b
+  created: 2026-11-21
+  size: [ 7, 7, 6 ]
+  blocks: 129
+  materials: { spruce_trapdoor: 35, spruce_slab: 29, stripped_oak_log: 12, spruce_stairs: 12, oak_trapdoor: 9, oak_fence: 8 }
+roles:
+  wood_planks: { default: spruce_planks, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_planks$", wood: true }
+  wood_fence: { default: oak_fence, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence$", wood: true }
+  wood_slab: { default: spruce_slab, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_slab$", wood: true }
+  wood_fence_gate: { default: spruce_fence_gate, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence_gate$", wood: true }
+  wood_stairs: { default: spruce_stairs, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_stairs$", wood: true }
+palette:
+  "G": {"block":"gravel"}
+  "O": {"block":"stripped_oak_log","state":{"axis":"y"}}
+  "H": {"block":"hay_block","state":{"axis":"x"}}
+  "P": {"role":"wood_planks"}
+  "F": {"role":"wood_fence"}
+  "T": {"block":"spruce_trapdoor","state":{"half":"bottom","facing":"east","open":"true"}}
+  "t": {"block":"spruce_trapdoor","state":{"half":"bottom","facing":"north","open":"true"}}
+  "A": {"block":"spruce_trapdoor","state":{"half":"bottom","facing":"south","open":"true"}}
+  "B": {"block":"spruce_trapdoor","state":{"half":"bottom","facing":"north","open":"false"}}
+  "C": {"block":"cauldron"}
+  "L": {"block":"lantern","state":{"hanging":"false"}}
+  "I": {"block":"iron_bars"}
+  "S": {"role":"wood_slab","state":{"type":"top"}}
+  "D": {"block":"spruce_trapdoor","state":{"half":"top","facing":"east","open":"false"}}
+  "f": {"role":"wood_fence_gate","state":{"facing":"east","open":"false"}}
+  "E": {"block":"oak_trapdoor","state":{"half":"bottom","facing":"north","open":"true"}}
+  "J": {"block":"oak_trapdoor","state":{"half":"bottom","facing":"south","open":"true"}}
+  "K": {"block":"oak_trapdoor","state":{"half":"bottom","facing":"east","open":"true"}}
+  "s": {"role":"wood_slab","state":{"type":"bottom"}}
+  "M": {"role":"wood_stairs","state":{"half":"bottom","shape":"outer_left","facing":"south"}}
+  "N": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "Q": {"role":"wood_stairs","state":{"half":"bottom","shape":"outer_left","facing":"east"}}
+  "R": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "U": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "l": {"block":"lantern","state":{"hanging":"true"}}
+  "V": {"role":"wood_stairs","state":{"half":"bottom","shape":"outer_left","facing":"west"}}
+  "W": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "X": {"role":"wood_stairs","state":{"half":"bottom","shape":"outer_left","facing":"north"}}
+  "c": {"block":"chest","state":{"facing":"west"}}
+  "d": {"block":"dirt"}
+  ".": air
+layers:
+  # y=0
+  - ["",
+     "",
+     " GdGd",
+     " d Gd",
+     " GddG",
+     "",
+     ""]
+  # y=1
+  - [".F...F.",
+     "FOttBOF",
+     ".T...T.",
+     ".T..cT.",
+     "....CT.",
+     "FOAAAOF",
+     ".F...F."]
+  # y=2
+  - [".......",
+     ".OBttO.",
+     ".....T.",
+     ".....T.",
+     "....IT.",
+     "LOAAAO.",
+     "......."]
+  # y=3
+  - [".S...S.",
+     "SOEEEOS",
+     "Df...K.",
+     "Df...K.",
+     "Df..HK.",
+     "SOJJJOS",
+     ".S...S."]
+  # y=4
+  - [".BsssB.",
+     "BMRPRVB",
+     "sNS.SWs",
+     "sP.l.Ps",
+     "sNS.SWs",
+     "BQUPUXB",
+     ".BsssB."]
+  # y=5
+  - [".......",
+     ".......",
+     "..BsB..",
+     "..sss..",
+     "..BsB..",
+     ".......",
+     "......."]

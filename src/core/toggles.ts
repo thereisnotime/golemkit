@@ -45,6 +45,8 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'llm.goals.ownerWaitMin', description: 'minutes to wait for an owner answer before going on alone (0 = forever)', schema: z.number().min(0).max(1440) },
   { key: 'pathfinder.thinkTimeoutMs', description: 'how long the pathfinder may plan one path (ms); raise on a loaded machine', schema: z.number().int().min(1000).max(60_000) },
   { key: 'building', description: 'which blueprint to build: library (best saved match) | creative (design a new one) | ask (owner chooses when online)', schema: z.enum(['library', 'creative', 'ask']) },
+  { key: 'worldedit.enabled', description: 'WorldEdit actions: true = the server has it (skip detection), false = never use it; reset = detect', schema: bool },
+  { key: 'worldedit.maxBlocks', description: 'largest region a WorldEdit action may change (blocks of volume)', schema: z.number().int().min(1).max(10_000_000) },
   { key: 'retry.actions.*', description: 'extra attempts after a failed action, e.g. retry.actions.goto 2', schema: z.number().int().min(0).max(10) }
 ]
 

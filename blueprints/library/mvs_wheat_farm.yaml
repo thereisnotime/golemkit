@@ -1,0 +1,131 @@
+name: mvs_wheat_farm
+description: "mvs wheat farm: farmland and wheat in a log frame"
+facing: south
+site: near
+meta:
+  tags: [ farm ]
+  author: FinnDog_123 (Moog's Mods)
+  source: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+  url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/other_decoration/wooden_wheat_farm.nbt
+  license: LGPL-3.0
+  sha256: 72aebeb4b7744049d72d59cec55fd352e8a4a21075d03d894f0682e4baa28dd6
+  created: 2026-11-21
+  size: [ 15, 16, 5 ]
+  blocks: 294
+  materials: { dirt: 158, oak_log: 30, stripped_spruce_log: 24, spruce_log: 19, spruce_trapdoor: 15, spruce_slab: 14 }
+roles:
+  wood_fence_gate: { default: spruce_fence_gate, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence_gate$", wood: true }
+  wood_trapdoor: { default: spruce_trapdoor, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_trapdoor$", wood: true }
+palette:
+  "D": {"block":"dirt"}
+  "C": {"block":"cobblestone"}
+  "L": {"block":"oak_log","state":{"axis":"y"}}
+  "S": {"block":"stripped_spruce_log","state":{"axis":"y"}}
+  "l": {"block":"spruce_log","state":{"axis":"y"}}
+  "H": {"block":"hay_block","state":{"axis":"y"}}
+  "h": {"block":"hay_block","state":{"axis":"x"}}
+  "c": {"block":"carved_pumpkin","state":{"facing":"west"}}
+  "s": {"block":"oak_slab","state":{"type":"top"}}
+  "A": {"block":"composter"}
+  "F": {"block":"oak_fence"}
+  "f": {"block":"spruce_fence"}
+  "B": {"block":"spruce_slab","state":{"type":"bottom"}}
+  "E": {"role":"wood_fence_gate","state":{"facing":"east","open":"false"}}
+  "G": {"block":"lantern","state":{"hanging":"false"}}
+  "T": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"west","open":"false"}}
+  "t": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"north","open":"false"}}
+  "I": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"south","open":"false"}}
+  "J": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"east","open":"false"}}
+  "b": {"block":"barrel","state":{"facing":"up","open":"false"}}
+  "K": {"block":"chest","state":{"facing":"south"}}
+  "M": {"block":"chest","state":{"facing":"north"}}
+  "N": {"block":"campfire","state":{"facing":"south"}}
+  "O": {"block":"brown_wall_banner","state":{"facing":"west"}}
+  "P": {"block":"brown_wall_banner","state":{"facing":"east"}}
+  ".": air
+layers:
+  # y=0
+  - ["     D DD",
+     "    DD DD   D D",
+     "   D DC DDD  D",
+     "  DDDDDDD bD",
+     " D DsDDDD DDD",
+     "DDDDDDDDDDDD D",
+     "DDDDDDDDDDDDDD",
+     "DDDDDDDDDDsDD D",
+     " DDDDDDDDDDDDDD",
+     " DDDDsDDDDDDDDD",
+     " DDDDDDDDDDDDDD",
+     " DDDDDDDDsDDDDD",
+     "  DD DDDDDDDD D",
+     "   D DDDDD D D",
+     "    DDDDDD DD",
+     "      DDDDD"]
+  # y=1
+  - [".... ........N.",
+     "... L...l  .HMh",
+     ".. LK  ..Ll..H.",
+     ". S .    F S...",
+     " l. .    .  S .",
+     "L           .l",
+     "S            L.",
+     "L         f  .L",
+     " l            S",
+     " S   A        l",
+     ".L            L",
+     ".l       A    l",
+     ". S .        .S",
+     ".  L      . ML.",
+     "..  Ll     lL .",
+     "..... SLSlS  .."]
+  # y=2
+  - ["...............",
+     "... L...l ....H",
+     ".. L.....Ll..G.",
+     "..B....... B...",
+     ".l..........S .",
+     "L............B.",
+     "S.........E..L.",
+     "L........OHP..L",
+     ".B........E...S",
+     ".S............B",
+     ".L............L",
+     ".l............l",
+     "..S...........S",
+     ".. B  .......B.",
+     "....Ll...  BL..",
+     "..... SLSlS. .."]
+  # y=3
+  - ["...............",
+     "....t...B.....",
+     "...L.....Lt....",
+     "...............",
+     ".f.............",
+     "L..............",
+     "T............t.",
+     "f.........c...f",
+     "...............",
+     ".S.............",
+     ".B............L",
+     ".f............B",
+     "..S............",
+     "...............",
+     "....Bf......f..",
+     "......SIBlS...."]
+  # y=4
+  - ["...............",
+     "...............",
+     "...f.....f.....",
+     "...............",
+     "...............",
+     "T..............",
+     "..........t....",
+     ".........TBJ...",
+     "..........I....",
+     ".I.............",
+     "..............t",
+     "...............",
+     "..T............",
+     "...............",
+     "...............",
+     "......I..fI...."]

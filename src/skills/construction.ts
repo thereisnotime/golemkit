@@ -43,7 +43,7 @@ export function ownBlocks (agent: Pick<Agent, 'storage'>): { has: (p: Pos) => bo
   }
 }
 /** Default keep-out radius around the world spawn (vanilla spawn protection is 16). */
-const SPAWN_KEEP_OUT = 24
+export const SPAWN_KEEP_OUT = 24
 const SITE_RADIUS = 10
 /** Blocks used to fill dips under a floor (site preparation). */
 const FILL_ITEMS = ['dirt', 'coarse_dirt', 'cobblestone', 'cobbled_deepslate', 'andesite', 'diorite', 'granite', 'gravel']

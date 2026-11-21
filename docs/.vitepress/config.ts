@@ -32,6 +32,7 @@ export default withMermaid(defineConfig({
           { text: 'Goals and building', link: '/guide/goals-and-building' },
           { text: 'Tool progression and gathering', link: '/guide/progression' },
           { text: 'Blueprint libraries', link: '/guide/blueprints' },
+          { text: 'WorldEdit', link: '/guide/worldedit' },
           { text: 'Self-improver', link: '/guide/self-improver' },
           { text: 'Context packs and evals', link: '/guide/context-pack' },
           { text: 'Logging', link: '/guide/logging' },

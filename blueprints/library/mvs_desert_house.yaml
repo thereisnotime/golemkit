@@ -1,0 +1,206 @@
+name: mvs_desert_house
+description: mvs desert house (structure)
+facing: west
+site: near
+meta:
+  tags: [ house, hut, sandstone ]
+  author: FinnDog_123 (Moog's Mods)
+  source: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+  url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/houses/desert_house.nbt
+  license: LGPL-3.0
+  sha256: 4536d39fea6bdc99940087e91b0839639802d7cd52fb1d711fb951ec46f8db8f
+  created: 2026-11-21
+  size: [ 9, 12, 8 ]
+  blocks: 335
+  materials: { oak_planks: 59, spruce_stairs: 40, hay_block: 40, oak_trapdoor: 22, spruce_slab: 20, spruce_fence_gate: 12 }
+roles:
+  wood_door: { default: spruce_door, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_door$", wood: true, kind: door }
+  wood_fence_gate: { default: spruce_fence_gate, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence_gate$", wood: true }
+palette:
+  "S": {"block":"stone"}
+  "C": {"block":"cobblestone"}
+  "A": {"block":"andesite"}
+  "P": {"block":"oak_planks"}
+  "B": {"block":"bookshelf"}
+  "L": {"block":"loom","state":{"facing":"north"}}
+  "O": {"block":"stripped_oak_wood","state":{"axis":"y"}}
+  "H": {"block":"hay_block","state":{"axis":"z"}}
+  "p": {"block":"birch_planks"}
+  "s": {"block":"stone_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "D": {"block":"stone_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "c": {"block":"cobblestone_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "a": {"block":"andesite_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "E": {"block":"stone_button","state":{"face":"floor","facing":"north"}}
+  "F": {"block":"oak_pressure_plate"}
+  "G": {"block":"stone_button","state":{"face":"floor","facing":"south"}}
+  "I": {"block":"sandstone_wall"}
+  "d": {"role":"wood_door","state":{"hinge":"left","half":"lower","facing":"west","open":"false"}}
+  "J": {"block":"oak_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "K": {"block":"stone_pressure_plate"}
+  "T": {"block":"oak_trapdoor","state":{"half":"top","facing":"east","open":"false"}}
+  "l": {"block":"light_gray_carpet"}
+  "M": {"block":"oak_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "N": {"block":"oak_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "Q": {"block":"smooth_sandstone_stairs","state":{"half":"top","shape":"straight","facing":"east"}}
+  "R": {"block":"oak_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "t": {"block":"oak_trapdoor","state":{"half":"top","facing":"west","open":"true"}}
+  "f": {"role":"wood_fence_gate","state":{"facing":"east","open":"true"}}
+  "U": {"block":"oak_fence"}
+  "V": {"role":"wood_door","state":{"hinge":"left","half":"upper","facing":"west","open":"false"}}
+  "W": {"block":"spruce_fence"}
+  "X": {"block":"oak_trapdoor","state":{"half":"top","facing":"south","open":"true"}}
+  "Y": {"block":"oak_trapdoor","state":{"half":"top","facing":"north","open":"true"}}
+  "Z": {"role":"wood_fence_gate","state":{"facing":"north","open":"true"}}
+  "b": {"role":"wood_fence_gate","state":{"facing":"south","open":"true"}}
+  "e": {"block":"turtle_egg"}
+  "g": {"block":"oak_trapdoor","state":{"half":"top","facing":"west","open":"false"}}
+  "h": {"block":"lantern","state":{"hanging":"false"}}
+  "i": {"block":"birch_pressure_plate"}
+  "j": {"block":"oak_trapdoor","state":{"half":"top","facing":"east","open":"true"}}
+  "k": {"role":"wood_fence_gate","state":{"facing":"west","open":"true"}}
+  "m": {"block":"spruce_trapdoor","state":{"half":"bottom","facing":"west","open":"false"}}
+  "n": {"block":"spruce_slab","state":{"type":"bottom"}}
+  "o": {"block":"lantern","state":{"hanging":"true"}}
+  "q": {"block":"chain","state":{"axis":"y"}}
+  "r": {"block":"spruce_stairs","state":{"half":"bottom","shape":"outer_left","facing":"south"}}
+  "u": {"block":"spruce_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "w": {"block":"spruce_stairs","state":{"half":"bottom","shape":"inner_right","facing":"east"}}
+  "x": {"block":"spruce_stairs","state":{"half":"top","shape":"straight","facing":"west"}}
+  "y": {"block":"spruce_trapdoor","state":{"half":"top","facing":"east","open":"false"}}
+  "z": {"block":"spruce_button","state":{"face":"wall","facing":"south"}}
+  "0": {"block":"spruce_button","state":{"face":"wall","facing":"north"}}
+  "1": {"block":"spruce_slab","state":{"type":"top"}}
+  "2": {"block":"oak_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "3": {"block":"spruce_trapdoor","state":{"half":"top","facing":"south","open":"false"}}
+  "4": {"block":"spruce_trapdoor","state":{"half":"top","facing":"north","open":"false"}}
+  "5": {"block":"oak_stairs","state":{"half":"top","shape":"straight","facing":"south"}}
+  "6": {"block":"spruce_trapdoor","state":{"half":"top","facing":"west","open":"false"}}
+  "7": {"block":"spruce_stairs","state":{"half":"top","shape":"straight","facing":"east"}}
+  "8": {"block":"spruce_stairs","state":{"half":"bottom","shape":"inner_right","facing":"west"}}
+  "9": {"block":"spruce_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "#": {"block":"spruce_stairs","state":{"half":"bottom","shape":"outer_left","facing":"north"}}
+  "%": {"block":"birch_button","state":{"face":"wall","facing":"west"}}
+  "&": {"block":"birch_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "*": {"block":"birch_trapdoor","state":{"half":"top","facing":"east","open":"true"}}
+  "+": {"block":"birch_button","state":{"face":"wall","facing":"east"}}
+  "=": {"block":"birch_trapdoor","state":{"half":"bottom","facing":"west","open":"false"}}
+  "?": {"block":"birch_slab","state":{"type":"bottom"}}
+  "@": {"block":"spruce_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "~": {"block":"spruce_stairs","state":{"half":"top","shape":"straight","facing":"south"}}
+  "$": {"block":"birch_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "!": {"block":"birch_trapdoor","state":{"half":"bottom","facing":"east","open":"false"}}
+  "/": {"block":"barrel","state":{"facing":"up","open":"false"}}
+  ";": {"block":"brown_bed","state":{"part":"foot","facing":"south"}}
+  ":": {"block":"brown_bed","state":{"part":"head","facing":"south"}}
+  "(": {"block":"barrel","state":{"facing":"south","open":"false"}}
+  ")": {"block":"chest","state":{"facing":"east"}}
+  "[": {"block":"chest","state":{"facing":"west"}}
+  "]": {"block":"brown_wall_banner","state":{"facing":"west"}}
+  "{": {"block":"brown_wall_banner","state":{"facing":"east"}}
+  "}": {"block":"dirt"}
+  ".": air
+layers:
+  # y=0
+  - ["",
+     "",
+     "",
+     "}  SsAA",
+     "}}}CSCa",
+     " }  CSC",
+     "   SAcS",
+     "   ACA",
+     "   /DS",
+     "    S",
+     "",
+     ""]
+  # y=1
+  - [".........",
+     "....... .",
+     ".. IPNPI",
+     "E.IP(. P.",
+     "F.dK.lQR.",
+     ".GIP..QP.",
+     "..PTl.P .",
+     "..J;lBR..",
+     ". P:.LP..",
+     "..IPMPI .",
+     ".. ... ..",
+     "........."]
+  # y=2
+  - [".........",
+     "....YbY .",
+     "...OPWPO.",
+     "..UPF.gPj",
+     "..V...hWk",
+     "..UP..iPj",
+     ".tP)..Pj.",
+     ".fW..eWk.",
+     ".tP..BPj.",
+     "..OPWPO..",
+     "...XZX...",
+     "........."]
+  # y=3
+  - [".........",
+     "....YbY..",
+     "...OPWPO.",
+     "..mP..[Pj",
+     "..nPq..Wk",
+     "..mP...Pj",
+     ".tP...Pj.",
+     ".fWo..Wk.",
+     ".tP .FPj.",
+     "..OPWPO..",
+     "...XZX...",
+     "........."]
+  # y=4
+  - [".........",
+     "..ux04079",
+     "..uOP5PO9",
+     "..uPy16P9",
+     "..uPq1qP9",
+     ".rwPy16P9",
+     ".uPy16P8#",
+     ".uPq1.P9.",
+     " uPy16P9.",
+     ".uOP2PO9.",
+     ".uxz3z79.",
+     "........."]
+  # y=5
+  - [".....o...",
+     "...uxb79.",
+     "..%HPWPp.",
+     "..]HH.HH.",
+     "...pH.HH",
+     "...HH.HH+",
+     "..&H.HH*.",
+     ".%HH.HH..",
+     ". pH.HH{.",
+     ".]HPWPp..",
+     "..uxZ79..",
+     "....o...."]
+  # y=6
+  - [".....q...",
+     "....u~9..",
+     "....pPH+.",
+     "...?H1H$.",
+     "... HHH{.",
+     "...iHHp .",
+     "...pHHp..",
+     ".. HHH?..",
+     "..=H1H+..",
+     "..%HPH ..",
+     "...u@9...",
+     "....q...."]
+  # y=7
+  - [".....n...",
+     ".....n...",
+     ".....n...",
+     "....  ...",
+     ".....n ..",
+     "....=n...",
+     "... ni...",
+     "... n....",
+     "...in ...",
+     "....n!...",
+     "....n....",
+     "....n...."]

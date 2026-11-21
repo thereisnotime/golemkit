@@ -126,7 +126,7 @@ const blueprintPick = defineAction({
 
 const blueprintImport = defineAction({
   name: 'blueprint_import',
-  description: 'Import a schematic file (Sponge .schem, Litematica .litematic or structure .nbt) from the import folder into my learned blueprints (owners only). ' +
+  description: 'Import a schematic file (Sponge/WorldEdit .schem, legacy MCEdit .schematic, Litematica .litematic, structure .nbt incl. Create, Axiom .bp; read by content) from the import folder into my learned blueprints (owners only). ' +
     'Refuses more than the block limit (default 4000) and suggests a crop.',
   params: z.object({
     file: z.string().describe('file name inside the import folder (blueprints/import/ unless configured)'),
@@ -134,6 +134,7 @@ const blueprintImport = defineAction({
     crop: z.string().optional().describe('keep only "x1 y1 z1 x2 y2 z2" (the file\'s own coordinates)'),
     max_blocks: z.number().int().min(1).optional().describe('block limit for this import (default settings.build.importMaxBlocks, 4000)'),
     air: z.boolean().default(true).describe('false: empty space in the file is "don\'t care" instead of "must be clear"'),
+    terrain: z.boolean().default(true).describe('false: ground cover the file carries from its surroundings (grass, paths, podzol, farmland) becomes dirt, plants, crops and leaves are left out'),
     exact: z.boolean().default(false).describe('keep the exact wood of wooden blocks (default: any wood, following the build theme)'),
     facing: facingSchema.optional().describe('the side its entrance is on as drawn; default the side of the first door'),
     tags: tagsSchema,
@@ -148,7 +149,7 @@ const blueprintImport = defineAction({
     const path = safeChild(root, p.file)
     if (!path || p.file.includes('/') || p.file.includes('\\')) return fail(`"${p.file}" isn't a file name in the import folder`)
     if (!existsSync(path)) {
-      const there = existsSync(root) ? readdirSync(root).filter(f => /\.(schem|schematic|litematic|nbt)$/i.test(f)) : []
+      const there = existsSync(root) ? readdirSync(root).filter(f => /\.(schem|schematic|litematic|nbt|bp)$/i.test(f)) : []
       return fail(`no ${p.file} in the import folder${there.length ? `; there: ${there.join(', ')}` : ' (it is empty)'}`)
     }
     const st = lstatSync(path)
@@ -169,7 +170,7 @@ const blueprintImport = defineAction({
       const names = [...new Set(s.palette.map(e => e.name.replace(/^minecraft:/, '')))]
       const tags = tagList(p.tags) ?? guessTags(`${name} ${p.description ?? ''}`, names)
       const out = importStructure(s, {
-        name, description: p.description, facing: p.facing, air: p.air, anyWood: !p.exact, maxBlocks: max, ...(crop ? { crop } : {}),
+        name, description: p.description, facing: p.facing, air: p.air, terrain: p.terrain, anyWood: !p.exact, maxBlocks: max, ...(crop ? { crop } : {}),
         meta: { tags, author: author(ctx), source: `imported from ${p.file} (${s.format})`, created: today() }
       })
       const saved = writeLearned(learnedDir(ctx.agent), name, out.yaml, p.overwrite)

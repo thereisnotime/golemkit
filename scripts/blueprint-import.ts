@@ -1,6 +1,7 @@
-// Converts a schematic (Sponge .schem, Litematica .litematic, structure .nbt) into a blueprint.
+// Converts a schematic (Sponge/WorldEdit .schem, legacy .schematic, Litematica .litematic, structure .nbt, Axiom .bp)
+// into a blueprint. The format is read from the content, not the extension.
 //   node scripts/blueprint-import.ts <file> [--name tower] [--crop "x1 y1 z1 x2 y2 z2"] [--max-blocks 4000]
-//        [--no-air] [--exact] [--facing south] [--tags house,stone] [--out <dir> | --bot <username>] [--force]
+//        [--no-air] [--no-terrain] [--exact] [--facing south] [--tags house,stone] [--out <dir> | --bot <username>] [--force]
 // Without --out or --bot it prints the YAML and a preview. --bot writes into that bot's learned
 // library (data/bots/<username>/blueprints/), --out into any folder (e.g. one listed in
 // settings.build.blueprintDirs).
@@ -18,6 +19,7 @@ const { values, positionals } = parseArgs({
     crop: { type: 'string' },
     'max-blocks': { type: 'string', default: '4000' },
     'no-air': { type: 'boolean', default: false },
+    'no-terrain': { type: 'boolean', default: false },
     exact: { type: 'boolean', default: false },
     facing: { type: 'string' },
     tags: { type: 'string' },
@@ -29,7 +31,7 @@ const { values, positionals } = parseArgs({
 })
 
 const die = (msg: string): never => { console.error(msg); process.exit(1) }
-const file = positionals[0] ?? die('usage: blueprint-import <file.schem|.litematic|.nbt> [--name x] [--crop "x1 y1 z1 x2 y2 z2"] [--max-blocks n] [--no-air] [--facing f] [--tags a,b] [--out dir | --bot name]')
+const file = positionals[0] ?? die('usage: blueprint-import <file.schem|.schematic|.litematic|.nbt|.bp> [--name x] [--crop "x1 y1 z1 x2 y2 z2"] [--max-blocks n] [--no-air] [--no-terrain] [--facing f] [--tags a,b] [--out dir | --bot name]')
 const name = (values.name ?? basename(file).replace(/\.[^.]+$/, '')).toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '')
 const bad = checkName(name)
 if (bad) die(bad)
@@ -41,7 +43,7 @@ try {
   const names = [...new Set(s.palette.map(e => e.name.replace(/^minecraft:/, '')))]
   const tags = values.tags ? values.tags.split(',').map(t => t.trim()).filter(Boolean) : guessTags(`${name} ${values.description ?? ''}`, names)
   const out = importStructure(s, {
-    name, description: values.description, facing: values.facing as Facing | undefined, air: !values['no-air'], anyWood: !values.exact, maxBlocks: Number(values['max-blocks']), ...(crop ? { crop } : {}),
+    name, description: values.description, facing: values.facing as Facing | undefined, air: !values['no-air'], terrain: !values['no-terrain'], anyWood: !values.exact, maxBlocks: Number(values['max-blocks']), ...(crop ? { crop } : {}),
     meta: { tags, author: process.env.USER ?? 'cli', source: `imported from ${basename(file)} (${s.format})`, created: today() }
   })
   const bp = parseBlueprint(out.yaml, name)

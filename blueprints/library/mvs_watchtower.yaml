@@ -1,0 +1,481 @@
+name: mvs_watchtower
+description: "mvs watchtower: tall; the spawners are left out"
+facing: south
+site: near
+meta:
+  tags: [ defence, tower, watchtower ]
+  author: FinnDog_123 (Moog's Mods)
+  source: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+  url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/small_pillager_tower.nbt
+  license: LGPL-3.0
+  sha256: 27d4c0dcb24fde99cc8f177144a9d9aa349e6c835eaece76c2295d2aae6a9276
+  created: 2026-11-21
+  size: [ 13, 13, 27 ]
+  blocks: 1085
+  materials: { spruce_log: 166, cobblestone: 144, dark_oak_stairs: 135, dark_oak_fence: 89, dark_oak_slab: 88, dark_oak_planks: 67 }
+roles:
+  wood_log: { default: spruce_log, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_(log|wood)$", wood: true }
+  wood_trapdoor: { default: dark_oak_trapdoor, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_trapdoor$", wood: true }
+  wood_fence: { default: dark_oak_fence, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence$", wood: true }
+  wood_fence_gate: { default: dark_oak_fence_gate, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence_gate$", wood: true }
+palette:
+  "C": {"block":"cobblestone"}
+  "L": {"role":"wood_log","state":{"axis":"x"}}
+  "l": {"role":"wood_log","state":{"axis":"y"}}
+  "P": {"block":"dark_oak_planks"}
+  "A": {"role":"wood_log","state":{"axis":"z"}}
+  "a": {"block":"andesite"}
+  "D": {"block":"stripped_dark_oak_wood","state":{"axis":"y"}}
+  "T": {"block":"tuff"}
+  "S": {"block":"stone"}
+  "B": {"block":"polished_andesite"}
+  "d": {"block":"dead_tube_coral_block"}
+  "E": {"block":"light_gray_wool"}
+  "s": {"block":"dark_oak_slab","state":{"type":"double"}}
+  "H": {"block":"hay_block","state":{"axis":"x"}}
+  "h": {"block":"hay_block","state":{"axis":"y"}}
+  "p": {"block":"spruce_planks"}
+  "F": {"block":"dark_oak_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "G": {"block":"dark_oak_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "I": {"block":"dark_oak_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "J": {"block":"dark_oak_slab","state":{"type":"top"}}
+  "K": {"block":"dark_oak_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "M": {"block":"ladder","state":{"facing":"north"}}
+  "t": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"south","open":"true"}}
+  "N": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"west","open":"true"}}
+  "c": {"block":"cobblestone_wall"}
+  "O": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"north","open":"true"}}
+  "Q": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"east","open":"true"}}
+  "R": {"role":"wood_trapdoor","state":{"half":"top","facing":"west","open":"true"}}
+  "U": {"block":"stone_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "V": {"block":"andesite_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "f": {"role":"wood_fence"}
+  "W": {"block":"andesite_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "X": {"block":"cobblestone_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "Y": {"block":"cobblestone_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "Z": {"block":"stone_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "b": {"block":"andesite_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "e": {"block":"cobblestone_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "g": {"block":"dark_oak_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "i": {"block":"dark_oak_stairs","state":{"half":"top","shape":"straight","facing":"south"}}
+  "j": {"block":"dark_oak_stairs","state":{"half":"top","shape":"straight","facing":"west"}}
+  "k": {"role":"wood_trapdoor","state":{"half":"top","facing":"south","open":"false"}}
+  "m": {"block":"dark_oak_stairs","state":{"half":"top","shape":"straight","facing":"east"}}
+  "n": {"block":"cobblestone_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "o": {"role":"wood_trapdoor","state":{"half":"top","facing":"west","open":"false"}}
+  "q": {"role":"wood_trapdoor","state":{"half":"top","facing":"north","open":"true"}}
+  "r": {"role":"wood_trapdoor","state":{"half":"top","facing":"south","open":"true"}}
+  "u": {"role":"wood_trapdoor","state":{"half":"top","facing":"east","open":"true"}}
+  "w": {"block":"andesite_slab","state":{"type":"top"}}
+  "x": {"block":"stone_slab","state":{"type":"top"}}
+  "y": {"block":"cobblestone_slab","state":{"type":"top"}}
+  "z": {"role":"wood_fence_gate","state":{"facing":"west","open":"false"}}
+  "0": {"block":"andesite_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "1": {"role":"wood_fence_gate","state":{"facing":"north","open":"false"}}
+  "2": {"role":"wood_fence_gate","state":{"facing":"south","open":"false"}}
+  "3": {"role":"wood_fence_gate","state":{"facing":"east","open":"false"}}
+  "4": {"block":"lantern","state":{"hanging":"false"}}
+  "5": {"block":"cobblestone_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "6": {"role":"wood_trapdoor","state":{"half":"top","facing":"north","open":"false"}}
+  "7": {"block":"chain","state":{"axis":"y"}}
+  "8": {"role":"wood_trapdoor","state":{"half":"top","facing":"east","open":"false"}}
+  "9": {"block":"dark_oak_slab","state":{"type":"bottom"}}
+  "#": {"block":"spruce_slab","state":{"type":"top"}}
+  "%": {"block":"spruce_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "&": {"block":"spruce_slab","state":{"type":"bottom"}}
+  "*": {"block":"spruce_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "+": {"block":"spruce_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "=": {"block":"spruce_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "?": {"block":"dark_oak_wall_sign","state":{"facing":"west"}}
+  "@": {"block":"dark_oak_wall_sign","state":{"facing":"north"}}
+  "~": {"block":"dark_oak_wall_sign","state":{"facing":"south"}}
+  "$": {"block":"chest","state":{"facing":"north"}}
+  "!": {"block":"dark_oak_wall_sign","state":{"facing":"east"}}
+  "/": {"block":"white_wall_banner","state":{"facing":"west"}}
+  ";": {"block":"white_wall_banner","state":{"facing":"north"}}
+  ":": {"block":"white_wall_banner","state":{"facing":"south"}}
+  "(": {"block":"white_wall_banner","state":{"facing":"east"}}
+  ")": {"block":"chest","state":{"facing":"south"}}
+  "[": {"block":"chest","state":{"facing":"west"}}
+  "]": {"block":"bell","state":{"attachment":"ceiling","facing":"east"}}
+  "{": {"block":"chest","state":{"facing":"east"}}
+  ".": air
+layers:
+  # y=0
+  - ["",
+     "",
+     "    CCACC",
+     "   CCCACCC",
+     "  CClPAPlCC",
+     "  CCPPAPPCC",
+     " CCLLLlLLLCC",
+     "  CCPPAPPCC",
+     "  CClPAPlCC",
+     "   CCCACCC",
+     "    CCCCC",
+     "      C",
+     ""]
+  # y=1
+  - [".............",
+     ".............",
+     "...@GC.CG@...",
+     "..?DlC.ClD!..",
+     "..FllK.FllK..",
+     "..aCI...ISC..",
+     ".FCTJ.M.JCCK.",
+     "..CCG$t.GBa..",
+     "..FllKJFllK..",
+     "..?DlaCClD!..",
+     "...~ICCaI~...",
+     "......I......",
+     "............."]
+  # y=2
+  - [".............",
+     ".............",
+     "....OC.CO....",
+     "...clC.alc...",
+     "..NllQ.RllQ..",
+     "..CB.....CT..",
+     ".NCCc.M.cBCQ.",
+     "..CC..t..CC..",
+     "..Nll.c.llQ..",
+     "...clCTalc...",
+     "....tCCCt....",
+     "......t......",
+     "............."]
+  # y=3
+  - [".............",
+     ".............",
+     ".....WCY.....",
+     "...flCCClf...",
+     "...llQ.Rll...",
+     "..US.....dZ..",
+     "..SSf.M.fCa..",
+     "..Va..t..Cb..",
+     "...ll.f.ll...",
+     "...flCCClf...",
+     ".....XCX.....",
+     ".............",
+     "............."]
+  # y=4
+  - [".............",
+     ".............",
+     "......W......",
+     "...flSTSlf...",
+     "...lljkmll...",
+     "...Sg...gC...",
+     "..eSf.M.fCn..",
+     "...ai.t.iC...",
+     "...lljfmll...",
+     "...flCdClf...",
+     "......X......",
+     ".............",
+     "............."]
+  # y=5
+  - [".............",
+     ".............",
+     "......q......",
+     "...flCSTlf...",
+     "...llLLLll...",
+     "...dAkkkAC...",
+     "..RCAoMoACu..",
+     "...CAogoAa...",
+     "...llLLLll...",
+     "...flCBClf...",
+     "......r......",
+     ".............",
+     "............."]
+  # y=6
+  - [".............",
+     ".............",
+     "....q.i.q....",
+     "...clCCClc...",
+     "..Rllf.fllu..",
+     "...Cf...fC...",
+     "..mC..M. Cj..",
+     "...Cf.t.fC...",
+     "..Rllf$fllu..",
+     "...claSClc...",
+     "....r.g.r....",
+     ".............",
+     "............."]
+  # y=7
+  - [".............",
+     "....;.i.;....",
+     "...@iwIxi@...",
+     "..?DlCSClD!..",
+     "./mll...llj(.",
+     "...a.....a...",
+     ".mKd..M..aFj.",
+     "...a..t..E...",
+     "./mll...llj(.",
+     "..?DlSSSlD!..",
+     "...~g.G.g~...",
+     "....:.g.:....",
+     "............."]
+  # y=8
+  - [".....xyw.....",
+     "...yxSCSxy...",
+     "..wSaCaCSSy..",
+     ".xTalSCalCaw.",
+     ".xTlljJmllBy.",
+     "yCBCgJJJgaCax",
+     "yCaSJJMJJTCEy",
+     "ySSCiJgJiSBSy",
+     ".xalljJmllSx.",
+     ".wSSlSSClSEx.",
+     "..ySdSdaaSw..",
+     "...xwBSEyy...",
+     ".....yyx....."]
+  # y=9
+  - [".....c1c.....",
+     "...ff...ff...",
+     "..c.......c..",
+     ".f..lY.Yl..f.",
+     ".f.llB.dll.f.",
+     "c..Yac.caW..c",
+     "z..Sa M[da..3",
+     "c..0actcaX..c",
+     ".f.llTSEll.f.",
+     ".f.)lVCnl..f.",
+     "..c.......c..",
+     "...ff...ff...",
+     ".....c2c....."]
+  # y=10
+  - [".............",
+     ".............",
+     "..4.......4..",
+     "....GO.OG....",
+     "...FlC.TlK...",
+     "....Sf.fC....",
+     "...eS...ab...",
+     "....af.fC....",
+     "...FlSSSlK...",
+     "....I.X.I....",
+     "..4.......4..",
+     ".............",
+     "............."]
+  # y=11
+  - [".............",
+     ".............",
+     ".............",
+     "....cOJqc....",
+     "...clS5dlc...",
+     "....Cf.fC....",
+     "...JC...aJ...",
+     "....Cf.fE....",
+     "...clCaTlc...",
+     "....c.J.c....",
+     ".............",
+     ".............",
+     "............."]
+  # y=12
+  - [".............",
+     ".............",
+     "......;......",
+     "....fKAFf....",
+     "...flSSElf...",
+     "...ICsJsSI...",
+     "../LCJ]JSL(..",
+     "...GSsJsEG...",
+     "...flTSClf...",
+     "....fKAFf....",
+     "......:......",
+     ".............",
+     "............."]
+  # y=13
+  - [".............",
+     ".............",
+     ".............",
+     "....fj6mf....",
+     "...flCaSlf...",
+     "...gCHf.Sg...",
+     "...oCf7fa8...",
+     "...iChf$Si...",
+     "...flCCClf...",
+     "....fjkmf....",
+     ".............",
+     ".............",
+     "............."]
+  # y=14
+  - [".............",
+     ".............",
+     ".............",
+     "....f.9.f....",
+     "...flEaClf...",
+     "....T{f.E....",
+     "...9af7fS9...",
+     "....Ehf.C....",
+     "...flCaClf...",
+     "....f.9.f....",
+     ".............",
+     ".............",
+     "............."]
+  # y=15
+  - [".............",
+     "....J##JJ....",
+     "...J.....J...",
+     "..J.i...i.J..",
+     ".J.mlTTClj.J.",
+     ".#..S.f.a..J.",
+     ".#..SfffS..J.",
+     ".J..S.f.S..J.",
+     ".J.mlSaElj.J.",
+     "..J.g...g.J..",
+     "...J.....J...",
+     "....JJJJJ....",
+     "............."]
+  # y=16
+  - [".............",
+     "......9......",
+     "....9GGG9....",
+     "...9GjJmG9...",
+     "..9FPBTapK9..",
+     "..FgCJgJE*K..",
+     ".9FJSjcmSJK9.",
+     "..FiEJiJBiK..",
+     "..9FPSSSp+9..",
+     "...9%jJmI9...",
+     "....&III9....",
+     "......9......",
+     "............."]
+  # y=17
+  - [".............",
+     ".............",
+     ".............",
+     ".....9P9.....",
+     "....9Ppp&....",
+     "...9PPPPp&...",
+     "...PPPPPPP...",
+     "...9PPPPP9...",
+     "....9PpP&....",
+     ".....9P9.....",
+     ".............",
+     ".............",
+     "............."]
+  # y=18
+  - [".............",
+     ".............",
+     ".............",
+     "......G......",
+     ".....GP=.....",
+     "....FPPp+....",
+     "...FPPPPPK...",
+     "....FPPpK....",
+     ".....IPI.....",
+     "......I......",
+     ".............",
+     ".............",
+     "............."]
+  # y=19
+  - [".............",
+     ".............",
+     ".............",
+     ".............",
+     "......P......",
+     ".....pPP.....",
+     "....PPPPP....",
+     ".....pPp.....",
+     "......P......",
+     ".............",
+     ".............",
+     ".............",
+     "............."]
+  # y=20
+  - [".............",
+     ".............",
+     ".............",
+     ".............",
+     "......G......",
+     ".....&P9.....",
+     "....FPPPK....",
+     ".....&P9.....",
+     "......I......",
+     ".............",
+     ".............",
+     ".............",
+     "............."]
+  # y=21
+  - [".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "......P......",
+     ".....PPp.....",
+     "......P......",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "............."]
+  # y=22
+  - [".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "......G......",
+     ".....FP+.....",
+     "......I......",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "............."]
+  # y=23
+  - [".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "......P......",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "............."]
+  # y=24
+  - [".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "......c......",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "............."]
+  # y=25
+  - [".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "......f......",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "............."]
+  # y=26
+  - [".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "......f......",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "............."]

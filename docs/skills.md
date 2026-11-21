@@ -174,7 +174,24 @@ Blueprints are YAML in `blueprints/`. Observe hook: `build` (the structure in pr
 ### materials
 | action | |
 |---|---|
-| `gather_materials` *dig* | Get everything for a shopping list (`{"planks": 80, "door": 1}`, generic names mean any wood or colour) or a blueprint (`template=small_house`): fells trees (crafting a wooden axe as soon as it has wood), crafts planks, sticks, stairs, slabs, fences, doors, trapdoors, ladders, tables, chests, furnaces, beds and tools, mines cobblestone with a pickaxe, and tries for torches (coal or charcoal), glass panes (sand smelted) and a bed (wool from sheep). Reports what is still missing and what was skipped, and why. Long-running. |
+| `gather_materials` *dig* | Get everything for a shopping list (`{"planks": 80, "door": 1}`, generic names mean any wood or colour) or a blueprint (`template=small_house`): fells trees (crafting a wooden axe as soon as it has wood), crafts planks, sticks, stairs, slabs, fences, doors, trapdoors, ladders, tables, chests, furnaces, beds and tools, mines cobblestone, andesite, diorite, granite and tuff with a pickaxe, makes the stone family (cobblestone, stone and stone brick slabs, stairs and walls, stone bricks, smooth stone, smelting cobblestone into stone on the way), and tries for torches (coal or charcoal), glass panes (sand smelted) and a bed (wool from sheep). Reports what is still missing and what was skipped, and why. Long-running. |
+
+### worldedit
+For servers that run [WorldEdit](/guide/worldedit) (mod, plugin or FAWE) and let the bot use it; see
+[WorldEdit](./guide/worldedit.md). All owners only, with a block limit (`worldedit.maxBlocks`).
+
+| action | |
+|---|---|
+| `we_status` *ne* | Is WorldEdit there for me (settings, announced channels, then a `/we version` probe), my selection, clipboard and limit. |
+| `we_select` *ne* | `//pos1` / `//pos2` from two corners, or a box around the asking player. |
+| `we_set`, `we_replace`, `we_walls`, `we_outline`, `we_hollow` *ne* | Region edits on the selection, refused over the limit or in protected areas. |
+| `we_copy`, `we_cut`, `we_paste`, `we_rotate`, `we_flip` | Clipboard; `we_paste` checks the clipboard size (`//size -c`) first and can walk to x y z. |
+| `we_undo`, `we_redo` *ne* | History. |
+| `we_schem_list`, `we_schem_load`, `we_schem_save` *ne* | [Schematics](/guide/blueprints#import) in the server's WorldEdit folder. |
+| `we_raw` *ne* | One whitelisted `//` command (expand, stack, smooth...). |
+| `we_build` | A library blueprint through WorldEdit when the server has a schematic of that name, else the normal `build`. |
+
+Observe hook: `worldedit` (only when it is available).
 
 ### pickup
 | action | |

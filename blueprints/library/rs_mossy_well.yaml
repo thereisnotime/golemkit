@@ -1,0 +1,60 @@
+name: rs_mossy_well
+description: 'rs mossy well: stone bricks and a bell; its palette names blocks with "id" instead of "Name"'
+facing: south
+site: near
+meta:
+  tags: [ well, decoration, small ]
+  author: TelepathicGrunt
+  source: https://github.com/TelepathicGrunt/RepurposedStructures
+  url: https://raw.githubusercontent.com/TelepathicGrunt/RepurposedStructures/2b6e218b92ba8d7e77c4a3a3e95dc41d177fe386/common/src/main/resources/data/repurposed_structures/structure/wells/mossy_stone.nbt
+  license: LGPL-3.0
+  sha256: 3a9926420fe52c9a76a5e0949363cc221f67cdbb09f94dd7eefc5177f80ed9c5
+  created: 2026-11-21
+  size: [ 5, 5, 6 ]
+  blocks: 83
+  materials: { stone_bricks: 53, stone_brick_slab: 12, stone_brick_wall: 12, stone: 5, bell: 1 }
+roles: {}
+palette:
+  "S": {"block":"stone_bricks"}
+  "s": {"block":"stone"}
+  "A": {"block":"stone_brick_slab"}
+  "B": {"block":"stone_brick_wall"}
+  "b": {"block":"bell"}
+  ".": air
+layers:
+  # y=0
+  - ["SSSSS",
+     "SSsSS",
+     "SsssS",
+     "SSsSS",
+     "SSSSS"]
+  # y=1
+  - ["SSSSS",
+     "SS SS",
+     "S   S",
+     "SS SS",
+     "SSSSS"]
+  # y=2
+  - ["SSASS",
+     "SB BS",
+     "A . A",
+     "SB BS",
+     "SSASS"]
+  # y=3
+  - ["",
+     " B B",
+     "  .",
+     " B B",
+     ""]
+  # y=4
+  - ["",
+     " B B",
+     "  b",
+     " B B",
+     ""]
+  # y=5
+  - ["",
+     " AAA",
+     " ASA",
+     " AAA",
+     ""]

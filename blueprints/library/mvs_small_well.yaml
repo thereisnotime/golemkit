@@ -1,0 +1,77 @@
+name: mvs_small_well
+description: mvs small well (structure)
+facing: south
+site: near
+meta:
+  tags: [ well, decoration, small ]
+  author: FinnDog_123 (Moog's Mods)
+  source: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+  url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/well/small_well.nbt
+  license: LGPL-3.0
+  sha256: 52b8c27439e2f563d1ecda0887db9144ee853add7ab928bf6d5036857901c4f5
+  created: 2026-11-21
+  size: [ 8, 6, 5 ]
+  blocks: 52
+  materials: { dirt: 20, spruce_trapdoor: 9, stone_brick_wall: 5, stone_brick_stairs: 4, dark_oak_fence: 4, spruce_stairs: 4 }
+roles:
+  wood_fence: { default: dark_oak_fence, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence$", wood: true }
+  wood_trapdoor: { default: spruce_trapdoor, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_trapdoor$", wood: true }
+  wood_stairs: { default: spruce_stairs, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_stairs$", wood: true }
+palette:
+  "D": {"block":"dirt"}
+  "G": {"block":"gravel"}
+  "S": {"block":"stone_bricks"}
+  "s": {"block":"stone_brick_wall"}
+  "A": {"block":"stone_brick_stairs","state":{"half":"top","shape":"straight","facing":"east"}}
+  "B": {"block":"stone_brick_stairs","state":{"half":"top","shape":"straight","facing":"south"}}
+  "C": {"block":"chain","state":{"axis":"y"}}
+  "E": {"block":"stone_brick_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "F": {"block":"stone_brick_stairs","state":{"half":"top","shape":"straight","facing":"west"}}
+  "f": {"role":"wood_fence"}
+  "T": {"role":"wood_trapdoor","state":{"half":"top","facing":"west","open":"false"}}
+  "t": {"role":"wood_trapdoor","state":{"half":"top","facing":"north","open":"false"}}
+  "H": {"role":"wood_trapdoor","state":{"half":"top","facing":"south","open":"false"}}
+  "I": {"role":"wood_trapdoor","state":{"half":"top","facing":"east","open":"false"}}
+  "J": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"west","open":"false"}}
+  "K": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "L": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "M": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "N": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"east","open":"false"}}
+  "O": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  ".": air
+layers:
+  # y=0
+  - [" D GD D",
+     "  DG G",
+     " DDSDDDD",
+     "D DDDD",
+     "   DD D",
+     "  D  D"]
+  # y=1
+  - [".... ...",
+     "..sBs...",
+     "..ACF...",
+     "..sEs...",
+     "... .. .",
+     "........"]
+  # y=2
+  - ["........",
+     "..ftf...",
+     "..TCI...",
+     "..fHf...",
+     "........",
+     "........"]
+  # y=3
+  - ["........",
+     "..JLN...",
+     "..KsO...",
+     "..JMN...",
+     "........",
+     "........"]
+  # y=4
+  - ["........",
+     "........",
+     "...J....",
+     "........",
+     "........",
+     "........"]
