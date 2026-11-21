@@ -8,7 +8,8 @@
 import { Agent, defineVariant, serverFromEnv, PRIORITY, configureLogging, loggingFromEnv, type ActionResult } from '../src/core/index.ts'
 import { standardSkills, extendedSkills } from '../src/skills/index.ts'
 import { getPlacements } from '../src/skills/construction.ts'
-import { getRoads } from '../src/skills/roads.ts'
+import { getRoads, scanTerrain } from '../src/skills/roads.ts'
+import { writeFileSync } from 'node:fs'
 import { isNaturalBlock, facingToward } from '../src/skills/blueprint.ts'
 
 const [xs = '1400', zs = '1400'] = process.argv.slice(2)
@@ -16,6 +17,7 @@ const CX = Number(xs)
 const CZ = Number(zs)
 const BOT = process.env.ROAD_BOT || 'ClaudeTest'
 const KEEP = process.env.ROAD_KEEP === 'true'
+const METHOD = process.env.ROAD_METHOD || 'commands'
 configureLogging(loggingFromEnv())
 const t0 = Date.now()
 const log = (m: string) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s] ${m}`)
@@ -123,9 +125,11 @@ for (const [dx, dz] of [[0, 0], [160, 0], [0, 160], [-160, 0], [0, -160]] as con
   const p = here()
   if (!p || Math.hypot(p.x - (CX + dx), p.z - (CZ + dz)) >= 8) { log(`the teleport to ${CX + dx} ${CZ + dz} didn't happen (at ${p ? `${Math.round(p.x)} ${Math.round(p.z)}` : 'nowhere'})`); continue }
   await wait(10000)
-  sites = findSites()
-  if (sites && !(farEnough(sites.a.x, sites.a.z) && farEnough(sites.b.x, sites.b.z))) sites = null
-  log(`around ${CX + dx} ${CZ + dz}: ${sites ? `sites ${JSON.stringify(sites.a)} and ${JSON.stringify(sites.b)}, heights spread ${sites.spread}` : 'no two hut sites'}`)
+  let found = findSites()
+  if (found && !(farEnough(found.a.x, found.a.z) && farEnough(found.b.x, found.b.z))) found = null
+  // keep the best pair seen so far (the most height between the two sites)
+  if (found && (!sites || Math.abs(found.a.y - found.b.y) > Math.abs(sites.a.y - sites.b.y))) sites = found
+  log(`around ${CX + dx} ${CZ + dz}: ${found ? `sites ${JSON.stringify(found.a)} and ${JSON.stringify(found.b)}, heights spread ${found.spread}` : 'no two hut sites'}`)
   if (sites && Math.abs(sites.a.y - sites.b.y) >= Number(process.env.ROAD_RISE ?? 8)) break
 }
 if (!sites || !farEnough(sites.a.x, sites.a.z)) { log('no sites, stopping'); await agent.stop(); process.exit(1) }
@@ -135,11 +139,19 @@ await wait(3000)
 try { agent.bot.creative.startFlying() } catch {}
 
 const roadsBefore = new Set(getRoads(agent).map(r => r.id))
-const h1 = await step('build', { template: 'hut', x: a.x, z: a.z, facing: facingToward(a, b), method: 'commands', path: false })
-const h2 = await step('build', { template: 'hut', x: b.x, z: b.z, facing: facingToward(b, a), method: 'commands', path: false })
+const h1 = await step('build', { template: 'hut', x: a.x, y: a.y + 1, z: a.z, facing: facingToward(a, b), method: 'commands', path: false })
+const h2 = await step('build', { template: 'hut', x: b.x, y: b.y + 1, z: b.z, facing: facingToward(b, a), method: 'commands', path: false })
+if (h1.ok && h2.ok && process.env.ROAD_DUMP) {
+  // the height map the planner sees, for replaying a plan offline
+  const ends = getPlacements(agent).slice(-2).map(p => { const v = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] }[p.facing]; return { x: p.door!.x + v[0]!, z: p.door!.z + v[1]!, f: p.door!.y, out: p.facing } })
+  const box = { x0: Math.min(...ends.map(e => e.x)) - 24, z0: Math.min(...ends.map(e => e.z)) - 24, x1: Math.max(...ends.map(e => e.x)) + 24, z1: Math.max(...ends.map(e => e.z)) + 24 }
+  const t = scanTerrain(agent.bot, agent, box, Math.min(...ends.map(e => e.f)), Math.max(...ends.map(e => e.f)), 1)
+  writeFileSync(process.env.ROAD_DUMP, JSON.stringify({ ends, box, ground: [...t.ground], flags: [...t.flags] }))
+  log(`terrain written to ${process.env.ROAD_DUMP}`)
+}
 if (h1.ok && h2.ok) {
-  await step('connect_buildings', { source: 'built', radius: 96, method: 'commands', dry_run: true })
-  const c = await step('connect_buildings', { source: 'built', radius: 96, method: 'commands' })
+  await step('connect_buildings', { source: 'built', radius: 96, method: METHOD, dry_run: true })
+  const c = await step('connect_buildings', { source: 'built', radius: 96, method: METHOD })
   for (const r of getRoads(agent).filter(r => !roadsBefore.has(r.id))) {
     log(`road ${r.id}: ${r.label}`)
     log(`  profile (x z f, T = landing): ${r.route.map(c => `${c[0]} ${c[1]} ${c[2]}${c[3] ? 'T' : ''}${c[4] ? 'J' : ''}`).join(' | ')}`)
