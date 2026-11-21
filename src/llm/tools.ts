@@ -17,6 +17,8 @@ export const LLM_CALLER: Caller = { kind: 'brain', name: 'llm' }
 export interface TurnScope {
   /** Player the turn is for (whoever talked to the bot), passed to actions as ctx.player. */
   player?: string
+  /** Who actually talked this turn (chat turns only; goal/event turns have none). */
+  speaker?: string
   /** Where `reply` goes. */
   replyTo?: { from: string, whisper: boolean }
   maxToolCalls: number

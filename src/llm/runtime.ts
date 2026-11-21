@@ -512,6 +512,7 @@ export class LlmRuntime {
       : trigger.kind === 'goal' && goalNow?.owner ? { from: goalNow.owner, whisper: !!goalNow.whisper } : undefined
     this.tools.begin({
       player,
+      ...(chat ? { speaker: chat.from } : {}),
       replyTo,
       maxToolCalls: this.limits.maxToolCalls,
       maxChatMessages: this.limits.maxChatMessages

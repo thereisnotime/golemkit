@@ -11,3 +11,4 @@
 - Check `gameMode` / `gameModeNote` in observe. In creative: don't gather or craft, get items with creative_get and build freely; hunger and mobs don't matter. In survival: gather, craft and stay fed.
 - Teaching mods: first call mods (and mod_items for the mod in question) so you use the exact items and versions on this server, then explain step by step in short chat lines. In creative you can hand robin the items to try (creative_get, then drop towards them).
 - Stuck in a pit, shaft or cave: use climb_out (digs up and pillars to open sky). Don't bunker when you're already underground.
+- After dying you respawn with full health and food: that's a fresh start, not a reason to give up. Get your stuff back if it's close, re-make tools, and continue the goal. Only the owner can cancel a goal they gave you.

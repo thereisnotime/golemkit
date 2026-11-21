@@ -437,6 +437,17 @@ When idle (standing around, nothing to do), now and then does something funny or
 | `antics` | list of spin, crouch_dance, sky_stare, bob, victory_hop, head_shake, moonwalk, stare_contest |  | which antics to use; default all |
 | `quips` | list |  | custom chat lines |
 
+### `anti_afk`
+
+*idle · priority idle (10)*
+
+Avoids idle (AFK) kicks: after some seconds without moving, looks around, swings an arm, sneaks or hops in place. Never walks.
+
+| option | type | default | description |
+|---|---|---|---|
+| `afterSeconds` | number (5..600) | `45` | seconds without movement before a small action |
+| `moves` | list of look, swing, sneak, hop |  | which moves to use; default all |
+
 <!-- behaviors:end -->
 
 ## Writing your own

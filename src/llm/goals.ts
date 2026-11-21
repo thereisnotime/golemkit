@@ -370,9 +370,15 @@ export function registerGoalTools (tools: BotTools, store: GoalStore, onChange?:
       return { ok: true, text: `goal done: ${g.text}` }
     })
   tools.define('abandon_goal',
-    'Drop the active goal: the owner cancelled it, it is impossible, or you are stuck and they should decide. Tell them why.',
+    'Drop the active goal, only when the person who gave it cancels it (or changes their mind) in this turn. ' +
+      'Dying, failures or the owner being away are NOT reasons: recover (eat, get gear, try another way) and keep going, or pause with update_goal.',
     z.object({ reason: z.string().min(1).max(200) }),
-    ({ reason }) => {
+    ({ reason }, scope: TurnScope) => {
+      const owner = store.active?.owner
+      if (owner && scope.speaker !== owner) {
+        store.update({ note: `wanted to drop it (${reason.slice(0, 120)}); not allowed: only ${owner} can cancel it` })
+        return { ok: false, text: `only ${owner} can cancel this goal. Recover and keep working on it (or pause with update_goal).` }
+      }
       const g = store.abandon(reason)
       if (!g) return { ok: false, text: 'no active goal' }
       onChange?.('abandon')

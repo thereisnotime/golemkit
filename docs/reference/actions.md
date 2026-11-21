@@ -651,7 +651,7 @@ Emergency escape: jump and place blocks underneath to stand on a pillar out of r
 
 ### `climb_out`
 
-Get out of a pit, shaft or cave straight up to open sky: dig the block above if needed, jump and place a block underneath, repeat. Needs dirt/cobblestone/planks (digging on the way gives some).
+Get out of a pit, shaft or cave straight up to open sky: dig the block above if needed, jump and place a block underneath, repeat. Without blocks it carves stair steps up into the wall instead.
 
 | param | type | required | default | description |
 |---|---|---|---|---|

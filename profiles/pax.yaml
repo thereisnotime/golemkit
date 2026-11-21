@@ -54,3 +54,4 @@ behaviors:
   follow_owner: { player: robin, distance: 3 }   # stay with robin when there is nothing else to do
   idle_antics: { everySeconds: [40, 120], chat: 0.15 }   # funny/strange stuff now and then when idle
   collect_drops: { radius: 16 }   # pick up dropped items nearby (including its own after dying)
+  anti_afk: { afterSeconds: 45 }   # small look/swing/hop so idle-kick servers don't drop it

@@ -99,3 +99,47 @@ export const idleAntics = defineBehavior({
     }
   }
 })
+
+// anti_afk: servers (or AFK plugins) kick players who don't move for a while. After some seconds
+// without movement, look around, swing an arm, sneak or hop in place. It never walks, so it's safe
+// next to ledges and doesn't disturb builds or follow.
+const AFK_MOVES = ['look', 'swing', 'sneak', 'hop'] as const
+
+export const antiAfk = defineBehavior({
+  name: 'anti_afk',
+  category: 'idle',
+  description: 'Avoids idle (AFK) kicks: after some seconds without moving, looks around, swings an arm, sneaks or hops in place. Never walks.',
+  options: z.object({
+    afterSeconds: z.number().min(5).max(600).default(45).describe('seconds without movement before a small action'),
+    moves: z.array(z.enum(AFK_MOVES)).optional().describe('which moves to use; default all')
+  }),
+  priority: 'idle',
+  hook: (o) => {
+    let lastPos = ''
+    let still = Date.now()
+    let busy = false
+    const pool = o.moves?.length ? o.moves : [...AFK_MOVES]
+    return (ctx) => {
+      const { bot, now } = ctx
+      if (!bot.entity || busy || bot.isSleeping) return
+      const p = bot.entity.position
+      const key = `${p.x.toFixed(1)},${p.y.toFixed(1)},${p.z.toFixed(1)},${bot.entity.yaw.toFixed(2)},${bot.entity.pitch.toFixed(2)}`
+      if (key !== lastPos) { lastPos = key; still = now; return }
+      if (now - still < o.afterSeconds * 1000) return
+      still = now
+      busy = true
+      const move = pool[Math.floor(Math.random() * pool.length)]!
+      ctx.log.debug('anti-afk', { move })
+      const yaw = bot.entity.yaw
+      const run = async () => {
+        switch (move) {
+          case 'look': await bot.look(yaw + (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 0.8, false); break
+          case 'swing': bot.swingArm('right'); break
+          case 'sneak': bot.setControlState('sneak', true); await wait(400); bot.setControlState('sneak', false); break
+          case 'hop': if (bot.entity.onGround) { bot.setControlState('jump', true); await wait(200); bot.setControlState('jump', false) } break
+        }
+      }
+      void run().catch(() => {}).finally(() => { busy = false })
+    }
+  }
+})
