@@ -276,6 +276,18 @@ or an owner passes `replace=true`. Spawn protection applies either way: the serv
 Other places still prefer natural sources whatever the setting: woodcutting fells real trees,
 strip mining digs natural stone, farm sites avoid builds.
 
+## Travel stays on the surface
+
+Long trips (`travel`, used by `goto`, scouting and going home) go in legs of about 64 blocks. Each
+leg aims at the **open-sky ground height** at its waypoint (surface legs), not just at x/z: with
+digging allowed, an x/z-only goal let the pathfinder tunnel straight through the terrain or drop
+into ravines. A leg that ends up more than 12 blocks below both its start and its target under a
+roof stops with `TravelUndergroundError`.
+
+`goto` then climbs out (`climb_out`: dig up and pillar, or carve stair steps without blocks) and
+tries again; it also climbs out first when it starts deep under a roof on a trip of more than 24
+blocks. A fight pauses the climb instead of cancelling it.
+
 ## Falling and drops
 
 The pathfinder never plans drops over 4 blocks, also not into water (mineflayer allows any

@@ -118,3 +118,15 @@ Measured on mc02 (loaded machine), empty inventory, before → after:
 ```sh
 node scripts/speed-test.ts 700 -90 'gather_materials {"items":{"cobblestone":64}}' 'gather_materials {"items":{"planks":64}}'
 ```
+
+## Digging that gives nothing
+
+`collect` and the strip mine check two things while they dig, so a bot never mines for nothing:
+
+- **Before each source block:** the right tool must be in hand (stone needs a pickaxe). Tools are
+  picked **by name** (best pickaxe / axe / shovel), because the NeoForge [registry sync](/concepts/neoforge#_4-modded-item-and-entity-names) renumbers items
+  and the pathfinder's id-based tool lookup can come back empty. No tool: it stops with
+  "stone drops nothing without a pickaxe (holding cobblestone)".
+- **Every 5 dug blocks:** the inventory must have grown. If not, drops lying around are swept up
+  first; if that gives nothing either, it stops and says why: wrong tool, full inventory, or
+  "N drops are lying around that I didn't pick up".

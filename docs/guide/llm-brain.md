@@ -267,6 +267,15 @@ When a limit is hit the brain pauses: it logs a warning once, tells the first pl
 to it once ("I'm taking a thinking break ... !commands still work"), and resumes by itself when
 the window frees up. Dollar limits ignore subscription turns; limit those by turns and tokens.
 
+## Provider quota
+
+When a turn fails because the provider's quota is used up ("You've hit your weekly limit · resets
+12pm", "usage limit reached, try again in 20 minutes", "quota exceeded", low credit), the brain
+pauses all turns until the reset time in the message (an hour if it gives none) instead of failing
+on every trigger. The bot tells the owner once; the pause is kept in storage (`llm.quotaUntil`), so
+reconnects and restarts don't send failing turns, and the brain switches itself back on at the reset
+time. Meanwhile the [behaviours brain](/guide/behaviors) runs in [NPC mode](./behaviors#npc-mode-when-the-llm-can-t-think).
+
 ## Usage and cost tracking
 
 Every turn records input, output, cache-read and cache-write tokens, tool calls, duration,
