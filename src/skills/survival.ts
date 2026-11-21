@@ -173,8 +173,19 @@ const bunker = defineAction({
     // Climb out: break the seal and pillar back up.
     const lid = bot.blockAt(cover)
     if (lid && lid.boundingBox === 'block') await digBlock(bot, lid, signal).catch(() => {})
-    const out = await agent.act('pillar', { height: dug }, { caller: { kind: 'system', name: 'bunker' } }).catch(() => null)
-    return ok(`sheltered ${dug} blocks down${sealed ? ' (sealed)' : ''} and ${out?.ok ? 'climbed back out' : 'stayed in the hole (couldn\'t climb out)'}`)
+    let out = await agent.act('pillar', { height: dug }, { caller: { kind: 'system', name: 'bunker' } }).catch(() => null)
+    let how = 'climbed back out'
+    if (!out?.ok) {
+      // No blocks left to pillar with: let the pathfinder dig a staircase back to the surface.
+      try {
+        await goto(bot, new goals.GoalNear(start.x, start.y, start.z, 1), signal)
+        out = { ok: true, message: '' }
+        how = 'dug a staircase out'
+      } catch (e) {
+        checkAborted(signal)
+      }
+    }
+    return ok(`sheltered ${dug} blocks down${sealed ? ' (sealed)' : ''} and ${out?.ok ? how : 'stayed in the hole (couldn\'t climb out)'}`)
   }
 })
 
