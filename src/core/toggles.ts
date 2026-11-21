@@ -14,6 +14,7 @@ export interface ToggleDef {
 
 const bool = z.boolean()
 const health = z.number().min(0).max(20)
+const unit = z.number().min(0).max(1)
 
 export const TOGGLES: ToggleDef[] = [
   { key: 'selfAware', description: 'show the bot its own variant, profile, model and settings every turn (observe: self)', schema: bool },
@@ -49,6 +50,15 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'llm.goals.timeoutMin', description: 'goal minutes on its own before checking back', schema: z.number().min(1).max(1440) },
   { key: 'llm.goals.ownerWaitMin', description: 'minutes to wait for an owner answer before going on alone (0 = forever)', schema: z.number().min(0).max(1440) },
   { key: 'intents.mode', description: 'plain-language commands without the LLM: fallback (only while the LLM is down) | first (simple requests itself, the rest to the LLM) | off', schema: z.enum(['fallback', 'first', 'off']) },
+  { key: 'intents.strategy', description: 'how the intent layers decide: first_confident (first layer above its threshold) | vote (most confident layers agree) | best (highest confidence)', schema: z.enum(['first_confident', 'vote', 'best']) },
+  { key: 'intents.log_decisions', description: "log each intent layer's guess, confidence and time per message (debug level)", schema: bool },
+  { key: 'intents.layers.patterns.enabled', description: 'intents: the pattern parser layer', schema: bool },
+  { key: 'intents.layers.patterns.threshold', description: 'intents: confidence the pattern parser needs (default 0.7)', schema: unit },
+  { key: 'intents.layers.embeddings.enabled', description: 'intents: the local sentence-embedding layer (nearest example phrasings)', schema: bool },
+  { key: 'intents.layers.embeddings.threshold', description: 'intents: similarity the embeddings layer needs (default 0.62)', schema: unit },
+  { key: 'intents.layers.local_llm.enabled', description: 'intents: the local LLM layer (OpenAI-compatible endpoint; needs url and model in the profile)', schema: bool },
+  { key: 'intents.layers.local_llm.threshold', description: 'intents: confidence the local LLM layer needs (default 0.7)', schema: unit },
+  { key: 'intents.layers.cloud_llm.enabled', description: 'intents: hand lines no layer understood to the LLM brain (off = drop them in mode first)', schema: bool },
   { key: 'pathfinder.thinkTimeoutMs', description: 'how long the pathfinder may plan one path (ms); raise on a loaded machine', schema: z.number().int().min(1000).max(60_000) },
   { key: 'building', description: 'which blueprint to build: library (best saved match) | creative (design a new one) | ask (owner chooses when online)', schema: z.enum(['library', 'creative', 'ask']) },
   { key: 'build.creativeMethod', description: 'creative builds: hand (block by block like a player) | commands (/fill and /setblock when op; shown to other ops) | auto (= hand)', schema: z.enum(['auto', 'hand', 'commands']) },

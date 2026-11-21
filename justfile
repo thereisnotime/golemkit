@@ -59,6 +59,12 @@ reset-channels:
     @echo "{{YELLOW}}==> removing learned channel caches{{NORMAL}}"
     rm -f data/channels-*.json
 
+# Benchmark intent layers on labelled phrasings (--config patterns+embeddings:threshold=0.58@vote --set heldout --errors --grid --json f)
+[group('intents')]
+intents-bench *args:
+    @echo "{{BOLD}}{{BLUE}}==> intents benchmark{{NORMAL}}"
+    node scripts/intents-bench.ts {{args}}
+
 # Docs site dev server (http://127.0.0.1:5173)
 [group('docs')]
 docs: docs-gen

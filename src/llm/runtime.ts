@@ -266,6 +266,19 @@ export class LlmRuntime {
     this.memory.push({ kind: msg.whisper ? 'whisper' : 'chat', from: msg.from, text: msg.message })
     // Another brain (intents) already handles this message: keep it in memory for context only.
     if (msg.claimedBy) return
+    this.route(msg)
+  }
+
+  /**
+   * A line another brain claimed and then gave back (the intents brain when none of its slower
+   * layers understood it): handled as if it had just arrived unclaimed. It's already in memory.
+   */
+  handoff (msg: ChatMessage): void {
+    if (this.stopped) return
+    this.route(msg)
+  }
+
+  private route (msg: ChatMessage): void {
     const t = this.opts.triggers ?? {}
     if ((t.ownersOnly ?? true) && !this.agent.isOwner(msg.from)) return
     const now = Date.now()

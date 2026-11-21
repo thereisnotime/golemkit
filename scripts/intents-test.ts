@@ -3,6 +3,8 @@
 // (/spreadplayers when op, else both walk out east; aborts if they end up within 300 blocks of spawn, the village or
 // robin) and says plain requests in chat, printing the bot's replies.
 //   node scripts/intents-test.ts ["follow me,come here,chop some wood,what are you doing,stop"] [x z]
+// INTENTS_EMBEDDINGS=1 adds the embeddings layer after the patterns (decision log on; see it with
+// MC_LOG_LEVEL='info,*/intents=debug').
 import { Agent, defineVariant, serverFromEnv, PRIORITY, configureLogging, loggingFromEnv } from '../src/core/index.ts'
 import { standardSkills, extendedSkills, navigation } from '../src/skills/index.ts'
 import { commandBrain, reflexes, intentsBrain } from '../src/brains/index.ts'
@@ -19,7 +21,12 @@ const wait = (ms: number) => new Promise(r => setTimeout(r, ms))
 const bot = new Agent(defineVariant({
   name: 'intents-test',
   skills: [...standardSkills(), navigation(), ...extendedSkills()],
-  brains: [commandBrain({ verbose: false }), reflexes(), intentsBrain({ mode: 'fallback' })]
+  brains: [commandBrain({ verbose: false }), reflexes(), intentsBrain({
+    mode: 'fallback',
+    ...(process.env.INTENTS_EMBEDDINGS === '1'
+      ? { logDecisions: true, layers: [{ use: 'patterns' }, { use: 'embeddings', threshold: 0.58, margin: 0.03, preload: true }, { use: 'cloud_llm' }] }
+      : {})
+  })]
 }), serverFromEnv(), { username: BOT, owners: [OWNER], dataDir: `data/${BOT}`, canDig: true })
 const owner = new Agent(defineVariant({ name: 'owner', skills: [...standardSkills()], brains: [] }), serverFromEnv(), { username: OWNER, dataDir: `data/${OWNER}` })
 

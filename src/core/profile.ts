@@ -45,6 +45,23 @@ export const LlmProfileSchema = z.object({
   }).optional().describe('persistent goals and continuation guardrails')
 }).passthrough()
 
+/** One intents pipeline layer (docs/guide/intents.md). */
+const IntentLayerSchema = z.object({
+  use: z.enum(['patterns', 'embeddings', 'local_llm', 'cloud_llm']),
+  name: z.string().regex(/^[a-z0-9_]+$/).optional(),
+  enabled: z.boolean().optional(),
+  threshold: z.number().min(0).max(1).optional(),
+  model: z.string().optional(),
+  dtype: z.string().optional(),
+  method: z.enum(['knn', 'centroid']).optional(),
+  k: z.number().int().min(1).max(50).optional(),
+  margin: z.number().min(0).max(1).optional(),
+  preload: z.boolean().optional(),
+  url: z.string().url().optional(),
+  timeout_ms: z.number().int().min(100).max(60_000).optional(),
+  api_key_var: z.string().optional()
+}).strict()
+
 export const ProfileSchema = z.object({
   variant: z.string().describe('variant name (variants/<name>.ts) or path'),
   description: z.string().optional(),
@@ -69,7 +86,14 @@ export const ProfileSchema = z.object({
   intents: z.object({
     mode: z.enum(['fallback', 'first', 'off']).optional(),
     threshold: z.number().min(0).max(1).optional(),
-    aliases: z.array(z.string()).optional()
+    aliases: z.array(z.string()).optional(),
+    /** Classifier layers in order: patterns, embeddings, local_llm; cloud_llm = hand the rest to the LLM brain. */
+    layers: z.array(IntentLayerSchema).optional(),
+    strategy: z.enum(['first_confident', 'vote', 'best']).optional(),
+    min_votes: z.number().int().min(1).optional(),
+    log_decisions: z.boolean().optional(),
+    /** Extra example phrasings for the embeddings layer: { intent: [lines], none: [chat lines] }. */
+    examples: z.record(z.string(), z.array(z.string())).optional()
   }).strict().optional(),
   /** Building policy: library (reuse a saved blueprint), creative (design one), ask (the owner picks). Lands in settings.building. */
   building: z.enum(['library', 'creative', 'ask']).optional(),
@@ -172,7 +196,16 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (profile.npcMode !== undefined) settings.npcMode = profile.npcMode
   settings.profileName = name   // so the bot can tell which profile it is (observe: profile)
   if (profile.llm) settings.llm = { ...(settings.llm as object | undefined), ...profile.llm }
-  if (profile.intents) settings.intents = { ...(settings.intents as object | undefined), ...profile.intents }
+  if (profile.intents) {
+    // layers: [{use, ...}] -> layers: {name: entry} + order, so live toggles (intents.layers.<name>.enabled) merge into it
+    const { layers, ...rest } = profile.intents
+    const named = layers ? layers.map(l => ({ ...l, name: l.name ?? l.use })) : undefined
+    settings.intents = {
+      ...(settings.intents as object | undefined),
+      ...rest,
+      ...(named ? { layers: Object.fromEntries(named.map(l => [l.name, l])), order: named.map(l => l.name) } : {})
+    }
+  }
   if (profile.humanize !== undefined) settings.humanize = profile.humanize
   if (profile.reflexes) settings.reflexes = { ...(settings.reflexes as object | undefined), ...profile.reflexes }
   if (profile.journal !== undefined) settings.journal = profile.journal === false ? false : { ...(settings.journal as object | undefined), ...profile.journal }

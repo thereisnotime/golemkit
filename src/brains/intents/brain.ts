@@ -8,11 +8,16 @@
 //
 // One message, one handler: the chat listener is prepended (it runs before every other brain)
 // and sets msg.claimedBy = 'intents' on lines it takes; the LLM runtime and the command brain
-// skip claimed lines. See docs/guide/intents.md.
+// skip claimed lines. Understanding is a pipeline of layers (config.ts): patterns decide
+// synchronously; when slower layers (embeddings, a local LLM) have to run, the line is claimed
+// first and handed back to the LLM brain (LlmRuntime.handoff) if none of them understood it.
+// See docs/guide/intents.md.
 import { defineBrain, PRIORITY, type Agent, type ActionResult, type ChatMessage, type Logger } from '../../core/index.ts'
 import { llmRuntime } from '../llm.ts'
 import { runtimeFor } from '../behaviors/actions.ts'
-import { addressed, parseIntent, helpLines, ACTIVITIES, DEFAULT_THRESHOLD, type Intent } from './parse.ts'
+import { addressed, helpLines, ACTIVITIES, type Intent, type Addressed } from './parse.ts'
+import { resolveConfig, buildPipeline, type LayerConfig, type PipelineConfig, type IntentsSettings, type BuildDeps } from './config.ts'
+import { formatDecision, type Decision, type IntentLayer, type IntentPipeline, type Strategy } from './pipeline.ts'
 
 export type IntentsMode = 'fallback' | 'first' | 'off'
 
@@ -29,6 +34,16 @@ export interface IntentsBrainOptions {
   ackAfterMs?: number
   /** Why the LLM can't think right now, or null when it can; undefined when there is no LLM brain. Default: the llm brain's runtime. */
   llmBlocked?: (agent: Agent) => string | null | undefined
+  /** Gives a claimed line back to the LLM brain; false when there is none. Default: the llm brain's runtime.handoff(). */
+  llmHandoff?: (agent: Agent, msg: ChatMessage) => boolean
+  /** Layers when the profile has none (profile: intents.layers). Default [patterns, cloud_llm]. */
+  layers?: LayerConfig[]
+  /** Default first_confident. Profile/toggle: intents.strategy. */
+  strategy?: Strategy
+  /** One debug line per message with each layer's guess. Profile: intents.log_decisions. */
+  logDecisions?: boolean
+  /** Injected dependencies for the layers (tests: a fake embedder or fetch). */
+  deps?: Omit<BuildDeps, 'log' | 'cache'>
 }
 
 export const INTENTS_CALLER = 'intents'
@@ -41,8 +56,13 @@ type Pos = { x: number, y: number, z: number }
 export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
   const lastExchange = new Map<string, number>()
   const lastHint = new Map<string, number>()
+  /** Per speaker: sequence of addressed lines, and the newest one acted on (a slow guess never overtakes a newer command). */
+  let seq = 0
+  const lastActed = new Map<string, number>()
+  const layerCache = new Map<string, IntentLayer>()
+  const pipelines = new WeakMap<Agent, { key: string, cfg: PipelineConfig, pipe: IntentPipeline }>()
 
-  const settings = (agent: Agent) => (agent.settings.intents ?? {}) as { mode?: IntentsMode, threshold?: number, aliases?: string[] }
+  const settings = (agent: Agent) => (agent.settings.intents ?? {}) as IntentsSettings & { mode?: IntentsMode, aliases?: string[] }
   const llmSettings = (agent: Agent) => (agent.settings.llm ?? {}) as { aliases?: string[], listen?: string, conversationMs?: number }
   const modeOf = (agent: Agent): IntentsMode => settings(agent).mode ?? opts.mode ?? 'fallback'
 
@@ -50,6 +70,27 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
   const llmDown = (agent: Agent): string | null => {
     const r = opts.llmBlocked ? opts.llmBlocked(agent) : (() => { const rt = llmRuntime(agent); return rt ? rt.blockedReason() : undefined })()
     return r === undefined ? 'no LLM brain' : r
+  }
+
+  const handoff = (agent: Agent, msg: ChatMessage): boolean => {
+    if (opts.llmHandoff) return opts.llmHandoff(agent, msg)
+    const rt = llmRuntime(agent)
+    if (!rt) return false
+    rt.handoff(msg)
+    return true
+  }
+
+  /** The pipeline for the current settings (rebuilt when they change; loaded layers are reused). */
+  const pipelineOf = (agent: Agent, log: Logger): { cfg: PipelineConfig, pipe: IntentPipeline } => {
+    const s = settings(agent)
+    const cfg = resolveConfig({ ...s, threshold: s.threshold ?? opts.threshold }, opts.layers, { strategy: opts.strategy, logDecisions: opts.logDecisions })
+    const key = JSON.stringify(cfg)
+    const hit = pipelines.get(agent)
+    if (hit?.key === key) return hit
+    const pipe = buildPipeline(cfg, { ...opts.deps, log, cache: layerCache })
+    pipelines.set(agent, { key, cfg, pipe })
+    if (hit) log.info(`pipeline: ${describe(cfg)}`)
+    return { cfg, pipe }
   }
 
   const othersOnline = (agent: Agent, except: string): number => {
@@ -67,9 +108,20 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
       agent.prependListener('chat', msg => {
         try { onChat(agent, msg, log) } catch (e) { log.warn(`chat: ${(e as Error).message}`) }
       })
+      try {
+        const { cfg, pipe } = pipelineOf(agent, log)
+        log.debug(`pipeline: ${describe(cfg)}`)
+        // preload: true loads a model now instead of on the first line that needs it
+        for (const l of cfg.layers) {
+          if (!l.preload) continue
+          const layer = pipe.layers.find(p => p.layer.name === l.name)?.layer
+          void layer?.warmup?.().catch(() => {})
+        }
+      } catch (e) { log.warn(`pipeline: ${(e as Error).message}`) }
     },
     observe (agent) {
-      return { intents: { mode: modeOf(agent) } }
+      const cfg = pipelines.get(agent)?.cfg
+      return { intents: { mode: modeOf(agent), ...(cfg ? { layers: cfg.layers.map(l => l.name), strategy: cfg.strategy, handoff: cfg.handoff } : {}) } }
     }
   })
 
@@ -93,28 +145,60 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
     if (!addr) return
     const down = llmDown(agent)
     if (mode === 'fallback' && !down) return
-    const threshold = settings(agent).threshold ?? opts.threshold ?? DEFAULT_THRESHOLD
-    const intent = parseIntent(addr.body, { speaker: msg.from })
-    if (!intent || intent.confidence < threshold) {
+    const { cfg, pipe } = pipelineOf(agent, log)
+    const ctx = { speaker: msg.from }
+    const n = ++seq
+    const sync = pipe.decideSync(addr.body, ctx)
+    if (sync) return conclude(agent, msg, addr, sync, { cfg, down, mode, n, early: false }, log)
+    // Slower layers have to run: take the line now (the LLM and command brain skip it) and give
+    // it back to the LLM brain afterwards if none of them understood it.
+    msg.claimedBy = INTENTS_CALLER
+    void pipe.decide(addr.body, ctx)
+      .then(d => conclude(agent, msg, addr, d, { cfg, down, mode, n, early: true }, log))
+      .catch(e => {
+        log.warn(`pipeline: ${(e as Error).message}`)
+        if (!down && cfg.handoff) handoff(agent, msg)
+      })
+  }
+
+  function conclude (agent: Agent, msg: ChatMessage, addr: Addressed, d: Decision, o: { cfg: PipelineConfig, down: string | null, mode: IntentsMode, n: number, early: boolean }, log: Logger): void {
+    if (o.cfg.logDecisions) log.debug(`decide ${formatDecision(addr.body, d)}`)
+    const w = d.winner
+    if (w) {
+      if (o.early && (lastActed.get(msg.from) ?? 0) > o.n) { log.info(`${msg.from}: ${addr.body} -> ${w.intent} dropped: a newer command came first`); return }
+      const intent: Intent = { intent: w.intent, args: w.args, confidence: w.confidence }
+      msg.claimedBy = INTENTS_CALLER
+      lastActed.set(msg.from, o.n)
+      lastExchange.set(msg.from, Date.now())
+      log.info(`${msg.from}: ${addr.body} -> ${intent.intent}`, { args: JSON.stringify(intent.args), confidence: intent.confidence, layer: w.layer, ms: d.ms, mode: o.mode, llm: o.down ?? 'up' })
+      void execute(agent, msg, intent, log).catch(e => {
+        log.warn(`${intent.intent} failed: ${(e as Error).message}`)
+        agent.reply(msg, `can't: ${(e as Error).message}`)
+      })
+      return
+    }
+    const best = d.trace.map(e => e.result?.confidence ?? 0).reduce((a, b) => Math.max(a, b), 0)
+    if (o.down) {
       // Nobody else will answer: say so (rate limited) when the line was clearly for us.
-      if (down && addr.explicit) {
+      if (addr.explicit) {
         msg.claimedBy = INTENTS_CALLER
         const now = Date.now()
         if (now - (lastHint.get(msg.from) ?? 0) > 20_000) {
           lastHint.set(msg.from, now)
-          agent.reply(msg, `didn't get that (${down === 'no LLM brain' ? 'plain commands only' : `LLM off: ${down}`}); say "${agent.username} help"`)
+          agent.reply(msg, `didn't get that (${o.down === 'no LLM brain' ? 'plain commands only' : `LLM off: ${o.down}`}); say "${agent.username} help"`)
         }
-        log.debug('not understood', { from: msg.from, text: addr.body, confidence: intent?.confidence })
+        log.debug('not understood', { from: msg.from, text: addr.body, confidence: best })
       }
       return
     }
-    msg.claimedBy = INTENTS_CALLER
-    lastExchange.set(msg.from, Date.now())
-    log.info(`${msg.from}: ${addr.body} -> ${intent.intent}`, { args: JSON.stringify(intent.args), confidence: intent.confidence, mode, llm: down ?? 'up' })
-    void execute(agent, msg, intent, log).catch(e => {
-      log.warn(`${intent.intent} failed: ${(e as Error).message}`)
-      agent.reply(msg, `can't: ${(e as Error).message}`)
-    })
+    // The LLM can think (mode first): it gets the line, unless the handoff is switched off.
+    if (!o.cfg.handoff) {
+      msg.claimedBy = INTENTS_CALLER
+      log.debug('not understood, cloud_llm handoff off', { from: msg.from, text: addr.body, confidence: best })
+      return
+    }
+    if (o.early && !handoff(agent, msg)) log.debug('not understood, no LLM brain to hand it to', { from: msg.from, text: addr.body })
+    // not claimed (sync decision): the LLM runtime's own listener sees it next, as before
   }
 
   // ---------------------------------------------------------------- execution
@@ -379,6 +463,10 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
       }
     }
   }
+}
+
+function describe (cfg: PipelineConfig): string {
+  return `${cfg.layers.map(l => `${l.name}@${l.threshold}`).join(' > ') || '(no layers)'}${cfg.handoff ? ' > cloud_llm' : ''}, ${cfg.strategy}`
 }
 
 function interrupted (r: ActionResult): boolean {

@@ -65,3 +65,9 @@ behaviors:
 # wood". first = simple requests are handled directly (no tokens), everything else goes to the LLM.
 intents:
   mode: first                 # fallback (only while the LLM is down) | first | off
+  strategy: first_confident   # first layer above its threshold wins (vote | best)
+  log_decisions: true         # debug line per message: each layer's guess, confidence, ms, the winner
+  layers:                     # in order; embeddings catch paraphrases (thresholds from `just intents-bench --grid`)
+    - { use: patterns, threshold: 0.7 }
+    - { use: embeddings, threshold: 0.58, margin: 0.03, model: Xenova/all-MiniLM-L6-v2, method: knn, k: 3 }
+    - { use: cloud_llm }      # anything else goes to the LLM brain

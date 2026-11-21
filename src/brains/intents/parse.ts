@@ -9,6 +9,13 @@ export type IntentName =
   | 'find' | 'bring' | 'give' | 'drop' | 'eat' | 'sleep' | 'stop' | 'status' | 'where' | 'inventory'
   | 'set_home' | 'remember_place' | 'build' | 'behavior_on' | 'behavior_off' | 'help'
 
+/** Every intent the brain can act on (the label set for classifiers and the local LLM prompt). */
+export const INTENT_NAMES: readonly IntentName[] = [
+  'follow', 'unfollow', 'come', 'go_home', 'goto', 'guard', 'unguard', 'farm', 'chop', 'collect',
+  'find', 'bring', 'give', 'drop', 'eat', 'sleep', 'stop', 'status', 'where', 'inventory',
+  'set_home', 'remember_place', 'build', 'behavior_on', 'behavior_off', 'help'
+]
+
 export interface Intent {
   intent: IntentName
   args: Record<string, unknown>
@@ -86,7 +93,7 @@ const TRAIL_FILLERS = [
 /** Words that start a question; such lines only map to the info intents (status, where, inventory, help). */
 const QUESTION_START = /^(did|do(?! not)|does|is|are|was|were|have|has|had|why|how|when|who|whose|which|should|shall|may|might|am|isn t|aren t|didn t|doesn t)\b/
 
-interface Cleaned { t: string, question: boolean, polite: boolean }
+export interface Cleaned { t: string, question: boolean, polite: boolean }
 
 export function clean (text: string): Cleaned {
   let t = text.toLowerCase().replace(/[’`´]/g, "'")
@@ -189,7 +196,7 @@ export function quantityItem (text: string): { count?: number, item: string } {
 }
 
 /** Item words, singular: what players say -> [block/mining name, item/inventory name]. */
-const ITEM_ALIASES: Record<string, [string, string]> = {
+export const ITEM_ALIASES: Record<string, [string, string]> = {
   cobble: ['cobblestone', 'cobblestone'],
   cobblestone: ['cobblestone', 'cobblestone'],
   stone: ['stone', 'cobblestone'],
@@ -250,7 +257,7 @@ const ITEM_ALIASES: Record<string, [string, string]> = {
 /** Words whose trailing s is part of the name. */
 const KEEP_S = new Set(['glass', 'grass', 'moss', 'leaves', 'planks', 'bricks', 'stairs', 'boots', 'leggings', 'shears', 'lapis', 'tongs', 'oats', 'gras', 'sweet_berries', 'beans', 'netherrack'])
 
-function singular (word: string): string {
+export function singular (word: string): string {
   if (KEEP_S.has(word) || word.length <= 3) return word
   if (/ies$/.test(word)) return word.slice(0, -3) + 'y'
   if (/(ch|sh|x|ss)es$/.test(word)) return word.slice(0, -2)
@@ -311,7 +318,7 @@ export const ACTIVITIES: Record<string, string> = {
 
 // ------------------------------------------------------------------ templates
 
-const TEMPLATES: Record<string, string> = {
+export const TEMPLATES: Record<string, string> = {
   house: 'small_house',
   'small house': 'small_house',
   'little house': 'small_house',
@@ -333,7 +340,7 @@ const TEMPLATES: Record<string, string> = {
   fortress: 'fortress',
   fort: 'fortress'
 }
-const NOT_BLUEPRINTS = /\b(road|roads|path|bridge|farm|fire|portal|tunnel|stair|stairs|staircase|nether)\b/
+export const NOT_BLUEPRINTS = /\b(road|roads|path|bridge|farm|fire|portal|tunnel|stair|stairs|staircase|nether)\b/
 
 // ------------------------------------------------------------------ the pattern table
 
@@ -345,11 +352,11 @@ const ME = '(me|us|myself)'
 const PLAYER = '([a-z0-9_]{3,16})'
 
 /** "me"/"us" -> the speaker, else the named player (lower case; the brain matches the real name). */
-function who (word: string | undefined, ctx: ParseContext): string {
+export function who (word: string | undefined, ctx: ParseContext): string {
   return !word || /^(me|us|myself)$/.test(word) ? ctx.speaker : word
 }
 
-const NOT_PLAYERS = new Set(['it', 'that', 'this', 'them', 'there', 'here', 'around', 'everyone', 'everybody', 'someone', 'home', 'the', 'a', 'my', 'your'])
+export const NOT_PLAYERS = new Set(['it', 'that', 'this', 'them', 'there', 'here', 'around', 'everyone', 'everybody', 'someone', 'home', 'the', 'a', 'my', 'your'])
 
 const RULES: Rule[] = [
   // ---- help and info (questions allowed)
@@ -382,7 +389,7 @@ const RULES: Rule[] = [
   { re: new RegExp(`^(come to|go to|walk to|run to|meet|join) ${PLAYER}$`), build: m => NOT_PLAYERS.has(m[2]!) ? null : ({ intent: 'goto', args: { place: m[2] }, confidence: 0.8 }) },
 
   // ---- home and places
-  { re: /^((go|head|walk|run|get|come|go back|head back|walk back|run back|get back|come back|return|back|move|travel)( back)? home|home|go to (your |the |our )?(home|base)|return to (your |the |our )?(home|base)|go back to (your |the |our )?(home|base)|back to base|to base|go to base|return home|head home|go home now|homeward)$/, build: () => ({ intent: 'go_home' }) },
+  { re: /^((go|head|walk|run|get|come|go back|head back|walk back|run back|get back|come back|return|back|move|travel)( back)? home|home|go to (your |the |our )?(home|base)|return to (your |the |our )?(home|base)|go back to (your |the |our )?(home|base)|back to base|to base|go to base|return home|head home|go home now|homeward|(go|head|get|walk|run|come|make your way)( back)? to (the |your |our )?(base|house|home base))$/, build: () => ({ intent: 'go_home' }) },
   { re: /^(go|walk|head|move|travel|run|goto|tp)( to)? (-?\d+) (-?\d+)(?: (-?\d+))?$/, build: m => m[5] !== undefined ? ({ intent: 'goto', args: { x: Number(m[3]), y: Number(m[4]), z: Number(m[5]) } }) : ({ intent: 'goto', args: { x: Number(m[3]), z: Number(m[4]) } }) },
   { re: /^(go|walk|move|head|run|get) (there|over there|here|over here|to where i am|where i am|to me|to my spot)$/, build: () => ({ intent: 'goto', args: { at: 'speaker' } }) },
   { re: /^(go|head|walk|travel|move|run|return|get|come|go back|head back) (back )?to (the |my |your |our )?([a-z0-9_: ]{2,32})$/, build: m => ({ intent: 'goto', args: { place: m[4]!.trim().replace(/\s+/g, '_') }, confidence: 0.8 }) },
@@ -473,33 +480,78 @@ export function minable (name: string): boolean {
 }
 
 /** Info intents answer questions; everything else needs a request, not a question. */
-const INFO: ReadonlySet<IntentName> = new Set(['help', 'status', 'where', 'inventory'])
+export const INFO: ReadonlySet<IntentName> = new Set(['help', 'status', 'where', 'inventory'])
+
+/** A cleaned line plus what kind of sentence it is: question, negation, polite request. */
+export interface LineShape extends Cleaned {
+  /** "don't X" / "never X" / "no X": only unfollow and unguard may come out of it. */
+  negated: boolean
+  /** A real question (not "can you ...?"): only the info intents act on it at full confidence. */
+  asksQuestion: boolean
+}
+
+/**
+ * A statement about someone ("I'm going to get wood", "we need a farm", "the guard is asleep"),
+ * not a request to the bot. Patterns never match these (they are anchored); looser classifiers check it.
+ * Requests phrased as needs ("I need bread", "I could use torches") don't count.
+ */
+export function isStatement (t: string): boolean {
+  if (/^((can|could|does|will|would|is) )?(anyone|someone|somebody|anybody|everyone|everybody)\b/.test(t)) return true
+  return /^(i am|i was|i will|i have|i had|i did|i think|i just|i went|i got|i found|i love|i hate|i saw|i chopped|i built|i made|we|we are|he|she|they|my|his|her|their|our|the|someone|somebody|everyone|nobody)\b/.test(t)
+}
+
+/** "steve, give me your sword": the line starts by naming someone else (the bot's own name is already stripped). */
+export function addressesOther (text: string): boolean {
+  const m = /^\s*@?([A-Za-z0-9_]{3,16})\s*,/.exec(text)
+  return !!m && !/^(hey|hi|yo|oi|ok|okay|alright|right|so|well|now|please|pls|yes|yeah|no|nope|mate|buddy|bro|dude|then|and|also|thanks|sorry)$/i.test(m[1]!)
+}
+
+/** Cleans a line and classifies its sentence shape. Shared by every classifier layer. */
+export function lineShape (text: string): LineShape {
+  const c = clean(text)
+  const negated = /^(do not|never(?! mind)|no) /.test(c.t)
+  const asksQuestion = (c.question && !c.polite) || QUESTION_START.test(c.t)
+  return { ...c, negated, asksQuestion }
+}
+
+/**
+ * Applies the sentence shape to a classifier's raw confidence: negated requests other than
+ * unfollow/unguard are no request at all (null), questions halve the confidence of action
+ * intents ("did you follow him?"), except searches phrased as questions ("where is the village?").
+ */
+export function shapeConfidence (intent: IntentName, confidence: number, shape: LineShape): number | null {
+  if (shape.negated && intent !== 'unfollow' && intent !== 'unguard') return null
+  let c = confidence
+  if (shape.asksQuestion && !INFO.has(intent)) {
+    if (!(intent === 'find' && /^(where|is there|are there|any)\b/.test(shape.t))) c *= 0.5
+  }
+  return Math.round(c * 100) / 100
+}
+
+/** Fills in the speaker for "me"/"us" and for follow/come/guard without a player. */
+export function resolvePlayers (intent: IntentName, args: Record<string, unknown>, ctx: ParseContext): Record<string, unknown> {
+  const out = { ...args }
+  if ('player' in out) out.player = who(out.player as string | undefined, ctx)
+  if (intent === 'follow' || intent === 'come' || intent === 'guard' && out.target === 'player') out.player = out.player || ctx.speaker
+  return out
+}
 
 /**
  * Parses one line (already stripped of the bot's name) into an intent, or null. No match for
  * the whole line means no intent: partial matches would act on chat that wasn't a request.
  */
 export function parseIntent (text: string, ctx: ParseContext): Intent | null {
-  const { t, question, polite } = clean(text)
+  const shape = lineShape(text)
+  const { t } = shape
   if (!t || t.length > 120) return null
-  // "don't follow me" is a request to stop; other negations are never a request to act
-  const negated = /^(do not|never(?! mind)|no) /.test(t)
-  const asksQuestion = (question && !polite) || QUESTION_START.test(t)
   for (const rule of RULES) {
     const m = rule.re.exec(t)
     if (!m) continue
     const r = rule.build(m, ctx)
     if (!r) continue
-    if (negated && r.intent !== 'unfollow' && r.intent !== 'unguard') return null
-    let confidence = r.confidence ?? 0.9
-    if (asksQuestion && !INFO.has(r.intent)) {
-      // "where is the village?" is a search; "did you follow him?" is a question, not a request
-      if (!(r.intent === 'find' && /^(where|is there|are there|any)\b/.test(t))) confidence *= 0.5
-    }
-    const args = { ...(r.args ?? {}) }
-    if ('player' in args) args.player = who(args.player as string | undefined, ctx)
-    if (r.intent === 'follow' || r.intent === 'come' || r.intent === 'guard' && args.target === 'player') args.player = args.player || ctx.speaker
-    return { intent: r.intent, args, confidence: Math.round(confidence * 100) / 100 }
+    const confidence = shapeConfidence(r.intent, r.confidence ?? 0.9, shape)
+    if (confidence === null) return null
+    return { intent: r.intent, args: resolvePlayers(r.intent, r.args ?? {}, ctx), confidence }
   }
   return null
 }

@@ -72,7 +72,7 @@ async function setup (opts: IntentsBrainOptions & { llm?: boolean, unavailable?:
     await rt.start()
     agent.on('chat', m => rt!.onChat(m))
   }
-  const brain = intentsBrain({ ackAfterMs: 20, llmBlocked: () => rt ? rt.blockedReason() : undefined, ...opts })
+  const brain = intentsBrain({ ackAfterMs: 20, llmBlocked: () => rt ? rt.blockedReason() : undefined, llmHandoff: (_a, m) => { rt?.handoff(m); return !!rt }, ...opts })
   brain.start!(agent as any)
   const done = async () => { agent.stopActions(); await rt?.stop() }
   return { agent, provider, rt, done }
@@ -200,5 +200,89 @@ test('! commands are left to the command brain', async () => {
   await settle()
   assert.equal(msg.claimedBy, undefined)
   assert.equal(agent.calls.length, 0)
+  await done()
+})
+
+// ------------------------------------------------------------------ layer pipeline in the brain
+
+/** Bag-of-words vectors (deterministic, no model download), optionally slow. */
+const bowEmbedder = (delayMs = 0) => ({
+  async embed (texts: string[]) {
+    if (delayMs) await new Promise(r => setTimeout(r, delayMs))
+    return texts.map(t => {
+      const v = new Float32Array(128)
+      for (const w of t.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)) { let h = 0; for (const ch of w) h = (h * 31 + ch.charCodeAt(0)) >>> 0; v[h % 128]! += 1 }
+      const n = Math.sqrt(v.reduce((a, x) => a + x * x, 0)) || 1
+      return v.map(x => x / n)
+    })
+  }
+})
+
+const layered = (delayMs = 0): IntentsBrainOptions => ({
+  mode: 'first',
+  layers: [{ use: 'patterns' }, { use: 'embeddings', threshold: 0.9, margin: 0, k: 1 }, { use: 'cloud_llm' }],
+  deps: { embedder: bowEmbedder(delayMs) }
+})
+const examples = { come: ['scurry over to my spot'] }
+
+test('layers: a line the patterns miss is caught by embeddings, claimed once, the LLM never runs', async () => {
+  const { agent, provider, rt, done } = await setup(layered())
+  agent.settings = { intents: { examples } }
+  const msg = agent.chat('Tester', 'pax scurry over to my spot')
+  assert.equal(msg.claimedBy, 'intents', 'claimed synchronously, before the slower layer answers')
+  await settle()
+  await rt!.idle()
+  assert.deepEqual(agent.calls.map(c => c.name), ['come'])
+  assert.equal(provider.inputs.length, 0)
+  await done()
+})
+
+test('layers: nothing understood -> handed back to the LLM exactly once', async () => {
+  const { agent, provider, rt, done } = await setup(layered(20))
+  agent.settings = { intents: { examples } }
+  const msg = agent.chat('Tester', 'pax tell me a joke about creepers')
+  assert.equal(msg.claimedBy, 'intents')
+  await settle(400) // the slow fake embedder indexes the examples first (8 batches)
+  await rt!.idle()
+  assert.equal(provider.inputs.length, 1)
+  assert.match(provider.inputs[0]!.userMessage, /joke about creepers/)
+  assert.deepEqual(agent.said.map(s => s.msg), ['llm here'])
+  assert.equal(agent.calls.length, 0)
+  await done()
+})
+
+test('layers: cloud_llm switched off (toggle) keeps unclear lines away from the LLM', async () => {
+  const { agent, provider, rt, done } = await setup(layered())
+  agent.settings = { intents: { examples, layers: { cloud_llm: { enabled: false } } } }
+  agent.chat('Tester', 'pax tell me a joke about creepers')
+  agent.chat('Tester', 'pax come here')
+  await settle()
+  await rt!.idle()
+  assert.equal(provider.inputs.length, 0)
+  assert.deepEqual(agent.calls.map(c => c.name), ['come'])
+  await done()
+})
+
+test('layers: a slow guess never overtakes a newer command', async () => {
+  const { agent, rt, done } = await setup(layered(30))
+  agent.settings = { intents: { examples } }
+  agent.chat('Tester', 'pax scurry over to my spot')
+  agent.chat('Tester', 'pax stop')
+  await settle(500)
+  await rt!.idle()
+  assert.deepEqual(agent.calls.map(c => c.name), ['stop'])
+  await done()
+})
+
+test('layers: an unavailable embeddings layer falls back to patterns + LLM as before', async () => {
+  const { agent, provider, rt, done } = await setup({ ...layered(), deps: { embedder: async () => { throw new Error('no onnxruntime') } } })
+  agent.chat('Tester', 'pax tell me a joke')     // first line: the layer tries to load, fails, hands back
+  await settle()
+  await rt!.idle()
+  const b = agent.chat('Tester', 'pax another joke please')
+  assert.equal(b.claimedBy, undefined, 'decided synchronously once the layer is known to be unavailable')
+  await settle()
+  await rt!.idle()
+  assert.equal(provider.inputs.length >= 1, true)
   await done()
 })
