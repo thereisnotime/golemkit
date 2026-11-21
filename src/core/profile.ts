@@ -156,6 +156,7 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   const profile = ProfileSchema.parse(YAML.parse(text))
   const settings: Record<string, unknown> = { ...profile.settings }
   if (profile.respectBuilds !== undefined) settings.respectBuilds = profile.respectBuilds
+  settings.profileName = name   // so the bot can tell which profile it is (observe: profile)
   if (profile.llm) settings.llm = { ...(settings.llm as object | undefined), ...profile.llm }
   if (profile.humanize !== undefined) settings.humanize = profile.humanize
   if (profile.reflexes) settings.reflexes = { ...(settings.reflexes as object | undefined), ...profile.reflexes }

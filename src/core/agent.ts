@@ -542,6 +542,8 @@ export class Agent extends TypedEmitter<AgentEvents> {
     for (const i of bot.inventory.items()) inventory[itemName(i)] = (inventory[itemName(i)] ?? 0) + i.count
     const snapshot: Record<string, unknown> = {
       username: bot.username,
+      variant: this.definition.name,
+      ...((this.baseSettings as { profileName?: string }).profileName ? { profile: (this.baseSettings as { profileName?: string }).profileName } : {}),
       position: fmtPos(pos),
       dimension: bot.game.dimension,
       // World spawn (compass target); context packs use it for "don't dig near spawn" rules.
