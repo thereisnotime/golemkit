@@ -61,6 +61,7 @@ journal:                      # optional, event journal settings (on by default)
 | `journal` | [event journal](/guide/journal): types, caps, retention, optional LLM summary; `false` turns it off. See [Event journal](./journal) |
 | `context` | [context pack](/guide/context-pack) dir (default: `profiles/<name>/` if it exists), see [Context packs](./context-pack) |
 | `building` | [building policy](/guide/blueprints#building-policy): `library` (default), `creative` or `ask` |
+| `worldedit` | `true`/`false` forces [WorldEdit](/guide/worldedit) on or off; or `{ enabled, maxBlocks, ownersOnly, replyMs }`. Lands in `settings.worldedit` |
 | `blueprints` | extra blueprint folders (relative to the profile), added to `settings.build.blueprintDirs` |
 | `behaviors` | armed behaviours for the [behaviours brain](/guide/behaviors): `{ name: true \| false \| { enabled?, ...options } }`, checked against the registry when the profile is run, see [Behaviours](./behaviors) |
 

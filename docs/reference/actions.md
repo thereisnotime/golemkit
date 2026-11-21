@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-21 skills, 73 actions.
+22 skills, 92 actions.
 
 ## blueprint-library
 
@@ -70,7 +70,7 @@ Decide which blueprint to build for a request, following the building policy (co
 
 ### `blueprint_import`
 
-Import a schematic file (Sponge .schem, Litematica .litematic or structure .nbt) from the import folder into my learned blueprints (owners only). Refuses more than the block limit (default 4000) and suggests a crop.
+Import a schematic file (Sponge/WorldEdit .schem, legacy MCEdit .schematic, Litematica .litematic, structure .nbt incl. Create, Axiom .bp; read by content) from the import folder into my learned blueprints (owners only). Refuses more than the block limit (default 4000) and suggests a crop.
 
 *non-exclusive*
 
@@ -81,6 +81,7 @@ Import a schematic file (Sponge .schem, Litematica .litematic or structure .nbt)
 | `crop` | string |  |  | keep only "x1 y1 z1 x2 y2 z2" (the file's own coordinates) |
 | `max_blocks` | integer (1..9007199254740991) |  |  | block limit for this import (default settings.build.importMaxBlocks, 4000) |
 | `air` | boolean |  | `true` | false: empty space in the file is "don't care" instead of "must be clear" |
+| `terrain` | boolean |  | `true` | false: ground cover the file carries from its surroundings (grass, paths, podzol, farmland) becomes dirt, plants, crops and leaves are left out |
 | `exact` | boolean |  | `false` | keep the exact wood of wooden blocks (default: any wood, following the build theme) |
 | `facing` | `north` \| `east` \| `south` \| `west` |  |  | the side its entrance is on as drawn; default the side of the first door |
 | `tags` | any |  |  | house, defence, farm, decoration, or your own (a list, or comma separated) |
@@ -570,7 +571,7 @@ Gathering and crafting everything a job needs.
 
 ### `gather_materials`
 
-Get the materials for a job in one go: chops as many trees as needed (crafting a wooden axe first), turns logs into planks and sticks, crafts wooden items (stairs, slabs, fences, doors, trapdoors, ladders, crafting tables, chests, tools), mines cobblestone with a pickaxe and other simple blocks, and tries for the extras: torches (coal, or charcoal smelted from logs), glass panes (sand smelted into glass), a bed (wool from sheep nearby). Extras it can't get are skipped and reported. Give either items, e.g. {"planks": 80, "door": 1} ("planks", "log", "door", "stairs", "slab", "fence", "bed" mean any wood/colour), or template="small_house" for everything a blueprint needs. Prefer this over many chop_tree/craft calls. Needs digging enabled to chop or mine.
+Get the materials for a job in one go: chops as many trees as needed (crafting a wooden axe first), turns logs into planks and sticks, crafts wooden items (stairs, slabs, fences, doors, trapdoors, ladders, crafting tables, chests, tools), mines cobblestone with a pickaxe and other simple blocks, makes the stone family (cobblestone/stone/stone brick slabs, stairs and walls, stone bricks, smooth stone; smelting cobblestone into stone in a furnace), and tries for the extras: torches (coal, or charcoal smelted from logs), glass panes (sand smelted into glass), a bed (wool from sheep nearby). Extras it can't get are skipped and reported. Give either items, e.g. {"planks": 80, "door": 1} ("planks", "log", "door", "stairs", "slab", "fence", "bed" mean any wood/colour), or template="small_house" for everything a blueprint needs. Prefer this over many chop_tree/craft calls. Needs digging enabled to chop or mine.
 
 *long-running*
 
@@ -906,6 +907,224 @@ Fell the nearest natural tree (any wood type): cut the logs it can reach, pick u
 | `radius` | number (4..64) |  | `32` | how far to look for a tree, in blocks |
 | `replant` | boolean |  | `true` | plant a sapling of the same kind afterwards if the bot has one |
 | `make_axe` | boolean |  | `true` | craft a wooden axe first when there is none and there is wood for it |
+
+## worldedit
+
+WorldEdit commands (mod or plugin, or FAWE) on servers that have it and give me permission; owners only, with a block limit.
+
+### `we_status`
+
+Is WorldEdit available on this server for me? Checks settings, the channels and registries the server announced, and if those say nothing asks the server with /we version. Also shows my selection, clipboard and limit.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `refresh` | boolean |  | `false` | ask the server again instead of the cached answer |
+
+### `we_select`
+
+Select a WorldEdit region (//pos1 and //pos2): two corners x1 y1 z1 x2 y2 z2, or a box around the asking player (or me): radius around them, height up from their feet. Owners only.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `x1` | number |  |  |  |
+| `y1` | number |  |  |  |
+| `z1` | number |  |  |  |
+| `x2` | number |  |  |  |
+| `y2` | number |  |  |  |
+| `z2` | number |  |  |  |
+| `radius` | integer (0..64) |  | `3` | around the player: blocks out from them on each side |
+| `height` | integer (1..64) |  | `4` | around the player: from their feet up |
+| `down` | integer (0..64) |  | `0` | around the player: blocks below their feet to include |
+
+### `we_set`
+
+Fill the selected WorldEdit region with a block pattern (//set). Owners only; refused over the block limit (worldedit.maxBlocks) or in protected areas.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `pattern` | string | yes |  | block or WorldEdit pattern, e.g. stone_bricks, oak_planks, 50%stone,50%cobblestone, oak_stairs[facing=north] |
+| `protected_ok` | boolean |  | `false` | owners only: allow it inside a protected area or the spawn area, when the owner explicitly asked for that spot |
+
+### `we_replace`
+
+Replace one block (or mask) with another pattern in the selected region (//replace from to). Owners only; block limit and protected areas apply.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `from` | string | yes |  | block or mask to replace, e.g. dirt, grass_block,dirt |
+| `to` | string | yes |  | block or pattern to put instead |
+| `protected_ok` | boolean |  | `false` | owners only: allow it inside a protected area or the spawn area, when the owner explicitly asked for that spot |
+
+### `we_walls`
+
+Build walls around the sides of the selected region (//walls), not floor or ceiling. Owners only; block limit and protected areas apply.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `pattern` | string | yes |  | block or WorldEdit pattern, e.g. stone_bricks, oak_planks, 50%stone,50%cobblestone, oak_stairs[facing=north] |
+| `protected_ok` | boolean |  | `false` | owners only: allow it inside a protected area or the spawn area, when the owner explicitly asked for that spot |
+
+### `we_outline`
+
+Cover all six faces of the selected region (//faces, also known as //outline): walls, floor and ceiling. Owners only; block limit and protected areas apply.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `pattern` | string | yes |  | block or WorldEdit pattern, e.g. stone_bricks, oak_planks, 50%stone,50%cobblestone, oak_stairs[facing=north] |
+| `protected_ok` | boolean |  | `false` | owners only: allow it inside a protected area or the spawn area, when the owner explicitly asked for that spot |
+
+### `we_hollow`
+
+Hollow out the objects in the selected region (//hollow), leaving a shell of the given thickness, inside filled with the pattern (default air). Owners only; block limit and protected areas apply.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `thickness` | integer (1..8) |  | `1` |  |
+| `pattern` | string |  | `"air"` | what to fill the inside with |
+| `protected_ok` | boolean |  | `false` | owners only: allow it inside a protected area or the spawn area, when the owner explicitly asked for that spot |
+
+### `we_copy`
+
+Copy the selected region to the WorldEdit clipboard (//copy). The clipboard remembers where I stood: we_paste puts it back relative to where I stand then. Owners only.
+
+*non-exclusive*
+
+No parameters.
+
+### `we_cut`
+
+Cut the selected region to the WorldEdit clipboard (//cut): copies it and leaves air. Owners only; block limit and protected areas apply.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `protected_ok` | boolean |  | `false` | owners only: allow it inside a protected area or the spawn area, when the owner explicitly asked for that spot |
+
+### `we_paste`
+
+Paste the WorldEdit clipboard (//paste) where I stand, or walk to x y z first. skip_air=true (-a) leaves existing blocks where the clipboard has air. Owners only; the clipboard size is checked against the block limit and protected areas first.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `skip_air` | boolean |  | `true` | -a: don't paste air |
+| `original` | boolean |  | `false` | -o: paste where it was copied from, not where I stand |
+| `x` | number |  |  | walk here first (where I stand is where the clipboard origin goes) |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
+| `protected_ok` | boolean |  | `false` | owners only: allow it inside a protected area or the spawn area, when the owner explicitly asked for that spot |
+
+### `we_rotate`
+
+Rotate the WorldEdit clipboard around the vertical axis (//rotate), in steps of 90 degrees. Owners only.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `degrees` | any | yes |  | 90, 180, 270 or -90 |
+
+### `we_flip`
+
+Flip (mirror) the WorldEdit clipboard (//flip) along a direction; default the way I face. Owners only.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `direction` | `north` \| `south` \| `east` \| `west` \| `up` \| `down` |  |  |  |
+
+### `we_undo`
+
+Undo my last WorldEdit change(s) (//undo). Owners only.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `times` | integer (1..10) |  | `1` |  |
+
+### `we_redo`
+
+Redo WorldEdit changes I undid (//redo). Owners only.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `times` | integer (1..10) |  | `1` |  |
+
+### `we_schem_list`
+
+List the schematics in the server's WorldEdit schematics folder (//schem list). Owners only.
+
+*non-exclusive*
+
+No parameters.
+
+### `we_schem_load`
+
+Load a schematic from the server's WorldEdit schematics folder into the clipboard (//schem load name), then we_paste puts it down. Only files already on the server; I can't upload any. Owners only.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `name` | string | yes |  | schematic name, with or without .schem |
+
+### `we_schem_save`
+
+Save the WorldEdit clipboard as a schematic in the server's schematics folder (//schem save name). Owners only.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `name` | string | yes |  | schematic name (letters, digits, _ and -) |
+| `overwrite` | boolean |  | `false` | -f: replace a schematic of that name |
+
+### `we_raw`
+
+Run one other WorldEdit command from a whitelist (size, count, distr, sel, desel, pos1, pos2, hpos1, hpos2, expand, contract, shift, outset, inset, chunk, clearclipboard, set, replace, walls, faces, outline, hollow, overlay, naturalize, smooth, center, centre, line, move, stack), e.g. "//expand 5 up" or "//stack 3 north". Commands that change blocks need a selection from we_select and stay under the block limit. Owners only.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `command` | string | yes |  | the command with its arguments, e.g. "//expand 5 up" |
+| `protected_ok` | boolean |  | `false` | owners only: allow it inside a protected area or the spawn area, when the owner explicitly asked for that spot |
+
+### `we_build`
+
+Build a library blueprint with WorldEdit when an owner asks for it: if WorldEdit is available and the server already has a schematic with that name (//schem list), load and paste it (-a) at x y z (or where I stand); otherwise, or when that fails, build it the normal way (build). I can't upload schematics to the server. Owners only.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `template` | string | yes |  | blueprint name (also the schematic name looked for on the server) |
+| `schematic` | string |  |  | schematic name on the server if it differs from the blueprint name |
+| `x` | number |  |  |  |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
+| `facing` | `north` \| `east` \| `south` \| `west` |  |  | for the normal build fallback |
+| `fallback` | boolean |  | `true` | build it normally when WorldEdit can't |
+| `gather` | boolean |  | `false` | normal build: gather missing materials first |
+| `protected_ok` | boolean |  | `false` | owners only: allow it inside a protected area or the spawn area, when the owner explicitly asked for that spot |
 
 ## behaviors (brain)
 
