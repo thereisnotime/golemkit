@@ -44,3 +44,17 @@ health <= 10 or there is no shield, else shield.
 
 mineflayer-pvp: pinned to an old mineflayer and has no crits or spacing. A separate brain for
 combat: would fight reflexes over the body; keeping it inside `defend` keeps one owner.
+
+## Found in live runs
+
+- A creeper walking up while the bot fought a zombie blew it up in full iron: the loop now ends
+  the fight (`retarget`) when a creeper comes within 5 blocks of a bot fighting something else.
+- Repeated `defend` runs each measured the chase from their own start, so the bot drifted down a
+  hillside 30 blocks: the chase is now measured from an anchor that lives until 20 s without a
+  fight, and `defend` walks back to it afterwards.
+- After a respawn the hurt event for our own entity went missing once (5 s idle while hit): a
+  health drop now triggers the same reflex.
+- Exploding creepers were counted as kills: a kill needs the death animation (entityDead).
+- At full hunger bread can't be eaten, so the heal back-off also applies at food >= 18, where
+  natural regeneration does the healing.
+- A shield already in the offhand wasn't found (`inventory.items()` skips slot 45).

@@ -154,8 +154,11 @@ flowchart TB
 - **Archers**: shot with a bow when it has arrows; otherwise approached in a zig-zag sprint, or
   behind a raised shield. When it can't get closer for 3 s it backs out of the line of fire.
 - **Spiders** on walls aren't followed; it waits on the ground for them to drop.
-- **Chase limit** (`combat.maxChase`, default 16): a fight ends this far from where it started,
-  and `defend` caps the total drift, so a reflex fight doesn't drag the bot away from shelter.
+- **Chase limit** (`combat.maxChase`, default 16): measured from where the run of fights started
+  (kept until 20 s pass without a fight), and `defend` walks back there afterwards, so reflex
+  fights don't drag the bot away from shelter.
+- **Creepers first**: a creeper coming within 5 blocks ends the current fight so it gets dealt
+  with before its fuse.
 - **Outnumbered** (3+ melee mobs within 6, health under half): pillar 2 blocks (zombies can't
   reach feet that high, the bot still reaches their heads) and fight from the top; without
   blocks, go home if it is within 48 blocks, else back off.
