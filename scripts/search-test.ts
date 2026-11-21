@@ -3,7 +3,7 @@
 //   node scripts/search-test.ts walk 205 165 234 333          both walk to each x/z in turn (the tester stops a few blocks off)
 //   node scripts/search-test.ts run 'find_target {"target":"iron"}' 'bring_item {"item":"bread","count":2}'
 //                                                              runs actions as if the tester asked, one after the other
-//   node scripts/search-test.ts drops                         the bot drops what it holds, walks off and fetches it back (fetch_drops with x y z)
+//   node scripts/search-test.ts drops                         the tester drops what it holds and walks off, the bot fetches it back (fetch_drops with x y z)
 //   node scripts/search-test.ts tidy                          drops what the tester was given and lists the bot's own chests
 // The bot is SEARCH_BOT (default FindTest), owned by SEARCH_TESTER (default FindTester), who
 // stands next to it and receives what it brings. Data lives in data/search-test.
@@ -79,6 +79,7 @@ async function stop (...agents: Agent[]): Promise<void> {
 
 /** Walks the tester to within a few blocks of the bot. */
 async function joinUp (bot: Agent, tester: Agent): Promise<void> {
+  if (process.env.SEARCH_NO_JOIN === 'true') return
   const p = bot.bot.entity.position
   if (tester.bot.entity.position.distanceTo(p) < 6) return
   await act(tester, 'goto', { x: Math.floor(p.x) + 3, z: Math.floor(p.z) + 2 }, false)
@@ -127,12 +128,14 @@ async function main (): Promise<void> {
         log(state(tester))
       }
     } else if (mode === 'drops') {
-      // stand-in for a death: the bot drops what it carries here, walks off 20 blocks, then fetches it back for the tester
+      // stand-in for a death: the tester drops what it carries and walks off 12 blocks, the bot
+      // walks 20 the other way, then fetch_drops brings the items back to the tester
       await joinUp(bot, tester)
-      const p = bot.bot.entity.position.floored()
-      if (!bot.bot.inventory.items().length) { log('the bot carries nothing to drop'); return }
-      await act(bot, 'drop', { item: 'all' }, false)
-      await act(bot, 'goto', { x: p.x + 20, z: p.z }, false)
+      const p = tester.bot.entity.position.floored()
+      if (!tester.bot.inventory.items().length) { log('the tester carries nothing to drop'); return }
+      await act(tester, 'drop', { item: 'all' }, false)
+      await act(tester, 'goto', { x: p.x, z: p.z + 12 }, false)
+      await act(bot, 'goto', { x: p.x, z: p.z - 20 }, false)
       await act(bot, 'fetch_drops', { player: TESTER, x: p.x, y: p.y, z: p.z })
       log(state(bot))
       log(state(tester))

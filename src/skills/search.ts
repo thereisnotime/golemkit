@@ -594,7 +594,7 @@ async function deliver (ctx: Ctx, who: string, items: Record<string, number>, fa
       }
     }
     const tossed = before - invCount(bot, has)
-    for (let i = 0; i < 20 && picked < tossed; i++) await sleep(200, signal)
+    for (let i = 0; i < 30 && picked < tossed; i++) await sleep(200, signal)
   } finally {
     bot.removeListener('playerCollect', onCollect)
   }
@@ -1033,7 +1033,7 @@ const fetchDrops = defineAction({
     say(`picked up ${n} items, coming back`, true)
     const d = await deliver(ctx, who, got, origin)
     const list = Object.entries(got).map(([k, v]) => `${v} ${k}`).join(', ')
-    return d.given >= n ? ok(`brought back ${list} from ${fmtPos(at)}: ${d.message} (${secs()})`, { got, given: d.given }) : fail(`picked up ${list} at ${fmtPos(at)}; ${d.message} (${secs()})`, { got, given: d.given })
+    return d.ok ? ok(`brought back ${list} from ${fmtPos(at)}: ${d.message} (${secs()})`, { got, given: d.given }) : fail(`picked up ${list} at ${fmtPos(at)}; ${d.message} (${secs()})`, { got, given: d.given })
   }
 })
 
