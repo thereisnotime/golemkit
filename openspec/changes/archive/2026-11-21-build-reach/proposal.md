@@ -29,3 +29,6 @@ through terrain and then waits for a move event with no timeout.
   creeper is close.
 - Creative: own `flyNear` (up, across, down, never into a block, time limit, honours the
   signal); creative stock has a per-slot timeout and counts what arrived.
+- Creative build methods: `hand` (default, with `build.handDelayMs`) and `commands` (/fill runs
+  and /setblock when op, falls back to hand), chosen by the action's `method` or the live
+  setting `build.creativeMethod`.

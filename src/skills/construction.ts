@@ -20,6 +20,7 @@ import { placeBlockState, toggleBlock, reachToDig, newStandMemory, NotPlaceableY
 import { gatherMaterials, wantsForRoles, type RoleWants } from './materials.ts'
 import { isCreative, takeFromCreative } from './creative.ts'
 import { libraryDirs, loadLibrary } from './blueprint-library.ts'
+import { chooseMethod, creativeSettings, cellBlocks, planCommands, runCommands, handPause, BUILD_METHODS, type BuildMethod } from './creative-build.ts'
 
 const ACTIVE_KEY = 'build.active'
 /** Positions of blocks this bot placed for builds, so it never mistakes its own work for a player's. */
@@ -276,7 +277,7 @@ export function remainingWants (ctx: Pick<ActionContext, 'bot' | 'agent' | 'play
   return { ...wantsForRoles(bp.cells, resolveRoles(bp, inventoryCounts(ctx.bot), material, theme)), note: '' }
 }
 
-export interface BuildParams extends PlanInput { gather: boolean, path?: boolean, replace?: boolean }
+export interface BuildParams extends PlanInput { gather: boolean, path?: boolean, replace?: boolean, method?: BuildMethod }
 
 type BuildCtx = Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log' | 'player'>
 
@@ -408,14 +409,25 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
     return ok(`the ${bp.name} at ${fmtPos(origin)} is already complete`)
   }
 
+  // Creative: by hand (default) or with /fill and /setblock when op (falls back to hand without op)
+  const creative = isCreative(bot)
+  const ccfg = creativeSettings(agent.settings)
+  let methodNote = ''
+  if (chooseMethod(creative, params.method, ccfg.method) === 'commands') {
+    const r = await buildWithCommands(ctx, { ...planned, roles }, diff, own, total, save)
+    if (typeof r !== 'string') return r
+    methodNote = `no op rights for commands (${r.slice(0, 80)}), built by hand instead; `
+    log.info('build: commands refused, building by hand', { reply: r.slice(0, 200) })
+  }
+
   // Materials for what is still to place; gather first if asked.
   let rows = materials([...diff.place, ...diff.dig], roles, inventoryCounts(bot))
-  let gatherNote = ''
+  let gatherNote = methodNote
   if ((params.gather || isCreative(bot)) && rows.some(r => r.missing)) {
     const want = wantsForRoles([...diff.place, ...diff.dig], roles)
     log.info('gathering materials before building', { need: fmtMaterials(rows) })
     const g = await gatherMaterials(ctx, want.required, { optional: want.optional, fallbacks: want.fallbacks, theme })
-    gatherNote = isCreative(bot) ? `${g.message}; ` : `gathered first (${g.message}); `
+    gatherNote = methodNote + (isCreative(bot) ? `${g.message}; ` : `gathered first (${g.message}); `)
     log.info('materials gathered', { ok: g.ok, result: g.message })
     checkAborted(signal)
     await travel(bot, { x: origin.x, y: origin.y, z: origin.z }, signal, { range: 3 }).catch(e => { checkAborted(signal); log.debug('travel back to site', { error: (e as Error).message }) })
@@ -529,6 +541,7 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
     try {
       const res = await placeBlockState(bot, pick!.item, vec(bot, c.x, c.y, c.z), relax ? undefined : pick!.state, signal, { accepts: n => roleAccepts(r!, n), canDig: agent.canDig, log, stands })
       own.add(c)
+      if (creative) await handPause(ccfg.handDelayMs, signal) // a player doesn't place 10 blocks a second
       if (pick!.fallback) usedFallback.set(c.role, pick!.item)
       if (!res.ok) log.debug('placed with a wrong state', { at: fmtPos(c), item: pick!.item, wrong: res.check.hard.join(','), via: res.via })
       return 'done'
@@ -697,6 +710,39 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
   return fail(`${gatherNote}built ${sum.built}/${total} blocks of the ${bp.name} ${where}${counts}, ${sum.missingRequired} required still missing${stuckNote}: ${why}${tail}. Calling build again resumes it`, { ...data, unreachable: missingKeys.filter(k => unreachable.has(k)) })
 }
 
+/**
+ * The commands method (creative, op): clears the plan's air cells, fills dips under the floor,
+ * places the structure bottom-up with merged /fill runs and /setblock, attachments last, then
+ * reads every block back. Returns the server's reply text when the bot has no op rights.
+ */
+async function buildWithCommands (ctx: BuildCtx, plan: Plan, diff: ReturnType<typeof diffCells>, own: ReturnType<typeof ownBlocks>, total: number, save: (placed: number) => void): Promise<ActionResult | string> {
+  const { bot, agent, signal, log } = ctx
+  const { bp, origin, facing, cells, roles } = plan
+  const P3 = (c: Pos) => ({ x: c.x, y: c.y, z: c.z })
+  const blocks = solidCells([...diff.place, ...diff.dig]).flatMap(c => cellBlocks(c, roles[c.role]!.item, roles[c.role]!.kind ?? 'block'))
+  const commands = planCommands({ clear: diff.clear.map(P3), fills: plan.fills.filter(f => isReplaceable(blockName(bot, f))).map(P3), blocks })
+  if (!commands.length) return ok(`the ${bp.name} at ${fmtPos(origin)} is already complete`)
+  const t0 = Date.now()
+  log.info(`building ${bp.name} with commands`, { at: fmtPos(origin), facing, commands: commands.length, blocks: blocks.length })
+  const run = await runCommands(agent, commands, signal, log)
+  if (run.noRights) return run.noRights
+  await sleep(1000, signal) // block updates
+  const rowsQ = qualityRows(bot, cells, roles)
+  const sum = summarize(rowsQ)
+  solidCells(cells).forEach((c, i) => { if (rowsQ[i]!.check.status === 'ok' || rowsQ[i]!.check.status === 'soft') own.add(c) })
+  save(sum.built)
+  const warn = `${run.sent} op commands, each shown to other ops as an admin message (gamerule logAdminCommands)`
+  log.warn('build: op commands are visible to other ops', { commands: run.sent })
+  const secs = Math.round((Date.now() - t0) / 1000)
+  const data = { origin, facing, method: 'commands', commands: run.sent, total, built: sum.built, wrongState: sum.wrongState, seconds: secs }
+  const errs = run.errors.length ? `; server said: ${run.errors.slice(0, 2).join(' | ')}` : ''
+  if (sum.missingRequired === 0) {
+    agent.storage.delete(ACTIVE_KEY)
+    return ok(`built a ${bp.name} at ${fmtPos(origin)} facing ${facing} with commands: ${sum.built}/${total} blocks right${sum.wrongState ? `, ${sum.wrongState} facing the wrong way` : ''} (${warn})${errs}`, data)
+  }
+  return fail(`placed a ${bp.name} at ${fmtPos(origin)} with commands but only ${sum.built}/${total} blocks are right, ${sum.missingRequired} required missing (${warn})${errs}. Calling build again with method=hand finishes it by hand`, data)
+}
+
 /** Every planned block checked against the world. */
 function qualityRows (bot: Bot, cells: WorldCell[], roles: Record<string, ResolvedRole>): QualityRow[] {
   return solidCells(cells).map(c => {
@@ -772,6 +818,7 @@ const build = defineAction({
     theme: themeSchema,
     gather: z.boolean().default(false).describe('gather missing materials first (chop trees, mine, craft)'),
     path: z.boolean().default(true).describe('dig a short dirt path from the door afterwards when the bot can make a shovel'),
+    method: z.enum(BUILD_METHODS).optional().describe('creative only: hand = place block by block like a player (default), commands = /fill and /setblock when the bot is op (fast; every command shows to other ops as an admin message), auto = the build.creativeMethod setting. Survival always builds by hand'),
     replace: z.boolean().default(false).describe('owners only: also dig up and replace blocks in the footprint that look player-made (e.g. an older build of ours being upgraded). Only when the owner asked to fix, upgrade or rebuild something there')
   }),
   longRunning: true,

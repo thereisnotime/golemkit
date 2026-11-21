@@ -8,4 +8,5 @@
 - [x] Reflexes keep climbing unless a melee mob is on the bot
 - [x] Creative flyNear and creative stock timeouts
 - [x] Tests: build-reach.test.ts, creative.test.ts
-- [x] Docs: goals-and-building, world
+- [x] Creative build methods (hand, commands), settings and toggles, creative-build.test.ts
+- [x] Docs: goals-and-building, world, live-config

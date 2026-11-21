@@ -622,6 +622,40 @@ forever for a move event), so tall parts need no scaffolding. A slot the server 
 within 6 s stops the stocking with a note, and what was taken is counted from the inventory. No tools are made; a shovel for the path comes from the creative inventory too.
 Survival is unchanged.
 
+A creative build has two methods (the `build` action's `method`, else `build.creativeMethod`;
+`auto` means `hand`; survival ignores both and always builds by hand):
+
+- **hand** (default): like a player. It stocks up from the creative inventory, walks (or flies
+  to high spots), places what's in reach before moving, in build order with the placement
+  planner, and pauses `build.handDelayMs` (default 150 ms, jittered) after each block.
+- **commands**: fast, for an op. The plan's air cells that hold something are cleared (only
+  those: a hut inside a fort's footprint stays), dips under the floor are filled with
+  cobblestone, then the structure goes in bottom-up with `/fill` for identical blocks merged
+  into runs, rectangles and boxes, and `/setblock` for single blocks, with the blueprint's block
+  states. A facing torch becomes a `wall_torch`, doors get both halves (`half=lower/upper`), beds
+  both parts (`part=foot/head`, the head one step along the facing), and attachments, doors and
+  furniture go last. Every block is read back and the result says "N/M blocks right". The first
+  command's reply tells whether the bot may use commands: "Unknown or incomplete command" or a
+  permission message means no op rights, and the build carries on by hand with a note. Every op
+  command shows up to other ops as a grey admin message (gamerule `logAdminCommands`), which is
+  why runs are merged; the result says how many were sent.
+
+```mermaid
+flowchart LR
+  B(["build in creative"]) --> M{"method"}
+  M -- "hand / auto" --> H["stock from creative inventory,<br/>walk or fly, place with delay"]
+  M -- commands --> C["clear air cells, fill dips,<br/>/fill runs bottom-up, attachments last"]
+  C --> R{"first reply:<br/>unknown command / no permission?"}
+  R -- yes --> H
+  R -- no --> V["read back: N/M right"]
+  classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
+  class B a
+  class M,R d
+  class H,C,V g
+```
+
 ### ensureTool
 
 `ensureTool(bot, signal, kind, { minTier?, cheapOnly? })` in `src/skills/toolkit.ts` makes
