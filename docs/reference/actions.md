@@ -153,6 +153,7 @@ Build a whole structure from a blueprint. For "build a house" use small_house (c
 | `theme` | string |  |  | wood to build with: oak, spruce, birch, jungle, acacia, dark_oak, mangrove, cherry, pale_oak; default whatever wood the bot has most of |
 | `gather` | boolean |  | `false` | gather missing materials first (chop trees, mine, craft) |
 | `path` | boolean |  | `true` | dig a short dirt path from the door afterwards when the bot can make a shovel |
+| `replace` | boolean |  | `false` | owners only: also dig up and replace blocks in the footprint that look player-made (e.g. an older build of ours being upgraded). Only when the owner asked to fix, upgrade or rebuild something there |
 
 ### `build_plan`
 

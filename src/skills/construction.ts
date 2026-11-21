@@ -263,7 +263,7 @@ export function remainingWants (ctx: Pick<ActionContext, 'bot' | 'agent' | 'play
   return { ...wantsForRoles(bp.cells, resolveRoles(bp, inventoryCounts(ctx.bot), material, theme)), note: '' }
 }
 
-export interface BuildParams extends PlanInput { gather: boolean, path?: boolean }
+export interface BuildParams extends PlanInput { gather: boolean, path?: boolean, replace?: boolean }
 
 type BuildCtx = Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log' | 'player'>
 
@@ -350,7 +350,12 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
   let { bp, origin, facing, cells, roles, theme } = planned
   const at = (p: Pos) => blockName(bot, p)
   const own = ownBlocks(agent)
-  let diff = diffCells(cells, at, roles, agent.canDig, own.has)
+  // replace=true (only for an owner): blocks in the footprint that don't fit may be dug and replaced,
+  // e.g. our own older builds from before build.own existed. Never inside protected areas.
+  const ownerAsked = !!params.replace && !!ctx.player && agent.isOwner(ctx.player)
+  if (params.replace && !ownerAsked) return fail('replace=true is only for my owners: I don\'t dig up blocks I can\'t tell are mine otherwise')
+  const mine = (p: Pos) => own.has(p) || (ownerAsked && !agent.protectedAreas.isProtected(p))
+  let diff = diffCells(cells, at, roles, agent.canDig, mine)
   if (diff.blocked.length) {
     const b = diff.blocked[0]!
     if (planned.resumed) agent.storage.delete(ACTIVE_KEY)
@@ -377,7 +382,7 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
     await travel(bot, { x: origin.x, y: origin.y, z: origin.z }, signal, { range: 3 }).catch(e => { checkAborted(signal); log.debug('travel back to site', { error: (e as Error).message }) })
     theme = params.theme ?? theme ?? pickTheme(inventoryCounts(bot)) ?? undefined
     roles = resolveRoles(bp, inventoryCounts(bot), params.material, theme)
-    diff = diffCells(cells, at, roles, agent.canDig, own.has)
+    diff = diffCells(cells, at, roles, agent.canDig, mine)
     rows = materials([...diff.place, ...diff.dig], roles, inventoryCounts(bot))
   }
   const required = rows.filter(r => !r.optional)
@@ -411,7 +416,7 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
 
   /** Places one cell (digging what's in the way first). 'later' = nothing to click for its state yet. */
   const placeCell = async (c: WorldCell, relax: boolean): Promise<'done' | 'skip' | 'later' | 'failed'> => {
-    const state = cellState(c, at(c), roles, agent.canDig, own.has(c))
+    const state = cellState(c, at(c), roles, agent.canDig, mine(c))
     if (state === 'done') return 'done'
     if (state === 'blocked') { errors.push(`${at(c)} in the way at ${fmtPos(c)}`); return 'failed' }
     const r = c.role === 'air' || c.passive ? null : roles[c.role]!
@@ -668,7 +673,8 @@ const build = defineAction({
     material: z.string().optional().describe('main block, e.g. spruce_planks or cobblestone; default whatever fits that the bot has most of'),
     theme: themeSchema,
     gather: z.boolean().default(false).describe('gather missing materials first (chop trees, mine, craft)'),
-    path: z.boolean().default(true).describe('dig a short dirt path from the door afterwards when the bot can make a shovel')
+    path: z.boolean().default(true).describe('dig a short dirt path from the door afterwards when the bot can make a shovel'),
+    replace: z.boolean().default(false).describe('owners only: also dig up and replace blocks in the footprint that look player-made (e.g. an older build of ours being upgraded). Only when the owner asked to fix, upgrade or rebuild something there')
   }),
   longRunning: true,
   run: (ctx, p) => buildStructure(ctx, p)
