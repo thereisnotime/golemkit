@@ -15,6 +15,7 @@
 | debug | `just probe` | connect once, print the world snapshot |
 | debug | `just chat-test "!help,!pos"` | join as a second player and send commands |
 | debug | `just reset-channels` | forget learned NeoForge channels |
+| llm | `just llm-eval --dry` | A/B eval of a profile's context pack (real providers need `--yes`) |
 | docs | `just docs` | docs site dev server |
 | docs | `just docs-gen` | regenerate the action reference |
 | docs | `just docs-build` | static HTML in `docs/.vitepress/dist` |

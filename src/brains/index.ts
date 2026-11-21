@@ -4,3 +4,4 @@ export { npcBrain, actionBehavior, type Behavior, type NpcOptions } from './npc/
 export { sceneBrain, sceneSkill, scene, b, defineScene, type SceneBrainOptions } from './scene/index.ts'
 export { llmBrain, llmRuntime, llmFleetUsage, llmUsageAction, type LlmBrainOptions } from './llm.ts'
 export { selfImprover, type SelfImproverOptions } from './self/index.ts'
+export { hooksBrain, HOOKS_CALLER, type HooksBrainOptions } from './hooks.ts'

@@ -14,6 +14,8 @@ import { LlmRuntime, type LimitOptions, type RuntimeOptions, type TriggerOptions
 import type { LlmProvider } from '../llm/types.ts'
 import type { MemoryOptions } from '../llm/memory.ts'
 import type { BotToolsOptions } from '../llm/tools.ts'
+import { contextFor, disposeContext, emitLlmBudgetExhausted } from '../context/handle.ts'
+import { skillTools } from '../context/skills.ts'
 
 export interface LlmBrainOptions {
   /** A provider instance, or a name: claude-subscription | codex | anthropic | opencode | openai. Default MC_LLM_PROVIDER or claude-subscription. */
@@ -105,6 +107,10 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
       const s = fromSettings(agent)
       const triggerKeys = ['listen', 'aliases', 'conversationMs', 'ownersOnly', 'tickMs', 'mention', 'whisper', 'ambientBatchMs', 'ambientMinGapMs', 'playerCooldownMs']
       const triggersFromProfile = Object.fromEntries(triggerKeys.filter(k => s[k] !== undefined).map(k => [k, s[k]]))
+      // Context pack (profile `context:` / profiles/<name>/): prompt sections, MEMORY.md as the
+      // note store, list_skills/read_skill when it has skills. See docs/guide/context-pack.md.
+      const ctx = contextFor(agent)
+      const extra = ctx && ctx.pack.skills.length ? skillTools(() => ctx.pack.skills) : []
       const rt = new LlmRuntime(agent, {
         provider: makeProvider(agent),
         persona: opts.persona,
@@ -113,12 +119,14 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
         rules: opts.rules,
         triggers: { ...opts.triggers, ...(opts.tickMs !== undefined ? { tickMs: opts.tickMs } : {}), ...triggersFromProfile },
         limits: { ...opts.budget, ...(s.budget ?? {}) },
-        memory: opts.memory,
-        tools: opts.tools,
+        memory: { ...opts.memory, ...(ctx?.pack.memory ? { store: ctx.pack.memory } : {}) },
+        tools: { exclude: ['llm_usage', 'context_status'], ...opts.tools, extra: [...extra, ...(opts.tools?.extra ?? [])] },
         mcp: opts.mcp,
         replyWithFinalText: opts.replyWithFinalText,
         prices: opts.prices,
-        onUsage: snapshot => agent.emit('llmUsage', snapshot)
+        onUsage: snapshot => agent.emit('llmUsage', snapshot),
+        ...(ctx ? { context: () => ctx.promptContext() } : {}),
+        onPause: reason => emitLlmBudgetExhausted(agent, reason)
       })
       runtimes.set(agent, rt)
       allRuntimes.set(agent, rt)
@@ -176,6 +184,7 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
       await runtimes.get(agent)?.stop()
       runtimes.delete(agent)
       allRuntimes.delete(agent)
+      disposeContext(agent)
     }
   })
 }

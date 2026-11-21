@@ -8,3 +8,4 @@ fleet.yaml
 docs/.vitepress/dist/
 docs/.vitepress/cache/
 logs/
+profiles/*/MEMORY.md

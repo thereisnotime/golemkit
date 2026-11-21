@@ -7,10 +7,12 @@
 //
 // Providers: claude-subscription (default) | codex | anthropic | opencode | openai.
 // A profile's `llm:` block (provider, model, login, listen, budget...) overrides these
-// defaults. See docs/guide/llm-brain.md and docs/guide/profiles.md.
+// defaults. A context pack (profiles/<name>/: AGENTS.md, USER.md, skills/, hooks.yaml,
+// MEMORY.md) is loaded automatically. See docs/guide/llm-brain.md, docs/guide/profiles.md
+// and docs/guide/context-pack.md.
 import { defineVariant } from '../src/core/index.ts'
 import { standardSkills, extendedSkills, navigation } from '../src/skills/index.ts'
-import { commandBrain, reflexes, llmBrain } from '../src/brains/index.ts'
+import { commandBrain, reflexes, llmBrain, hooksBrain } from '../src/brains/index.ts'
 
 const num = (v: string | undefined, d: number) => (v && !Number.isNaN(Number(v)) ? Number(v) : d)
 
@@ -26,6 +28,7 @@ export default defineVariant({
   brains: [
     commandBrain({ verbose: false, whisperNeedsPrefix: true }),
     reflexes(),
+    hooksBrain(), // runs the context pack's hooks.yaml (profiles/<name>/), no-op without one
     llmBrain({
       provider: process.env.MC_LLM_PROVIDER || 'claude-subscription',
       triggers: {

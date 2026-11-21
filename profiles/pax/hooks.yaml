@@ -1,0 +1,38 @@
+# Deterministic reactions for Pax, run by the hooks brain without the LLM.
+# Actions run at priority 40 (above the LLM's 30, below player commands and reflexes).
+hooks:
+  # reflexes() also eats to heal below 14 health when no mob is near, and retreats from mobs
+  # at 8 or less; this hook is the deterministic backstop at hook priority.
+  - id: low-health-eat
+    on: lowHealth
+    below: 8
+    when: { hasFood: true, food: '<20' }   # can't eat on a full hunger bar
+    cooldown: 20s
+    do:
+      - act: eat
+
+  - id: low-health-say
+    on: lowHealth
+    below: 8
+    once: session            # say it once per session, not on every dip
+    do:
+      - say: "backing off, low health ({health}/20)"
+
+  - id: death-report
+    on: death
+    do:
+      - whisper: { to: owners, text: "I died at {pos}. My stuff should still be there for a few minutes." }
+      - remember: { text: "died at {pos}", about: deaths }
+
+  - id: greet-owner
+    on: playerJoined
+    ownerOnly: true
+    cooldown: 10m
+    do:
+      - whisper: { to: player, text: "hi {player}, I'm online at {pos}" }
+
+  - id: budget-out
+    on: llmBudgetExhausted
+    once: session
+    do:
+      - whisper: { to: owners, text: "I'm out of thinking budget ({reason}). !commands still work." }

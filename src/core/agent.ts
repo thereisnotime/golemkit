@@ -442,6 +442,8 @@ export class Agent extends TypedEmitter<AgentEvents> {
       username: bot.username,
       position: fmtPos(pos),
       dimension: bot.game.dimension,
+      // World spawn (compass target); context packs use it for "don't dig near spawn" rules.
+      spawnPoint: bot.spawnPoint ? fmtPos(bot.spawnPoint) : null,
       gameMode: bot.game.gameMode,
       health: Math.round(bot.health),
       food: bot.food,

@@ -64,8 +64,12 @@ export class FakeAgent implements RuntimeAgent {
   private readonly actions = new Map<string, ActionDef<any>>()
   private running: { info: ActionInfo, controller: AbortController } | null = null
 
-  constructor (opts: { username?: string, dataDir: string, actions?: ActionDef<any>[], persona?: string }) {
+  /** Overrides observe() (a scripted world for evals). */
+  observation?: () => Record<string, unknown>
+
+  constructor (opts: { username?: string, dataDir: string, actions?: ActionDef<any>[], persona?: string, observation?: () => Record<string, unknown> }) {
     this.username = opts.username ?? 'Buddy'
+    this.observation = opts.observation
     this.storage = new Storage(opts.dataDir)
     for (const a of opts.actions ?? fakeActions()) this.actions.set(a.name, a)
     this.definition = { name: 'fake', skills: [], brains: [], persona: opts.persona }
@@ -125,6 +129,7 @@ export class FakeAgent implements RuntimeAgent {
   }
 
   observe (): Record<string, unknown> {
+    if (this.observation) return { ...this.observation(), currentAction: this.currentAction ? { name: this.currentAction.name } : null }
     return {
       username: this.username,
       position: '10 64 -20',

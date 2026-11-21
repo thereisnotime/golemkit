@@ -217,6 +217,8 @@ Set `--owners` (or `MC_OWNERS`) on public servers: every trigger spends tokens.
 - **Long term:** notes in `agent.storage` (`llm.notes`, up to 200). The model writes them with
   `remember` and searches them with `recall`; each prompt includes the notes that match the
   message plus the latest few.
+- **With a context pack** (`profiles/<name>/`), notes live in its `MEMORY.md` instead, which
+  is also put in the system prompt. See [Context packs and evals](./context-pack).
 
 ## Prompts
 

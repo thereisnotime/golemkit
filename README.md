@@ -62,6 +62,7 @@ them as a local site with `just docs` (dev server) or `just docs-build` (static 
 Self-sufficient NPCs (utility-AI brain, behaviours, `variants/villager.ts`): [docs/guide/npc-brain.md](docs/guide/npc-brain.md).
 LLM-driven bots on your Claude / Codex subscription or an API (`variants/companion.ts`): [docs/guide/llm-brain.md](docs/guide/llm-brain.md).
 NPCs that run their own program and rewrite it with one LLM call when an owner teaches them (`variants/apprentice.ts`): [docs/guide/self-improver.md](docs/guide/self-improver.md).
+Per-profile rules, skills, memory and hooks, with an A/B eval: [docs/guide/context-pack.md](docs/guide/context-pack.md).
 
 What each skill and action does, including `extendedSkills()` (crafting, chests, farming, woodcutting, building): [docs/skills.md](docs/skills.md).
 Scenes with several bots acting together (`variants/actor.ts`, `scenes/*.yaml`): [docs/guide/scenes.md](docs/guide/scenes.md).

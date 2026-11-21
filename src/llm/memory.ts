@@ -15,9 +15,21 @@ export interface Note {
   text: string
   /** Who the note is about or came from, when known. */
   about?: string
+  /** Set by stores that dedup (MEMORY.md): what remember() did. */
+  status?: 'added' | 'updated' | 'duplicate'
 }
 
-const NOTES_KEY = 'llm.notes'
+/**
+ * Where long-term notes live. Default: agent.storage (`llm.notes`). A context pack swaps in
+ * its MEMORY.md (src/context/memoryFile.ts), which then is the authoritative copy.
+ */
+export interface NoteStore {
+  list (): Note[]
+  add (text: string, about?: string): Note
+  forget (match: string): number
+}
+
+export const NOTES_KEY = 'llm.notes'
 const SUMMARY_KEY = 'llm.summary'
 
 export interface MemoryOptions {
@@ -27,6 +39,8 @@ export interface MemoryOptions {
   maxNotes?: number
   /** Max characters per note. Default 300. */
   maxNoteChars?: number
+  /** Long-term note backend; default agent.storage. */
+  store?: NoteStore
 }
 
 export class Memory {
@@ -35,12 +49,19 @@ export class Memory {
   private readonly maxNotes: number
   private readonly maxNoteChars: number
   private readonly storage: Storage
+  private readonly store: NoteStore | null
 
   constructor (storage: Storage, opts: MemoryOptions = {}) {
     this.storage = storage
     this.size = opts.shortTermSize ?? 40
     this.maxNotes = opts.maxNotes ?? 200
     this.maxNoteChars = opts.maxNoteChars ?? 300
+    this.store = opts.store ?? null
+  }
+
+  /** True when notes go to a NoteStore (MEMORY.md) instead of agent.storage. */
+  get external (): boolean {
+    return this.store !== null
   }
 
   // -------------------------------------------------------------- short term
@@ -85,10 +106,12 @@ export class Memory {
   // -------------------------------------------------------------- long term
 
   notes (): Note[] {
+    if (this.store) return this.store.list()
     return this.storage.get<Note[]>(NOTES_KEY, [])
   }
 
   remember (text: string, about?: string): Note {
+    if (this.store) return this.store.add(text.trim().slice(0, this.maxNoteChars), about)
     const note: Note = { at: Date.now(), text: text.trim().slice(0, this.maxNoteChars) }
     if (about) note.about = about
     const notes = [...this.notes(), note].slice(-this.maxNotes)
@@ -113,6 +136,7 @@ export class Memory {
   }
 
   forget (match: string): number {
+    if (this.store) return this.store.forget(match)
     const before = this.notes()
     const kept = before.filter(n => !n.text.toLowerCase().includes(match.toLowerCase()))
     this.storage.set(NOTES_KEY, kept)

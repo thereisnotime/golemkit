@@ -6,7 +6,7 @@ import { Budget, type BudgetOptions } from './budget.ts'
 import { startMcpHttp, type McpHttpBridge } from './mcp.ts'
 import { Memory, type MemoryOptions } from './memory.ts'
 import { backoffMs, isTransientLlmError } from '../core/retry.ts'
-import { buildSystemPrompt, buildUserMessage, chatTrigger, type ChatTriggerOptions, type Trigger } from './prompt.ts'
+import { buildSystemPrompt, buildUserMessage, chatTrigger, type ChatTriggerOptions, type PromptContext, type Trigger } from './prompt.ts'
 import { BotTools, LLM_CALLER, type BotToolsOptions, type ToolAgent } from './tools.ts'
 import type { LlmProvider, ToolCallRecord, TurnResult } from './types.ts'
 import { PriceTable, type Price } from './pricing.ts'
@@ -76,6 +76,10 @@ export interface RuntimeOptions {
   prices?: Record<string, Price>
   /** Called after every turn with the turn's usage and the bot's totals (the brain emits `llmUsage` on the agent). */
   onUsage?: (snapshot: UsageSnapshot) => void
+  /** Context pack sections for the system prompt (src/context). Called per turn, so hot reloads apply. */
+  context?: () => PromptContext | undefined
+  /** Called once when turns pause because a budget ran out (hooks: llmBudgetExhausted). */
+  onPause?: (reason: string) => void
 }
 
 export interface TurnReport {
@@ -141,7 +145,8 @@ export class LlmRuntime {
       username: this.agent.username,
       persona: this.opts.persona ?? this.agent.definition.persona,
       immersive: this.opts.immersive,
-      rules: this.opts.rules
+      rules: this.opts.rules,
+      context: this.opts.context?.()
     })
   }
 
@@ -330,7 +335,10 @@ export class LlmRuntime {
     const blocked = this.budget.blocked()
     if (blocked) {
       // Pause: log once, tell the first person who talks to the bot once, then stay quiet until it lifts.
-      if (!this.paused) this.log.warn(`paused: ${blocked}`, { reason: blocked })
+      if (!this.paused) {
+        this.log.warn(`paused: ${blocked}`, { reason: blocked })
+        try { this.opts.onPause?.(blocked) } catch (e) { this.log.warn(`onPause: ${(e as Error).message}`) }
+      }
       this.paused = blocked
       if (chat && !this.pauseAnnounced) {
         this.pauseAnnounced = true
@@ -347,7 +355,10 @@ export class LlmRuntime {
     }
 
     const query = chat ? chat.message : trigger.kind === 'event' ? trigger.detail : ''
-    const notes = [...new Set([...this.memory.recall(query, 5), ...this.memory.recall(undefined, 3)])]
+    const system = this.systemPrompt
+    // With a context pack, MEMORY.md is in the system prompt; only add notes if it was cut short there.
+    const memoryInPrompt = !!this.opts.context?.()?.memoryInPrompt
+    const notes = memoryInPrompt ? [] : [...new Set([...this.memory.recall(query, 5), ...this.memory.recall(undefined, 3)])]
     const spent = this.budget.hour()
     const userMessage = buildUserMessage({
       trigger,
@@ -367,7 +378,6 @@ export class LlmRuntime {
     const controller = new AbortController()
     this.current = controller
     const started = Date.now()
-    const system = this.systemPrompt
     this.log.trace('prompt', { system, user: userMessage })
     let result: TurnResult | undefined
     let error: string | undefined

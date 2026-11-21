@@ -40,6 +40,16 @@ export interface BotToolsOptions {
   log?: Logger
   /** Accept calls outside a turn (an external MCP client driving the bot). Default false. */
   allowOutsideTurn?: boolean
+  /** Extra built-in tools (e.g. list_skills / read_skill from a context pack). */
+  extra?: ExtraTool[]
+}
+
+/** A tool added from outside (context pack skills): JSON-schema'd via zod, plain-text result. */
+export interface ExtraTool {
+  name: string
+  description: string
+  schema: z.ZodObject
+  run (args: any): Promise<{ ok: boolean, text: string }> | { ok: boolean, text: string }
 }
 
 interface Builtin {
@@ -53,7 +63,7 @@ const MAX_RESULT_CHARS = 4000
 export class BotTools implements ToolHost {
   readonly agent: ToolAgent
   readonly memory: Memory
-  private readonly opts: Required<Omit<BotToolsOptions, 'exclude' | 'log' | 'allowOutsideTurn'>> & { exclude: string[] }
+  private readonly opts: Required<Omit<BotToolsOptions, 'exclude' | 'log' | 'allowOutsideTurn' | 'extra'>> & { exclude: string[] }
   private readonly external: TurnScope | null
   private readonly log: Logger
   private readonly builtins = new Map<string, Builtin>()
@@ -72,6 +82,12 @@ export class BotTools implements ToolHost {
     }
     this.external = opts.allowOutsideTurn ? { maxToolCalls: Infinity, maxChatMessages: Infinity, calls: [], chatCount: 0 } : null
     this.defineBuiltins()
+    for (const t of opts.extra ?? []) this.addTool(t)
+  }
+
+  /** Adds (or replaces) a built-in tool. Counts toward the per-turn tool limit like any other. */
+  addTool (t: ExtraTool): void {
+    this.builtins.set(t.name, { spec: { name: t.name, description: t.description, inputSchema: cleanSchema(z.toJSONSchema(t.schema, { io: 'input' }) as Record<string, unknown>) }, schema: t.schema, run: args => t.run(args) })
   }
 
   // ------------------------------------------------------------ turn scope
@@ -180,8 +196,8 @@ export class BotTools implements ToolHost {
       text: z.string().min(1).max(300),
       about: z.string().optional().describe('player or topic the note is about')
     }), ({ text, about }) => {
-      this.memory.remember(text, about)
-      return { ok: true, text: 'noted' }
+      const note = this.memory.remember(text, about)
+      return { ok: true, text: note.status === 'duplicate' ? 'already noted' : note.status === 'updated' ? 'noted (updated an existing note)' : 'noted' }
     })
     add('recall', 'Search long-term notes. Without a query returns the latest ones.', z.object({ query: z.string().optional() }), ({ query }) => {
       const notes = this.memory.recall(query)

@@ -10,7 +10,7 @@
 //
 // `llm` lands in settings.llm, where the LLM brain picks it up.
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import YAML from 'yaml'
 import { z } from 'zod'
 import type { InstanceOptions, ServerConfig } from './definition.ts'
@@ -70,7 +70,23 @@ export const ProfileSchema = z.object({
     typoRate: z.number().min(0).max(1).optional(),
     idleFidget: z.boolean().optional()
   })]).optional(),
-  logging: LoggingSchema.optional()
+  logging: LoggingSchema.optional(),
+  /**
+   * Context pack directory (AGENTS.md, USER.md, skills/, hooks.yaml, MEMORY.md...), see
+   * docs/guide/context-pack.md. Default: the sibling directory profiles/<name>/ if it exists.
+   * false turns it off. Lands in settings.context as absolute paths.
+   */
+  context: z.union([
+    z.literal(false),
+    z.string(),
+    z.array(z.string()),
+    z.object({
+      dirs: z.union([z.string(), z.array(z.string())]).optional(),
+      memoryFile: z.union([z.string(), z.literal(false)]).optional(),
+      caps: z.record(z.string(), z.number()).optional(),
+      watch: z.boolean().optional()
+    }).strict()
+  ]).optional()
 })
 
 export type ProfileFile = z.infer<typeof ProfileSchema>
@@ -98,6 +114,8 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (profile.llm) settings.llm = { ...(settings.llm as object | undefined), ...profile.llm }
   if (profile.humanize !== undefined) settings.humanize = profile.humanize
   if (profile.retry) settings.retry = { ...(settings.retry as object | undefined), ...profile.retry }
+  const context = resolveContext(profile.context, name, file)
+  if (context !== undefined) settings.context = context
   return {
     name,
     file,
@@ -111,6 +129,34 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
       settings
     }
   }
+}
+
+const CONTEXT_FILES = ['AGENTS.md', 'RULES.md', 'IDENTITY.md', 'SOUL.md', 'USER.md', 'MEMORY.md', 'hooks.yaml', 'hooks.yml', 'skills']
+
+/** Relative paths: next to the profile file, then its parent (repo root), then the working directory. */
+function resolveDir (p: string, file: string): string {
+  if (isAbsolute(p)) return p
+  const base = file === '(inline)' ? [] : [dirname(file), dirname(dirname(file))]
+  const found = [...base, process.cwd()].map(b => resolve(b, p)).find(existsSync)
+  return found ?? resolve(p)
+}
+
+function resolveContext (c: ProfileFile['context'], name: string, file: string): unknown {
+  if (c === false) return false
+  if (typeof c === 'string') return resolveDir(c, file)
+  if (Array.isArray(c)) return c.map(d => resolveDir(d, file))
+  if (c && typeof c === 'object') {
+    const dirs = c.dirs === undefined ? autoContext(name, file) : [c.dirs].flat().map(d => resolveDir(d, file))
+    return { ...c, dirs: dirs ?? [], ...(typeof c.memoryFile === 'string' ? { memoryFile: resolveDir(c.memoryFile, file) } : {}) }
+  }
+  return autoContext(name, file)
+}
+
+/** profiles/<name>/ next to profiles/<name>.yaml, if it holds any context file. */
+function autoContext (name: string, file: string): string | undefined {
+  if (file === '(inline)') return undefined
+  const dir = join(dirname(file), name)
+  return CONTEXT_FILES.some(f => existsSync(join(dir, f))) ? resolve(dir) : undefined
 }
 
 export function loadProfile (name: string, dir = PROFILES_DIR): LoadedProfile | null {

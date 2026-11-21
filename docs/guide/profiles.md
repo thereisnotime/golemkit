@@ -52,6 +52,7 @@ logging:                      # optional, same keys as the fleet `logging:` bloc
 | `llm` | LLM brain settings: provider, model, effort, login, token source, `listen`, `immersive`, aliases, budget |
 | `settings` | anything the variant's skills/brains read |
 | `logging` | applied when the profile is run on its own |
+| `context` | context pack dir (default: `profiles/<name>/` if it exists), see [Context packs](./context-pack) |
 
 ## LLM listening modes
 

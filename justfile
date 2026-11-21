@@ -87,6 +87,11 @@ llm-login provider mode="" *args:
 llm-status *args:
     @node scripts/llm-login.ts status {{args}}
 
+# A/B eval of a profile's context pack: --dry (scripted, free) or a real provider with --yes (costs quota)
+[group('llm')]
+llm-eval *args:
+    @node --env-file-if-exists=.env scripts/llm-eval.ts {{args}}
+
 # Build the container image (podman)
 [group('deploy')]
 image tag="mc-buddy":

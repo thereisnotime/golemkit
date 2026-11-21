@@ -27,6 +27,7 @@ export default withMermaid(defineConfig({
           { text: 'NPC brain', link: '/guide/npc-brain' },
           { text: 'LLM brain', link: '/guide/llm-brain' },
           { text: 'Self-improver', link: '/guide/self-improver' },
+          { text: 'Context packs and evals', link: '/guide/context-pack' },
           { text: 'Logging', link: '/guide/logging' },
           { text: 'Scenes', link: '/guide/scenes' },
           { text: 'Deployment', link: '/guide/deployment' }
