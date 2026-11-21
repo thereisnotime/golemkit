@@ -18,6 +18,7 @@ roles:
   wood_planks: { default: birch_planks, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_planks$", wood: true }
   wood_stairs: { default: oak_stairs, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_stairs$", wood: true }
   wood_slab: { default: oak_slab, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_slab$", wood: true }
+  door: { default: oak_door, accept: "_door$", kind: door, wood: true }   # added: the original has an open doorway
 palette:
   "L": {"role":"wood_log","state":{"axis":"y"}}
   "C": {"block":"cobblestone"}
@@ -39,6 +40,7 @@ palette:
   "O": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
   "Q": {"role":"wood_stairs","state":{"half":"bottom","shape":"outer_right","facing":"west"}}
   "R": {"role":"wood_slab","state":{"type":"bottom"}}
+  "d": "door[facing=north,hinge=left]"
   ".": air
 layers:
   # y=0
@@ -53,7 +55,7 @@ layers:
      "P...P",
      "P...P",
      "P...P",
-     "LP.PL",
+     "LPdPL",
      "....."]
   # y=2
   - ["LP.PL",
