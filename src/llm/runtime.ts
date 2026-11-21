@@ -358,6 +358,21 @@ export class LlmRuntime {
       this.enqueue({ kind: 'goal', reason, ...(detail ? { detail } : {}), ...(goal.owner ? { player: goal.owner } : {}) })
       return true
     }
+    if ('stop' in d && d.stop.startsWith('the same thing failed')) {
+      // Repeated identical failure: put that action on hold for 10 min and carry on with other steps,
+      // instead of stopping the whole goal (the owner may be away for hours).
+      const g = this.goals.active!
+      const [sig] = Object.entries(g.failures).sort((a, b) => b[1] - a[1])[0] ?? []
+      if (sig) {
+        const action = sig.split(':')[0]!
+        this.tools.blocked.set(action, { until: Date.now() + 10 * 60_000, why: sig.slice(action.length + 1).trim().slice(0, 80) })
+        delete g.failures[sig]
+        this.goals.update({ note: `${action} on hold 10 min (failed the same way 3 times): do other steps meanwhile` })
+        this.log.info(`goal: ${action} on hold for 10 min after repeated failures`, { goal: g.text })
+        this.enqueue({ kind: 'goal', reason, ...(detail ? { detail } : {}), ...(g.owner ? { player: g.owner } : {}) })
+        return true
+      }
+    }
     if ('stop' in d) {
       this.goals.pause(d.stop)
       this.log.info(`goal paused: ${d.stop}`, { goal: goal.text })

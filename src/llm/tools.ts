@@ -159,7 +159,14 @@ export class BotTools implements ToolHost {
     return this.runAction(entry.name, args, entry.longRunning, scope)
   }
 
+  /** Actions the model may not call for a while (repeated identical failures during a goal). */
+  readonly blocked = new Map<string, { until: number, why: string }>()
+
   private async runAction (name: string, args: unknown, longRunning: boolean, scope: TurnScope): Promise<{ ok: boolean, text: string }> {
+    const b = this.blocked.get(name)
+    if (b && Date.now() < b.until) {
+      return { ok: false, text: `${name} is on hold for ${Math.ceil((b.until - Date.now()) / 60_000)} more min: it failed the same way several times (${b.why}). Do a different step or use another approach.` }
+    }
     const cur = this.agent.currentAction
     // `stop` is non-exclusive, so the lock wouldn't stop the model from cancelling a player's command.
     if (name === 'stop' && cur && cur.priority > this.opts.priority) {

@@ -241,26 +241,23 @@ test('guardrail: autonomous turn limit pauses the goal and asks the owner once',
   await rt.stop()
 })
 
-test('guardrail: the same failure three times stops the loop and reports', async () => {
+test('guardrail: the same failure three times puts that action on hold, the goal goes on', async () => {
+  const results: string[] = []
   const p = new ScriptedProvider(async (turn, n) => {
     if (n === 1) await turn.tools.call('set_goal', { goal: 'get wood' })
-    if (/Stop working on your goal/.test(turn.userMessage)) {
-      await turn.tools.call('reply', { text: 'no trees near here, where should I go?' })
-      await turn.tools.call('update_goal', { wait_for_owner: true })
-    } else {
-      await turn.tools.call('chop_fail', {})
-    }
+    if (results.some(r => /on hold/.test(r))) return { text: '' } // a real model would do another step now
+    results.push((await turn.tools.call('chop_fail', {})).text)
     return { text: '' }
   })
   const { agent, rt } = setup(p)
   await rt.start()
   rt.onChat({ from: 'Steve', message: 'get wood', whisper: true })
-  await waitFor(() => !!rt.goals.active?.paused && !rt.isBusy)
+  await waitFor(() => results.some(r => /on hold/.test(r)))
   await settle(rt, 200)
-  assert.equal(agent.calls.filter(c => c.name === 'chop_fail').length, 3)
-  assert.match(p.inputs.at(-1)!.userMessage, /failed 3 times: chop_fail: no natural tree within # blocks/)
-  assert.equal(p.inputs.length, 4)
-  assert.equal(rt.goals.active!.paused, 'waiting for the owner')
+  assert.equal(agent.calls.filter(c => c.name === 'chop_fail').length, 3, 'the 4th call is refused without running')
+  assert.match(results.at(-1)!, /chop_fail is on hold for \d+ more min/)
+  assert.equal(rt.goals.active!.paused, undefined, 'the goal keeps going')
+  assert.match(rt.goals.active!.notes.join(' '), /chop_fail on hold 10 min/)
   await rt.stop()
 })
 
