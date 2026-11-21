@@ -137,23 +137,25 @@ Building structures from blueprints.
 
 ### `build`
 
-Build a whole structure from a blueprint: hut (small 5x5 wooden house with door, roof and torch), shelter (emergency 3x3 box around the bot), wall_segment, platform, tower. Picks a flat, clear spot near whoever asked (never in protected areas or over player builds), levels small bumps, places floor, walls, roof, then torch and door, and skips blocks that are already right, so calling it again resumes an interrupted build. gather=true first chops trees and crafts whatever is missing. Reports how many blocks it placed. Use build_plan to check materials first.
+Build a whole structure from a blueprint. For "build a house" use small_house (cozy 5x5 wooden house: log corners, pitched stair roof, windows, door, torches, crafting table, chest, bed if there is wool). Others: cottage (bigger 7x7 house on a cobblestone foundation with porch, glass windows, furnace), cabin (log cabin), watchtower (ladder, fenced platform), fortress (15x15 walled compound to put a house in), hut (plain box, quick), shelter (emergency 3x3 box around the bot), wall_segment, platform, tower. Picks a flat, clear spot near whoever asked (never in protected areas or over player builds), fills small dips, digs bumps and plants, faces the door to the player (or an open side), places blocks with the right facing (stairs, slabs, logs, doors, torches...), checks every block afterwards and fixes mistakes, and skips blocks that are already right, so calling it again resumes an interrupted build. gather=true first gathers what is missing. Reports blocks built and what was skipped.
 
 *long-running*
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `template` | string | yes |  | blueprint name: hut, shelter, wall_segment, platform, tower (build_plan lists all) |
+| `template` | string | yes |  | blueprint name: small_house (default house), cottage, cabin, watchtower, fortress, hut, shelter, wall_segment, platform, tower (build_plan lists all) |
 | `x` | number |  |  | centre of the footprint; omit to pick a spot near the player |
 | `y` | number |  |  | level of the floor (layer 0); default the ground there + 1 |
 | `z` | number |  |  |  |
 | `facing` | `north` \| `east` \| `south` \| `west` |  |  | side the entrance faces; default towards the player |
 | `material` | string |  |  | main block, e.g. spruce_planks or cobblestone; default whatever fits that the bot has most of |
-| `gather` | boolean |  | `false` | gather missing materials first (chop trees, craft planks and a door) |
+| `theme` | string |  |  | wood to build with: oak, spruce, birch, jungle, acacia, dark_oak, mangrove, cherry, pale_oak; default whatever wood the bot has most of |
+| `gather` | boolean |  | `false` | gather missing materials first (chop trees, mine, craft) |
+| `path` | boolean |  | `true` | dig a short dirt path from the door afterwards when the bot can make a shovel |
 
 ### `build_plan`
 
-What a blueprint needs vs what the bot carries, and where it would go. Without a template, lists the blueprints.
+What a blueprint needs vs what the bot carries, and where it would go. preview=true adds a text drawing (top view and every layer). Without a template, lists the blueprints.
 
 *non-exclusive*
 
@@ -161,10 +163,12 @@ What a blueprint needs vs what the bot carries, and where it would go. Without a
 |---|---|---|---|---|
 | `template` | string |  |  |  |
 | `material` | string |  |  |  |
+| `theme` | string |  |  | wood to build with: oak, spruce, birch, jungle, acacia, dark_oak, mangrove, cherry, pale_oak; default whatever wood the bot has most of |
 | `x` | number |  |  |  |
 | `y` | number |  |  |  |
 | `z` | number |  |  |  |
 | `facing` | `north` \| `east` \| `south` \| `west` |  |  |  |
+| `preview` | boolean |  | `false` | include a text drawing of the structure |
 
 ## containers
 
@@ -366,7 +370,7 @@ Gathering and crafting everything a job needs.
 
 ### `gather_materials`
 
-Get the materials for a job in one go: chops as many trees as needed (crafting a wooden axe first), turns logs into planks and sticks, crafts wooden items (doors, crafting tables, chests, tools, torches if there is coal) and mines simple blocks (cobblestone, dirt, sand, gravel). Give either items, e.g. {"planks": 80, "door": 1} ("planks", "log", "door" mean any wood), or template="hut" for everything a blueprint needs. Prefer this over many chop_tree/craft calls. Needs digging enabled to chop or mine.
+Get the materials for a job in one go: chops as many trees as needed (crafting a wooden axe first), turns logs into planks and sticks, crafts wooden items (stairs, slabs, fences, doors, trapdoors, ladders, crafting tables, chests, tools), mines cobblestone with a pickaxe and other simple blocks, and tries for the extras: torches (coal, or charcoal smelted from logs), glass panes (sand smelted into glass), a bed (wool from sheep nearby). Extras it can't get are skipped and reported. Give either items, e.g. {"planks": 80, "door": 1} ("planks", "log", "door", "stairs", "slab", "fence", "bed" mean any wood/colour), or template="small_house" for everything a blueprint needs. Prefer this over many chop_tree/craft calls. Needs digging enabled to chop or mine.
 
 *long-running*
 
@@ -375,6 +379,7 @@ Get the materials for a job in one go: chops as many trees as needed (crafting a
 | `items` | object |  |  | item -> count, e.g. {"oak_planks": 64, "stick": 8, "door": 1} |
 | `template` | string |  |  | blueprint name (see build_plan) to gather everything it needs |
 | `material` | string |  |  | with template: the main block to use, e.g. spruce_planks or cobblestone |
+| `theme` | string |  |  | wood to build with: oak, spruce, birch, dark_oak...; default whatever wood the bot has most of |
 | `radius` | integer (8..64) |  | `32` | how far to look for trees and blocks |
 
 ## mods

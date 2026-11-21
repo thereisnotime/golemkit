@@ -1,0 +1,36 @@
+# A lookout: a 3x3 shaft on a cobblestone base with log corners and plank walls, a ladder up the
+# inside, windows on the sides, a 5x5 platform with a fence railing and torches on the corner
+# posts. The platform is 6 blocks up; the bot builds it from the ground and the ladder.
+name: watchtower
+description: Lookout tower with a ladder inside, side windows and a fenced 5x5 platform 6 blocks up
+facing: south
+site: near
+meta: { tags: [tower, lookout], style: rustic, author: mc-buddy }
+roles:
+  base: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone_bricks|stone)$" }
+  wall: { default: oak_planks, accept: "_planks$", material: true, wood: true }
+  frame: { default: oak_log, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_log$", wood: true, state: { axis: y } }
+  ladder: { default: ladder, kind: attachment }
+  fence: { default: oak_fence, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak|bamboo|crimson|warped)_fence$", wood: true }
+  door: { default: oak_door, accept: "_door$", kind: door, wood: true }
+  window: { default: glass_pane, accept: "^(glass|glass_pane)$", optional: true, wood: true, fallback: [oak_fence] }
+  light: { default: torch, accept: "^(wall_)?torch$|^lantern$", kind: attachment, optional: true }
+palette:
+  c: base
+  "#": wall
+  "|": frame
+  H: "ladder[facing=south]"               # on the wall to its north
+  f: fence
+  D: "door[facing=north,hinge=left]"
+  W: window
+  t: light                                # standing torch on a fence post
+  ".": air
+layers:
+  - ["     ", " ccc ", " ccc ", " ccc ", "     "]
+  - ["     ", " |#| ", " #H# ", " |D| ", "     "]
+  - ["     ", " |#| ", " #H# ", " | | ", "     "]
+  - ["     ", " |#| ", " WHW ", " |#| ", "     "]
+  - ["     ", " |#| ", " #H# ", " |#| ", "     "]
+  - ["#####", "#####", "##H##", "#####", "#####"]
+  - ["fffff", "f...f", "f...f", "f...f", "fffff"]
+  - ["t   t", "     ", "     ", "     ", "t   t"]

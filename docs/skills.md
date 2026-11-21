@@ -147,8 +147,8 @@ how many were out of reach.
 ### construction
 | action | |
 |---|---|
-| `build` | Build a whole structure from a [blueprint](/guide/goals-and-building#blueprint-format) (`hut`, `shelter`, `wall_segment`, `platform`, `tower`): picks a flat, natural site near whoever asked, outside protected areas and spawn, refuses if the footprint has player-made blocks, places floor, walls, roof, torch and door, skips blocks already right (re-running resumes on the same site) and reports the real count. `gather=true` gathers missing materials first. Long-running. |
-| `build_plan` *ne* | Without a template, lists the blueprints; with one, where it would go and its materials vs the inventory. |
+| `build` | Build a whole structure from a [blueprint](/guide/goals-and-building#blueprint-format) (`small_house` is the default house; `cottage`, `cabin`, `watchtower`, `hut`, `shelter`, `wall_segment`, `platform`, `tower`): picks a flat, natural site near whoever asked, outside protected areas and spawn, fills dips and digs bumps, faces the door to the player or an open side, refuses if the footprint has player-made blocks, places every block in the state the blueprint asks for (stair facing and half, log axis, door hinge, wall torches...) with the [placement planner](/guide/goals-and-building#the-placement-planner), checks every block afterwards and fixes mistakes once, skips blocks already right (re-running resumes on the same site) and reports built/total and what was skipped. `gather=true` gathers missing materials first; `theme` picks the wood. Long-running. |
+| `build_plan` *ne* | Without a template, lists the blueprints; with one, where it would go, which wood it would use and its materials vs the inventory. `preview=true` adds a text drawing (top view and every layer). |
 
 Blueprints are YAML in `blueprints/`. Observe hook: `build` (the structure in progress). See
 [Goals and building](./guide/goals-and-building.md) for the format.
@@ -156,7 +156,7 @@ Blueprints are YAML in `blueprints/`. Observe hook: `build` (the structure in pr
 ### materials
 | action | |
 |---|---|
-| `gather_materials` *dig* | Get everything for a shopping list (`{"planks": 80, "door": 1}`, generic names mean any wood) or a blueprint (`template=hut`): fells trees (crafting a wooden axe as soon as it has wood), crafts planks, sticks, tables, doors, tools, torches (with coal), mines cobblestone, dirt, sand, gravel. Reports what is still missing and why. Long-running. |
+| `gather_materials` *dig* | Get everything for a shopping list (`{"planks": 80, "door": 1}`, generic names mean any wood or colour) or a blueprint (`template=small_house`): fells trees (crafting a wooden axe as soon as it has wood), crafts planks, sticks, stairs, slabs, fences, doors, trapdoors, ladders, tables, chests, furnaces, beds and tools, mines cobblestone with a pickaxe, and tries for torches (coal or charcoal), glass panes (sand smelted) and a bed (wool from sheep). Reports what is still missing and what was skipped, and why. Long-running. |
 
 ### pickup
 | action | |

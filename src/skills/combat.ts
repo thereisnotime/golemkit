@@ -210,7 +210,7 @@ export function huntRefusal (e: HuntCandidate, opts: { animals?: readonly string
 }
 
 /** True if a fence or fence gate is within `r` blocks: animals there are probably someone's farm. */
-function inPen (bot: Bot, e: Entity, r = 3): boolean {
+export function inPen (bot: Bot, e: Entity, r = 3): boolean {
   const base = e.position.floored()
   for (let dx = -r; dx <= r; dx++) {
     for (let dz = -r; dz <= r; dz++) {

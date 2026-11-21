@@ -24,13 +24,15 @@ layers:
 
 // ------------------------------------------------------------------ parsing
 
+const xyz = (c: { x: number, y: number, z: number, role: string }) => ({ x: c.x, y: c.y, z: c.z, role: c.role })
+
 test('blueprints parse into cells; " " is ignored', () => {
   const bp = parseBlueprint(SMALL)
   assert.equal(bp.name, 'box')
   assert.deepEqual([bp.width, bp.depth, bp.height], [3, 3, 3])
   assert.equal(bp.cells.length, 27)
   assert.equal(bp.cells.filter(c => c.role === 'wall').length, 25)
-  assert.deepEqual(bp.cells.find(c => c.role === 'door'), { x: 1, y: 1, z: 2, role: 'door' })
+  assert.deepEqual(xyz(bp.cells.find(c => c.role === 'door')!), { x: 1, y: 1, z: 2, role: 'door' })
   const gap = parseBlueprint(SMALL.replace('"#D#"', '"# #"'))
   assert.equal(gap.cells.length, 26)
 })
@@ -57,7 +59,7 @@ test('shipped blueprints all load', () => {
 
 test('rotation turns the entrance to the requested side', () => {
   const bp = parseBlueprint(SMALL)
-  const door = (b: typeof bp) => b.cells.find(c => c.role === 'door')!
+  const door = (b: typeof bp) => xyz(b.cells.find(c => c.role === 'door')!)
   assert.deepEqual(door(rotate(bp, 'south')), { x: 1, y: 1, z: 2, role: 'door' })
   assert.deepEqual(door(rotate(bp, 'west')), { x: 0, y: 1, z: 1, role: 'door' })
   assert.deepEqual(door(rotate(bp, 'north')), { x: 1, y: 1, z: 0, role: 'door' })

@@ -1,0 +1,127 @@
+# A proper survival starter house: 7x7 on a cobblestone foundation with log corner posts, plank
+# walls, log beams along the top, glass-pane windows on every side (fences without glass), a
+# covered porch with fence posts and a stair step, two torches by the door and two inside, and
+# a gabled stair roof with a slab ridge that overhangs on all four sides. Inside: bed, chest,
+# crafting table and furnace (and a carpet if the bot carries one). About 85 logs and 40
+# cobblestone from scratch. Wood follows the theme.
+name: cottage
+description: 7x7 cottage on a cobblestone foundation, log frame, glass windows, porch, gabled stair roof with overhang, torches, bed, chest, crafting table and furnace
+facing: south
+site: near
+meta: { tags: [house, cottage, wood, stone], style: rustic, author: mc-buddy }
+stairs: roof
+roles:
+  foundation: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone_bricks|mossy_stone_bricks|stone|andesite|polished_andesite)$" }
+  floor: { default: oak_planks, accept: "_planks$", wood: true }
+  wall: { default: oak_planks, accept: "_planks$", material: true, wood: true }
+  frame: { default: oak_log, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_log$", wood: true, state: { axis: y } }
+  roof: { default: oak_stairs, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak|bamboo|crimson|warped)_stairs$", wood: true }
+  ridge: { default: oak_slab, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak|bamboo|crimson|warped)_slab$", wood: true, state: { type: bottom } }
+  fence: { default: oak_fence, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak|bamboo|crimson|warped)_fence$", wood: true }
+  door: { default: oak_door, accept: "_door$", kind: door, wood: true }
+  window: { default: glass_pane, accept: "^(glass|glass_pane)$", optional: true, wood: true, fallback: [oak_fence] }
+  light: { default: torch, accept: "^(wall_)?torch$|^lantern$", kind: attachment, optional: true }
+  bed: { default: white_bed, accept: "_bed$", kind: furnish, optional: true }
+  chest: { default: chest, kind: furnish, optional: true }
+  table: { default: crafting_table, kind: furnish, optional: true }
+  furnace: { default: furnace, kind: furnish, optional: true }
+  carpet: { default: white_carpet, accept: "_carpet$", kind: furnish, optional: true, gather: false }
+palette:
+  c: foundation
+  "=": floor
+  "#": wall
+  "|": frame
+  L: "frame[axis=x]"                      # beams along the front and back walls
+  s: ridge
+  f: fence
+  D: "door[facing=north,hinge=left]"
+  W: window
+  t: "light[facing=south]"
+  e: "light[facing=east]"
+  w: "light[facing=west]"
+  B: "bed[facing=north,part=foot]"
+  b: "bed[facing=north,part=head]"
+  C: "chest[facing=south]"
+  K: table
+  U: "furnace[facing=west]"
+  r: carpet
+  ".": air
+layers:
+  # y=0 cobblestone foundation ring and porch, plank floor, stair step to the door
+  - ["         ",
+     " ccccccc ",
+     " c=====c ",
+     " c=====c ",
+     " c=====c ",
+     " c=====c ",
+     " c=====c ",
+     " ccccccc ",
+     " ccc^ccc "]
+  # y=1 log corners, plank walls, door; bed, chest, crafting table, furnace, carpet; porch posts
+  - ["         ",
+     " |#####| ",
+     " #bC..K# ",
+     " #B...U# ",
+     " #..r..# ",
+     " #.....# ",
+     " #.....# ",
+     " |##D##| ",
+     " f     f "]
+  # y=2 windows on every side, torches inside and by the door
+  - ["         ",
+     " |##W##| ",
+     " #.....# ",
+     " W.....W ",
+     " #e...w# ",
+     " W.....W ",
+     " #.....# ",
+     " |W# #W| ",
+     " f t t f "]
+  # y=3 log beams front and back, eaves overhanging all round
+  - ["vvvvvvvvv",
+     " |LLLLL| ",
+     " #.....# ",
+     " #.....# ",
+     " #.....# ",
+     " #.....# ",
+     " #.....# ",
+     " |LLLLL| ",
+     "^^^^^^^^^"]
+  # y=4..6 roof slopes, gable ends of planks, overhang at the gables
+  - ["         ",
+     "vvvvvvvvv",
+     " #.....# ",
+     " #.....# ",
+     " #.....# ",
+     " #.....# ",
+     " #.....# ",
+     "^^^^^^^^^",
+     "         "]
+  - ["         ",
+     "         ",
+     "vvvvvvvvv",
+     " #.....# ",
+     " #.....# ",
+     " #.....# ",
+     "^^^^^^^^^",
+     "         ",
+     "         "]
+  - ["         ",
+     "         ",
+     "         ",
+     "vvvvvvvvv",
+     " #.....# ",
+     "^^^^^^^^^",
+     "         ",
+     "         ",
+     "         "]
+  # y=7 slab ridge
+  - ["         ",
+     "         ",
+     "         ",
+     "         ",
+     "sssssssss",
+     "         ",
+     "         ",
+     "         ",
+     "         "]

@@ -141,6 +141,76 @@ const craft = defineAction({
   run: ({ bot, signal }, { item, count }) => craftItem(bot, signal, item, count)
 })
 
+/**
+ * Smelts `count` of an item in a furnace within 32 blocks, or one put down from the inventory
+ * (the smelt action's body, for gather_materials to reuse). Adds fuel, waits and takes the
+ * output. `data.placed` is where it put a furnace down, if it did.
+ */
+export async function smeltItem (bot: Bot, signal: AbortSignal, log: { debug: (msg: string, f?: Record<string, unknown>) => void }, item: string, count: number, fuel?: string): Promise<ActionResult> {
+  const input = findItem(bot, item)
+  if (!input) return fail(`no ${item} to smelt`)
+  count = Math.min(count, countItem(bot, item))
+
+  let placed: Block['position'] | null = null
+  let furnaceBlock = bot.findBlock({ matching: bot.registry.blocksByName.furnace.id, maxDistance: FURNACE_SEARCH })
+  if (!furnaceBlock) {
+    if (!findItem(bot, 'furnace')) return fail('no furnace nearby and none in the inventory')
+    const spot = findFreeSpot(bot)
+    if (!spot) return fail('no room to put down a furnace')
+    await placeAt(bot, 'furnace', spot, signal)
+    furnaceBlock = bot.blockAt(spot)
+    if (furnaceBlock?.name !== 'furnace') return fail('could not place a furnace')
+    placed = furnaceBlock.position
+  }
+  await reachBlock(bot, furnaceBlock.position, signal)
+  const data = placed ? { placed: { x: placed.x, y: placed.y, z: placed.z } } : {}
+
+  const furnace = await bot.openFurnace(furnaceBlock)
+  try {
+    const busy = furnace.inputItem()
+    if (busy && itemName(busy) !== item) return fail(`the furnace is busy smelting ${itemName(busy)}`, data)
+    const out = furnace.outputItem()
+    if (out) await furnace.takeOutput()
+
+    // fuel: count what's already burning/loaded, add the rest
+    const loaded = furnace.fuelItem()
+    let capacity = loaded ? fuelValue(itemName(loaded)) * loaded.count : 0
+    if (capacity < count) {
+      const fuelName = fuel ?? pickFuel(bot.inventory.items().map(itemName), item)
+      if (!fuelName) return fail('no fuel (coal, charcoal, planks or logs)', data)
+      if (loaded && itemName(loaded) !== fuelName) return fail(`the furnace already has ${itemName(loaded)} as fuel`, data)
+      const need = Math.min(fuelNeeded(fuelName, count - capacity), countItem(bot, fuelName))
+      if (need <= 0) return fail(`no ${fuelName} for fuel`, data)
+      await furnace.putFuel(bot.registry.itemsByName[fuelName].id, null, need)
+      capacity += fuelValue(fuelName) * need
+    }
+    const toSmelt = Math.min(count, Math.floor(capacity) || count)
+    await furnace.putInput(input.type, null, toSmelt)
+
+    let taken = 0
+    let idle = 0
+    const deadline = Date.now() + toSmelt * 10_500 + 15_000
+    while (taken < toSmelt && Date.now() < deadline) {
+      await sleep(1000, signal)
+      const o = furnace.outputItem()
+      if (o) {
+        const n = o.count
+        await furnace.takeOutput()
+        taken += n
+        idle = 0
+        continue
+      }
+      if (!furnace.inputItem()) break
+      idle = furnace.progress > 0 || furnace.fuel > 0 ? 0 : idle + 1
+      if (idle >= 5) { log.debug('furnace stopped burning', { taken, of: toSmelt }); break }
+    }
+    if (!taken) return fail(`nothing came out of the furnace (is ${item} smeltable?)`, data)
+    return taken >= count ? ok(`smelted ${taken} ${item}`, data) : ok(`smelted ${taken} of ${count} ${item}`, data)
+  } finally {
+    furnace.close()
+  }
+}
+
 const smelt = defineAction({
   name: 'smelt',
   description: 'Smelt items in a furnace within 32 blocks (or one placed from the inventory), add fuel, wait and take the results.',
@@ -149,67 +219,7 @@ const smelt = defineAction({
     count: z.number().int().min(1).max(64).default(1),
     fuel: z.string().optional().describe('fuel item; default the best one in the inventory (coal, charcoal, planks, logs...)')
   }),
-  async run ({ bot, signal, log }, { item, count, fuel }): Promise<ActionResult> {
-    const input = findItem(bot, item)
-    if (!input) return fail(`no ${item} to smelt`)
-    count = Math.min(count, countItem(bot, item))
-
-    let furnaceBlock = bot.findBlock({ matching: bot.registry.blocksByName.furnace.id, maxDistance: FURNACE_SEARCH })
-    if (!furnaceBlock) {
-      if (!findItem(bot, 'furnace')) return fail('no furnace nearby and none in the inventory')
-      const spot = findFreeSpot(bot)
-      if (!spot) return fail('no room to put down a furnace')
-      await placeAt(bot, 'furnace', spot, signal)
-      furnaceBlock = bot.blockAt(spot)
-      if (furnaceBlock?.name !== 'furnace') return fail('could not place a furnace')
-    }
-    await reachBlock(bot, furnaceBlock.position, signal)
-
-    const furnace = await bot.openFurnace(furnaceBlock)
-    try {
-      const busy = furnace.inputItem()
-      if (busy && itemName(busy) !== item) return fail(`the furnace is busy smelting ${itemName(busy)}`)
-      const out = furnace.outputItem()
-      if (out) await furnace.takeOutput()
-
-      // fuel: count what's already burning/loaded, add the rest
-      const loaded = furnace.fuelItem()
-      let capacity = loaded ? fuelValue(itemName(loaded)) * loaded.count : 0
-      if (capacity < count) {
-        const fuelName = fuel ?? pickFuel(bot.inventory.items().map(itemName), item)
-        if (!fuelName) return fail('no fuel (coal, charcoal, planks or logs)')
-        if (loaded && itemName(loaded) !== fuelName) return fail(`the furnace already has ${itemName(loaded)} as fuel`)
-        const need = Math.min(fuelNeeded(fuelName, count - capacity), countItem(bot, fuelName))
-        if (need <= 0) return fail(`no ${fuelName} for fuel`)
-        await furnace.putFuel(bot.registry.itemsByName[fuelName].id, null, need)
-        capacity += fuelValue(fuelName) * need
-      }
-      const toSmelt = Math.min(count, Math.floor(capacity) || count)
-      await furnace.putInput(input.type, null, toSmelt)
-
-      let taken = 0
-      let idle = 0
-      const deadline = Date.now() + toSmelt * 10_500 + 15_000
-      while (taken < toSmelt && Date.now() < deadline) {
-        await sleep(1000, signal)
-        const o = furnace.outputItem()
-        if (o) {
-          const n = o.count
-          await furnace.takeOutput()
-          taken += n
-          idle = 0
-          continue
-        }
-        if (!furnace.inputItem()) break
-        idle = furnace.progress > 0 || furnace.fuel > 0 ? 0 : idle + 1
-        if (idle >= 5) { log.debug('furnace stopped burning', { taken, of: toSmelt }); break }
-      }
-      if (!taken) return fail(`nothing came out of the furnace (is ${item} smeltable?)`)
-      return taken >= count ? ok(`smelted ${taken} ${item}`) : ok(`smelted ${taken} of ${count} ${item}`)
-    } finally {
-      furnace.close()
-    }
-  }
+  run: ({ bot, signal, log }, { item, count, fuel }) => smeltItem(bot, signal, log, item, count, fuel)
 })
 
 export const crafting = () => defineSkill({

@@ -1,0 +1,12 @@
+- [x] Pure placement planner, verification and fix plan (`blockstate.ts`) with unit tests
+- [x] Bot-side placement with stand-spot choice, look-then-click, read back and one retry (`placement.ts`)
+- [x] Blueprint format: palette states, shorthand arrows, plain block entries, meta, rotation of states, themes, fallbacks, furnish kind, passive halves, multi-directory loading
+- [x] New blueprints: small_house, cottage, cabin, watchtower; text preview and `scripts/blueprint-preview.ts`
+- [x] Materials: recipes and plan for stairs, slabs, fences, trapdoors, ladders, beds, furnaces, panes; coal/charcoal, glass, wool, cobblestone; fallbacks; reporting
+- [x] Site preparation (fill, dig, door side, path) and quality pass in `build`
+- [x] Action descriptions and Pax's build-house skill point at small_house
+- [x] `scripts/build-test.ts`: template choice, inspect, remove by blueprint, clear box
+- [x] Live test on mc02: small_house and cottage from an empty inventory, one LLM run
+- [x] Docs: goals-and-building guide, action reference, interlinks, vitepress build
+- [x] Creative mode: take items from the creative inventory, fly to stand spots, unit test for the pure stock plan
+- [x] Doors last, door top cleared, door taken out when resuming; mixed materials and own blocks count; unreachable leftovers finish ok

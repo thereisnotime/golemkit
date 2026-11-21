@@ -333,7 +333,7 @@ export function registerGoalTools (tools: BotTools, store: GoalStore, onChange?:
   const fmt = () => store.fmtPrompt() ?? 'no active goal'
   tools.define('set_goal',
     'Start a goal for a request that takes more than one turn (build, gather, multi-step jobs). One goal at a time; a new one replaces the old. ' +
-    'Give a short ordered plan of high-level steps (e.g. "gather_materials template=hut", "build hut"). The goal is shown to you every turn and you get ' +
+    'Give a short ordered plan of high-level steps (e.g. "gather_materials template=small_house", "build small_house"). The goal is shown to you every turn and you get ' +
     'follow-up turns to keep working on it until you call complete_goal or abandon_goal.',
     z.object({
       goal: z.string().min(3).max(300).describe('what was asked, in a few words'),
@@ -362,7 +362,7 @@ export function registerGoalTools (tools: BotTools, store: GoalStore, onChange?:
     })
   tools.define('complete_goal',
     'Finish the active goal once the tool results show it is really done. Then tell the owner the real result in one short line.',
-    z.object({ result: z.string().min(1).max(200).describe('what was achieved, truthfully (e.g. "built a hut at 600 70 40")') }),
+    z.object({ result: z.string().min(1).max(200).describe('what was achieved, truthfully (e.g. "built a small_house at 600 70 40")') }),
     ({ result }) => {
       const g = store.complete(result)
       if (!g) return { ok: false, text: 'no active goal' }

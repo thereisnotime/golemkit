@@ -1,0 +1,90 @@
+# The default "build a house": a 5x5 room with log corner posts, plank walls three high, a
+# pitched stair roof with a slab ridge and eaves that overhang front and back, a door with a
+# step, two windows (glass panes, or fences when there's no glass), a torch inside and one by
+# the door. Inside: a crafting table, a chest and a bed when there is wool. Cheap enough to
+# gather from scratch: about 45 logs, half of what the cottage takes. Wood follows the theme (oak, spruce, birch...).
+name: small_house
+description: Cozy 5x5 wooden house with log corners, a pitched stair roof, windows, a door with a step, torches, crafting table, chest and bed
+facing: south            # the door side, as drawn
+site: near
+meta: { tags: [house, starter, wood], style: rustic, author: mc-buddy }
+stairs: roof             # ^ v < > are roof stairs climbing north, south, west, east
+roles:
+  wall: { default: oak_planks, accept: "_planks$", material: true, wood: true }
+  frame: { default: oak_log, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_log$", wood: true, state: { axis: y } }
+  roof: { default: oak_stairs, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak|bamboo|crimson|warped)_stairs$", wood: true }
+  ridge: { default: oak_slab, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak|bamboo|crimson|warped)_slab$", wood: true, state: { type: bottom } }
+  door: { default: oak_door, accept: "_door$", kind: door, wood: true }
+  window: { default: glass_pane, accept: "^(glass|glass_pane)$", optional: true, wood: true, fallback: [oak_fence] }
+  light: { default: torch, accept: "^(wall_)?torch$|^lantern$", kind: attachment, optional: true }
+  bed: { default: white_bed, accept: "_bed$", kind: furnish, optional: true }
+  chest: { default: chest, kind: furnish, optional: true }
+  table: { default: crafting_table, kind: furnish, optional: true }
+palette:
+  "#": wall
+  "|": frame
+  s: ridge
+  D: "door[facing=north,hinge=left]"      # placed from outside, looking in
+  W: window
+  t: "light[facing=south]"                # a wall torch on the wall to its north
+  B: "bed[facing=north,part=foot]"
+  b: "bed[facing=north,part=head]"
+  C: "chest[facing=south]"
+  K: table
+  ".": air
+layers:
+  # y=0 floor on the ground, a stair step in front of the door
+  - ["     ",
+     "#####",
+     "#####",
+     "#####",
+     "#####",
+     "#####",
+     "  ^  "]
+  # y=1 log corners, plank walls, door; bed, chest, crafting table
+  - ["     ",
+     "|###|",
+     "#b.C#",
+     "#B.K#",
+     "#...#",
+     "|#D#|",
+     "     "]
+  # y=2 windows east and west, a torch inside on the north wall, one outside by the door
+  - ["     ",
+     "|###|",
+     "#.t.#",
+     "W...W",
+     "#...#",
+     "|# #|",
+     " t   "]
+  # y=3 top of the walls; eaves overhang front and back
+  - ["vvvvv",
+     "|###|",
+     "#...#",
+     "#...#",
+     "#...#",
+     "|###|",
+     "^^^^^"]
+  # y=4 roof on the wall tops, gable ends filled with planks
+  - ["     ",
+     "vvvvv",
+     "#...#",
+     "#...#",
+     "#...#",
+     "^^^^^",
+     "     "]
+  - ["     ",
+     "     ",
+     "vvvvv",
+     "#...#",
+     "^^^^^",
+     "     ",
+     "     "]
+  # y=6 slab ridge
+  - ["     ",
+     "     ",
+     "     ",
+     "sssss",
+     "     ",
+     "     ",
+     "     "]
