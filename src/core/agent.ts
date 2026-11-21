@@ -771,7 +771,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
             if (this.current || this.chatSending || bot.pathfinder?.isMoving?.() || Math.random() > 0.35) return
             const near = bot.nearestEntity(e => e.type === 'player' && e.position.distanceTo(bot.entity.position) < 10)
             if (near && Math.random() < 0.6) void bot.lookAt(near.position.offset(0, near.height ?? 1.6, 0)).catch(() => {})
-            else void bot.look(bot.entity.yaw + (Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 0.6).catch(() => {})
+            else void bot.look(bot.entity.yaw + (Math.random() - 0.5) * 1.6, bot.nearestEntity(e => e.name === 'enderman' && e.position.distanceTo(bot.entity.position) < 48) ? -0.7 : (Math.random() - 0.5) * 0.6) // never a random glance at an enderman.catch(() => {})
           }, 6000)
           cleanups.push(() => clearInterval(fidget))
         }
