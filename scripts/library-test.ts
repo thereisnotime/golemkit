@@ -172,17 +172,20 @@ async function clean (): Promise<void> {
   await once(bot)
   const built = bot.storage.get<Built[]>('built', [])
   let total = 0
-  for (const b of built) {
+  const left: string[] = []
+  for (const b of [...built].reverse()) {
     const plan = boxOf(bot, b)
     if (!plan) { log(`no blueprint ${b.template} any more, skipping ${JSON.stringify(b.origin)}`); continue }
-    await gotoSurface(bot, plan.box.max.x + 3, b.origin.z)
+    // right next to it, digging allowed: builds on a peak can't be reached by walking alone
+    await step(bot, 'goto', { x: plan.box.max.x + 2, y: b.origin.y, z: b.origin.z })
     // the door's top half and anything else that drops with its block comes off with it
     const cells = plan.cells.filter(c => c.role !== 'air').sort((p, q) => q.y - p.y)
+    let fails = 0
     for (const c of cells) {
       const bl = bot.bot.blockAt(bot.bot.entity.position.clone().set(c.x, c.y, c.z))
       if (!bl || bl.name === 'air' || isNaturalBlock(bl.name) || /_log$|water|lava/.test(bl.name)) continue
       const r = await step(bot, 'break_block', { x: c.x, y: c.y, z: c.z, force: true })
-      if (r.ok) total++
+      if (r.ok) { total++; fails = 0 } else if (++fails >= 3) { left.push(`${b.template} at ${b.origin.x} ${b.origin.y} ${b.origin.z}`); break }
     }
     // dips filled with cobblestone under the floor (dirt fills pass for terrain)
     for (let y = b.origin.y - 1; y >= b.origin.y - 2; y--) {
@@ -197,9 +200,9 @@ async function clean (): Promise<void> {
     }
     await step(bot, 'pickup_items', { radius: 10 })
   }
-  bot.storage.set('built', [])
+  bot.storage.set('built', built.filter(b => left.includes(`${b.template} at ${b.origin.x} ${b.origin.y} ${b.origin.z}`)))
   bot.storage.flush()
-  log(`removed ${total} blocks from ${built.length} builds`)
+  log(`removed ${total} blocks from ${built.length} builds${left.length ? `; could not reach: ${left.join(', ')}` : ''}`)
   await bot.stop()
 }
 
