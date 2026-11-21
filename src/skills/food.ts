@@ -13,6 +13,7 @@ import { CROPS, isMature, plantOn, TILLABLE } from './farming.ts'
 import { getHome, getPlaces, setPlace, sameDimension, type Place } from './navigation.ts'
 import { digBlock, DigRefusedError, findItem, countItem, placeAt, reachBlock, vec, within, gotoWithin } from './world.ts'
 import { pickupNearby } from './pickup.ts'
+import { climbOut, roofAbove } from './survival.ts'
 import { ensureTool } from './toolkit.ts'
 import { collectBlocks } from './gather.ts'
 import { craftItem } from './crafting.ts'
@@ -258,7 +259,8 @@ const findFood = defineAction({
     from: z.enum(['home', 'here']).default('home').describe('centre of the search: home (when set) or where the bot stands')
   }),
   longRunning: true,
-  async run ({ bot, agent, signal, log }, p): Promise<ActionResult> {
+  async run (ctx, p): Promise<ActionResult> {
+    const { bot, agent, signal, log } = ctx
     if (!needsSurvival(bot)) return fail(`no need to look for food in ${bot.game.gameMode} mode`)
     if (isNight(bot) && !p.atNight) return fail('it is night; I scout for food by day (atNight=true to go anyway)')
     const dim = bot.game?.dimension
@@ -323,17 +325,25 @@ const findFood = defineAction({
       const top = surfaceAt(bot, w.x, Math.floor(bot.entity.position.y), w.z)
       if (top && /water|lava/.test(top.name)) { log.debug('find_food: skipping wet waypoint', { at: `${w.x} ${w.z}`, block: top.name }); continue }
       const start = bot.entity.position.clone()
+      // Aim at the open-sky ground (not just any solid block in a ±30 window, which can be a cave
+      // floor or nothing at all on a mountain), so the pathfinder stays on the surface.
+      const sky = topY(bot, w.x, w.z)
+      let wentUnder = false
       // walk there, but stop as soon as something edible comes into view
       const ctl = new AbortController()
       const leg = AbortSignal.any([signal, ctl.signal])
       let seen: Sighting | null = null
       try {
         // with the surface height when we can see it, so the pathfinder doesn't tunnel there
-        await travel(bot, top ? { x: w.x, y: top.position.y + 1, z: w.z } : { x: w.x, z: w.z }, leg, {
+        await travel(bot, sky !== null ? { x: w.x, y: sky, z: w.z } : top ? { x: w.x, y: top.position.y + 1, z: w.z } : { x: w.x, z: w.z }, leg, {
           range: 8,
           stepTimeoutMs: 45_000,
           onProgress: () => {
             seen = look(agent, bot, p.animals, p.crops, p.keepAtLeast)
+            // Dropped well below both where we started and the target ground, under a roof: we're in
+            // a cave or ravine, not on the way. Stop and climb out (Pax died at y=-3 like this).
+            const y = bot.entity.position.y
+            if (y < Math.min(start.y, sky ?? start.y) - 10 && roofAbove(bot, 32) !== null) { wentUnder = true; ctl.abort() }
             if (seen || scoutStopReason(progress(), limits)) ctl.abort()
           }
         })
@@ -345,6 +355,14 @@ const findFood = defineAction({
           blocked.set(w.sector, w.ring + 1)
           log.debug('find_food: leg failed', { to: `${w.x} ${w.z}`, error: (e as Error).message })
         }
+      }
+      if (wentUnder) {
+        // That direction leads into a cave or ravine: mark it and get back to the sky before going on.
+        blocked.set(w.sector, w.ring)
+        consecutiveFailures++
+        log.info('find_food: ended up underground, climbing out', { at: fmtPos(bot.entity.position) })
+        const r = await (climbOut as any).run(ctx, { maxBlocks: 64 }).catch((e: Error) => ({ ok: false, message: e.message }))
+        if (!r?.ok) { reason = `fell into a cave at ${fmtPos(bot.entity.position)} and couldn't climb out (${r?.message ?? 'unknown'})`; break }
       }
       legs++
       walked += bot.entity.position.distanceTo(start)

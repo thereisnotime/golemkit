@@ -163,7 +163,7 @@ async function stairStep (ctx: any): Promise<boolean> {
   return false
 }
 
-const climbOut = defineAction({
+export const climbOut = defineAction({
   name: 'climb_out',
   description: 'Get out of a pit, shaft or cave straight up to open sky: dig the block above if needed, jump and place ' +
     'a block underneath, repeat. Without blocks it carves stair steps up into the wall instead.',
