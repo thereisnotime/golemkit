@@ -159,6 +159,20 @@ export class BotTools implements ToolHost {
     return this.runAction(entry.name, args, entry.longRunning, scope)
   }
 
+  /**
+   * Turns for an owner (they're talking, or it's their goal) outrank the bot's own behaviours, except
+   * while health or food is low: then hunting/eating/safety behaviours keep the upper hand.
+   */
+  private priorityFor (scope: TurnScope): number {
+    const isOwner = (p?: string) => !!p && !!(this.agent as { isOwner?: (p: string) => boolean }).isOwner?.(p)
+    if (isOwner(scope.speaker)) return Math.max(this.opts.priority, PRIORITY.behavior + 5)
+    if (isOwner(scope.player)) {
+      const bot = (() => { try { return (this.agent as any).bot } catch { return null } })()
+      if (bot && bot.health > 6 && bot.food > 6) return Math.max(this.opts.priority, PRIORITY.behavior + 5)
+    }
+    return this.opts.priority
+  }
+
   /** Actions the model may not call for a while (repeated identical failures during a goal). */
   readonly blocked = new Map<string, { until: number, why: string }>()
 
@@ -169,14 +183,12 @@ export class BotTools implements ToolHost {
     }
     const cur = this.agent.currentAction
     // `stop` is non-exclusive, so the lock wouldn't stop the model from cancelling a player's command.
-    const outranks = !!scope.speaker && !!(this.agent as { isOwner?: (p: string) => boolean }).isOwner?.(scope.speaker) ? PRIORITY.behavior + 5 : this.opts.priority
-    if (name === 'stop' && cur && cur.priority > outranks) {
+    if (name === 'stop' && cur && cur.priority > this.priorityFor(scope)) {
       return { ok: false, text: `busy: ${cur.name} was started by ${cur.caller.kind} ${cur.caller.name} and outranks you; you can't stop it` }
     }
     // Doing what an owner just asked outranks the bot's own behaviours (hunt, scouting...), but not
     // reflexes or a direct player command.
-    const ownerAsked = !!scope.speaker && !!(this.agent as { isOwner?: (p: string) => boolean }).isOwner?.(scope.speaker)
-    const priority = ownerAsked ? Math.max(this.opts.priority, PRIORITY.behavior + 5) : this.opts.priority
+    const priority = this.priorityFor(scope)
     const pending = this.agent.act(name, args, { caller: LLM_CALLER, priority, player: scope.player })
     const waitMs = longRunning ? this.opts.startGraceMs : this.opts.actionTimeoutMs
     const settled = await raceTimeout(pending, waitMs)

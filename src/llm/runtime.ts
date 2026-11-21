@@ -7,6 +7,7 @@ import { startMcpHttp, type McpHttpBridge } from './mcp.ts'
 import { Memory, type MemoryOptions } from './memory.ts'
 import { backoffMs, isTransientLlmError } from '../core/retry.ts'
 import { buildSystemPrompt, buildUserMessage, chatTrigger, type ChatTriggerOptions, type PromptContext, type Trigger } from './prompt.ts'
+import { PRIORITY } from '../core/index.ts'
 import { BotTools, LLM_CALLER, type BotToolsOptions, type ToolAgent } from './tools.ts'
 import type { LlmProvider, ToolCallRecord, TurnResult } from './types.ts'
 import { PriceTable, type Price } from './pricing.ts'
@@ -351,7 +352,7 @@ export class LlmRuntime {
     const d = continuationDecision(goal, this.goals.opts, {
       now: Date.now(),
       busy: this.busy || this.queue.length > 0,
-      acting: !!this.agent.currentAction,
+      acting: this.bodyBusyForGoal(),
       connected: (this.agent as { connected?: boolean }).connected !== false,
       budgetBlocked: this.budget.blocked(),
       hour: this.budget.hour(),
@@ -386,11 +387,26 @@ export class LlmRuntime {
     return false
   }
 
+  /**
+   * Is the body busy in a way that should hold the goal back? Our own action, a player's command or a
+   * reflex: yes. A behaviour (hunting, scouting, tools...) only while health or food is low: otherwise
+   * an owner's goal outranks behaviours (see BotTools: goal turns for an owner run above them), and
+   * waiting for the bot to be fully idle meant the goal never got a turn.
+   */
+  private bodyBusyForGoal (): boolean {
+    const cur = this.agent.currentAction
+    if (!cur) return false
+    if (cur.caller.kind !== 'brain' || cur.caller.name === LLM_CALLER.name) return true
+    if (cur.priority > PRIORITY.behavior) return true
+    const bot = (() => { try { return (this.agent as any).bot } catch { return null } })()
+    return !!bot && (bot.health <= 6 || bot.food <= 6)
+  }
+
   /** Every few seconds: if a goal is active and nothing has happened for a while, nudge it (backoff grows with stalled turns). */
   private goalIdleCheck (): void {
     if (this.goals.resumeIfOwnerSilent()) this.log.info('owner silent; going on with the goal by myself')
     const goal = this.goals.active
-    if (!goal || goal.paused || this.goalWake || this.busy || this.queue.length || this.agent.currentAction) return
+    if (!goal || goal.paused || this.goalWake || this.busy || this.queue.length || this.bodyBusyForGoal()) return
     const quietFor = Date.now() - Math.max(this.lastTurnAt, this.lastActionEndAt)
     if (quietFor >= idleDelay(goal.stalls, this.goals.opts)) this.tryContinue('idle')
   }
@@ -408,7 +424,7 @@ export class LlmRuntime {
     const g = this.goals.active
     if (!g || g.paused) return
     // Something still running (a long action we started, a player command): its actionEnd continues.
-    if (this.agent.currentAction) return
+    if (this.bodyBusyForGoal()) return
     const progress = g.stalls === 0
     this.scheduleGoal('continue', undefined, progress ? this.goals.opts.continueDelayMs : idleDelay(g.stalls, this.goals.opts))
   }
