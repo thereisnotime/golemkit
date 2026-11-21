@@ -3,6 +3,9 @@
 // long-running actions (follow, guard) resume afterwards.
 import { defineBrain, PRIORITY, nearestHostile, isHostile, FLYING, needsSurvival } from '../core/index.ts'
 import { bestFood } from '../skills/survival.ts'
+import { threats } from '../skills/combat.ts'
+import { fightFood } from '../skills/fight.ts'
+import { gearPlan, hasGearUpgrade } from '../skills/gear.ts'
 
 export interface ReflexOptions {
   selfDefense?: boolean
@@ -29,6 +32,8 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       }
       let busy = false
       let bunkerFailedAt = 0
+      let gearTriedAt = 0
+      const combatCfg = () => (agent.settings.combat ?? {}) as { autoArmor?: boolean, disengageToHeal?: boolean }
       const reflex = async (action: string) => {
         if (busy) return
         busy = true
@@ -45,8 +50,12 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
 
       const onHurt = (entity: any) => {
         if (!cfg().selfDefense || entity !== bot.entity || !needsSurvival(bot)) return
-        // Flyers (phantoms) hit and climb away, so look further for them.
-        const mob = nearestHostile(bot, bot.entity.position, 8) ??
+        // next tick: the combat skill notes who hit us first (neutral mobs count only then)
+        setImmediate(() => { try { onHurtNow() } catch {} })
+      }
+      const onHurtNow = () => {
+        // Flyers (phantoms) hit and climb away, so look further for them; archers shoot from afar.
+        const mob = threats(bot, 20)[0] ?? nearestHostile(bot, bot.entity.position, 8) ??
           bot.nearestEntity((e: any) => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20)
         if (!mob) return
         const cur = agent.currentAction?.name
@@ -82,6 +91,17 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         if (mob && !FLYING.has(mob.name ?? '') && bot.health <= retreatBelow && agent.currentAction?.name !== 'retreat' && agent.getAction('retreat')) {
           void reflex('retreat')
           return
+        }
+        // retreatBelow 0 means stand ground, not die: at <= 4 health with food, defend backs off to eat (combat.disengageToHeal)
+        if (selfDefense && mob && bot.health <= 4 && combatCfg().disengageToHeal !== false && fightFood(bot) &&
+            agent.currentAction?.name !== 'defend' && agent.getAction('defend')) {
+          void reflex('defend')
+          return
+        }
+        // wear armour (and a shield/totem) as soon as it's in the inventory: gear_up runs beside the current action
+        if (combatCfg().autoArmor !== false && agent.getAction('gear_up') && !bot.currentWindow && Date.now() - gearTriedAt > 10_000 && hasGearUpgrade(gearPlan(bot))) {
+          gearTriedAt = Date.now()
+          void agent.act('gear_up', {}, { caller, priority: PRIORITY.reflex })
         }
         if (autoEat && bot.food < eatBelow && agent.getAction('eat') && bestFood(bot)) void reflex('eat')
         // Eat to heal when hurt and safe (food above 17 doesn't heal faster, but saturation helps).

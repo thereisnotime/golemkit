@@ -8,12 +8,14 @@ import type { Bot } from 'mineflayer'
 import { z } from '../../../core/index.ts'
 import { defineBehavior } from '../types.ts'
 import type { NpcContext } from '../../npc/index.ts'
-import { fillerBlock } from '../../../skills/survival.ts'
+import { fillerBlock, bestFood, roofAbove } from '../../../skills/survival.ts'
+import { wornArmorPoints } from '../../../skills/gear.ts'
+import { unpreparedForNight } from '../../../skills/tactics.ts'
 import { findStandable, getHome } from '../../../skills/navigation.ts'
 import { canPlace } from '../runtime.ts'
 import { hostilesNear } from './util.ts'
 
-type Danger = 'surrounded' | 'low_health' | 'water' | 'night' | null
+type Danger = 'surrounded' | 'low_health' | 'water' | 'night' | 'shelter' | null
 
 function inWater (bot: Bot): boolean {
   const p = bot.entity?.position
@@ -28,8 +30,19 @@ const stayOptions = z.object({
   pillar: z.boolean().default(true).describe('when surrounded, pillar up out of reach (needs blocks and block placing)'),
   avoidWater: z.boolean().default(true).describe('get out of water when hostiles are near and health is below 16'),
   homeAtNight: z.boolean().default(true).describe('go home at night if a home is set'),
-  homeRange: z.number().min(2).max(64).default(8).describe('how close to home counts as home at night')
+  homeRange: z.number().min(2).max(64).default(8).describe('how close to home counts as home at night'),
+  shelterUnprepared: z.boolean().default(true).describe('at night without armour, a weapon or food and no home: dig in (bunker) until morning')
 })
+
+/** Why the bot shouldn't be out tonight (no armour, weapon or food), or null. Exported for tests. */
+export function nightUnready (bot: Bot): string | null {
+  const items = bot.inventory?.items?.() ?? []
+  return unpreparedForNight({
+    armorPoints: bot.inventory?.slots ? wornArmorPoints(bot) : 0,
+    hasWeapon: items.some(i => /_(sword|axe)$/.test(i.name)),
+    hasFood: !!bestFood(bot)
+  })
+}
 
 type StayO = z.infer<typeof stayOptions>
 
@@ -47,6 +60,9 @@ export function assessDanger (ctx: Pick<NpcContext, 'agent' | 'bot' | 'bb'> & { 
   if (near.length && o.retreatBelow > 0 && health <= (running ? o.retreatBelow + 2 : o.retreatBelow)) return 'low_health'
   if (o.avoidWater && near.length && health < 16 && inWater(bot)) return 'water'
   if (o.homeAtNight && bb.facts.isNight && !bb.facts.sleeping && getHome(agent) && bb.facts.homeDistance !== null && bb.facts.homeDistance > o.homeRange) return 'night'
+  // no home to go to and not fit for a night outside: dig in, unless already under a roof
+  if (o.shelterUnprepared && bb.facts.isNight && !bb.facts.sleeping && !getHome(agent) && agent.canDig && agent.getAction?.('bunker') &&
+      !agent.protectedAreas?.isProtected(pos) && nightUnready(bot) && roofAbove(bot, 12) === null) return 'shelter'
   return null
 }
 
@@ -54,9 +70,10 @@ export const staySafe = defineBehavior({
   name: 'stay_safe',
   category: 'safety',
   description: 'Keeps the bot alive: backs away from mobs at low health, pillars up when surrounded (if it can place blocks), ' +
-    'gets out of water when mobs are around, and heads home at night if a home is set. Arm it on any bot that roams.',
+    'gets out of water when mobs are around, heads home at night if a home is set (sooner when it has no armour, weapon or food), ' +
+    'and without a home digs in for the night when it is unprepared. Arm it on any bot that roams.',
   options: stayOptions,
-  uses: ['retreat', 'flee', 'pillar', 'goto', 'go_home'],
+  uses: ['retreat', 'flee', 'pillar', 'goto', 'go_home', 'bunker'],
   priority: 'behavior',
   create (o, { agent }) {
     return {
@@ -68,7 +85,8 @@ export const staySafe = defineBehavior({
           case 'surrounded': return 92
           case 'low_health': return 88
           case 'water': return 78
-          case 'night': return ctx.current === 'stay_safe' ? 50 : 48
+          case 'night': return nightUnready(ctx.bot) ? 70 : ctx.current === 'stay_safe' ? 50 : 48 // unprepared: home beats other jobs
+          case 'shelter': return 66
           default: return 0
         }
       },
@@ -101,6 +119,8 @@ export const staySafe = defineBehavior({
             }
             return agent.getAction('flee') ? ctx.act('flee', { distance: 16 }) : 'no dry land nearby'
           }
+          case 'shelter':
+            return ctx.act('bunker', { untilDay: true })
           case 'night':
             return agent.getAction('go_home') ? ctx.act('go_home', { range: Math.min(o.homeRange, 4) }) : 'no go_home action'
           default:

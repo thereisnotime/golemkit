@@ -1,10 +1,14 @@
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
+import type { ActionContext } from '../core/index.ts'
 import { defineSkill, defineAction, z, noParams, ok, fail, goals, fmtPos, gotoTimed, playerEntity, nearestHostile, isHostile, FLYING, sleep, checkAborted } from '../core/index.ts'
 import { pickupNearby } from './pickup.ts'
-import { equipForTarget, hasRanged, shootAt, blockWithShield, isRangedMob, weaponFlags, type WeaponFlags } from './weapons.ts'
-
-const REACH = 3.2
+import { isRangedMob, weaponFlags, type WeaponFlags } from './weapons.ts'
+import { fightTarget, eyeReach, lineOfSight, creeperFuseLit, eatNow, fightFood, meleeNear, type FightResult } from './fight.ts'
+import { rankTargets, type ThreatInfo } from './tactics.ts'
+import { fillerBlock } from './survival.ts'
+import { getHome } from './navigation.ts'
+import { gearUp, wornArmorPoints } from './gear.ts'
 const WEAPONS = ['netherite_sword', 'diamond_sword', 'iron_sword', 'stone_sword', 'golden_sword', 'wooden_sword',
   'netherite_axe', 'diamond_axe', 'iron_axe', 'stone_axe']
 
@@ -19,75 +23,74 @@ export async function equipBestWeapon (bot: Bot): Promise<void> {
 }
 
 /**
- * Walks up to the target and swings until it dies, escapes or the signal aborts. With
- * adaptive weapons (default) it re-picks the best item for this target before each swing,
- * shoots flyers and out-of-reach targets when it has a bow and arrows, and blocks ranged mobs
- * with a shield between swings. Flags: settings.combat (live via !config_set combat.*).
+ * Fights one target until it dies, escapes or the signal aborts (fight.ts has the loop): swings on
+ * the weapon's real cooldown, jumps for critical hits, keeps spacing and strafes, shoots flyers
+ * and archers with a bow, blocks arrows with a shield. True when it died. Flags: settings.combat
+ * (live via !config_set combat.*). fightTarget() returns why it stopped.
  */
 export async function fight (bot: Bot, target: Entity, signal: AbortSignal, maxMs = 20000, flags: WeaponFlags = { adaptive: true, ranged: true, shield: true }): Promise<boolean> {
-  await equipForTarget(bot, target, flags)
-  const start = Date.now()
-  // Flyers (phantoms...) can't be chased on foot: hold position, track them and swing when
-  // they dive into reach. Ground mobs: follow and hit.
-  const flying = FLYING.has(target.name ?? '')
-  if (!flying) {
-    const mv = (bot.pathfinder as any).movements
-    if (mv) mv.allowSprinting = true
-    bot.pathfinder.setGoal(new goals.GoalFollow(target, 2), true)
-  }
-  // Stuck chasing (no path to it, e.g. a skeleton up a slope): standing still while it shoots us is
-  // the worst option. If we haven't got closer for 3 s and it's out of reach, stop and say so.
-  let bestDist = Infinity
-  let bestAt = Date.now()
-  try {
-    while ((target as any).isValid !== false && Date.now() - start < maxMs) {
-      checkAborted(signal)
-      const dist = bot.entity.position.distanceTo(target.position)
-      if (!flying) {
-        if (dist < bestDist - 0.5) { bestDist = dist; bestAt = Date.now() }
-        else if (dist > REACH + 0.5 && Date.now() - bestAt > 3000) return false
-      }
-      // A creeper whose fuse is lit (it swells, ~1.5 s): get away now, finish it after the fizzle.
-      if (target.name === 'creeper' && creeperFuseLit(target) && dist < 5) {
-        bot.pathfinder.setGoal(new goals.GoalInvert(new goals.GoalFollow(target, 7)), true)
-        await sleep(1500, signal)
-        bot.pathfinder.setGoal(new goals.GoalFollow(target, 2), true)
-        continue
-      }
-      if (dist > (flying ? 40 : 24)) return false
-      if (flying) await bot.lookAt(target.position.offset(0, target.height * 0.5, 0), true).catch(() => {})
-      if (dist <= REACH + (flying ? 0.5 : 0)) {
-        await equipForTarget(bot, target, flags) // health changes: re-pick (finisher, shield...)
-        if (!flying) await bot.lookAt(target.position.offset(0, target.height * 0.8, 0), true)
-        bot.attack(target)
-        if (target.name === 'creeper') {
-          // Hit and step back: the knockback plus distance keeps us out of the blast; never stand next to it.
-          bot.pathfinder.setGoal(null)
-          bot.setControlState('back', true)
-          bot.setControlState('sprint', true)
-          await sleep(700, signal).finally(() => { bot.setControlState('back', false); bot.setControlState('sprint', false) })
-          bot.pathfinder.setGoal(new goals.GoalFollow(target, 2), true)
-          continue
-        }
-        await sleep(600, signal) // full sword cooldown
-      } else if (flags.ranged && hasRanged(bot) && (flying || dist > 6) && dist < 32) {
-        await shootAt(bot, target, signal) // flyers and targets out of reach: shoot
-      } else if (flags.shield && isRangedMob(target.name) && dist > REACH) {
-        await blockWithShield(bot, 600) // skeleton aiming at us while we close in
-      } else {
-        await sleep(flying ? 100 : 300, signal) // flyers dive fast: check often
-      }
-    }
-    return (target as any).isValid === false
-  } finally {
-    bot.pathfinder.setGoal(null)
-  }
+  return (await fightTarget(bot, target, signal, { maxMs, flags })).killed
 }
 
-/** Creeper fuse state: metadata "swell direction" is 1 while it is about to explode. */
-function creeperFuseLit (e: Entity): boolean {
+// ---- who to fight ----
+
+/** Mobs that hit us recently (id -> time), so neutral mobs (endermen, piglins, wolves) are fought only then. */
+const attackers = new WeakMap<Bot, Map<number, number>>()
+const ATTACKER_MS = 15_000
+
+export function recentAttacker (bot: Bot, id: number): boolean {
+  const t = attackers.get(bot)?.get(id)
+  return !!t && Date.now() - t < ATTACKER_MS
+}
+
+function noteAttacker (bot: Bot): void {
+  // the nearest living non-player within melee range when we got hurt
+  const e = bot.nearestEntity(x => x !== bot.entity && x.type !== 'player' && x.type !== 'object' && x.type !== 'orb' &&
+    x.position.distanceTo(bot.entity.position) < 4.5)
+  if (!e) return
+  let m = attackers.get(bot)
+  if (!m) attackers.set(bot, m = new Map())
+  m.set(e.id, Date.now())
+}
+
+const NEUTRAL_FIGHTABLE = new Set(['enderman', 'piglin', 'zombified_piglin', 'wolf', 'polar_bear', 'llama', 'trader_llama', 'bee', 'panda', 'goat'])
+const NEVER = new Set(['villager', 'wandering_trader', 'iron_golem', 'snow_golem', 'allay', 'cat', 'parrot', 'horse', 'donkey', 'mule', 'axolotl'])
+
+/**
+ * Why an entity must not be attacked, or null when it may: never players, villagers, golems,
+ * pets (owner or tamed flag), named mobs; neutral mobs only while they're attacking us.
+ */
+export function combatRefusal (bot: Bot, e: Entity): string | null {
+  if (e.type === 'player' || (e as any).username) return 'a player'
+  const name = e.name ?? ''
+  if (NEVER.has(name)) return `a ${name}`
+  const keys = (bot.registry as any).entitiesByName?.[name]?.metadataKeys as string[] | undefined
   const md = (e as any).metadata as unknown[] | undefined
-  return !!md && (md[16] === 1 || md[18] === true) // 1.21 creeper: 16 = state (-1 idle, 1 fusing), 17 = charged, 18 = ignited (flint and steel)
+  const at = (key: string, fallback: number) => { const i = keys?.indexOf(key) ?? -1; return md?.[i >= 0 ? i : fallback] }
+  const custom = at('custom_name', 2)
+  if (custom !== undefined && custom !== null && custom !== '') return 'named'
+  if (at('owneruuid', -1)) return 'someone\'s pet'
+  const id = e.id
+  if (isHostile(e)) return null
+  if (NEUTRAL_FIGHTABLE.has(name) && recentAttacker(bot, id)) return null
+  return 'not hostile'
+}
+
+/** Everything worth fighting around the bot, most threatening first (tactics.rankTargets). */
+export function threats (bot: Bot, radius = 24): Entity[] {
+  const me = bot.entity.position
+  const list: (ThreatInfo & { e: Entity })[] = []
+  for (const e of Object.values(bot.entities)) {
+    if (e === bot.entity || !e.position) continue
+    const d = e.position.distanceTo(me)
+    if (d > radius) continue
+    if (combatRefusal(bot, e)) continue
+    const ground = !FLYING.has(e.name ?? '') && !isRangedMob(e.name)
+    if (ground && d > 8 && !recentAttacker(bot, e.id)) continue // melee mobs far away aren't a fight yet
+    if (FLYING.has(e.name ?? '') && d > 20) continue
+    list.push({ id: e.id, name: e.name ?? '', dist: d, los: isRangedMob(e.name) ? lineOfSight(bot, e) : true, fuseLit: e.name === 'creeper' && creeperFuseLit(e), attacking: recentAttacker(bot, e.id), e })
+  }
+  return rankTargets(list).map(t => t.e)
 }
 
 /** Animals a hunt couldn't get to (up a cliff, behind water...): skipped by later hunts for 5 minutes. */
@@ -104,16 +107,18 @@ function unreachableAnimals (bot: Bot): { has: (id: number) => boolean, add: (id
 
 const attack = defineAction({
   name: 'attack',
-  description: 'Fight the nearest hostile mob, or a specific entity by id.',
+  description: 'Fight the most dangerous hostile mob nearby, or a specific entity by id. Never attacks players, villagers, golems, pets or named mobs.',
   params: z.object({
-    entityId: z.number().optional().describe('entity id; default nearest hostile mob'),
-    radius: z.number().default(16)
+    entityId: z.number().optional().describe('entity id; default the most dangerous hostile mob nearby'),
+    radius: z.number().default(16).describe('how far to look for a target, in blocks')
   }),
   async run ({ bot, agent, signal }, { entityId, radius }) {
-    const target = entityId !== undefined ? bot.entities[entityId] : nearestHostile(bot, bot.entity.position, radius)
+    const target = entityId !== undefined ? bot.entities[entityId] : threats(bot, radius)[0] ?? nearestHostile(bot, bot.entity.position, radius)
     if (!target) return fail('no target nearby')
-    const killed = await fight(bot, target, signal, 20000, weaponFlags(agent))
-    return killed ? ok(`killed ${target.name}`) : ok(`stopped fighting ${target.name}`)
+    const why = combatRefusal(bot, target)
+    if (why && !(why === 'not hostile' && entityId !== undefined && HUNTABLE.includes(target.name as any))) return fail(`won't attack ${target.name ?? 'that'}: ${why}`)
+    const r = await fightTarget(bot, target, signal, { maxMs: 20000, flags: weaponFlags(agent) })
+    return r.killed ? ok(`killed ${target.name} (${r.hits} hits, ${r.crits} crits)`) : ok(`stopped fighting ${target.name}: ${r.reason ?? r.end}`)
   }
 })
 
@@ -144,28 +149,98 @@ const guard = defineAction({
   }
 })
 
+/** Back away from a mob for a few seconds (pathfinder), until `dist` blocks or `ms` run out. */
+async function backOff (bot: Bot, mob: Entity, signal: AbortSignal, dist: number, ms: number): Promise<void> {
+  bot.pathfinder.setGoal(new goals.GoalInvert(new goals.GoalFollow(mob, dist)), true)
+  try {
+    const until = Date.now() + ms
+    while (Date.now() < until && (mob as any).isValid !== false && bot.entity.position.distanceTo(mob.position) < dist) await sleep(200, signal)
+  } finally { bot.pathfinder.setGoal(null) }
+}
+
+/** Runs another action's body inline (agent.act from inside an action would preempt this one). */
+async function runInline (ctx: ActionContext, name: string, params: Record<string, unknown>): Promise<{ ok: boolean, message: string } | null> {
+  const def = ctx.agent.getAction(name)
+  if (!def) return null
+  const r = await def.run(ctx, def.params.parse(params))
+  if (r === undefined) return { ok: true, message: 'done' }
+  return typeof r === 'string' ? { ok: true, message: r } : r
+}
+
+/**
+ * Outnumbered (3+ melee mobs close, under half health): a 2-block pillar puts us above zombie
+ * reach while we can still hit their heads; otherwise home if it is close, otherwise back off.
+ */
+async function escapeCrowd (ctx: ActionContext): Promise<string> {
+  const { bot, agent, signal } = ctx
+  const flags = weaponFlags(agent)
+  if (agent.settings.canPlace !== false && fillerBlock(bot) && agent.getAction('pillar') && !agent.protectedAreas.isProtected(bot.entity.position)) {
+    const r = await runInline(ctx, 'pillar', { height: 2 }).catch(() => null)
+    if (r?.ok) {
+      // fight from the top: swing at whatever comes into reach, eat when it's quiet
+      const until = Date.now() + 60_000
+      while (Date.now() < until && meleeNear(bot, 8) >= 2) {
+        checkAborted(signal)
+        const near = threats(bot, 6).find(e => eyeReach(bot, e) <= 3)
+        if (near) await fightTarget(bot, near, signal, { maxMs: 1500, flags: { ...flags, strafe: false, maxChase: 0.5 }, tactical: false })
+        else if (bot.health <= 10 && fightFood(bot)) await eatNow(bot, signal)
+        else await sleep(250, signal)
+      }
+      return 'pillared up out of reach'
+    }
+  }
+  const home = getHome(agent)
+  if (home && Math.hypot(home.x - bot.entity.position.x, home.z - bot.entity.position.z) < 48) {
+    const r = await runInline(ctx, 'go_home', { range: 2 }).catch(() => null)
+    if (r?.ok) return 'ran home'
+  }
+  const r = await runInline(ctx, 'retreat', { distance: 20 }).catch(() => null)
+  return r?.ok ? 'backed off' : 'tried to back off'
+}
+
 const defend = defineAction({
   name: 'defend',
-  description: 'Fight back against whatever hostile mob is closest (used by reflexes).',
+  description: 'Fight back against the hostile mobs around, most dangerous first (used by reflexes).',
   params: noParams,
   internal: true,
-  async run ({ bot, agent, signal }) {
-    // Flyers hit and climb away, so look further for them.
-    // Flyers hit and climb away, and archers (skeletons...) shoot from ~16 blocks: look further for them.
-    const mob = nearestHostile(bot, bot.entity.position, 6) ??
-      bot.nearestEntity(e => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20) ??
-      bot.nearestEntity(e => isHostile(e) && isRangedMob(e.name) && e.position.distanceTo(bot.entity.position) < 24)
-    if (!mob) return fail('nothing to fight')
-    // Archers back off while shooting: chase them longer (and sprint) instead of giving up after 10 s.
-    const long = FLYING.has(mob.name ?? '') || isRangedMob(mob.name)
-    const killed = await fight(bot, mob, signal, long ? 25000 : 10000, weaponFlags(agent))
-    if (!killed && isRangedMob(mob.name) && (mob as any).isValid !== false) {
-      // Couldn't get to the archer: get out of its line of fire instead of standing there.
-      bot.pathfinder.setGoal(new goals.GoalInvert(new goals.GoalFollow(mob, 20)), true)
-      try { await sleep(4000, signal) } finally { bot.pathfinder.setGoal(null) }
-      return ok(`couldn't reach the ${mob.name}; backed out of its line of fire`)
+  async run (ctx) {
+    const { bot, agent, signal } = ctx
+    const flags = weaponFlags(agent)
+    const maxChase = flags.maxChase ?? 16
+    const origin = bot.entity.position.clone()
+    const skip = new Set<number>()
+    const killed: string[] = []
+    const notes: string[] = []
+    let heals = 0
+    const until = Date.now() + 60_000
+    while (Date.now() < until) {
+      checkAborted(signal)
+      const mob = threats(bot, 24).find(e => !skip.has(e.id) && e.position.distanceTo(origin) <= maxChase + 12)
+      if (!mob) break
+      const drift = bot.entity.position.distanceTo(origin)
+      const long = FLYING.has(mob.name ?? '') || isRangedMob(mob.name)
+      const r: FightResult = await fightTarget(bot, mob, signal, { maxMs: long ? 25000 : 12000, flags: { ...flags, maxChase: Math.max(3, maxChase - drift) } })
+      if (r.killed) { killed.push(mob.name ?? 'mob'); continue }
+      if (r.end === 'heal' && heals < 3) {
+        // standing ground doesn't mean dying: step back, eat, come back
+        heals++
+        await backOff(bot, mob, signal, 10, 5000)
+        const ate = await eatNow(bot, signal)
+        if (ate && bot.health <= 8 && fightFood(bot)) await eatNow(bot, signal)
+        notes.push(ate ? 'backed off to eat' : 'backed off but could not eat')
+        continue
+      }
+      if (r.end === 'outnumbered') { notes.push(await escapeCrowd(ctx)); break }
+      skip.add(mob.id)
+      if (r.end === 'gave_up' && isRangedMob(mob.name) && (mob as any).isValid !== false) {
+        // couldn't get to the archer: get out of its line of fire instead of standing there
+        await backOff(bot, mob, signal, 20, 4000)
+        notes.push(`couldn't reach the ${mob.name} (${r.reason}); backed out of its line of fire`)
+      } else if (r.reason) notes.push(`left the ${mob.name}: ${r.reason}`)
     }
-    return ok(`${killed ? 'killed' : 'fought'} ${mob.name}`)
+    if (!killed.length && !notes.length) return fail('nothing to fight')
+    const k = killed.length ? `killed ${[...new Set(killed)].map(n => `${killed.filter(x => x === n).length} ${n}`).join(', ')}` : 'killed nothing'
+    return ok([k, ...notes].join('; '))
   }
 })
 
@@ -327,9 +402,15 @@ const hunt = defineAction({
 export const combat = () => defineSkill({
   name: 'combat',
   description: 'Fighting hostile mobs, guarding players and hunting animals for food.',
-  actions: [attack, guard, defend, retreat, hunt],
+  actions: [attack, guard, defend, retreat, hunt, gearUp],
+  setup: (_agent, bot) => {
+    // remember who hit us: neutral mobs are fought only while they attack
+    const onHurt = (e: Entity) => { if (e === bot.entity) noteAttacker(bot) }
+    bot.on('entityHurt', onHurt)
+    return () => { bot.off('entityHurt', onHurt) }
+  },
   observe: (_agent, bot) => {
-    const mob = nearestHostile(bot, bot.entity.position, 16)
-    return { nearestHostile: mob ? { name: mob.name, distance: Math.round(mob.position.distanceTo(bot.entity.position)) } : null }
+    const mob = threats(bot, 16)[0] ?? nearestHostile(bot, bot.entity.position, 16)
+    return { nearestHostile: mob ? { name: mob.name, distance: Math.round(mob.position.distanceTo(bot.entity.position)) } : null, armour: wornArmorPoints(bot) }
   }
 })
