@@ -1,6 +1,7 @@
 // Anthropic Messages API with a client-side tool-use loop over the bot's tools.
 // Auth: ANTHROPIC_API_KEY (or whatever the SDK resolves: ANTHROPIC_AUTH_TOKEN, an
 // `ant auth login` profile). Tools + system prompt are static per bot and cached.
+import { resolveProxy } from './proc.ts'
 import Anthropic from '@anthropic-ai/sdk'
 import { ProviderError, type LlmProvider, type TurnInput, type TurnResult, type Usage } from '../types.ts'
 
@@ -12,6 +13,8 @@ export interface AnthropicProviderOptions {
   maxTokens?: number
   apiKey?: string
   baseURL?: string
+  /** 'caveman' or a gateway URL; sets baseURL. */
+  proxy?: string
   /** Server-side refusal fallback (beta). Default on for models that support it. */
   fallbacks?: boolean
 }
@@ -33,6 +36,12 @@ export class AnthropicProvider implements LlmProvider {
     this.model = opts.model || DEFAULT_ANTHROPIC_MODEL
   }
 
+  /** Resolves `proxy` into baseURL once (starts caveman if needed). */
+  private async ensureBase (): Promise<void> {
+    if (this.client || !this.opts.proxy || this.opts.baseURL) return
+    this.opts.baseURL = (await resolveProxy(this.opts.proxy))?.baseUrl
+  }
+
   private getClient (): Anthropic {
     this.client ??= new Anthropic({ apiKey: this.opts.apiKey, baseURL: this.opts.baseURL, maxRetries: 2 })
     return this.client
@@ -46,6 +55,7 @@ export class AnthropicProvider implements LlmProvider {
   }
 
   async run (turn: TurnInput): Promise<TurnResult> {
+    await this.ensureBase()
     const client = this.getClient()
     const specs = turn.tools.list()
     const tools: Anthropic.Beta.BetaTool[] = specs.map((t, i) => ({

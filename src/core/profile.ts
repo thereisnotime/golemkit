@@ -23,6 +23,7 @@ export const LlmProfileSchema = z.object({
   login: z.string().optional().describe('LLM login dir (default .auth/<provider>) or "user"'),
   oauthTokenVar: z.string().optional().describe('claude-subscription: variable holding a setup-token'),
   oauthTokenFile: z.string().optional().describe('dotenv file to read oauthTokenVar from (only that variable is read)'),
+  proxy: z.string().optional().describe('"caveman" (local layer, auto-started), "none", or an http(s) gateway URL'),
   listen: z.enum(['mention', 'conversation', 'all']).optional(),
   immersive: z.boolean().optional().describe('stay in character; default false (factual, openly a bot)'),
   aliases: z.array(z.string()).optional(),

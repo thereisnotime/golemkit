@@ -22,7 +22,7 @@ import { query, type Options, type SDKMessage } from '@anthropic-ai/claude-agent
 import { join } from 'node:path'
 import { buildMcpServer } from '../mcp.ts'
 import { ProviderError, type LlmProvider, type TurnInput, type TurnResult, type Usage } from '../types.ts'
-import { isolatedEnv, readEnvFileVar, resolveProfile, runProcess, scratchDir, tail, which, type Profile } from './proc.ts'
+import { isolatedEnv, readEnvFileVar, resolveProfile, resolveProxy, runProcess, scratchDir, tail, which, type Profile } from './proc.ts'
 
 export interface ClaudeSubscriptionOptions {
   mode?: 'sdk' | 'cli'
@@ -47,6 +47,8 @@ export interface ClaudeSubscriptionOptions {
   oauthToken?: string
   oauthTokenVar?: string
   oauthTokenFile?: string
+  /** Route through a proxy: 'caveman' (local layer, auto-started) or an http(s) gateway URL. */
+  proxy?: string
 }
 
 const KEY_VARS = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN']
@@ -75,8 +77,17 @@ export class ClaudeSubscriptionProvider implements LlmProvider {
     return (this.opts.oauthTokenFile ? readEnvFileVar(this.opts.oauthTokenFile, name) : undefined) ?? process.env[name]
   }
 
+  private proxyUrl: string | null = null
+
+  /** Resolves the proxy once per turn (starts caveman if needed). */
+  private async prepare (): Promise<void> {
+    const p = await resolveProxy(this.opts.proxy)
+    this.proxyUrl = p?.baseUrl ?? null
+  }
+
   private env (): NodeJS.ProcessEnv {
     const set: Record<string, string> = { CLAUDE_AGENT_SDK_CLIENT_APP: 'mc-buddy/0.1' }
+    if (this.proxyUrl) set.ANTHROPIC_BASE_URL = this.proxyUrl
     const token = this.token()
     if (token) set.CLAUDE_CODE_OAUTH_TOKEN = token
     if (this.profile.kind === 'isolated') set.CLAUDE_CONFIG_DIR = join(this.profile.home, '.claude')
@@ -107,6 +118,7 @@ export class ClaudeSubscriptionProvider implements LlmProvider {
   }
 
   async run (turn: TurnInput): Promise<TurnResult> {
+    try { await this.prepare() } catch (e) { throw new ProviderError(this.name, (e as Error).message) }
     return this.opts.mode === 'cli' ? this.runCli(turn) : this.runSdk(turn)
   }
 

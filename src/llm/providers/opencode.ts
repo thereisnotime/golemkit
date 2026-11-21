@@ -14,7 +14,7 @@
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ProviderError, type LlmProvider, type TurnInput, type TurnResult } from '../types.ts'
-import { isolatedEnv, resolveProfile, runProcess, scratchDir, tail, which, type Profile } from './proc.ts'
+import { isolatedEnv, resolveProfile, resolveProxy, runProcess, scratchDir, tail, which, type Profile } from './proc.ts'
 
 export interface OpenCodeProviderOptions {
   /** provider/model, e.g. "openai/gpt-5.5" or "github-copilot/claude-sonnet-5-5". Default: OpenCode's default. */
@@ -28,6 +28,8 @@ export interface OpenCodeProviderOptions {
   login?: string
   /** @deprecated older name for `login` */
   profile?: string
+  /** Route through a proxy: 'caveman' or an http(s) gateway URL (sets Anthropic/OpenAI base URLs). */
+  proxy?: string
 }
 
 const SERVER = 'minecraft'
@@ -101,7 +103,7 @@ export class OpenCodeProvider implements LlmProvider {
         cwd: scratch.path,
         // Isolated HOME/XDG dirs: OpenCode keeps auth in $XDG_DATA_HOME/opencode and config in
         // $XDG_CONFIG_HOME/opencode, so your global OpenCode config is never read.
-        env: isolatedEnv(this.profile, { set: { [TOKEN_VAR]: turn.mcp!.token } }),
+        env: isolatedEnv(this.profile, { set: { [TOKEN_VAR]: turn.mcp!.token, ...(await proxyEnv(this.opts.proxy)) } }),
         timeoutMs: turn.timeoutMs,
         signal: turn.signal
       })
@@ -114,4 +116,9 @@ export class OpenCodeProvider implements LlmProvider {
       scratch.remove()
     }
   }
+}
+
+async function proxyEnv (spec: string | undefined): Promise<Record<string, string>> {
+  const p = await resolveProxy(spec)
+  return p ? { ANTHROPIC_BASE_URL: p.baseUrl, OPENAI_BASE_URL: p.baseUrl } : {}
 }

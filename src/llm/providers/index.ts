@@ -25,6 +25,7 @@ const list = (v: string | undefined) => (v ?? '').split(/\s+/).filter(Boolean)
 /**
  * Creates a provider. Env (all optional):
  *   MC_LLM_MODEL                        model for any provider
+ *   MC_LLM_PROXY=caveman|http(s)://...  route through the caveman layer or a gateway (MC_CAVEMAN_BIN to locate caveman)
  *   MC_LLM_EFFORT                       anthropic / claude-subscription effort, codex reasoning effort
  *   ANTHROPIC_API_KEY                   anthropic
  *   MC_CLAUDE_MODE=sdk|cli, MC_CLAUDE_TRANSPORT=sdk|http, MC_CLAUDE_ALLOW_API_KEY, MC_CLAUDE_BIN
@@ -37,12 +38,13 @@ const list = (v: string | undefined) => (v ?? '').split(/\s+/).filter(Boolean)
 export function createProvider (name: string, opts: Record<string, unknown> = {}, env: NodeJS.ProcessEnv = process.env): LlmProvider {
   const n = (ALIASES[name] ?? name) as ProviderName
   const model = (opts.model as string | undefined) ?? env.MC_LLM_MODEL
+  const proxy = (opts.proxy as string | undefined) ?? env.MC_LLM_PROXY
   const effort = (opts.effort as string | undefined) ?? env.MC_LLM_EFFORT
   switch (n) {
     case 'anthropic':
-      return new AnthropicProvider({ model, effort: (effort ?? 'low') as AnthropicProviderOptions['effort'], ...opts })
+      return new AnthropicProvider({ ...(proxy ? { proxy } : {}), model, effort: (effort ?? 'low') as AnthropicProviderOptions['effort'], ...opts })
     case 'claude-subscription':
-      return new ClaudeSubscriptionProvider({
+      return new ClaudeSubscriptionProvider({ ...(proxy ? { proxy } : {}),
         model,
         effort: effort as ClaudeSubscriptionOptions['effort'],
         mode: (env.MC_CLAUDE_MODE as 'sdk' | 'cli' | undefined) ?? 'sdk',
@@ -55,7 +57,7 @@ export function createProvider (name: string, opts: Record<string, unknown> = {}
         ...opts
       })
     case 'codex':
-      return new CodexProvider({
+      return new CodexProvider({ ...(proxy ? { proxy } : {}),
         model,
         reasoningEffort: effort,
         bin: env.MC_CODEX_BIN,
@@ -65,7 +67,7 @@ export function createProvider (name: string, opts: Record<string, unknown> = {}
         ...opts
       })
     case 'opencode':
-      return new OpenCodeProvider({
+      return new OpenCodeProvider({ ...(proxy ? { proxy } : {}),
         model,
         bin: env.MC_OPENCODE_BIN,
         login: env.MC_OPENCODE_LOGIN || env.MC_OPENCODE_PROFILE || undefined,

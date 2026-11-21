@@ -14,7 +14,7 @@
 // `code_mode_host` makes our MCP tools unreachable), request_user_input (no-op in exec mode),
 // apply_patch, and the collaboration/sub-agent tools (sub-agents get the same tool set).
 import { ProviderError, type LlmProvider, type TurnInput, type TurnResult, type Usage } from '../types.ts'
-import { isolatedEnv, resolveProfile, runProcess, scratchDir, tail, which, type Profile } from './proc.ts'
+import { isolatedEnv, resolveProfile, resolveProxy, runProcess, scratchDir, tail, which, type Profile, type ProxyInfo } from './proc.ts'
 import { join } from 'node:path'
 
 export interface CodexProviderOptions {
@@ -34,6 +34,8 @@ export interface CodexProviderOptions {
   profile?: string
   /** Extra `-c key=value` overrides. */
   config?: string[]
+  /** Route through a proxy: 'caveman' (local layer, auto-started) or an http(s) gateway URL. */
+  proxy?: string
 }
 
 const SERVER = 'minecraft'
@@ -81,7 +83,7 @@ export class CodexProvider implements LlmProvider {
   }
 
   /** The argv for one turn (exported for tests and docs). */
-  args (turn: Pick<TurnInput, 'system' | 'mcp'>, cwd: string): string[] {
+  args (turn: Pick<TurnInput, 'system' | 'mcp'>, cwd: string, proxy: ProxyInfo | null = null): string[] {
     if (!turn.mcp) throw new ProviderError(this.name, 'needs the MCP bridge, but it is not running')
     const toml = (s: string) => JSON.stringify(s) // a JSON string is a valid TOML basic string
     const args = ['exec', '--json', '--ephemeral', '--skip-git-repo-check', '--ignore-rules', '-s', 'read-only', '-C', cwd]
@@ -96,6 +98,11 @@ export class CodexProvider implements LlmProvider {
       `mcp_servers.${SERVER}.bearer_token_env_var=${toml(TOKEN_VAR)}`,
       `mcp_servers.${SERVER}.default_tools_approval_mode="approve"`,
       `mcp_servers.${SERVER}.tool_timeout_sec=60`,
+      // Same route caveman sets up in its own codex integration, given per run instead of via config.toml.
+      ...(proxy ? [
+        'model_provider="mcbproxy"',
+        `model_providers.mcbproxy={ name = ${toml(proxy.kind === 'caveman' ? 'Caveman' : 'Proxy')}, base_url = ${toml(proxy.codexBaseUrl)}, wire_api = "responses", requires_openai_auth = true }`
+      ] : []),
       ...(this.opts.config ?? [])
     ]
     for (const c of cfg) args.push('-c', c)
@@ -112,7 +119,9 @@ export class CodexProvider implements LlmProvider {
     let usage: Usage | undefined
     const errors: string[] = []
     try {
-      const r = await runProcess(bin, this.args(turn, scratch.path), {
+      let proxy: ProxyInfo | null
+      try { proxy = await resolveProxy(this.opts.proxy) } catch (e) { throw new ProviderError(this.name, (e as Error).message) }
+      const r = await runProcess(bin, this.args(turn, scratch.path, proxy), {
         cwd: scratch.path,
         env: this.env({ [TOKEN_VAR]: turn.mcp!.token }),
         timeoutMs: turn.timeoutMs,

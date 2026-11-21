@@ -66,3 +66,16 @@ test('readEnvFileVar reads one variable from a dotenv file', async () => {
     assert.equal(process.env.OTHER, undefined, 'nothing else is loaded into our env')
   } finally { rmSync(f) }
 })
+
+test('proxy: caveman maps to the local layer; codex gets a per-run provider override', async () => {
+  const { resolveProxy } = await import('../src/llm/providers/proc.ts')
+  assert.equal(await resolveProxy(undefined), null)
+  assert.equal(await resolveProxy('none'), null)
+  const custom = await resolveProxy('https://gw.example/v1/')
+  assert.equal(custom!.baseUrl, 'https://gw.example/v1')
+  await assert.rejects(resolveProxy('gw.example'), /http/)
+  const args = new CodexProvider({ login: join(tmpdir(), 'x') }).args({ system: 's', mcp: { url: 'http://127.0.0.1:1/mcp', token: 't' } } as any, '/tmp', custom)
+  const joined = args.join(' ')
+  assert.match(joined, /model_provider="mcbproxy"/)
+  assert.match(joined, /base_url = "https:\/\/gw.example\/v1"/)
+})

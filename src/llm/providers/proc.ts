@@ -192,3 +192,83 @@ export function readEnvFileVar (file: string, name: string): string | undefined 
   }
   return undefined
 }
+
+// ---------------------------------------------------------------- proxies (caveman, gateways)
+//
+// proxy: 'caveman'        -> the local caveman layer (http://127.0.0.1:8787), started if needed
+// proxy: 'http://host:p'  -> any Anthropic/OpenAI-compatible gateway
+// proxy: undefined/'none' -> direct
+// Only the base URL goes to the child; the rest of the isolation stays as it is.
+
+import { connect } from 'node:net'
+import { existsSync, readdirSync } from 'node:fs'
+import { spawn as spawnChild } from 'node:child_process'
+
+export const CAVEMAN_URL = 'http://127.0.0.1:8787'
+
+export interface ProxyInfo {
+  /** Base URL for Anthropic-style and OpenAI-style clients. */
+  baseUrl: string
+  /** Codex (ChatGPT login) needs its own route on caveman. */
+  codexBaseUrl: string
+  kind: 'caveman' | 'custom'
+}
+
+function portOpen (host: string, port: number, ms = 800): Promise<boolean> {
+  return new Promise(resolve => {
+    const s = connect({ host, port })
+    const done = (v: boolean) => { s.destroy(); resolve(v) }
+    s.setTimeout(ms, () => done(false))
+    s.once('connect', () => done(true))
+    s.once('error', () => done(false))
+  })
+}
+
+/** Finds the caveman CLI: MC_CAVEMAN_BIN, then asdf node installs, then PATH. */
+export function findCaveman (): string | null {
+  if (process.env.MC_CAVEMAN_BIN) return process.env.MC_CAVEMAN_BIN
+  const installs = join(homedir(), '.asdf', 'installs', 'nodejs')
+  try {
+    for (const v of readdirSync(installs).sort().reverse()) {
+      const p = join(installs, v, 'bin', 'caveman')
+      if (existsSync(p)) return p
+    }
+  } catch {}
+  return which('caveman')
+}
+
+let starting: Promise<void> | null = null
+
+/** Starts the caveman proxy (it keeps running in the background) and waits for its port. */
+async function ensureCaveman (): Promise<void> {
+  if (await portOpen('127.0.0.1', 8787)) return
+  starting ??= (async () => {
+    const bin = findCaveman()
+    if (!bin) throw new Error('caveman not found (install it or set MC_CAVEMAN_BIN)')
+    // `caveman run -- true` starts the proxy and leaves it running. It runs with the user's
+    // own environment on purpose: it's their tool and keeps its state in ~/.caveman.
+    const child = spawnChild(bin, ['run', '--', 'true'], {
+      stdio: 'ignore',
+      detached: true,
+      env: { ...process.env, PATH: [dirname(bin), process.env.PATH ?? ''].join(delimiter) }
+    })
+    child.unref()
+    for (let i = 0; i < 40; i++) {
+      if (await portOpen('127.0.0.1', 8787)) return
+      await new Promise(r => setTimeout(r, 250))
+    }
+    throw new Error('caveman proxy did not come up on 127.0.0.1:8787')
+  })().finally(() => { starting = null })
+  await starting
+}
+
+export async function resolveProxy (spec: string | undefined): Promise<ProxyInfo | null> {
+  if (!spec || spec === 'none' || spec === 'off') return null
+  if (spec === 'caveman') {
+    await ensureCaveman()
+    return { kind: 'caveman', baseUrl: CAVEMAN_URL, codexBaseUrl: `${CAVEMAN_URL}/chatgpt` }
+  }
+  if (!/^https?:\/\//.test(spec)) throw new Error(`proxy must be "caveman", "none" or an http(s) URL, got "${spec}"`)
+  const url = spec.replace(/\/$/, '')
+  return { kind: 'custom', baseUrl: url, codexBaseUrl: url }
+}

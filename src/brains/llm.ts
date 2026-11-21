@@ -94,7 +94,7 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
     const s = fromSettings(agent)
     const p = s.provider ?? opts.provider ?? process.env.MC_LLM_PROVIDER ?? 'claude-subscription'
     if (typeof p !== 'string') return p
-    const providerKeys = ['model', 'effort', 'login', 'profile', 'oauthTokenVar', 'oauthTokenFile', 'mode', 'transport', 'baseUrl', 'reasoningEffort']
+    const providerKeys = ['model', 'effort', 'login', 'profile', 'oauthTokenVar', 'oauthTokenFile', 'mode', 'transport', 'baseUrl', 'reasoningEffort', 'proxy']
     const fromProfile = Object.fromEntries(providerKeys.filter(k => s[k] !== undefined).map(k => [k, s[k]]))
     return createProvider(p, { ...(opts.model ? { model: opts.model } : {}), ...opts.providerOptions, ...fromProfile })
   }
