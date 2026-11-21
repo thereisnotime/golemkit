@@ -9,7 +9,10 @@ import type { Bot } from 'mineflayer'
 import type { ActionContext, ActionResult } from '../core/index.ts'
 import { ok, fail, goals, checkAborted, fmtPos } from '../core/index.ts'
 import { digBlock, DigRefusedError, gotoWithin, vec } from './world.ts'
-import { ensureTool, equipFor, inventoryCounts, toolTier, bestToolIn } from './toolkit.ts'
+import { ensureTool, equipFor, inventoryCounts, toolTier, bestToolIn, harvestProblem, dropWatch } from './toolkit.ts'
+
+/** Digging gives nothing (wrong tool, full inventory...): stop and say why instead of mining on. */
+export class NothingDropsError extends Error {}
 import { isNaturalBlock } from './blueprint.ts'
 import { pickupNearby } from './pickup.ts'
 import { perMinute, makeRoom } from './efficiency.ts'
@@ -178,6 +181,7 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
     if (r.ok) toolsMade.push(r.message)
   }
   const toolsMade: string[] = []
+  const watch = dropWatch(bot)
 
   const breakAt = async (p: P): Promise<boolean> => {
     const b = bot.blockAt(vec(bot, p.x, p.y, p.z))
@@ -186,9 +190,14 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
     await equipFor(bot, b)
     await keepPickaxe()
     const source = sources.has(b.name)
+    if (source) { const why = harvestProblem(bot, b); if (why) throw new NothingDropsError(why) }
     await digBlock(bot, b, signal, 80)
     broken++
-    if (source) yielded++
+    if (source) {
+      yielded++
+      const why = watch.dug(b)
+      if (why) throw new NothingDropsError(why)
+    }
     return true
   }
 
@@ -201,7 +210,7 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
         if (!b || !ORE.test(b.name) || !allowed(p, b.name) || !inReach(bot, p)) continue
         const need = /diamond|emerald|gold|redstone/.test(b.name) ? 3 : /iron|lapis|copper/.test(b.name) ? 2 : 1
         if (pickTier() < need || digHazard(at, p)) continue
-        try { await breakAt(p) } catch (e) { checkAborted(signal) }
+        try { await breakAt(p) } catch (e) { checkAborted(signal); if (e instanceof NothingDropsError) throw e }
       }
     }
   }
@@ -222,7 +231,7 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
       if (reach.length) {
         for (const p of reach) {
           if (progress() >= count) break
-          try { await breakAt(p) } catch (e) { checkAborted(signal); if (e instanceof DigRefusedError) agent.markProtected(vec(bot, p.x, p.y, p.z)) }
+          try { await breakAt(p) } catch (e) { checkAborted(signal); if (e instanceof NothingDropsError) throw e; if (e instanceof DigRefusedError) agent.markProtected(vec(bot, p.x, p.y, p.z)) }
         }
         continue
       }
@@ -232,6 +241,7 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
         await gotoWithin(bot, new goals.GoalLookAtBlock(vec(bot, near.x, near.y, near.z), bot.world, { reach: 4 }), signal, 8000)
       } catch (e) {
         checkAborted(signal)
+        if (e instanceof NothingDropsError) throw e
         pathFails++
       }
       if (!inReach(bot, near)) { pathFails++; continue }
@@ -292,6 +302,7 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
         await gotoWithin(bot, new goals.GoalBlock(plan.stand.x, plan.stand.y, plan.stand.z), signal, 6000)
       } catch (e) {
         checkAborted(signal)
+        if (e instanceof NothingDropsError) throw e
         stopped = `couldn't step to ${fmtPos(plan.stand)}`
         break
       }
@@ -300,7 +311,7 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
       for (const p of plan.side) {
         if (progress() >= count) break
         if (digHazard(at, p, new Set([key(feet), key(add(feet, 0, 1, 0))]))) continue
-        try { await breakAt(p) } catch (e) { checkAborted(signal) }
+        try { await breakAt(p) } catch (e) { checkAborted(signal); if (e instanceof NothingDropsError) throw e }
       }
       await oresNear([feet, add(feet, 0, 1, 0)])
     }

@@ -209,3 +209,40 @@ export function minTierFor (registry: { items: Record<number, { name: string } |
   }
   return (TIERS.find(t => RANK[t] === best) ?? 'wooden')
 }
+
+/** Why digging this block would give nothing with what's in hand, or null if it's fine. */
+export function harvestProblem (bot: Bot, block: Block): string | null {
+  if (!needsTool(block as any)) return null
+  const kind = toolKindFor(block as any) ?? 'pickaxe'
+  const held = bot.heldItem ? itemName(bot.heldItem) : ''
+  if (toolTier(held, kind) > 0) return null
+  return `${block.name} drops nothing without a ${kind} (holding ${held || 'nothing'})`
+}
+
+/**
+ * Notices digging that yields nothing: every `window` dug source blocks it checks that the
+ * inventory grew. If it didn't, it says why (wrong tool in hand, inventory full, drops left lying
+ * around), so collectors stop and report instead of mining for nothing.
+ */
+export function dropWatch (bot: Bot, window = 5): { dug: (block?: Block) => string | null } {
+  const total = () => bot.inventory.items().reduce((n, i) => n + i.count, 0)
+  let base = total()
+  let n = 0
+  let lastBlock: Block | undefined
+  return {
+    dug (block?: Block) {
+      if (block) lastBlock = block
+      if (++n < window) return null
+      const now = total()
+      const gained = now > base
+      base = now
+      n = 0
+      if (gained) return null
+      const free = bot.inventory.slots.slice(9, 45).filter(s => !s).length
+      const lying = Object.values(bot.entities).filter(e => e?.name === 'item' && e.position.distanceTo(bot.entity.position) < 8).length
+      const tool = lastBlock ? harvestProblem(bot, lastBlock) : null
+      const why = tool ?? (free === 0 ? 'my inventory is full' : lying ? `${lying} drops are lying around that I didn't pick up` : 'no idea why (maybe the server ate them, or they fell somewhere I can\'t reach)')
+      return `dug ${window} blocks in a row and got nothing: ${why}`
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import type { ActionContext, ActionResult } from '../core/index.ts'
 import { defineSkill, defineAction, z, ok, fail, goals, goto, travel, checkAborted } from '../core/index.ts'
 import { digBlock, DigRefusedError, gotoWithin } from './world.ts'
-import { ensureTool, equipFor, minTierFor, needsTool, toolKindFor } from './toolkit.ts'
+import { ensureTool, equipFor, minTierFor, needsTool, toolKindFor, harvestProblem, dropWatch } from './toolkit.ts'
 import { pickupNearby } from './pickup.ts'
 import { mineStone } from './mining.ts'
 import { autoUpgrade } from './progression.ts'
@@ -57,6 +57,8 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
   const key = (p: { x: number, y: number, z: number }) => `${p.x},${p.y},${p.z}`
   const allowed = (p: { x: number, y: number, z: number }) => !agent.protectedAreas.isProtected(p) && !skip.has(key(p))
   let got = 0
+  let nothing = '' // digging that gives nothing: why
+  const watch = dropWatch(bot)
   let refusals = 0
   let misses = 0
   let leftZone = false
@@ -85,9 +87,13 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
       const inReach = bot.canDigBlock(target) && target.position.offset(0.5, 0.5, 0.5).distanceTo(bot.entity.position.offset(0, 1.6, 0)) <= 4.5
       if (!inReach) await gotoWithin(bot, new goals.GoalLookAtBlock(target.position, bot.world), signal, 20_000)
       await equipFor(bot, target) // best tool for the block (axe for logs, pickaxe for stone...)
+      const noTool = harvestProblem(bot, target)
+      if (noTool) { nothing = noTool; break }
       await digBlock(bot, target, signal)
       got++
       misses = 0
+      const why = watch.dug(target)
+      if (why) { nothing = why; break }
     } catch (e) {
       checkAborted(signal)
       if (e instanceof DigRefusedError) {

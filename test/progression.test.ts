@@ -181,3 +181,23 @@ test('junkToToss: frees slots with junk only, keeps a reserve and the job\'s ite
   assert.deepEqual(junkToToss(stacks, 2, new Set(['rotten_flesh'])), [{ name: 'oak_sapling', count: 5 }])
   assert.deepEqual(junkToToss(stacks, 0), [])
 })
+
+test('drop watch: notices digging that yields nothing and says why', async () => {
+  const { dropWatch, harvestProblem } = await import('../src/skills/toolkit.ts')
+  const items: { name: string, count: number }[] = [{ name: 'cobblestone', count: 3 }]
+  const bot: any = {
+    inventory: { items: () => items, slots: Array(46).fill(null) },
+    entities: {}, entity: { position: { distanceTo: () => 0 } },
+    heldItem: { name: 'cobblestone' }
+  }
+  const stone: any = { name: 'stone', material: 'mineable/pickaxe', harvestTools: { 1: true } }
+  assert.match(harvestProblem(bot, stone)!, /stone drops nothing without a pickaxe \(holding cobblestone\)/)
+  const w = dropWatch(bot, 3)
+  assert.equal(w.dug(stone), null)
+  assert.equal(w.dug(stone), null)
+  assert.match(w.dug(stone)!, /dug 3 blocks in a row and got nothing: stone drops nothing without a pickaxe/)
+  items.push({ name: 'cobblestone', count: 1 }) // a gain resets it
+  assert.equal(w.dug(stone), null); assert.equal(w.dug(stone), null); assert.equal(w.dug(stone), null)
+  bot.heldItem = { name: 'stone_pickaxe' }
+  assert.equal(harvestProblem(bot, stone), null)
+})
