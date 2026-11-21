@@ -82,8 +82,11 @@ export class JournalCapture {
       const trigger = (snap as unknown as { trigger?: string }).trigger ?? (t as unknown as { trigger?: string }).trigger
       journal.record('llm_turn', {
         provider: t.provider, ...(t.model ? { model: t.model } : {}), ok: t.ok,
-        inputTokens: t.inputTokens, outputTokens: t.outputTokens, cacheReadTokens: t.cacheReadTokens,
-        toolCalls: t.toolCalls, ms: t.durationMs, ...(trigger ? { trigger } : {}), ...(t.estimated ? { estimated: true } : {})
+        billing: t.billing,
+        inputTokens: t.inputTokens, outputTokens: t.outputTokens, cacheReadTokens: t.cacheReadTokens, cacheWriteTokens: t.cacheWriteTokens,
+        toolCalls: t.toolCalls, ms: t.durationMs, ...(trigger ? { trigger } : {}), ...(t.estimated ? { estimated: true } : {}),
+        ...(t.costUsd !== undefined ? { costUsd: t.costUsd } : {}), ...(t.reportedCostUsd !== undefined ? { reportedCostUsd: t.reportedCostUsd } : {}),
+        ...(t.proxy ? { proxy: t.proxy } : {})
       })
     })
     agent.on('protectedArea', p => journal.record('protected_area', {}, { pos: p, dim: this.bot?.game?.dimension }))

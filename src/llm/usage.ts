@@ -32,6 +32,10 @@ export interface TurnUsage {
   /** Token numbers estimated from text length because the provider reported none. */
   estimated: boolean
   ok: boolean
+  /** What started the turn ("whisper from robin", "goal: actionDone", "event: death"...). */
+  trigger?: string
+  /** Proxy counters that changed during this turn (caveman /metrics), when a proxy is used. */
+  proxy?: Record<string, number>
 }
 
 export interface UsageTotals {

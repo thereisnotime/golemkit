@@ -225,3 +225,17 @@ separated), `MC_JOURNAL_RETENTION_DAYS`, `MC_JOURNAL_SUMMARIZE=<provider>`.
   that wasn't the bot's last swing is missed unless the server's death message names the bot.
 - Days and hour sections use the bot host's local time; on daylight saving change days the
   hour sections are approximate.
+
+## LLM usage
+
+Every LLM turn is an `llm_turn` event: provider, model, billing, input/output tokens, cache reads
+and writes, tool calls, duration, what started the turn (`trigger`: "whisper from robin",
+"goal: actionDone", "event: death"...), the cost (API spend, or the CLI's list-price estimate for
+subscription turns), and, when the brain goes through a proxy (`llm.proxy: caveman` or a gateway
+URL), `proxy`: the proxy's Prometheus counters that changed during that turn (scraped from
+`/metrics`; turn it off with `llm.proxyMetrics: false`).
+
+```sh
+just llm-usage Pax                 # today: by trigger, model and hour, plus proxy counters
+just llm-usage Pax 2026-11-21 --days 3
+```

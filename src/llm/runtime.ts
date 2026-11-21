@@ -8,6 +8,7 @@ import { Memory, type MemoryOptions } from './memory.ts'
 import { backoffMs, isTransientLlmError } from '../core/retry.ts'
 import { buildSystemPrompt, buildUserMessage, chatTrigger, type ChatTriggerOptions, type PromptContext, type Trigger } from './prompt.ts'
 import { PRIORITY } from '../core/index.ts'
+import type { ProxyMetrics } from './proxyMetrics.ts'
 import { BotTools, LLM_CALLER, inDanger, type BotToolsOptions, type ToolAgent } from './tools.ts'
 import type { LlmProvider, ToolCallRecord, TurnResult } from './types.ts'
 import { PriceTable, type Price } from './pricing.ts'
@@ -61,6 +62,8 @@ export interface LimitOptions extends BudgetOptions {
 
 export interface RuntimeOptions {
   provider: LlmProvider
+  /** Scraped after each turn; the counters that changed go into the turn's usage (journal). */
+  proxyMetrics?: ProxyMetrics
   persona?: string
   /** Retries for transient provider errors (timeouts, 429, 5xx, network). Default 2 attempts. */
   retry?: { attempts: number, backoffMs: [number, number] }
@@ -181,6 +184,7 @@ export class LlmRuntime {
 
   /** Checks the provider and starts the MCP bridge if needed. */
   async start (): Promise<void> {
+    void this.opts.proxyMetrics?.delta() // baseline for per-turn proxy metrics
     this.unavailable = await this.provider.check().catch(e => (e as Error).message)
     if (this.unavailable) this.log.warn(`provider ${this.provider.name} unavailable: ${this.unavailable}`, { provider: this.provider.name })
     if (this.provider.needsMcp || this.opts.mcp?.expose) {
@@ -614,7 +618,8 @@ export class LlmRuntime {
     }
     const scope = this.tools.end()
     const calls = scope?.calls ?? []
-    const usage = this.account({ result, ok: !error, calls, system, userMessage, durationMs: Date.now() - started })
+    const proxy = this.opts.proxyMetrics ? await this.opts.proxyMetrics.delta().catch(() => undefined) : undefined
+    const usage = this.account({ result, ok: !error, calls, system, userMessage, durationMs: Date.now() - started, trigger: describe(trigger), proxy })
     if (result && chat && chat.addressed !== false && (this.opts.replyWithFinalText ?? true) && scope && scope.chatCount === 0 && result.text) {
       const text = result.text.replace(/\s+/g, ' ').trim().slice(0, 400)
       if (chat.whisper) this.agent.whisper(chat.from, text)
@@ -654,7 +659,7 @@ export class LlmRuntime {
   }
 
   /** Turns provider usage (or an estimate) into a TurnUsage, records it in the counters and budget, and notifies. */
-  private account (a: { result?: TurnResult, ok: boolean, calls: ToolCallRecord[], system: string, userMessage: string, durationMs: number }): TurnUsage {
+  private account (a: { result?: TurnResult, ok: boolean, calls: ToolCallRecord[], system: string, userMessage: string, durationMs: number, trigger?: string, proxy?: Record<string, number> }): TurnUsage {
     const usage = turnUsage({
       provider: this.provider.name,
       model: this.provider.model,
@@ -670,6 +675,8 @@ export class LlmRuntime {
     })
     // A failed turn that reported nothing still counts as a turn, but not with made-up tokens.
     if (!a.ok && usage.estimated) { usage.inputTokens = 0; usage.outputTokens = 0 }
+    if (a.trigger) usage.trigger = a.trigger.slice(0, 80)
+    if (a.proxy && Object.keys(a.proxy).length) usage.proxy = a.proxy
     this.usage.record(usage)
     this.budget.record(usage)
     try { this.opts.onUsage?.(this.snapshot()) } catch (e) { this.log.warn(`onUsage: ${(e as Error).message}`) }

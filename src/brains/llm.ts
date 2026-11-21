@@ -10,6 +10,8 @@ import { defineBrain, defineAction, noParams, ok, fail } from '../core/index.ts'
 import type { Price } from '../llm/pricing.ts'
 import { sumBuckets, fmtTotals, type UsageBucket } from '../llm/usage.ts'
 import { createProvider } from '../llm/providers/index.ts'
+import { ProxyMetrics } from '../llm/proxyMetrics.ts'
+import { CAVEMAN_URL } from '../llm/providers/proc.ts'
 import { LlmRuntime, type LimitOptions, type RuntimeOptions, type TriggerOptions } from '../llm/runtime.ts'
 import type { LlmProvider } from '../llm/types.ts'
 import type { MemoryOptions } from '../llm/memory.ts'
@@ -159,6 +161,12 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
         prices: opts.prices,
         goals: { ...opts.goals, ...(s.goals ?? {}) },
         onUsage: snapshot => agent.emit('llmUsage', snapshot),
+        // Per-turn proxy metrics in the journal (caveman or a gateway with /metrics).
+        ...(() => {
+          const px = (s.proxy ?? process.env.MC_LLM_PROXY) as string | undefined
+          if (!px || px === 'none' || px === 'off' || s.proxyMetrics === false) return {}
+          try { return { proxyMetrics: ProxyMetrics.forBase(px === 'caveman' ? CAVEMAN_URL : px) } } catch { return {} }
+        })(),
         ...(ctx ? { context: () => ctx.promptContext() } : {}),
         onPause: reason => emitLlmBudgetExhausted(agent, reason)
       })

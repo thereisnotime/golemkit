@@ -729,3 +729,17 @@ test('goal does not wait for an owner who is offline', async () => {
   assert.equal(g.resumeIfOwnerSilent(), false, 'gives up after 3 until the owner is back')
   assert.match(g.fmtPrompt()!, /NOT on the server/)
 })
+
+test('proxy metrics: parse Prometheus text and keep what changed per turn', async () => {
+  const { parsePrometheus, metricDelta, ProxyMetrics } = await import('../src/llm/proxyMetrics.ts')
+  const a = parsePrometheus('# HELP x\ncave_requests_total 3\ncave_tokens_saved_total{route="v1"} 1000\ncave_proxy_inflight_requests 0\n')
+  assert.deepEqual(a, { cave_requests_total: 3, 'cave_tokens_saved_total{route="v1"}': 1000, cave_proxy_inflight_requests: 0 })
+  const b = { ...a, cave_requests_total: 4, 'cave_tokens_saved_total{route="v1"}': 1500 }
+  assert.deepEqual(metricDelta(a, b), { cave_requests_total: 1, 'cave_tokens_saved_total{route="v1"}': 500 })
+  let n = 0
+  const pages = ['cave_requests_total 3\n', 'cave_requests_total 5\n']
+  const m = new ProxyMetrics('http://x/metrics', 100, (async () => ({ ok: true, text: async () => pages[n++] })) as any)
+  assert.equal(await m.delta(), undefined, 'first call is the baseline')
+  assert.deepEqual(await m.delta(), { cave_requests_total: 2 })
+  assert.equal(ProxyMetrics.forBase('http://127.0.0.1:8787/v1').url, 'http://127.0.0.1:8787/metrics')
+})

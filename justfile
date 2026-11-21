@@ -92,6 +92,11 @@ llm-login provider mode="" *args:
 llm-status *args:
     @node scripts/llm-login.ts status {{args}}
 
+# LLM usage from a bot's journal: turns and tokens by trigger, model, hour, plus proxy (caveman) counters
+[group('llm')]
+llm-usage bot="Pax" *args:
+    @node scripts/llm-usage.ts {{bot}} {{args}}
+
 # A/B eval of a profile's context pack: --dry (scripted, free) or a real provider with --yes (costs quota)
 [group('llm')]
 llm-eval *args:
