@@ -6,3 +6,4 @@ export { llmBrain, llmRuntime, llmFleetUsage, llmUsageAction, type LlmBrainOptio
 export { selfImprover, type SelfImproverOptions } from './self/index.ts'
 export { hooksBrain, HOOKS_CALLER, type HooksBrainOptions } from './hooks.ts'
 export { behaviorsBrain, defaultBehaviorRegistry, defineBehavior, BehaviorRegistry, type BehaviorsBrainOptions, type BehaviorDefinition } from './behaviors/index.ts'
+export { intentsBrain, parseIntent, type IntentsBrainOptions, type IntentsMode, type Intent } from './intents/index.ts'

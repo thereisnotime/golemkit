@@ -59,3 +59,7 @@ behaviors:
   collect_drops: { radius: 16 }   # pick up dropped items nearby (including its own after dying)
   keep_tools_upgraded: { upTo: iron, armour: true }   # stone tools asap, then furnace + iron tools and iron armour; re-craft worn ones when idle
   anti_afk: { afterSeconds: 45 }   # small look/swing/hop so idle-kick servers don't drop it
+# Plain-language commands without the LLM (docs/guide/intents.md): "pax follow me", "pax chop some
+# wood". first = simple requests are handled directly (no tokens), everything else goes to the LLM.
+intents:
+  mode: first                 # fallback (only while the LLM is down) | first | off

@@ -16,7 +16,7 @@
 // arm more: follow_owner, guard_area, farm_loop... See docs/guide/behaviors.md.
 import { defineVariant } from '../src/core/index.ts'
 import { standardSkills, extendedSkills, navigation, modsSkill } from '../src/skills/index.ts'
-import { commandBrain, reflexes, llmBrain, hooksBrain, behaviorsBrain } from '../src/brains/index.ts'
+import { commandBrain, reflexes, llmBrain, hooksBrain, behaviorsBrain, intentsBrain } from '../src/brains/index.ts'
 
 const num = (v: string | undefined, d: number) => (v && !Number.isNaN(Number(v)) ? Number(v) : d)
 
@@ -35,6 +35,7 @@ export default defineVariant({
     reflexes(),
     hooksBrain(), // runs the context pack's hooks.yaml (profiles/<name>/), no-op without one
     behaviorsBrain({ defaults: { keep_fed: true, stay_safe: true } }), // a profile's behaviors: block merges over these
+    intentsBrain(), // plain-language commands while the LLM can't think (profile intents.mode: first to save tokens)
     llmBrain({
       provider: process.env.MC_LLM_PROVIDER || 'claude-subscription',
       triggers: {

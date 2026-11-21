@@ -237,6 +237,20 @@ export class LlmRuntime {
     }
   }
 
+  /**
+   * Why a turn could not run right now (provider unavailable, budget used up, provider quota),
+   * or null when the LLM can think. Read synchronously by the intents brain to decide whether
+   * it answers a chat line itself.
+   */
+  blockedReason (): string | null {
+    if (this.stopped) return 'LLM brain stopped'
+    if (this.unavailable) return `provider unavailable: ${this.unavailable}`
+    const b = this.budget.blocked()
+    if (b) return b
+    if (this.quotaUntil > Date.now()) return `provider quota used up until ${new Date(this.quotaUntil).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`
+    return null
+  }
+
   // ---------------------------------------------------------------- inputs
 
   /** Players online besides us and `except`. */
@@ -250,6 +264,8 @@ export class LlmRuntime {
 
   onChat (msg: ChatMessage): void {
     this.memory.push({ kind: msg.whisper ? 'whisper' : 'chat', from: msg.from, text: msg.message })
+    // Another brain (intents) already handles this message: keep it in memory for context only.
+    if (msg.claimedBy) return
     const t = this.opts.triggers ?? {}
     if ((t.ownersOnly ?? true) && !this.agent.isOwner(msg.from)) return
     const now = Date.now()

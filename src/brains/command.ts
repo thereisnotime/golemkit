@@ -32,7 +32,7 @@ export const commandBrain = (opts: CommandBrainOptions = {}) => {
   })
 
   async function handle (agent: Agent, msg: ChatMessage): Promise<void> {
-    if (!agent.isOwner(msg.from)) return
+    if (!agent.isOwner(msg.from) || msg.claimedBy) return
     let body = msg.message.trim()
     if (body.startsWith(prefix)) body = body.slice(prefix.length)
     else if (!msg.whisper || whisperNeedsPrefix) return

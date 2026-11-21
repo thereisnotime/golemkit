@@ -15,6 +15,12 @@ export class TypedEmitter<E extends EventMap> {
     return () => { this.ee.off(event, fn) }
   }
 
+  /** Like on(), but runs before the listeners added so far (a brain that must see chat first). */
+  prependListener<K extends keyof E & string> (event: K, fn: E[K]): () => void {
+    this.ee.prependListener(event, fn)
+    return () => { this.ee.off(event, fn) }
+  }
+
   once<K extends keyof E & string> (event: K, fn: E[K]): () => void {
     this.ee.once(event, fn)
     return () => { this.ee.off(event, fn) }

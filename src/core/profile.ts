@@ -65,6 +65,12 @@ export const ProfileSchema = z.object({
     version: z.string().optional()
   }).optional(),
   llm: LlmProfileSchema.optional(),
+  /** Plain-language commands without the LLM (intents brain). Lands in settings.intents. See docs/guide/intents.md. */
+  intents: z.object({
+    mode: z.enum(['fallback', 'first', 'off']).optional(),
+    threshold: z.number().min(0).max(1).optional(),
+    aliases: z.array(z.string()).optional()
+  }).strict().optional(),
   /** Building policy: library (reuse a saved blueprint), creative (design one), ask (the owner picks). Lands in settings.building. */
   building: z.enum(['library', 'creative', 'ask']).optional(),
   /** WorldEdit: true/false forces it on/off (no detection); an object sets { enabled, maxBlocks, ownersOnly, replyMs }. Lands in settings.worldedit. */
@@ -166,6 +172,7 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (profile.npcMode !== undefined) settings.npcMode = profile.npcMode
   settings.profileName = name   // so the bot can tell which profile it is (observe: profile)
   if (profile.llm) settings.llm = { ...(settings.llm as object | undefined), ...profile.llm }
+  if (profile.intents) settings.intents = { ...(settings.intents as object | undefined), ...profile.intents }
   if (profile.humanize !== undefined) settings.humanize = profile.humanize
   if (profile.reflexes) settings.reflexes = { ...(settings.reflexes as object | undefined), ...profile.reflexes }
   if (profile.journal !== undefined) settings.journal = profile.journal === false ? false : { ...(settings.journal as object | undefined), ...profile.journal }

@@ -33,6 +33,11 @@ export interface ChatMessage {
   from: string
   message: string
   whisper: boolean
+  /**
+   * Set by the first brain that takes the message on (e.g. 'intents'), so the others leave it
+   * alone: one message, one handler. Brains that answer chat check it before acting.
+   */
+  claimedBy?: string
 }
 
 export interface ActionInfo {
