@@ -694,11 +694,11 @@ async function findEngine (ctx: Ctx, t: ResolvedTarget, o: FindOptions): Promise
       say(`nothing in sight, scouting up to ${o.radius} blocks for ${t.label}`)
       const r = await scout(ctx, floorPos(bot.entity.position), o.radius, Math.max(1, o.maxMinutes - (Date.now() - t0) / 60_000), o.atNight, () => look(Math.min(view, 64)), say)
       if (r.seen) return found(r.seen, `scouted ${r.farthest} blocks ${sectorsText(r.sectors)}`)
-      notes.push(r.legs ? `scouted ${r.farthest} blocks ${sectorsText(r.sectors)}, no ${t.label}; stopped: ${r.reason}` : `didn't get to scout (${r.reason})`)
+      notes.push(r.legs ? `scouted ${r.farthest} blocks ${sectorsText(r.sectors)}, no sign of ${t.label}; stopped: ${r.reason}` : `didn't get to scout (${r.reason})`)
       continue
     }
     if (phase === 'prospect' && t.ore) {
-      say(`no ${t.label} in sight, strip mining for it`)
+      say(`nothing like ${t.label} in sight, strip mining for it`)
       const ore = ORES[t.ore]!
       const r = await tidyStations(ctx, () => mineStone(ctx, o.count, { item: ore.drop, sources: ore.blocks, minDepth: 20, maxSteps: 64, returnUp: !o.go }))
       const got = invCount(bot, n => n === ore.drop) - (before[ore.drop] ?? 0)
