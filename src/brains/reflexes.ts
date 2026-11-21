@@ -46,7 +46,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       }
       // Running from flyers is pointless (they're faster); fight them even when low.
       const shouldRetreat = (mob: any) => !FLYING.has(mob.name ?? '') &&
-        (bot.health <= cfg().retreatBelow || (inWater(mob) && bot.health < cfg().waterFightAbove))
+        ((bot.health > 0 && bot.health <= cfg().retreatBelow) || (inWater(mob) && bot.health < cfg().waterFightAbove))
 
       const onHurt = (entity: any) => {
         if (!cfg().selfDefense || entity !== bot.entity || !needsSurvival(bot)) return
@@ -88,7 +88,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         const { selfDefense, autoEat, eatBelow, retreatBelow } = cfg()
         // Low health with a hostile close by: get away even before the next hit.
         const mob = selfDefense ? nearestHostile(bot, bot.entity.position, 6) : null
-        if (mob && !FLYING.has(mob.name ?? '') && bot.health <= retreatBelow && agent.currentAction?.name !== 'retreat' && agent.getAction('retreat')) {
+        if (mob && !FLYING.has(mob.name ?? '') && bot.health > 0 && bot.health <= retreatBelow && agent.currentAction?.name !== 'retreat' && agent.getAction('retreat')) {
           void reflex('retreat')
           return
         }
