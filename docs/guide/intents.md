@@ -1,8 +1,9 @@
 # Plain-language commands (intents)
 
-The intents brain lets owners talk to a bot in normal chat without an LLM: "pax guard me",
-"follow me", "chop some wood", "get 64 cobblestone", "bring me bread", "stop". It parses the
-line with a fixed table of patterns (no model, no eval), runs the matching action through
+The intents brain lets owners talk to a bot in normal chat without the cloud LLM: "pax guard me",
+"follow me", "chop some wood", "get 64 cobblestone", "bring me bread", "stop". It understands the
+line with a [pipeline of layers](#layer-pipeline) (a fixed table of patterns by default; optionally
+a local embedding model and a local LLM, never eval), runs the matching action through
 `agent.act()` at player priority or arms a behaviour, and replies briefly with the real result.
 
 Use it so a bot stays useful when its LLM can't think (provider quota used up, budget out, no
@@ -31,7 +32,200 @@ intents:
   aliases: [p]         # optional: extra names (llm.aliases count too)
 ```
 
-`intents.mode` is a [feature toggle](/guide/live-config): `!config_set intents.mode off` switches it live.
+`intents.mode` is a [feature toggle](/guide/live-config): `!config_set intents.mode off` switches it live. So are
+`intents.strategy`, `intents.log_decisions` and each layer's `intents.layers.<name>.enabled` /
+`.threshold` (patterns, embeddings, local_llm; `cloud_llm.enabled`), e.g.
+`!config_set intents.layers.embeddings.enabled on` adds the embeddings layer to a bot that has no
+layer config, and `!config_set intents.layers.embeddings.threshold 0.55` retunes it without
+reloading the model.
+
+## Layer pipeline
+
+Understanding a line is a pipeline of layers. Each one is optional, has its own threshold, and can
+be reordered, switched off live and [benchmarked](#benchmark):
+
+| layer | what it is | speed | default |
+| --- | --- | --- | --- |
+| `patterns` | the anchored pattern table below (`parse.ts`); synchronous | ~0 ms | on, threshold 0.7 |
+| `embeddings` | a local sentence-embedding model (transformers.js, ONNX on the CPU, `Xenova/all-MiniLM-L6-v2` q8, 23 MB) that picks the intent by the nearest labelled example phrasings (`examples.ts`) | 2-4 ms per line, ~0.2 s load from disk, ~8 s first download | off (Pax: on) |
+| `local_llm` | a small model behind any OpenAI-compatible endpoint (Ollama, llama.cpp server, LM Studio), asked for strict JSON | ~0.8 s median for a 1.5B model on this CPU | off |
+| `cloud_llm` | not a classifier: hands the line to the [LLM brain](/guide/llm-brain), the existing handoff, always last | a turn | on |
+
+```mermaid
+flowchart LR
+  C["owner chat line<br/>(addressed, mode allows)"]
+  P["patterns<br/>sync, ~0 ms"]
+  E["embeddings<br/>MiniLM, ~3 ms"]
+  L["local_llm<br/>JSON, &le; 2 s"]
+  S{"strategy<br/>first_confident<br/>vote / best"}
+  V["slots from the line<br/>validated"]
+  ACT["claim + agent.act(...)<br/>reply with the result"]
+  H{"LLM can<br/>think?"}
+  CL["cloud_llm handoff<br/>LlmRuntime.handoff"]
+  HINT["hint: say pax help"]
+  LOG["decision log<br/>one debug line"]
+  C --> P --> E --> L --> S
+  S -- "a layer is confident" --> V --> ACT
+  S -- "nobody is" --> H
+  H -- yes --> CL
+  H -- no --> HINT
+  S -.-> LOG
+  classDef in fill:#f1f5f9,stroke:#475569,color:#0f172a
+  classDef layer fill:#dcfce7,stroke:#16a34a,color:#14532d
+  classDef local fill:#fef9c3,stroke:#ca8a04,color:#713f12
+  classDef dec fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef act fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef llm fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+  classDef log fill:#f5f5f4,stroke:#a8a29e,color:#44403c
+  class C in
+  class P,E layer
+  class L local
+  class S,H dec
+  class V,ACT,HINT act
+  class CL llm
+  class LOG log
+```
+
+```yaml
+# profiles/pax.yaml
+intents:
+  mode: first                         # fallback | first | off (as before)
+  strategy: first_confident           # first_confident | vote | best
+  log_decisions: true                 # one debug line per message: each layer's guess, confidence, ms, the winner
+  layers:                             # order matters; each optional
+    - { use: patterns, threshold: 0.7 }
+    - { use: embeddings, threshold: 0.58, margin: 0.03, model: Xenova/all-MiniLM-L6-v2, method: knn, k: 3 }
+    - { use: local_llm, url: http://127.0.0.1:11434/v1, model: qwen2.5:1.5b, timeout_ms: 2000, threshold: 0.7, enabled: false }
+    - { use: cloud_llm }              # enabled: false = unclear lines are dropped instead of costing a turn
+  examples:                           # optional: more phrasings for the embeddings layer (added to the built-in ones)
+    guard: ["keep the phantoms off me"]
+    none: ["pax is my favourite bot"]  # chat that must not trigger
+```
+
+Without `layers` the pipeline is today's: patterns at `intents.threshold` (0.7), then the cloud
+handoff. Layer keys: `threshold` (all), `enabled` (all), `name` (to run two of a kind, e.g. two
+local models); embeddings: `model` (any Hugging Face id with ONNX weights), `dtype` (q8, fp32,
+fp16, q4), `method` (`knn`: mean of the `k` most similar examples per intent; `centroid`:
+similarity to each intent's mean vector), `k`, `margin`, `preload` (load at start instead of on
+the first line); local_llm: `url`, `model`, `timeout_ms` (default 2000), `api_key_var` (an env var
+holding a key).
+
+### Strategies
+
+| `strategy` | winner | runs |
+| --- | --- | --- |
+| `first_confident` (default) | the first layer, in order, at or above its threshold | layers in order until one is confident; a confident pattern is acted on without waiting for anything |
+| `vote` | the intent most confident layers agree on (ties: higher summed confidence; `min_votes` to require more than one), args from its most confident voter | every layer, in parallel |
+| `best` | the highest confidence of any confident layer | every layer, in parallel |
+
+Confidences are on each layer's own scale (pattern confidence, cosine similarity, the model's
+own number), so `best` favours the layer with the more generous scale; `first_confident` with
+patterns first is the predictable choice.
+
+### What the loose layers may and may not do
+
+- **They only pick the intent.** Counts, items, places, players and templates come from the line
+  through the parser's own helpers (`slots.ts`): "dig up twenty sand" is collect, sand, 20 because
+  "twenty" and "sand" are in the line. A guess whose required slot is missing (bring without an
+  item, go to without a place) is rejected. The words also settle direction ("stop chopping" is
+  behavior_off even when the embedding is closer to "keep chopping") and give vs bring ("your bread").
+- **A local LLM's arguments are checked against the line.** An item must be a real 1.21.1 item
+  and be in the line ("bring me bread" answered with `diamond_sword` is rejected), a count or a
+  coordinate must be said, a place or player must appear. Its JSON is parsed, never evaluated, and
+  the intent must be one of the known names.
+- **Same sentence rules as the patterns**: negations ("don't mine that") and questions don't act,
+  statements ("I'm going to get some wood", "can anyone trade me iron") and lines that start by
+  naming someone else ("steve, give me your sword") are rejected. The embeddings layer also has a
+  `none` class of chat examples; a line closest to those is left alone.
+- **The margin** is the gap between the best intent and the best one outside its family
+  (follow/unfollow, guard/unguard, behavior_on/off, bring/give).
+
+### Claiming with slow layers
+
+Patterns decide inside the chat listener, as before. When a slower layer has to run (embeddings,
+a local LLM), the brain claims the line at once (so the LLM runtime and the command brain skip
+it), classifies it in the background and, if no layer is confident and the LLM can think, gives
+it back with `LlmRuntime.handoff(msg)`: the LLM then handles it as if it had just arrived. One
+message, one handler either way. If the owner says something newer that is acted on first ("stop"
+right after a slow "follow me"), the late guess is dropped.
+
+If `@huggingface/transformers` or the model can't load, the embeddings layer reports
+"unavailable" once in the log and the pipeline skips it; an unreachable local LLM endpoint is
+skipped for a minute at a time. The model is downloaded on first use into `data/models/`
+(gitignored) and loaded from there afterwards.
+
+### Decision log
+
+With `log_decisions: true` each message gets one debug line under `<bot>/intents` (run with
+`-v` or `MC_LOG_LEVEL=info,*/intents=debug`):
+
+```
+decide "keep me safe" | patterns: guard 0.90 3ms => patterns guard {"target":"player","player":"IntentTester"} (3ms)
+decide "get over to me" | patterns: - 0.3ms | embeddings: come 0.67 [next guard 0.531] 2.7ms => embeddings come {"player":"IntentTester"} (3.1ms)
+decide "what is in your bag" | patterns: - 0.1ms | embeddings: inventory 0.69 [next bring 0.378] 2.8ms => embeddings inventory {} (2.9ms)
+decide "keep the creepers away from me" | patterns: - 0.8ms | embeddings: guard 0.55 rejected (margin 0.008 < 0.03 (none)) [next none 0.541] 4.6ms => none (5.5ms)
+decide "tell me a joke" | patterns: - 0.1ms | embeddings: help 0.38 rejected (closest to chat 0.55) [next none 0.55] 2.8ms => none (2.9ms)
+```
+
+### Benchmark
+
+```bash
+just intents-bench                                    # patterns, embeddings, patterns+embeddings on both sets
+just intents-bench --config patterns+embeddings:threshold=0.58,margin=0.03 --set heldout --errors
+just intents-bench --config patterns+embeddings@vote  # strategy after @
+just intents-bench --config local_llm --url http://127.0.0.1:11434/v1 --model qwen2.5:1.5b --timeout 5000
+just intents-bench --config embeddings --grid         # threshold x margin sweep (vectors cached)
+just intents-bench --json data/bench/run.json         # full results, per-line errors included
+```
+
+A config is layer kinds joined by `+`, each with `key=value` settings after `:` (the [profile](/guide/profiles)
+keys), and an optional `@strategy`. Sets: `seen` (the parser's 137 test phrasings, most of them
+also embeddings examples), `heldout` (107 paraphrases that are in neither, 22 of them
+must-not-trigger; `test/fixtures/intents-heldout.ts`), `all`, or a JSON file of
+`[text, intent | null, args?]`. It reports accuracy, macro-F1, false triggers on must-not-trigger
+lines, slot accuracy (right intent and every expected arg right), latency p50/p95 and load time.
+
+Results on this machine (8 cores, heavily loaded; `all-MiniLM-L6-v2` q8):
+
+| config | set | acc | macro-F1 | false triggers | misses | slots | p50 / p95 ms |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| patterns | seen (137) | 1.000 | 1.000 | 0/19 | 0 | 1.000 | 0 / 0.7 |
+| patterns | held-out (107) | 0.495 | 0.381 | 0/22 | 46 | 0.962 | 0 / 0 |
+| embeddings (0.62 / 0.05) | seen | 0.905 | 0.907 | 0/19 | 9 | 1.000 | 2.4 / 3.8 |
+| embeddings (0.62 / 0.05) | held-out | 0.729 | 0.780 | 0/22 | 27 | 1.000 | 2.5 / 3.0 |
+| patterns+embeddings (0.62 / 0.05) | seen | 1.000 | 1.000 | 0/19 | 0 | 1.000 | 0 / 3.1 |
+| patterns+embeddings (0.62 / 0.05) | held-out | 0.766 | 0.779 | 0/22 | 16 | 0.974 | 2.3 / 3.4 |
+| embeddings (0.58 / 0.03) | held-out | 0.832 | 0.875 | 0/22 | 16 | 1.000 | 2.4 / 3.7 |
+| **patterns+embeddings (0.58 / 0.03), Pax** | seen | 1.000 | 1.000 | 0/19 | 0 | 1.000 | 0 / 2.3 |
+| **patterns+embeddings (0.58 / 0.03), Pax** | held-out | 0.822 | 0.826 | 0/22 | 10 | 0.975 | 2.2 / 2.8 |
+| patterns+embeddings (0.58 / 0.03) `@vote` / `@best` | held-out | 0.841 | 0.863 | 0/22 | 10 | 0.976 | 2.3 / 3.3 |
+| embeddings centroid (0.58 / 0.03) | held-out | 0.757 | 0.812 | 1/22 | 22 | 1.000 | 1.2 / 1.6 |
+| local_llm (qwen2.5 1.5B Q4_K_M) | seen | 0.599 | 0.585 | 0/19 | 31 | 1.000 | 818 / 5050 |
+| local_llm (qwen2.5 1.5B Q4_K_M) | held-out | 0.458 | 0.393 | 6/22 | 31 | 1.000 | 767 / 973 |
+| patterns+embeddings (0.58 / 0.03)+local_llm | held-out | 0.813 | 0.822 | 6/22 | 3 | 0.977 | 3.2 / 889 |
+
+- **Patterns alone** are perfect on the phrasings they were written for and catch half of the
+  paraphrases, with no false triggers.
+- **Embeddings** add 23 to 34 points on paraphrases at 2-4 ms per line. At the default 0.62 /
+  0.05 they never fired on chat in these sets; Pax uses 0.58 / 0.03 from the grid (still no false
+  triggers here, 6 more paraphrases caught).
+- **patterns+embeddings** loses a little to embeddings alone on the held-out set because a few
+  paraphrases get a confident but wrong pattern ("come to my side" as go to a place called side);
+  `vote`/`best` let the embedding outvote those.
+- The held-out set was also used for the grid and to spot generic gaps (polarity, statements,
+  tool words), so treat its numbers as optimistic; add your own lines with `--set file.json`.
+- Model load: about 8 s for the first download (23 MB), ~0.2 s from `data/models/`, plus ~0.25 s
+  to embed the ~450 examples. Memory: about 100 MB for the model and runtime.
+
+**Local LLM.** Tried with Qwen2.5-1.5B-Instruct (Q4_K_M) on a llama.cpp server in a throwaway
+podman container, CPU only, 4 threads, 5 s timeout. It is slow (0.8 s median, timeouts at the
+tail) and, at this size, a poor classifier: below the patterns on known phrasings, worse than
+the embeddings on paraphrases, and it triggered on 6 of 22 chat lines in the held-out set ("i
+just got home", "can anyone trade me some iron"). As the last classifier after patterns and
+embeddings it catches most of the remaining paraphrases (3 misses) but those false triggers come
+with it. Keep it off unless you have a bigger model and the hardware for it; a raised threshold
+or `strategy: vote` (it then needs another layer to agree) are the ways to tame it. Its prompt
+carries a few examples from the seen set, so its seen numbers are slightly flattering.
 
 ## Who it listens to
 
@@ -92,7 +286,8 @@ flowchart LR
 ```
 
 The intents brain registers its chat listener first (`prependListener`), whatever the brain
-order in the variant, decides synchronously and marks lines it takes with
+order in the variant, decides synchronously (or claims first and hands back later when a [slow
+layer](#claiming-with-slow-layers) runs) and marks lines it takes with
 `msg.claimedBy = 'intents'`. The [LLM brain](/guide/llm-brain) still records a claimed line in its memory (so a
 later turn knows the owner asked to follow) but starts no turn and sends no "thinking break"
 notice; the command brain skips it too. Whether the LLM can think comes from
@@ -158,4 +353,6 @@ outrank the LLM and [armed behaviours](/guide/behaviors), and "stop" from an own
 
 `node scripts/intents-test.ts` starts a bot (`IntentTest`, owner `IntentTester`, no LLM),
 walks both well away from spawn and says "follow me", "what are you doing", "stop", "come
-here", "chop some wood" in chat, printing the replies.
+here", "chop some wood" in chat, printing the replies. `INTENTS_EMBEDDINGS=1` adds the
+embeddings layer with the decision log (`MC_LOG_LEVEL='info,*/intents=debug'`); the lines above
+come from such a run on mc02.
