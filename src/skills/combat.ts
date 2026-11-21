@@ -200,6 +200,24 @@ async function escapeCrowd (ctx: ActionContext): Promise<string> {
   return r?.ok ? 'backed off' : 'tried to back off'
 }
 
+/**
+ * Where the current run of reflex fights started. defend runs again and again while mobs keep
+ * coming; measuring the chase from each run's own start let the bot drift 30 blocks down a hill
+ * (seen live). The anchor stays until 20 s pass without a fight.
+ */
+const anchors = new WeakMap<Bot, { pos: any, until: number }>()
+function fightAnchor (bot: Bot): any {
+  const a = anchors.get(bot)
+  if (a && Date.now() < a.until) return a.pos
+  const pos = bot.entity.position.clone()
+  anchors.set(bot, { pos, until: Date.now() + 20_000 })
+  return pos
+}
+function touchAnchor (bot: Bot): void {
+  const a = anchors.get(bot)
+  if (a) a.until = Date.now() + 20_000
+}
+
 const defend = defineAction({
   name: 'defend',
   description: 'Fight back against the hostile mobs around, most dangerous first (used by reflexes).',
@@ -209,7 +227,7 @@ const defend = defineAction({
     const { bot, agent, signal } = ctx
     const flags = weaponFlags(agent)
     const maxChase = flags.maxChase ?? 16
-    const origin = bot.entity.position.clone()
+    const origin = fightAnchor(bot)
     const skip = new Set<number>()
     const killed: string[] = []
     const notes: string[] = []
@@ -249,6 +267,14 @@ const defend = defineAction({
         await backOff(bot, mob, signal, 20, 4000)
         notes.push(`couldn't reach the ${mob.name} (${r.reason}); backed out of its line of fire`)
       } else if (r.reason) notes.push(`left the ${mob.name}: ${r.reason}`)
+    }
+    touchAnchor(bot)
+    // pulled too far from where the fighting started (shelter, home, the job): walk back
+    if (bot.health > 0 && bot.entity.position.distanceTo(origin) > maxChase && !threats(bot, 5).length) {
+      try {
+        await gotoTimed(bot, new goals.GoalNear(origin.x, origin.y, origin.z, 2), signal, 20_000)
+        notes.push('walked back to where the fight started')
+      } catch { checkAborted(signal) }
     }
     if (!killed.length && !notes.length) return fail('nothing to fight')
     const k = killed.length ? `killed ${[...new Set(killed)].map(n => `${killed.filter(x => x === n).length} ${n}`).join(', ')}` : 'killed nothing'
