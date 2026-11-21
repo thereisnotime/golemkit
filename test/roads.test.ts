@@ -235,3 +235,24 @@ test('search limits: a clear reason when there is no route or the search runs ou
   assert.equal(r2.ok, false)
   assert.match(r2.ok ? '' : r2.reason, /gave up after 500/)
 })
+
+test('connect: a door joins a road network that is already there', () => {
+  const t = flat(-10, -20, 40, 20)
+  const old = planned(t, { x: 20, z: -18 }, { x: 20, z: 18 })
+  layRoad(t, old.geo)
+  addBuilding(t, { x0: -6, z0: -2, x1: -2, z1: 2 }, 1)
+  const res = connect(t, [{ x: -1, z: 0, out: 'east', f: 65 }], {}, {}, [old.geo.surface.map(c => ({ x: c.x, z: c.z }))])
+  assert.equal(res.roads.length, 1)
+  assert.equal(res.roads[0]!.to, -1, 'ends on the old road')
+  assert.ok(res.roads[0]!.route.at(-1)!.junction)
+})
+
+test('road settings and door de-duplication', async () => {
+  const { roadSettings, dedupeEnds } = await import('../src/skills/roads.ts')
+  assert.deepEqual(roadSettings({}), { width: 3, palette: 'stone_bricks', maxCut: 6, maxFill: 6, lanterns: false, margin: 1 })
+  assert.deepEqual(roadSettings({ road: { width: 9, palette: 'oak', maxCut: '2', lanterns: true } }), { width: 5, palette: 'oak', maxCut: 2, maxFill: 6, lanterns: true, margin: 1 })
+  assert.equal(roadSettings({ road: { palette: 'gold' } }).palette, 'stone_bricks')
+  // a double door is one endpoint; two doors of different houses stay two
+  const ends = dedupeEnds([{ x: 0, z: 4, f: 65, out: 'south' }, { x: 1, z: 4, f: 65, out: 'south' }, { x: 10, z: 4, f: 65, out: 'south' }])
+  assert.equal(ends.length, 2)
+})

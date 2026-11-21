@@ -1029,7 +1029,12 @@ export function connect (t0: RoadTerrain, ends: RoadEnd[], opts: Partial<RoadOpt
     ...ends.map((_e, i) => ({ id: `d${i}`, ends: [i], free: [i], roads: [] })),
     ...existing.filter(r => r.length).map((r, k) => ({ id: `r${k}`, ends: [], free: [], roads: r }))
   ]
-  const joined = () => groups.filter(g => g.ends.length).length <= 1
+  // done when every door is in one group, and that group reaches a road network already there (if any)
+  const hasOld = groups.some(g => g.id.startsWith('r'))
+  const joined = () => {
+    const withEnds = groups.filter(g => g.ends.length)
+    return withEnds.length <= 1 && (!hasOld || !withEnds.length || /(^|\+)r/.test(withEnds[0]!.id))
+  }
   const roads: ConnectedRoad[] = []
   const cache = new Map<string, { res: PlanResult, swap: boolean, limited?: boolean }>()
   const gid = (g: Group) => g.id

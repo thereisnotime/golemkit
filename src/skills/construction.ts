@@ -43,6 +43,40 @@ export function ownBlocks (agent: Pick<Agent, 'storage'>): { has: (p: Pos) => bo
     save: () => { if (dirty) { agent.storage.set(OWN_KEY, [...set].slice(-OWN_MAX)); dirty = false } }
   }
 }
+/** Finished builds (template, where, which way, the door), newest last, so roads can find them. */
+const PLACEMENTS_KEY = 'build.placements'
+const PLACEMENTS_MAX = 100
+
+export interface Placement {
+  template: string
+  origin: Pos
+  facing: Facing
+  /** Footprint box. */
+  box: { min: Pos, max: Pos }
+  /** The door's lower half (no door: the middle of the entrance side). */
+  door?: Pos
+  at: number
+}
+
+/** The structures this bot finished building (agent storage). */
+export function getPlacements (agent: Pick<Agent, 'storage'>): Placement[] {
+  return agent.storage.get<Placement[] | undefined>(PLACEMENTS_KEY) ?? []
+}
+
+/** Forgets placements (e.g. a structure that was taken down). */
+export function setPlacements (agent: Pick<Agent, 'storage'>, list: Placement[]): void {
+  agent.storage.set(PLACEMENTS_KEY, list.slice(-PLACEMENTS_MAX))
+}
+
+function recordPlacement (agent: Pick<Agent, 'storage'>, plan: Pick<Plan, 'bp' | 'origin' | 'facing' | 'cells' | 'roles'>): void {
+  const door = plan.cells.find(c => plan.roles[c.role]?.kind === 'door' && !c.passive)
+  const box = bounds(plan.bp, plan.origin)
+  const same = (p: Placement) => p.origin.x === plan.origin.x && p.origin.y === plan.origin.y && p.origin.z === plan.origin.z
+  const list = getPlacements(agent).filter(p => !same(p))
+  list.push({ template: plan.bp.name, origin: plan.origin, facing: plan.facing, box, ...(door ? { door: { x: door.x, y: door.y, z: door.z } } : {}), at: Date.now() })
+  setPlacements(agent, list)
+}
+
 /** Default keep-out radius around the world spawn (vanilla spawn protection is 16). */
 export const SPAWN_KEEP_OUT = 24
 const SITE_RADIUS = 10
@@ -406,6 +440,7 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
   const save = (placed: number) => { own.save(); agent.storage.set(ACTIVE_KEY, { template: bp.name, origin, facing, material: params.material, theme, startedAt: Date.now(), placed, total } satisfies ActiveBuild) }
   if (already === total && !diff.clear.length) {
     agent.storage.delete(ACTIVE_KEY)
+    recordPlacement(agent, planned)
     return ok(`the ${bp.name} at ${fmtPos(origin)} is already complete`)
   }
 
@@ -697,11 +732,13 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
   const missingKeys = solidCells(cells).filter((c, i) => !roles[c.role]!.optional && rowsQ[i]!.check.status !== 'ok' && rowsQ[i]!.check.status !== 'soft').map(key)
   if (sum.missingRequired > 0 && finishDespiteUnreachable(missingKeys, unreachable, total, outOf.size > 0)) {
     agent.storage.delete(ACTIVE_KEY)
+    recordPlacement(agent, { ...planned, bp, roles })
     const at = missingKeys.map(k => k.replace(/,/g, ' ')).join(', ')
     return ok(`${gatherNote}built a ${bp.name} ${where}: ${sum.built}/${total} blocks${counts}; ${missingKeys.length} block${missingKeys.length === 1 ? '' : 's'} unreachable at ${at}, skipped${tail}`, { ...data, unreachable: missingKeys })
   }
   if (sum.missingRequired === 0) {
     agent.storage.delete(ACTIVE_KEY)
+    recordPlacement(agent, { ...planned, bp, roles })
     return ok(`${gatherNote}built a ${bp.name} ${where}: ${sum.built}/${total} blocks${counts}${tail}${pathNote}`, data)
   }
   const why = outOf.size ? `out of ${[...outOf].join(', ')}` : errors.slice(0, 2).join('; ') || 'stopped'
@@ -738,6 +775,7 @@ async function buildWithCommands (ctx: BuildCtx, plan: Plan, diff: ReturnType<ty
   const errs = run.errors.length ? `; server said: ${run.errors.slice(0, 2).join(' | ')}` : ''
   if (sum.missingRequired === 0) {
     agent.storage.delete(ACTIVE_KEY)
+    recordPlacement(agent, plan)
     return ok(`built a ${bp.name} at ${fmtPos(origin)} facing ${facing} with commands: ${sum.built}/${total} blocks right${sum.wrongState ? `, ${sum.wrongState} facing the wrong way` : ''} (${warn})${errs}`, data)
   }
   return fail(`placed a ${bp.name} at ${fmtPos(origin)} with commands but only ${sum.built}/${total} blocks are right, ${sum.missingRequired} required missing (${warn})${errs}. Calling build again with method=hand finishes it by hand`, data)

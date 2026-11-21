@@ -52,6 +52,11 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'building', description: 'which blueprint to build: library (best saved match) | creative (design a new one) | ask (owner chooses when online)', schema: z.enum(['library', 'creative', 'ask']) },
   { key: 'build.creativeMethod', description: 'creative builds: hand (block by block like a player) | commands (/fill and /setblock when op; shown to other ops) | auto (= hand)', schema: z.enum(['auto', 'hand', 'commands']) },
   { key: 'build.handDelayMs', description: 'pause after each block in a creative hand build (ms, jittered)', schema: z.number().int().min(0).max(5000) },
+  { key: 'road.width', description: 'lanes of a new road (1, 3 or 5)', schema: z.number().int().min(1).max(5) },
+  { key: 'road.palette', description: 'road look: stone_bricks | cobblestone | stone | oak | spruce', schema: z.enum(['stone_bricks', 'cobblestone', 'stone', 'oak', 'spruce']) },
+  { key: 'road.maxCut', description: 'deepest a road may cut into the ground (blocks)', schema: z.number().int().min(0).max(16) },
+  { key: 'road.maxFill', description: 'highest a road may stand on fill above the ground (blocks)', schema: z.number().int().min(0).max(24) },
+  { key: 'road.lanterns', description: 'lanterns on posts at road landings', schema: bool },
   { key: 'worldedit.enabled', description: 'WorldEdit actions: true = the server has it (skip detection), false = never use it; reset = detect', schema: bool },
   { key: 'worldedit.maxBlocks', description: 'largest region a WorldEdit action may change (blocks of volume)', schema: z.number().int().min(1).max(10_000_000) },
   { key: 'retry.actions.*', description: 'extra attempts after a failed action, e.g. retry.actions.goto 2', schema: z.number().int().min(0).max(10) }
