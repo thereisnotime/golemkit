@@ -1,0 +1,99 @@
+# Small walled fortress: a 15x15 compound with walls 3 high, battlements, a gate with a door
+# on the south side and torches on the corners. The inside is left as it is, so a house and a
+# farm can go in it. About 194 wall blocks + 1 door (+ 4 torches). Wood or stone both work.
+name: fortress
+description: Small 15x15 walled compound (3-high walls, battlements, gated door, corner torches) to put a house and farm inside
+facing: south            # the gate side, as drawn below
+site: near
+roles:
+  wall:
+    default: oak_planks
+    accept: "^(cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_cobblestone|[a-z_]+_planks)$"
+    material: true
+  door: { default: oak_door, accept: "_door$", kind: door }
+  light: { default: torch, accept: "^(wall_)?torch$", kind: attachment, optional: true }
+palette:
+  "#": wall
+  D: door
+  T: light
+layers:
+  # y=0 walls with the gate (door) in the middle of the south wall
+  - ["###############",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#######D#######"]
+  # y=1 walls; above the door's bottom half is its top half
+  - ["###############",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "####### #######"]
+  # y=2 walls closed over the gate
+  - ["###############",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "#             #",
+     "###############"]
+  # y=3 battlements
+  - ["# # # # # # # #",
+     "#             #",
+     "               ",
+     "#             #",
+     "               ",
+     "#             #",
+     "               ",
+     "#             #",
+     "               ",
+     "#             #",
+     "               ",
+     "#             #",
+     "               ",
+     "#             #",
+     "# # # # # # # #"]
+  # y=4 corner torches on top of the battlements
+  - ["T             T",
+     "               ",
+     "               ",
+     "               ",
+     "               ",
+     "               ",
+     "               ",
+     "               ",
+     "               ",
+     "               ",
+     "               ",
+     "               ",
+     "               ",
+     "               ",
+     "T             T"]

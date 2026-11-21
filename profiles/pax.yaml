@@ -33,12 +33,12 @@ llm:
   budget:
     turnsPerHour: 60
     tokensPerHour: 600000
-    tokensPerDay: 3000000
+    tokensPerDay: 8000000
     maxToolCalls: 40
     maxTurns: 30              # model round trips per turn (8 was too few for multi-step work)
   goals:                      # persistent goals: follow-up turns until the job is done
-    maxTurns: 30              # turns on its own before it checks back with robin
-    timeoutMin: 30            # minutes on its own before it checks back
+    maxTurns: 80              # turns on its own before it checks back with robin (big builds need many)
+    timeoutMin: 120           # minutes on its own before it checks back
     maxSameFailures: 3        # same failure this often: stop and ask
 retry:
   actions: { goto: 1, chop_tree: 1 }
