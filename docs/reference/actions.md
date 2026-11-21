@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-16 skills, 51 actions.
+16 skills, 52 actions.
 
 ## building
 
@@ -571,6 +571,18 @@ Emergency escape: jump and place blocks underneath to stand on a pillar out of r
 |---|---|---|---|---|
 | `height` | integer (1..8) |  | `3` | how many blocks to rise |
 | `item` | string |  |  | block to use; default the most plentiful dirt/cobblestone/planks |
+
+### `bunker`
+
+Hide from phantoms and other mobs: dig straight down 3 blocks, seal the hole above with a dug block, wait until morning (or until no hostiles are near), then climb out. Needs digging; not in protected areas.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `depth` | integer (2..4) |  | `3` |  |
+| `maxMinutes` | number (0.5..15) |  | `8` | give up waiting after this long |
+| `untilDay` | boolean |  | `true` | stay until morning instead of until mobs leave |
 
 ## woodcutting
 
