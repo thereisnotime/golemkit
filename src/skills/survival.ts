@@ -118,10 +118,55 @@ export function roofAbove (bot: Bot, range = 24): number | null {
   return null
 }
 
+const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const
+const LIQUID = /water|lava/
+
+/** Carves one step up into a wall (dig the 2 blocks of the next step, then walk/jump onto it). No blocks needed. */
+async function stairStep (ctx: any): Promise<boolean> {
+  const { bot, agent, signal } = ctx
+  const p = bot.entity.position.floored()
+  const solid = (b: any) => b && b.boundingBox === 'block'
+  // Try the side whose step is cheapest: the step block itself must be solid (to stand on).
+  for (const [dx, dz] of SIDES) {
+    const step = p.offset(dx, 0, dz) // we'll stand on top of this
+    const a = p.offset(dx, 1, dz)
+    const b = p.offset(dx, 2, dz)
+    if (!solid(bot.blockAt(step))) continue
+    const around = [a, b, b.offset(0, 1, 0), p.offset(0, 2, 0)].flatMap((q: any) => [q, ...SIDES.map(([sx, sz]) => q.offset(sx, 0, sz))])
+    if (around.some((q: any) => LIQUID.test(bot.blockAt(q)?.name ?? ''))) continue
+    if ([a, b].some((q: any) => agent.protectedAreas.isProtected(q))) continue
+    try {
+      for (const q of [p.offset(0, 2, 0), b, a]) {
+        const blk = bot.blockAt(q)
+        if (!solid(blk)) continue
+        if (blk.hardness === null || blk.hardness < 0) throw new Error('unbreakable')
+        const tool = (bot.pathfinder as any).bestHarvestTool?.(blk)
+        if (tool) await bot.equip(tool, 'hand').catch(() => {})
+        await digBlock(bot, blk, signal)
+      }
+      // Jump onto the step.
+      await bot.lookAt(a.offset(0.5, 0.5, 0.5), true)
+      bot.setControlState('forward', true)
+      bot.setControlState('jump', true)
+      const until = Date.now() + 1500
+      while (Date.now() < until && Math.floor(bot.entity.position.y) < a.y) await sleep(50, signal)
+      bot.setControlState('jump', false)
+      await sleep(250, signal)
+      bot.setControlState('forward', false)
+      if (Math.floor(bot.entity.position.y) >= a.y) return true
+    } catch (e) {
+      bot.setControlState('jump', false); bot.setControlState('forward', false)
+      checkAborted(signal)
+      if (e instanceof DigRefusedError) return false
+    }
+  }
+  return false
+}
+
 const climbOut = defineAction({
   name: 'climb_out',
   description: 'Get out of a pit, shaft or cave straight up to open sky: dig the block above if needed, jump and place ' +
-    'a block underneath, repeat. Needs dirt/cobblestone/planks (digging on the way gives some).',
+    'a block underneath, repeat. Without blocks it carves stair steps up into the wall instead.',
   params: z.object({ maxBlocks: z.number().int().min(1).max(64).default(32).describe('give up after rising this many blocks') }),
   async run (ctx, { maxBlocks }) {
     const { bot, agent, signal } = ctx
@@ -146,10 +191,11 @@ const climbOut = defineAction({
           await sleep(300, signal)
         }
       }
-      const r = await (pillar as any).run(ctx, { height: 1 }).catch(() => null)
+      const r = fillerBlock(bot) ? await (pillar as any).run(ctx, { height: 1 }).catch(() => null) : null
       if (!r?.ok) {
-        if (!fillerBlock(bot)) return fail(`no blocks left to climb with, at ${fmtPos(bot.entity.position)}`)
-        if (++fails > 6) return fail(`couldn't climb further, at ${fmtPos(bot.entity.position)}`)
+        // No blocks (or the pillar failed): carve one stair step up into a wall instead.
+        if (await stairStep(ctx)) { fails = 0; continue }
+        if (++fails > 6) return fail(`couldn't climb further (no blocks to pillar and no wall I can carve steps into), at ${fmtPos(bot.entity.position)}`)
         await sleep(400, signal)
       }
     }
