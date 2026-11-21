@@ -2,9 +2,10 @@
 // of items takes (planks, sticks, stairs, slabs, fences, doors, trapdoors, ladders, tables,
 // chests, beds, tools...), chops trees until it has them (making an axe as soon as there is
 // wood for one), crafts the intermediate steps and the items, mines simple blocks (cobblestone
-// with a pickaxe, dirt, sand, gravel), and goes the extra mile for the nice-to-haves: coal or
-// charcoal for torches, glass from sand, wool from sheep for a bed. Optional things that can't
-// be had are skipped and reported. The planning is pure (planWood) and unit tested; the rest
+// with a pickaxe, andesite, diorite, granite, tuff, dirt, sand, gravel), and goes the extra mile
+// for the nice-to-haves: coal or charcoal for torches, glass from sand, wool from sheep for a
+// bed. Stone-family blocks (slabs, stairs, walls, stone bricks, smooth stone) come from
+// cobblestone, smelted when needed. Optional things that can't be had are skipped and reported. The planning is pure (planWood) and unit tested; the rest
 // reuses fellTree, collectBlocks, craftItem, smeltItem and fight.
 import type { Bot } from 'mineflayer'
 import type { ActionContext, ActionResult } from '../core/index.ts'
@@ -26,7 +27,7 @@ import { isCreative, takeFromCreative } from './creative.ts'
  * What one craft costs and makes. `table`: needs a crafting table (3x3 grid). Non-wood inputs:
  * coal (or charcoal), cobblestone, wool, glass.
  */
-interface Recipe { planks?: number, sticks?: number, coal?: number, cobble?: number, wool?: number, glass?: number, out: number, table: boolean }
+interface Recipe { planks?: number, sticks?: number, coal?: number, cobble?: number, wool?: number, glass?: number, stone?: number, bricks?: number, smooth?: number, out: number, table: boolean }
 
 const TOOL_KINDS: ToolKind[] = ['axe', 'pickaxe', 'shovel', 'sword', 'hoe']
 
@@ -54,6 +55,76 @@ export function woodRecipe (item: string): Recipe | null {
   return null
 }
 
+/**
+ * Stone-family crafts (vanilla crafting table recipes): cobblestone, stone, stone brick and
+ * smooth stone slabs, stairs and walls, stone bricks, buttons and pressure plates. Inputs:
+ * cobble (cobblestone), stone (smelted cobblestone), bricks (stone_bricks), smooth (smooth_stone).
+ */
+export function stoneRecipe (item: string): Recipe | null {
+  if (item === 'stone_bricks') return { stone: 4, out: 4, table: false }
+  if (item === 'stone_button') return { stone: 1, out: 1, table: false }
+  if (item === 'stone_pressure_plate') return { stone: 2, out: 1, table: false }
+  const m = /^(cobblestone|stone|stone_brick|smooth_stone)_(slab|stairs|wall)$/.exec(item)
+  if (!m) return null
+  const inputs: Record<string, 'cobble' | 'stone' | 'bricks' | 'smooth'> = { cobblestone: 'cobble', stone: 'stone', stone_brick: 'bricks', smooth_stone: 'smooth' }
+  const input = inputs[m[1]!]!
+  const shape = m[2]!
+  if (shape === 'wall' && (input === 'stone' || input === 'smooth')) return null // no such block
+  if (shape === 'stairs' && input === 'smooth') return null
+  const n = shape === 'slab' ? 3 : 6
+  return { [input]: n, out: shape === 'stairs' ? 4 : 6, table: true }
+}
+
+/** What each smelted stone block is smelted from, in the order they have to be made. */
+export const STONE_SMELTS: [string, string][] = [['stone', 'cobblestone'], ['smooth_stone', 'stone'], ['cracked_stone_bricks', 'stone_bricks']]
+
+export interface StoneChain {
+  /** Cobblestone to have in total for the stone family (crafts plus smelting), before what's held. */
+  cobble: number
+  /** Items still to smelt, in order: stone (from cobblestone), smooth_stone (from stone), cracked_stone_bricks. */
+  smelt: Record<string, number>
+  /** stone_bricks crafts (4 stone -> 4 bricks) still to do. */
+  brickCrafts: number
+}
+
+/**
+ * The stone family part of a shopping list (pure): how much stone, smooth stone and stone
+ * bricks the wanted items take, what has to be smelted or crafted for them given the
+ * inventory, and how much cobblestone that comes down to. Mining only ever gives cobblestone.
+ */
+export function stoneChain (wants: Record<string, number>, inv: Record<string, number>): StoneChain {
+  const need = { cobble: 0, stone: 0, bricks: 0, smooth: 0, cracked: 0 }
+  for (const [item, want] of Object.entries(wants)) {
+    if (item === 'stone') need.stone += want
+    else if (item === 'smooth_stone') need.smooth += want
+    else if (item === 'stone_bricks') need.bricks += want
+    else if (item === 'cracked_stone_bricks') need.cracked += want
+    else {
+      const r = stoneRecipe(item)
+      if (!r) continue
+      const crafts = Math.ceil(Math.max(0, want - (inv[item] ?? 0)) / r.out)
+      need.cobble += (r.cobble ?? 0) * crafts
+      need.stone += (r.stone ?? 0) * crafts
+      need.bricks += (r.bricks ?? 0) * crafts
+      need.smooth += (r.smooth ?? 0) * crafts
+    }
+  }
+  const cracked = Math.max(0, need.cracked - (inv.cracked_stone_bricks ?? 0))
+  need.bricks += cracked
+  const bricksShort = Math.max(0, need.bricks - (inv.stone_bricks ?? 0))
+  const brickCrafts = Math.ceil(bricksShort / 4)
+  const smooth = Math.max(0, need.smooth - (inv.smooth_stone ?? 0))
+  need.stone += smooth + brickCrafts * 4
+  const stone = Math.max(0, need.stone - (inv.stone ?? 0))
+  const smelt: Record<string, number> = {}
+  if (stone) smelt.stone = stone
+  if (smooth) smelt.smooth_stone = smooth
+  if (cracked) smelt.cracked_stone_bricks = cracked
+  return { cobble: need.cobble + stone, smelt, brickCrafts }
+}
+
+const STONE_INTERMEDIATE = new Set(['stone', 'smooth_stone', 'stone_bricks', 'cracked_stone_bricks'])
+
 const WOOD_SET = new Set<string>([...WOODS, 'bamboo', 'crimson', 'warped'])
 function isWoodName (w: string): boolean { return WOOD_SET.has(w) }
 const COLORS = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black']
@@ -66,8 +137,14 @@ export const MINE_SOURCES: Record<string, string[]> = {
   dirt: ['dirt', 'grass_block'],
   sand: ['sand'],
   gravel: ['gravel'],
-  stone: ['stone']
+  andesite: ['andesite'],
+  diorite: ['diorite'],
+  granite: ['granite'],
+  tuff: ['tuff']
 }
+
+/** Mined blocks that need a pickaxe. */
+const NEEDS_PICKAXE = new Set(['cobblestone', 'cobbled_deepslate', 'andesite', 'diorite', 'granite', 'tuff'])
 
 /** Generic names that mean "any wood" (or any colour, for beds and carpets). */
 const GENERIC = ['planks', 'log', 'logs', 'door', 'trapdoor', 'slab', 'stairs', 'fence', 'fence_gate', 'bed', 'carpet']
@@ -112,6 +189,10 @@ export interface WoodPlan {
   furnaceCobble: number
   /** Planks burnt as fuel. */
   fuelPlanks: number
+  /** Stone-family smelting still to do (stone, smooth_stone, cracked_stone_bricks), in order. */
+  stoneSmelt: Record<string, number>
+  /** stone_bricks crafts still to do. */
+  brickCrafts: number
   /** Wanted items nothing here can make. */
   unsupported: string[]
 }
@@ -148,6 +229,7 @@ export function planWood (wants: Record<string, number>, inv: Record<string, num
     if (item === 'glass') { glass += missing; continue }
     if (item === 'coal' || item === 'charcoal') { coal += missing; continue }
     if (MINE_SOURCES[item]) { mine[item] = (mine[item] ?? 0) + missing; continue }
+    if (STONE_INTERMEDIATE.has(item) || stoneRecipe(item)) continue // stoneChain below
     const r = woodRecipe(item)
     if (!r) { unsupported.push(item); continue }
     const crafts = Math.ceil(missing / r.out)
@@ -160,11 +242,15 @@ export function planWood (wants: Record<string, number>, inv: Record<string, num
     if (r.table) table = true
   }
   glass = Math.max(0, glass - (inv.glass ?? 0))
+  const chain = stoneChain(wants, inv)
+  cobble += chain.cobble
+  if (Object.entries(wants).some(([k, n]) => stoneRecipe(k)?.table && countWant(k, inv) < n)) table = true
   if (cobble) mine.cobblestone = Math.max(0, (mine.cobblestone ?? 0) + cobble - (wants.cobblestone ? 0 : countWant('cobblestone', inv)))
   if (mine.cobblestone === 0) delete mine.cobblestone
   const coalShort = Math.max(0, coal - countWant('coal', inv))
   const charcoal = coalShort
-  const smelts = glass + charcoal
+  const stoneSmelts = Object.values(chain.smelt).reduce((a, b) => a + b, 0)
+  const smelts = glass + charcoal + stoneSmelts
   const haveFurnace = !!opts.haveFurnace || (inv.furnace ?? 0) > 0
   const needFurnace = smelts > 0 && !haveFurnace
   // the furnace used for smelting is picked up again afterwards, so a wanted furnace costs nothing extra
@@ -172,7 +258,7 @@ export function planWood (wants: Record<string, number>, inv: Record<string, num
   const fuelPlanks = smelts ? Math.ceil(smelts / 1.5) : 0
   planks += fuelPlanks
   logsKeep += charcoal
-  const makePickaxe = (!!mine.cobblestone || !!mine.stone || furnaceCobble > 0) && !bestToolIn(Object.keys(inv), 'pickaxe')
+  const makePickaxe = (Object.keys(mine).some(k => NEEDS_PICKAXE.has(k) && mine[k]! > 0) || furnaceCobble > 0) && !bestToolIn(Object.keys(inv), 'pickaxe')
   if (makePickaxe) { planks += TOOL_SHAPE.pickaxe.head; sticks += TOOL_SHAPE.pickaxe.sticks; table = true }
 
   const haveAxe = !!bestToolIn(Object.keys(inv), 'axe')
@@ -204,6 +290,8 @@ export function planWood (wants: Record<string, number>, inv: Record<string, num
     needFurnace,
     furnaceCobble,
     fuelPlanks,
+    stoneSmelt: chain.smelt,
+    brickCrafts: chain.brickCrafts,
     unsupported
   }
 }
@@ -375,6 +463,35 @@ async function ensureGlass (ctx: Ctx, need: number, radius: number, notes: strin
   if (!r.ok) notes.push(`glass: ${r.message}`)
 }
 
+/**
+ * Smelts and crafts the stone family's intermediates for a shopping list: cobblestone into
+ * stone, stone into smooth stone, stone into stone bricks, bricks into cracked bricks. Works
+ * from what the inventory holds now (stoneChain), so a second call does nothing extra.
+ */
+async function makeStone (ctx: Ctx, all: Record<string, number>, radius: number, notes: string[], placedFurnaces: { x: number, y: number, z: number }[]): Promise<void> {
+  const { bot, signal, log } = ctx
+  const craftBricks = async () => {
+    const n = stoneChain(all, inventoryCounts(bot)).brickCrafts
+    if (!n) return
+    const r = await craftItem(bot, signal, 'stone_bricks', n * 4).catch(e => fail((e as Error).message))
+    if (!r.ok) notes.push(`stone bricks: ${r.message}`)
+  }
+  for (const [out, from] of STONE_SMELTS) {
+    checkAborted(signal)
+    if (out === 'cracked_stone_bricks') await craftBricks()
+    const n = stoneChain(all, inventoryCounts(bot)).smelt[out] ?? 0
+    if (!n) continue
+    if (!(inventoryCounts(bot)[from] ?? 0)) { notes.push(`no ${from} to smelt into ${out}`); continue }
+    if (!await ensureFurnace(ctx, radius, notes)) return
+    const r = await smeltItem(bot, signal, log, from, n, plankFuel(bot))
+    log.debug('gather: smelt stone', { out, from, n, ok: r.ok, result: r.message })
+    const placed = (r.data as { placed?: { x: number, y: number, z: number } } | undefined)?.placed
+    if (placed) placedFurnaces.push(placed)
+    if (!r.ok) notes.push(`${out}: ${r.message}`)
+  }
+  await craftBricks()
+}
+
 /** Wool of one colour from sheep nearby (never pets, named, penned or protected ones). Returns the colour with enough, or null. */
 async function ensureWool (ctx: Ctx, need: number, radius: number, notes: string[]): Promise<string | null> {
   const { bot, agent, signal, log } = ctx
@@ -487,6 +604,9 @@ export async function gatherMaterials (ctx: Ctx, wants: Record<string, number>, 
     }
   }
 
+  // 3b. stone family: cobblestone smelted into stone (and on into smooth stone), stone bricks
+  if (Object.keys(all).some(k => STONE_INTERMEDIATE.has(k) || stoneRecipe(k))) await makeStone(ctx, all, radius, notes, placedFurnaces)
+
   // 4. extras that need smelting or animals: coal/charcoal for torches, glass, wool
   const missingOf = (k: string) => Math.max(0, (all[k] ?? 0) - countWant(k, inventoryCounts(bot)))
   if (missingOf('torch') > 0) await ensureCoal(ctx, Math.ceil(missingOf('torch') / 4), radius, notes, placedFurnaces)
@@ -507,12 +627,12 @@ export async function gatherMaterials (ctx: Ctx, wants: Record<string, number>, 
       if (/_planks$/.test(item) && item !== 'planks') await craftItem(bot, signal, item, want - have).catch(() => fail(''))
       continue
     }
-    if (MINE_SOURCES[item] || item === 'glass' || item === 'coal') continue
+    if (MINE_SOURCES[item] || item === 'glass' || item === 'coal' || (STONE_INTERMEDIATE.has(item) && item !== 'stone_bricks')) continue
     if (item === 'torch' && !countWant('coal', inventoryCounts(bot))) { notes.push('torches need coal or charcoal'); continue }
     if (item === 'glass_pane' && (inventoryCounts(bot).glass ?? 0) < 6) continue
     if ((item === 'bed' || item === 'carpet' || /_(bed|carpet)$/.test(item)) && !woolColor) continue
     if (item === 'furnace' && placedFurnaces.length) continue // picked up below
-    const r = woodRecipe(item)
+    const r = woodRecipe(item) ?? stoneRecipe(item)
     if (!r) continue
     const name = concreteName(item, inventoryCounts(bot), theme, woolColor)
     if (!name) { notes.push(`no planks to make a ${item} from`); continue }
@@ -620,6 +740,7 @@ const gatherAction = defineAction({
   name: 'gather_materials',
   description: 'Get the materials for a job in one go: chops as many trees as needed (crafting a wooden axe first), turns logs into planks and sticks, ' +
     'crafts wooden items (stairs, slabs, fences, doors, trapdoors, ladders, crafting tables, chests, tools), mines cobblestone with a pickaxe and other simple blocks, ' +
+    'makes the stone family (cobblestone/stone/stone brick slabs, stairs and walls, stone bricks, smooth stone; smelting cobblestone into stone in a furnace), ' +
     'and tries for the extras: torches (coal, or charcoal smelted from logs), glass panes (sand smelted into glass), a bed (wool from sheep nearby). ' +
     'Extras it can\'t get are skipped and reported. Give either items, e.g. {"planks": 80, "door": 1} ("planks", "log", "door", "stairs", "slab", "fence", "bed" mean any wood/colour), ' +
     'or template="small_house" for everything a blueprint needs. Prefer this over many chop_tree/craft calls. Needs digging enabled to chop or mine.',
