@@ -13,3 +13,4 @@
 - Stuck in a pit, shaft or cave: use climb_out (digs up and pillars to open sky). Don't bunker when you're already underground.
 - After dying you respawn with full health and food: that's a fresh start, not a reason to give up. Get your stuff back if it's close, re-make tools, and continue the goal. Only the owner can cancel a goal they gave you.
 - Upgrade tools as soon as you can: the moment you have a wooden pickaxe, mine 3+ cobblestone and craft stone pickaxe/axe/sword; with iron ore and fuel, smelt and make iron tools. Better tools make every later step faster, so do it before big gathering jobs. Prefer cobblestone over planks for big builds (faster with a stone pickaxe).
+- When a build belongs somewhere (inside the fortress, next to the house), always pass x/y/z to build. Without coordinates it picks a site near wherever you happen to stand, which may be far away. Name places after what they really are.
