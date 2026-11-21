@@ -12,7 +12,7 @@ import { equipForTarget, hasRanged, shootAt, readyShield, isRangedMob, DEFAULT_M
 import { attackCooldownMs, swingDecision, spacing, chaseRefusal, outnumbered, shouldDisengageToHeal, shouldEatInLull, MELEE_REACH } from './tactics.ts'
 import { bestFood } from './survival.ts'
 
-export type FightEnd = 'killed' | 'escaped' | 'timeout' | 'gave_up' | 'heal' | 'outnumbered'
+export type FightEnd = 'killed' | 'escaped' | 'timeout' | 'gave_up' | 'heal' | 'outnumbered' | 'retarget'
 export interface FightResult { end: FightEnd, killed: boolean, reason?: string, hits: number, crits: number }
 
 const EYE = 1.62
@@ -226,6 +226,11 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
           return finish('heal', `health ${Math.ceil(bot.health)}`)
         }
         if (outnumbered({ health: bot.health, meleeNear: meleeNear(bot) })) return finish('outnumbered', `${meleeNear(bot)} mobs close at health ${Math.ceil(bot.health)}`)
+        // a creeper walking up while we fight something else: it comes first (seen live: blown up in iron armour)
+        if (target.name !== 'creeper') {
+          const c = bot.nearestEntity(e => e.name === 'creeper' && isHostile(e) && e.position.distanceTo(me) <= 5)
+          if (c) return finish('retarget', 'creeper close')
+        }
       }
 
       // A creeper whose fuse is lit (~1.5 s): get away now, finish it after the fizzle.

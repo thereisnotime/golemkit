@@ -242,6 +242,7 @@ const defend = defineAction({
         continue
       }
       if (r.end === 'outnumbered') { notes.push(await escapeCrowd(ctx)); break }
+      if (r.end === 'retarget') continue // something worse came close: threats() puts it first
       skip.add(mob.id)
       if (r.end === 'gave_up' && isRangedMob(mob.name) && (mob as any).isValid !== false) {
         // couldn't get to the archer: get out of its line of fire instead of standing there
