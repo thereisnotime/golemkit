@@ -712,6 +712,9 @@ export class Agent extends TypedEmitter<AgentEvents> {
         moves.allow1by1towers = false
         moves.allowSprinting = true // explicit: travel sprints
         moves.allowParkour = true
+        // Never plan long drops into water (the default allows any height): Pax died falling 32 blocks
+        // into a ravine pool. Normal max drop (4) still applies.
+        ;(moves as { infiniteLiquidDropdownDistance?: boolean }).infiniteLiquidDropdownDistance = false
         moves.exclusionAreasBreak.push(this.protectedAreas.breakCost)
         bot.pathfinder.setMovements(moves)
         this.applyPathfinderSettings(bot)

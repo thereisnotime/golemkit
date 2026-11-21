@@ -129,6 +129,7 @@ const gotoDeath = defineAction({
     if (recent.length >= 2) {
       return fail(`died ${recent.length} times near ${fmtPos(d.pos)} in the last 10 minutes (${d.message ?? d.cause ?? 'unknown cause'}); not going back there. Re-make what I lost instead`)
     }
+    if (!d.lostCount) return fail(`I had nothing on me when I died at ${fmtPos(d.pos)}; nothing to pick up`)
     if (!d.itemsMayRemain) return fail(`the drops at ${fmtPos(d.pos)} are probably gone by now (over 5 minutes); not worth the trip`)
     try {
       await travel(bot, d.pos, signal, { range: 2 })

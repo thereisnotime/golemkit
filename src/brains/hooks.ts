@@ -97,9 +97,14 @@ export const hooksBrain = (opts: HooksBrainOptions = {}) => {
         lastHurt = Date.now()
         run(engine.emit({ type: 'hurt', health: bot.health }))
       }
+      // What we carried just before dying (the inventory is already empty by the death event).
+      let carried = 0
+      const countItems = () => { try { carried = bot.inventory.items().reduce((n, i) => n + i.count, 0) } catch {} }
+      const carryTimer = setInterval(countItems, 2000)
       const onDeath = () => {
         const pos = bot.entity ? fmtPos(bot.entity.position) : 'unknown position'
-        run(engine.emit({ type: 'death', vars: { pos, deathPos: pos } }))
+        const drops = carried > 0 ? `My stuff (${carried} items) should still be there for 5 minutes.` : 'I had nothing on me.'
+        run(engine.emit({ type: 'death', vars: { pos, deathPos: pos, drops } }))
       }
       const onJoin = (p: { username: string }) => {
         if (p.username === bot.username || Date.now() - spawnedAt < 10_000) return // the list is replayed on spawn
@@ -123,6 +128,7 @@ export const hooksBrain = (opts: HooksBrainOptions = {}) => {
         bot.off('playerJoined', onJoin)
         bot.off('playerLeft', onLeave)
         for (const t of timers) clearInterval(t)
+        clearInterval(carryTimer)
         states.delete(agent)
       }
     },
