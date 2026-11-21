@@ -15,9 +15,14 @@ export interface Zone { x: number, y: number, z: number, at: string }
 const ZONE_RADIUS = 20
 const REFUSAL_WINDOW_MS = 800
 
+const CONFIRM_RADIUS = 8
+const CONFIRM_WINDOW_MS = 10 * 60_000
+
 export class ProtectedAreas {
   readonly file: string
   zones: Zone[] = []
+  /** Single refusals waiting for a second one nearby; lag rollbacks look like refusals too. */
+  private suspects: { x: number, y: number, z: number, t: number }[] = []
 
   constructor (file: string) {
     this.file = file
@@ -28,9 +33,22 @@ export class ProtectedAreas {
     return this.zones.some(z => Math.abs(z.x - p.x) <= radius && Math.abs(z.z - p.z) <= radius && Math.abs(z.y - p.y) <= radius * 2)
   }
 
-  /** Records a refused break. Returns true if this created a new zone. */
-  add (p: { x: number, y: number, z: number }): boolean {
+  /**
+   * Records a refused break. A zone is only created after a second refusal within 8 blocks
+   * in 10 minutes (one rollback can be lag), or immediately with `confirmed`. Returns true if
+   * this created a new zone.
+   */
+  add (p: { x: number, y: number, z: number }, opts: { confirmed?: boolean } = {}): boolean {
     if (this.isProtected(p, ZONE_RADIUS / 2)) return false
+    if (!opts.confirmed) {
+      const now = Date.now()
+      this.suspects = this.suspects.filter(s => now - s.t < CONFIRM_WINDOW_MS)
+      const near = this.suspects.some(s => Math.abs(s.x - p.x) <= CONFIRM_RADIUS && Math.abs(s.y - p.y) <= CONFIRM_RADIUS && Math.abs(s.z - p.z) <= CONFIRM_RADIUS)
+      if (!near) {
+        this.suspects.push({ x: p.x, y: p.y, z: p.z, t: now })
+        return false
+      }
+    }
     this.zones.push({ x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z), at: new Date().toISOString() })
     try {
       mkdirSync(dirname(this.file), { recursive: true })
@@ -55,6 +73,8 @@ export class ProtectedAreas {
  */
 export function watchRefusedDigs (bot: Bot, onRefused: (pos: { x: number, y: number, z: number }) => void): () => void {
   const recent = new Map<string, number>()
+  // Right after (re)connecting the server resends state and can roll back late digs: ignore.
+  const quietUntil = Date.now() + 10_000
   const key = (p: { x: number, y: number, z: number }) => `${p.x},${p.y},${p.z}`
   const onDug = (block: { position: { x: number, y: number, z: number } }) => {
     recent.set(key(block.position), Date.now())
@@ -66,13 +86,18 @@ export function watchRefusedDigs (bot: Bot, onRefused: (pos: { x: number, y: num
     if (!t) return
     recent.delete(key(l))
     const name = bot.registry.blocksByStateId[packet.type]?.name
+    if (Date.now() < quietUntil) return
     if (Date.now() - t < REFUSAL_WINDOW_MS && packet.type !== 0 && name !== 'air' && name !== 'cave_air') onRefused(l)
   }
   bot.on('diggingCompleted', onDug)
+  // mineflayer drops diggingCompleted listeners when the bot dies: re-attach on respawn.
+  const reattach = () => { bot.off('diggingCompleted', onDug); bot.on('diggingCompleted', onDug) }
+  bot.on('respawn', reattach)
   bot._client.on('block_change', onChange)
   const prune = setInterval(() => { const now = Date.now(); for (const [k, t] of recent) if (now - t > 5000) recent.delete(k) }, 5000)
   return () => {
     bot.off('diggingCompleted', onDug)
+    bot.off('respawn', reattach)
     bot._client.removeListener('block_change', onChange)
     clearInterval(prune)
   }
