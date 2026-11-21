@@ -259,6 +259,13 @@ export interface PhaseOptions {
   feetY: number
 }
 
+/** The pickaxe an ore family needs: tier rank (1 wooden, 2 stone, 3 iron) and the upgrade target that gets it. */
+export function pickaxeFor (ore: string): { rank: number, upTo: 'stone' | 'iron' } {
+  if (ore === 'coal' || ore === 'quartz') return { rank: 1, upTo: 'stone' }
+  if (ore === 'iron' || ore === 'copper' || ore === 'lapis') return { rank: 2, upTo: 'stone' }
+  return { rank: 3, upTo: 'iron' }
+}
+
 /** Whether the strip mine (a staircase at most 20 blocks down) can reach this ore's height band. */
 export function prospectable (ore: string, feetY: number): boolean {
   const o = ORES[ore]

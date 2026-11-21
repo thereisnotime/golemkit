@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import {
   resolveTarget, isResolveError, normalizeTarget, singulars, searchPhases, prospectable, villageVerdict, portalVerdict,
-  describeFind, gatherSource, bringSteps, ingredientFor, isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, itemOfBlock,
+  describeFind, gatherSource, bringSteps, ingredientFor, pickaxeFor, isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, itemOfBlock,
   type RegistryNames, type ResolvedTarget, type BringState
 } from '../src/skills/searchPlan.ts'
 import { scoutWaypoints, scoutStopReason, nextWaypoint, DEFAULT_SCOUT_LIMITS, type ScoutProgress } from '../src/skills/foodPlan.ts'
@@ -216,6 +216,12 @@ test('bring order: inventory, own chests, craft, gather, find', () => {
   assert.deepEqual(bringSteps(st({ item: 'create:andesite_alloy' })), [])
   // iron ingots: crafting (from nuggets or a block) is tried, then the furnace from raw iron
   assert.deepEqual(bringSteps(st({ item: 'iron_ingot', recipe: true, source: gatherSource('iron_ingot'), smeltFrom: 'raw_iron' })), ['craft', 'smelt'])
+})
+
+test('pickaxe per ore: stone for iron, iron for diamonds', () => {
+  assert.deepEqual(pickaxeFor('iron'), { rank: 2, upTo: 'stone' })
+  assert.deepEqual(pickaxeFor('coal'), { rank: 1, upTo: 'stone' })
+  assert.deepEqual(pickaxeFor('diamond'), { rank: 3, upTo: 'iron' })
 })
 
 test('gather sources', () => {

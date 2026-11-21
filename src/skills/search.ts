@@ -19,6 +19,8 @@ import { craftItem, smeltItem } from './crafting.ts'
 import { gatherMaterials, plankFuel } from './materials.ts'
 import { fellTree } from './woodcutting.ts'
 import { mineStone } from './mining.ts'
+import { upgradeTools } from './progression.ts'
+import { toolTier, bestToolIn } from './toolkit.ts'
 import { CROPS, isMature, plantOn } from './farming.ts'
 import { withdraw as withdrawAction, knownContainers, CONTAINER_RE } from './containers.ts'
 import { moddedNames } from './mods.ts'
@@ -29,7 +31,7 @@ import {
 } from './foodPlan.ts'
 import {
   resolveTarget, isResolveError, searchPhases, villageVerdict, portalVerdict, describeFind, gatherSource, bringSteps,
-  isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, ORES, SMELTS, ingredientFor,
+  isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, ORES, SMELTS, ingredientFor, pickaxeFor,
   type ResolvedTarget, type RegistryNames, type SearchPhase, type GatherSource
 } from './searchPlan.ts'
 
@@ -411,6 +413,16 @@ async function tidyStations<T> (ctx: Ctx, fn: () => Promise<T>): Promise<T> {
   }
 }
 
+/** Makes sure a pickaxe good enough for this ore family is at hand (felling, crafting, mining stone for it). */
+async function pickaxeReady (ctx: Ctx, ore: string): Promise<string | null> {
+  const { bot, signal } = ctx
+  const need = pickaxeFor(ore)
+  const held = () => toolTier(bestToolIn(Object.keys(inventoryMap(bot)), 'pickaxe') ?? '', 'pickaxe')
+  if (held() >= need.rank) return null
+  const r = await tidyStations(ctx, () => upgradeTools(ctx, { upTo: need.upTo, kinds: ['pickaxe'], maxSteps: 10 })).catch(e => { checkAborted(signal); return fail((e as Error).message) })
+  return held() >= need.rank ? `made a pickaxe (${r.message})` : `no pickaxe for ${ore} ore: ${r.message}`
+}
+
 /** Harvests up to `want` ripe crops of one kind from own or village farms nearby, replanting. Returns the item gained. */
 async function harvestCrops (ctx: Ctx, block: string, item: string, want: number): Promise<number> {
   const { bot, agent, signal, log } = ctx
@@ -498,6 +510,7 @@ async function fetchTarget (ctx: Ctx, t: ResolvedTarget, at: Pos | null, count: 
     }
   } else {
     if (!agent.canDig) return { got: 0, message: 'digging is disabled for this bot' }
+    if (t.ore) { const n = await pickaxeReady(ctx, t.ore); if (n) notes.push(n) }
     for (const block of t.blocks ?? []) {
       if (got() >= count) break
       checkAborted(signal)
@@ -899,6 +912,8 @@ async function gatherOnce (ctx: Ctx, item: string, source: GatherSource, want: n
   const blocks = ore ? ore.blocks : [source.block!]
   const start = invCount(bot, matcher(item))
   const notes: string[] = []
+  const family = Object.entries(ORES).find(([, o]) => o === ore)?.[0]
+  if (family && bot.findBlocks({ matching: ids(bot, blocks), maxDistance: 48, count: 1 }).length) { const n = await pickaxeReady(ctx, family); if (n) notes.push(n) }
   for (const b of blocks) {
     const left = want - (invCount(bot, matcher(item)) - start)
     if (left <= 0) break
