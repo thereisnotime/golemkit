@@ -118,8 +118,18 @@ export function playerEntity (bot: Bot, name: string | undefined): Entity | unde
   return bot.players[name]?.entity
 }
 
+/** Neutral mobs: dangerous only when provoked, so never targeted proactively. */
+const NEUTRAL = new Set(['enderman', 'piglin', 'zombified_piglin', 'evoker_fangs', 'skeleton_horse', 'zombie_horse'])
+/** minecraft-data types these as plain "mob" although they attack on sight. */
+const ALSO_HOSTILE = new Set(['phantom', 'ghast', 'slime', 'magma_cube', 'shulker', 'hoglin', 'ender_dragon'])
+/** Mobs that fly: chasing them on foot is pointless, swing when they come into reach. */
+export const FLYING = new Set(['phantom', 'ghast', 'vex', 'blaze', 'breeze', 'bee', 'allay', 'parrot', 'bat', 'ender_dragon'])
+
 export function isHostile (e: Entity | null | undefined): e is Entity {
-  return !!e && e.type === 'hostile' && (e as any).isValid !== false
+  if (!e || (e as any).isValid === false) return false
+  const name = e.name ?? ''
+  if (NEUTRAL.has(name)) return false
+  return e.type === 'hostile' || ALSO_HOSTILE.has(name)
 }
 
 export function nearestHostile (bot: Bot, from: { distanceTo (p: any): number }, radius: number): Entity | null {

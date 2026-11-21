@@ -1,7 +1,7 @@
 // Reflexes: things the bot does on its own regardless of other brains: fight back when hit,
 // eat when hungry. They run at reflex priority, so they briefly preempt everything else and
 // long-running actions (follow, guard) resume afterwards.
-import { defineBrain, PRIORITY, nearestHostile } from '../core/index.ts'
+import { defineBrain, PRIORITY, nearestHostile, isHostile, FLYING } from '../core/index.ts'
 import { bestFood } from '../skills/survival.ts'
 
 export interface ReflexOptions {
@@ -33,12 +33,15 @@ export const reflexes = (opts: ReflexOptions = {}) => {
         const b = bot.blockAt(e.position)
         return b?.name === 'water' || e.name === 'drowned' || e.name === 'guardian'
       }
-      const shouldRetreat = (mob: any) =>
-        bot.health <= retreatBelow || (inWater(mob) && bot.health < waterFightAbove)
+      // Running from flyers is pointless (they're faster); fight them even when low.
+      const shouldRetreat = (mob: any) => !FLYING.has(mob.name ?? '') &&
+        (bot.health <= retreatBelow || (inWater(mob) && bot.health < waterFightAbove))
 
       const onHurt = (entity: any) => {
         if (!selfDefense || entity !== bot.entity) return
-        const mob = nearestHostile(bot, bot.entity.position, 8)
+        // Flyers (phantoms) hit and climb away, so look further for them.
+        const mob = nearestHostile(bot, bot.entity.position, 8) ??
+          bot.nearestEntity((e: any) => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20)
         if (!mob) return
         const cur = agent.currentAction?.name
         if (shouldRetreat(mob) && agent.getAction('retreat')) {
@@ -53,7 +56,7 @@ export const reflexes = (opts: ReflexOptions = {}) => {
       const timer = setInterval(() => {
         // Low health with a hostile close by: get away even before the next hit.
         const mob = selfDefense ? nearestHostile(bot, bot.entity.position, 6) : null
-        if (mob && bot.health <= retreatBelow && agent.currentAction?.name !== 'retreat' && agent.getAction('retreat')) {
+        if (mob && !FLYING.has(mob.name ?? '') && bot.health <= retreatBelow && agent.currentAction?.name !== 'retreat' && agent.getAction('retreat')) {
           void reflex('retreat')
           return
         }

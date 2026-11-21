@@ -1,6 +1,6 @@
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
-import { defineSkill, defineAction, z, noParams, ok, fail, goals, playerEntity, nearestHostile, sleep, checkAborted } from '../core/index.ts'
+import { defineSkill, defineAction, z, noParams, ok, fail, goals, playerEntity, nearestHostile, isHostile, FLYING, sleep, checkAborted } from '../core/index.ts'
 
 const REACH = 3.2
 const WEAPONS = ['netherite_sword', 'diamond_sword', 'iron_sword', 'stone_sword', 'golden_sword', 'wooden_sword',
@@ -20,17 +20,23 @@ export async function equipBestWeapon (bot: Bot): Promise<void> {
 export async function fight (bot: Bot, target: Entity, signal: AbortSignal, maxMs = 20000): Promise<boolean> {
   await equipBestWeapon(bot)
   const start = Date.now()
-  bot.pathfinder.setGoal(new goals.GoalFollow(target, 2), true)
+  // Flyers (phantoms...) can't be chased on foot: hold position, track them and swing when
+  // they dive into reach. Ground mobs: follow and hit.
+  const flying = FLYING.has(target.name ?? '')
+  if (!flying) bot.pathfinder.setGoal(new goals.GoalFollow(target, 2), true)
   try {
     while ((target as any).isValid !== false && Date.now() - start < maxMs) {
       checkAborted(signal)
       const dist = bot.entity.position.distanceTo(target.position)
-      if (dist > 24) return false
-      if (dist <= REACH) {
-        await bot.lookAt(target.position.offset(0, target.height * 0.8, 0), true)
+      if (dist > (flying ? 40 : 24)) return false
+      if (flying) await bot.lookAt(target.position.offset(0, target.height * 0.5, 0), true).catch(() => {})
+      if (dist <= REACH + (flying ? 0.5 : 0)) {
+        if (!flying) await bot.lookAt(target.position.offset(0, target.height * 0.8, 0), true)
         bot.attack(target)
+        await sleep(600, signal) // full sword cooldown
+      } else {
+        await sleep(flying ? 100 : 300, signal) // flyers dive fast: check often
       }
-      await sleep(600, signal) // full sword cooldown
     }
     return (target as any).isValid === false
   } finally {
@@ -86,9 +92,11 @@ const defend = defineAction({
   params: noParams,
   internal: true,
   async run ({ bot, signal }) {
-    const mob = nearestHostile(bot, bot.entity.position, 6)
+    // Flyers hit and climb away, so look further for them.
+    const mob = nearestHostile(bot, bot.entity.position, 6) ??
+      bot.nearestEntity(e => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20)
     if (!mob) return fail('nothing to fight')
-    await fight(bot, mob, signal, 10000)
+    await fight(bot, mob, signal, FLYING.has(mob.name ?? '') ? 20000 : 10000)
     return ok(`fought ${mob.name}`)
   }
 })
