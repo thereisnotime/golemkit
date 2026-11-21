@@ -619,7 +619,7 @@ async function findEngine (ctx: Ctx, t: ResolvedTarget, o: FindOptions): Promise
     const ownerAt = o.who ? seenAt(agent, bot, o.who) : null
     const ref = ownerAt ?? origin
     const refName = ownerAt ? 'you' : 'where I started'
-    const sy = t.kind === 'block' && !t.liquid ? surfaceY(bot, at.x, at.z) : null
+    const sy = t.ore ? surfaceY(bot, at.x, at.z) : null
     const text = describeFind({ ...at, what: s.what, count: s.count, capped: s.capped }, ref, refName, sy) + (s.note ? ` (${s.note})` : '')
     say(`found ${text}`, true)
     const parts = [`${how}: ${text}, remembered as found:${t.key}`]
