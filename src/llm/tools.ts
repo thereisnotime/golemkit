@@ -160,15 +160,16 @@ export class BotTools implements ToolHost {
   }
 
   /**
-   * Turns for an owner (they're talking, or it's their goal) outrank the bot's own behaviours, except
-   * while health or food is low: then hunting/eating/safety behaviours keep the upper hand.
+   * Turns for an owner (they're talking, or it's their goal) outrank the bot's own behaviours. A goal
+   * doesn't while the bot is in danger (low health or food, night, hostiles close): then eating,
+   * going home and safety behaviours keep the upper hand. A live request from the owner always does.
    */
   private priorityFor (scope: TurnScope): number {
     const isOwner = (p?: string) => !!p && !!(this.agent as { isOwner?: (p: string) => boolean }).isOwner?.(p)
     if (isOwner(scope.speaker)) return Math.max(this.opts.priority, PRIORITY.behavior + 5)
     if (isOwner(scope.player)) {
       const bot = (() => { try { return (this.agent as any).bot } catch { return null } })()
-      if (bot && bot.health > 6 && bot.food > 6) return Math.max(this.opts.priority, PRIORITY.behavior + 5)
+      if (bot && !inDanger(bot)) return Math.max(this.opts.priority, PRIORITY.behavior + 5)
     }
     return this.opts.priority
   }
@@ -264,4 +265,13 @@ export function cleanSchema (schema: Record<string, unknown>): Record<string, un
   if (rest.type !== 'object') return { type: 'object', properties: {}, ...rest }
   if (!rest.properties) rest.properties = {}
   return rest
+}
+
+/** Low health or food, night (or a thunderstorm), or a hostile mob within 12 blocks. */
+export function inDanger (bot: any): boolean {
+  if (!bot?.entity) return false
+  if (bot.health <= 6 || bot.food <= 6) return true
+  const t = bot.time?.timeOfDay ?? 0
+  if ((bot.thunderState ?? 0) > 0 || (t >= 12_542 && t <= 23_459)) return true
+  return Object.values(bot.entities ?? {}).some((e: any) => e?.type === 'hostile' && e.position?.distanceTo(bot.entity.position) < 12)
 }

@@ -8,7 +8,7 @@ import { Memory, type MemoryOptions } from './memory.ts'
 import { backoffMs, isTransientLlmError } from '../core/retry.ts'
 import { buildSystemPrompt, buildUserMessage, chatTrigger, type ChatTriggerOptions, type PromptContext, type Trigger } from './prompt.ts'
 import { PRIORITY } from '../core/index.ts'
-import { BotTools, LLM_CALLER, type BotToolsOptions, type ToolAgent } from './tools.ts'
+import { BotTools, LLM_CALLER, inDanger, type BotToolsOptions, type ToolAgent } from './tools.ts'
 import type { LlmProvider, ToolCallRecord, TurnResult } from './types.ts'
 import { PriceTable, type Price } from './pricing.ts'
 import { UsageTracker, fmtTurn, fmtCost, fmtSummary, turnUsage, type TurnUsage, type UsageSnapshot } from './usage.ts'
@@ -389,7 +389,8 @@ export class LlmRuntime {
 
   /**
    * Is the body busy in a way that should hold the goal back? Our own action, a player's command or a
-   * reflex: yes. A behaviour (hunting, scouting, tools...) only while health or food is low: otherwise
+   * reflex: yes. A behaviour (hunting, scouting, going home...) only while in danger (low health or
+   * food, night, hostiles close): otherwise
    * an owner's goal outranks behaviours (see BotTools: goal turns for an owner run above them), and
    * waiting for the bot to be fully idle meant the goal never got a turn.
    */
@@ -399,7 +400,7 @@ export class LlmRuntime {
     if (cur.caller.kind !== 'brain' || cur.caller.name === LLM_CALLER.name) return true
     if (cur.priority > PRIORITY.behavior) return true
     const bot = (() => { try { return (this.agent as any).bot } catch { return null } })()
-    return !!bot && (bot.health <= 6 || bot.food <= 6)
+    return !!bot && inDanger(bot)
   }
 
   /** Every few seconds: if a goal is active and nothing has happened for a while, nudge it (backoff grows with stalled turns). */
