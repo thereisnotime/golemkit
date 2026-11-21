@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-22 skills, 93 actions.
+23 skills, 97 actions.
 
 ## blueprint-library
 
@@ -304,6 +304,7 @@ Build a whole structure from a blueprint. For "build a house" use small_house (c
 | `theme` | string |  |  | wood to build with: oak, spruce, birch, jungle, acacia, dark_oak, mangrove, cherry, pale_oak; default whatever wood the bot has most of |
 | `gather` | boolean |  | `false` | gather missing materials first (chop trees, mine, craft) |
 | `path` | boolean |  | `true` | dig a short dirt path from the door afterwards when the bot can make a shovel |
+| `method` | `auto` \| `hand` \| `commands` |  |  | creative only: hand = place block by block like a player (default), commands = /fill and /setblock when the bot is op (fast; every command shows to other ops as an admin message), auto = the build.creativeMethod setting. Survival always builds by hand |
 | `replace` | boolean |  | `false` | owners only: also dig up and replace blocks in the footprint that look player-made (e.g. an older build of ours being upgraded). Only when the owner asked to fix, upgrade or rebuild something there |
 
 ### `build_plan`
@@ -810,6 +811,78 @@ Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines
 | `armour` | boolean |  | `false` | also make iron armour once iron tools are done |
 | `kinds` | array |  |  | tool kinds to upgrade; default pickaxe, axe, shovel, sword |
 | `prospect` | boolean |  | `true` | when no iron ore is in sight, dig a staircase and strip mine to look for some |
+
+## roads
+
+Roads and staircases between buildings: planning, building, removing.
+
+### `build_road`
+
+Plan and build a road with proper stairs between two places, like a person would: straight flights, stairs only on straight stretches (every stair facing up), flat landings at turns, switchbacks on steep slopes, a base filled down to the ground, head-room cut, wall railings where the drop beside it is 2 or more, never through buildings, trees or protected areas, joining existing roads at T-junctions. From the bot (or from_x/from_z, or `from` = a saved place or player) to x y z (or `to`). A point next to a door starts or ends straight out of that door. dry_run=true only plans and lists the materials. redo (a road id from road_list) builds a removed road again. Survival gathers stone bricks first; creative builds by hand or with commands.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `x` | number |  |  | target x |
+| `y` | number |  |  | target walking height (default the ground there + 1) |
+| `z` | number |  |  | target z |
+| `to` | string |  |  | target: a saved place name, a player name, or "me" |
+| `from_x` | number |  |  |  |
+| `from_y` | number |  |  |  |
+| `from_z` | number |  |  |  |
+| `from` | string |  |  | start: a saved place, a player, or "me" (default where the bot stands) |
+| `redo` | integer (-9007199254740991..9007199254740991) |  |  | id of a road built earlier (see road_list): build it again on the same line |
+| `width` | integer (1..5) |  |  | lanes (1, 3 or 5; even widths round up); default the road.width setting (3) |
+| `palette` | `stone_bricks` \| `cobblestone` \| `stone` \| `oak` \| `spruce` |  |  | look: stone_bricks, cobblestone, stone, oak, spruce; default the road.palette setting (stone_bricks: stone brick floor and stairs, cobblestone base, stone brick wall railings) |
+| `lanterns` | boolean |  |  | lanterns on posts at the landings (default the road.lanterns setting) |
+| `bridge` | boolean |  | `false` | may cross water or lava on a deck |
+| `maxCut` | integer (0..16) |  |  | deepest cut into the ground (default road.maxCut, 6; 0 without digging) |
+| `maxFill` | integer (0..24) |  |  | highest fill above the ground (default road.maxFill, 6) |
+| `dry_run` | boolean |  | `false` | only plan: length, stairs, landings, cut/fill and the materials needed |
+| `gather` | boolean |  | `true` | survival: gather missing materials first (stone bricks are smelted and crafted from cobblestone) |
+| `method` | `auto` \| `hand` \| `commands` |  |  | creative only: hand (default, block by block) or commands (/fill and /setblock when op; every command shows to other ops) |
+
+### `connect_buildings`
+
+Join buildings with roads and stairs, cheapest roads first, each door getting a straight start, later roads joining earlier ones at T-junctions. Buildings come from: what the bot built (source=built, the default), doors among its own blocks (own), doors within radius of here (nearby), or door coordinates (doors="x y z; x y z"). Same road rules as build_road. dry_run=true only plans.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `source` | `built` \| `own` \| `nearby` \| `doors` |  | `"built"` | built: structures this bot finished with build; own: doors among blocks it placed; nearby: every door within radius; doors: the given coordinates |
+| `doors` | string |  |  | door blocks as "x y z; x y z; ..." (source=doors) |
+| `radius` | integer (4..96) |  | `48` | how far from here to look (built, own, nearby) |
+| `width` | integer (1..5) |  |  | lanes (1, 3 or 5; even widths round up); default the road.width setting (3) |
+| `palette` | `stone_bricks` \| `cobblestone` \| `stone` \| `oak` \| `spruce` |  |  | look: stone_bricks, cobblestone, stone, oak, spruce; default the road.palette setting (stone_bricks: stone brick floor and stairs, cobblestone base, stone brick wall railings) |
+| `lanterns` | boolean |  |  | lanterns on posts at the landings (default the road.lanterns setting) |
+| `bridge` | boolean |  | `false` | may cross water or lava on a deck |
+| `maxCut` | integer (0..16) |  |  | deepest cut into the ground (default road.maxCut, 6; 0 without digging) |
+| `maxFill` | integer (0..24) |  |  | highest fill above the ground (default road.maxFill, 6) |
+| `dry_run` | boolean |  | `false` | only plan: length, stairs, landings, cut/fill and the materials needed |
+| `gather` | boolean |  | `true` | survival: gather missing materials first (stone bricks are smelted and crafted from cobblestone) |
+| `method` | `auto` \| `hand` \| `commands` |  |  | creative only: hand (default, block by block) or commands (/fill and /setblock when op; every command shows to other ops) |
+
+### `remove_road`
+
+Take out a road this bot built (road_list shows them): breaks the blocks it placed (only where they are still its blocks) and, in creative, puts back the ground it dug away. build_road with redo set to its id builds it again.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `id` | integer (-9007199254740991..9007199254740991) |  |  | road id; default the last one built |
+| `restore` | boolean |  | `true` | creative: put back the natural blocks that were dug out for it |
+| `method` | `auto` \| `hand` \| `commands` |  |  | creative only: hand (default) or commands (/fill when op) |
+
+### `road_list`
+
+The roads this bot built: id, from where to where, length, stairs, and whether it was removed.
+
+*non-exclusive*
+
+No parameters.
 
 ## status
 

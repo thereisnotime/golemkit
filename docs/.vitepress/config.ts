@@ -30,6 +30,7 @@ export default withMermaid(defineConfig({
           { text: 'Behaviours', link: '/guide/behaviors' },
           { text: 'LLM brain', link: '/guide/llm-brain' },
           { text: 'Goals and building', link: '/guide/goals-and-building' },
+          { text: 'Roads and stairs', link: '/guide/roads' },
           { text: 'Tool progression and gathering', link: '/guide/progression' },
           { text: 'Blueprint libraries', link: '/guide/blueprints' },
           { text: 'WorldEdit', link: '/guide/worldedit' },

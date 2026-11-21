@@ -8,7 +8,7 @@ Two bundles live in `src/skills/index.ts`:
 
 - `standardSkills()`: status, movement, combat, survival, inventory, gather, [journal](/guide/journal).
 - `extendedSkills()`: crafting, containers, farming, food, woodcutting, building, construction,
-  materials, pickup.
+  roads, materials, pickup.
 
 `navigation()` is exported on its own (the villager bot uses it).
 
@@ -169,7 +169,18 @@ how many were out of reach.
 | `build_plan` *ne* | Without a template, lists the blueprints; with one, where it would go, which wood it would use and its materials vs the inventory. `preview=true` adds a text drawing (top view and every layer). |
 
 Blueprints are YAML in `blueprints/`. Observe hook: `build` (the structure in progress). See
-[Goals and building](./guide/goals-and-building.md) for the format.
+[Goals and building](./guide/goals-and-building.md) for the format. Finished structures are
+recorded (`build.placements`) so roads can find their doors.
+
+### roads
+| action | |
+|---|---|
+| `build_road` *dig* | Plan and build a road with stairs from the bot (or a place, player, coordinates) to a place: straight flights, stairs only on straight stretches facing up, flat landings at turns, switchbacks on steep ground, base filled to the ground, head-room cut, wall railings on drops of 2 or more, never through buildings, trees or protected areas, T-junctions onto existing roads. `dry_run=true` plans only (length, stairs, landings, cut/fill, materials); `redo=<id>` builds a removed road again. Survival gathers stone bricks first; creative by hand or with `/fill`. Long-running. |
+| `connect_buildings` *dig* | Join buildings (the ones it built, doors among its own blocks, doors nearby, or given doors) cheapest roads first, later roads meeting earlier ones at T-junctions. Long-running. |
+| `remove_road` | Take out a road it built (only blocks still its own), creative puts the dug ground back. Long-running. |
+| `road_list` *ne* | The roads it built, with ids. |
+
+See [Roads and stairs](./guide/roads.md).
 
 ### materials
 | action | |
