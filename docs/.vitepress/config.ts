@@ -26,6 +26,7 @@ export default withMermaid(defineConfig({
           { text: 'Writing brains', link: '/guide/writing-brains' },
           { text: 'NPC brain', link: '/guide/npc-brain' },
           { text: 'LLM brain', link: '/guide/llm-brain' },
+          { text: 'Self-improver', link: '/guide/self-improver' },
           { text: 'Logging', link: '/guide/logging' },
           { text: 'Scenes', link: '/guide/scenes' },
           { text: 'Deployment', link: '/guide/deployment' }

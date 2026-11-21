@@ -195,6 +195,8 @@ Several brains run at once and negotiate through priorities. Shipped:
 - `sceneBrain()` lets several bots act out scenes together (see [Scenes](../guide/scenes.md)).
 - `llmBrain()` lets a language model drive the bot at llm priority, through the same actions
   (as tools, also over MCP). See [LLM brain](../guide/llm-brain.md).
+- `selfImprover()` runs a declarative program through the NPC controller and rewrites it with
+  one LLM call when an owner teaches it. See [Self-improver](../guide/self-improver.md).
 
 ## Bots
 

@@ -1,0 +1,20 @@
+# Apprentice: the self-improving NPC (variants/apprentice.ts) on mc02. Runs its own program
+# without an LLM; when robin teaches it something ("Apprentice, learn: ..."), it asks Claude
+# Sonnet 5.5 once (subscription token, isolated login .auth/apprentice) to rewrite it.
+#   just run apprentice
+variant: apprentice
+description: Self-improving NPC (Sonnet 5.5 via a subscription token for learning), taught by robin
+username: Apprentice
+owners: [robin]
+llm:
+  provider: claude-subscription      # "none" = never learn, just run the program
+  model: claude-sonnet-5-5
+  effort: low
+  login: .auth/apprentice
+  oauthTokenVar: CLAUDE_CODE_OAUTH_TOKEN
+  oauthTokenFile: ~/.config/mc-buddy/secrets.env
+  budget:
+    turnsPerHour: 10
+    tokensPerHour: 300000
+    tokensPerDay: 1000000
+    callsPerInstruction: 3
