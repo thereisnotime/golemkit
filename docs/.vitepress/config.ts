@@ -54,6 +54,12 @@ export default withMermaid(defineConfig({
     search: { provider: 'local' },
     outline: [2, 3]
   },
+  // Mermaid pulls in a few CommonJS packages; pre-bundle them or the dev server serves a blank page.
+  vite: {
+    optimizeDeps: {
+      include: ['mermaid', 'fastdom', 'dayjs', 'debug', '@braintree/sanitize-url', 'cytoscape', 'cytoscape-cose-bilkent']
+    }
+  },
   mermaid: {
     theme: 'base',
     themeVariables: {
