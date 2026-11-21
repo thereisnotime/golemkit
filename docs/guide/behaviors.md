@@ -267,7 +267,10 @@ flowchart TB
 
 The actions behind it are usable on their own: `protect` (the loop) and `feed_player`.
 `scripts/guard-test.ts` measures how often a player standing still at night gets hit with the
-bodyguard armed and with `follow_owner` only.
+bodyguard armed and with `follow_owner` only. First runs on mc02 (two nights, 4 minutes per phase,
+natural spawns, a stone sword and no armour): 0 hits with the bodyguard in 8 minutes, against 1
+hit (which killed the tester, already at 1 health) with `follow_owner` in 8 minutes. Too few mobs
+reached the player for that to mean much; it is a smoke test, not a benchmark.
 
 ## Food: keep_fed, scouting and farm_setup
 
