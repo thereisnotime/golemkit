@@ -239,7 +239,7 @@ const protect = defineAction({
     let fed = 0
     let mode = ''
     const player = () => bot.players[who]?.entity
-    const setMode = (m: string) => { if (m !== mode) { mode = m; log.debug(`protect: ${m}`) } }
+    const setMode = (m: string) => { if (m !== mode) { mode = m; (m.startsWith('fighting') || m.startsWith('blocking') ? log.info : log.debug)(`protect: ${m}`) } }
 
     try {
       while (true) {

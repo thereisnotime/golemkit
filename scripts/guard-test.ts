@@ -109,6 +109,16 @@ async function main (): Promise<void> {
     b.on('chat', (user: string, msg: string) => { if (user === BOT) { said.push(msg); log(`CHAT <${user}> ${msg}`) } })
     b.on('whisper', (user: string, msg: string) => { if (user === BOT) { said.push(`(w) ${msg}`); log(`WHISPER <${user}> ${msg}`) } })
   })
+  // walking without sprinting costs (almost) no hunger: both arrive fed after 500 blocks (fights still sprint)
+  for (const a of [bot, tester]) a.on('session', () => { a.bot.once('spawn', () => {}); setTimeout(() => { const m = (a.bot?.pathfinder as any)?.movements; if (m) { m.allowSprinting = false; m.allowParkour = false } }, 3000) })
+  const kills: Record<string, number> = {}
+  bot.on('session', () => {
+    const b = bot.bot
+    const hitAt = new Map<number, number>()
+    const orig = b.attack.bind(b)
+    ;(b as any).attack = (e: any) => { hitAt.set(e.id, Date.now()); return orig(e) }
+    b.on('entityDead', (e: any) => { const t = hitAt.get(e.id); if (measuring && t && Date.now() - t < 4000 && e !== b.entity) { kills[e.name] = (kills[e.name] ?? 0) + 1; log(`KILL ${e.name}`) } })
+  })
   bot.on('session', () => { bot.bot.on('death', () => { if (measuring) stats.botDeaths++; log('BOT DIED') }) })
 
   await connect(bot)
@@ -119,9 +129,57 @@ async function main (): Promise<void> {
   const robin = bot.bot.players.robin?.entity
   if (robin) log(`robin is in sight at ${fmtPos(robin.position)}: pick another spot`)
 
-  if (mode === 'food') {
+  if (mode === 'logs') {
+    // the tester hands its logs over (drop next to the bot), the bot crafts a sword
+    await step(tester, 'goto', { x: Math.floor(bot.bot.entity.position.x) + 1, y: Math.floor(bot.bot.entity.position.y), z: Math.floor(bot.bot.entity.position.z) })
+    await step(tester, 'drop', { item: 'spruce_log' })
+    await pause(1500)
+    await step(bot, 'pickup_items', { radius: 6 })
+    await step(bot, 'upgrade_tools', { up_to: 'stone', kinds: ['sword'], prospect: false })
+    await walkThere(bot)
+    await walkThere(tester, X + 2, Z + 2)
+    log(`logs: bot ${state(bot)} | tester ${state(tester)}`)
+  } else if (mode === 'reset') {
+    // reset hunger without /kill: walk off a ledge (dying refills food), respawn at spawn, walk back without sprinting
+    const who = (process.env.GUARD_RESET || 'tester,bot').split(',').map(n => n === 'bot' ? bot : tester)
+    for (const a of who) {
+      const b = a.bot
+      const died = new Promise<void>(resolve => b.once('death', () => resolve()))
+      const me = b.entity.position.floored()
+      let edge: { at: any, dir: [number, number] } | null = null
+      const ground = (x: number, z: number, from: number) => { for (let y = from; y > from - 40; y--) { const bl = b.blockAt(me.clone().set(x, y, z)); const up = b.blockAt(me.clone().set(x, y + 1, z)); const up2 = b.blockAt(me.clone().set(x, y + 2, z)); if (bl && bl.boundingBox === 'block' && !/leaves/.test(bl.name) && up?.boundingBox === 'empty' && up2?.boundingBox === 'empty') return y } return -999 }
+      for (let r = 1; r <= 20 && !edge; r++) {
+        for (let dx = -r; dx <= r && !edge; dx++) for (let dz = -r; dz <= r && !edge; dz++) {
+          if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue
+          const gy = ground(me.x + dx, me.z + dz, me.y + 4)
+          if (gy < -900) continue
+          for (const [ux, uz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as [number, number][]) {
+            const ny = ground(me.x + dx + ux, me.z + dz + uz, gy + 1)
+            const liquid = b.blockAt(me.clone().set(me.x + dx + ux, ny + 1, me.z + dz + uz))?.name
+            if (ny > -900 && gy - ny >= Math.ceil(b.health) + 4 && liquid !== 'water' && [1, 2, 3].every(h => b.blockAt(me.clone().set(me.x + dx + ux, gy + h, me.z + dz + uz))?.boundingBox === 'empty')) { edge = { at: me.clone().set(me.x + dx, gy + 1, me.z + dz), dir: [ux, uz] }; break }
+          }
+        }
+      }
+      if (!edge) { log(`${a.username}: no ledge high enough nearby`); continue }
+      log(`${a.username}: ledge at ${fmtPos(edge.at)}, stepping off`)
+      try { await b.pathfinder.goto(new goals.GoalBlock(edge.at.x, edge.at.y, edge.at.z)) } catch (e) { log(`${a.username}: couldn't stand on the edge: ${(e as Error).message}`); continue }
+      log(`${a.username}: on the edge at ${fmtPos(b.entity.position)}`)
+      await b.lookAt(edge.at.offset(edge.dir[0] * 3 + 0.5, 0, edge.dir[1] * 3 + 0.5), true)
+      b.setControlState('forward', true)
+      b.setControlState('jump', true)
+      await Promise.race([died, pause(6000)])
+      b.setControlState('forward', false)
+      b.setControlState('jump', false)
+      await pause(5000)
+      log(`${a.username}: ${state(a)}`)
+    }
+    await Promise.all([walkThere(bot), walkThere(tester, X + 2, Z + 2)])
+    log(`reset: bot ${state(bot)} | tester ${state(tester)}`)
+  } else if (mode === 'food') {
     // daytime: scout for animals, bring food back, feed the tester with feed_player
     const idle = async (a: Agent) => { for (let i = 0; i < 30 && a.currentAction; i++) await pause(1000) }
+    log(`difficulty ${bot.bot.game.difficulty}; tester ${state(tester)}`)
+    if (far(bot) > 50 || far(tester) > 50) await Promise.all([walkThere(bot), walkThere(tester, X + 2, Z + 2)])
     const meat = () => bot.bot.inventory.items().filter(it => /beef|porkchop|mutton|chicken|rabbit$|cod|salmon|bread|apple|carrot|potato/.test(it.name)).reduce((n, it) => n + it.count, 0)
     for (let i = 0; i < 4 && meat() < 10; i++) {
       await idle(bot)
@@ -167,6 +225,7 @@ async function main (): Promise<void> {
     const results = []
     for (const phase of order.split(',')) {
       if (!isNight(bot)) { log(`day came, stopping before ${phase}`); break }
+      for (const k of Object.keys(kills)) delete kills[k]
       Object.assign(stats, { hits: 0, damage: 0, deaths: 0, botDeaths: 0, healthSeen: 0, healthSamples: 0 })
       said.length = 0
       if (phase === 'guard') await step(bot, 'behavior_arm', { name: 'bodyguard', options: { player: TESTER } })
@@ -187,7 +246,7 @@ async function main (): Promise<void> {
       }
       measuring = false
       await step(bot, 'behavior_disarm', { name: phase === 'guard' ? 'bodyguard' : 'follow_owner' })
-      const r = { tag, phase, at: new Date().toISOString(), minutes: Number(mins), at_xz: [X, Z], testerHits: stats.hits, damage: Math.round(stats.damage), testerDeaths: stats.deaths, botDeaths: stats.botDeaths, healthVisible: `${stats.healthSeen}/${stats.healthSamples}`, said: said.slice(0, 20) }
+      const r = { tag, phase, at: new Date().toISOString(), minutes: Number(mins), at_xz: [X, Z], testerHits: stats.hits, damage: Math.round(stats.damage), testerDeaths: stats.deaths, botDeaths: stats.botDeaths, kills: { ...kills }, healthVisible: `${stats.healthSeen}/${stats.healthSamples}`, said: said.slice(0, 20) }
       log(`RESULT ${JSON.stringify(r)}`)
       appendFileSync(`${DATA}/results.jsonl`, JSON.stringify(r) + '\n')
       results.push(r)
