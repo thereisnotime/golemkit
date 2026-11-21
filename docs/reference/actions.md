@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-24 skills, 100 actions.
+25 skills, 102 actions.
 
 ## blueprint-library
 
@@ -149,6 +149,34 @@ Rename one of my learned blueprints. Owners only.
 |---|---|---|---|---|
 | `from` | string | yes |  |  |
 | `to` | string | yes |  |  |
+
+## bodyguard
+
+Protecting a player: stay with them, fight what threatens them, block arrows, feed them.
+
+### `protect`
+
+Stay with a player as a bodyguard until stopped: keep close (between them and the nearest danger), kill mobs that threaten them (creepers near them first, archers with a shot at them, diving phantoms, mobs coming for them or that hurt them), block arrows with a shield, and toss them food when they look hurt. Never attacks players, pets, villagers, golems or named mobs; neutral mobs only when they attack.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `player` | string |  |  | player to protect; defaults to the requesting player |
+| `distance` | number (1..8) |  | `3` | follow distance, blocks |
+| `range` | number (6..32) |  | `16` | protect this far around them |
+| `feed` | boolean |  | `true` | toss food when their health is low (needs the server to send player health) |
+| `keepFood` | integer (0..64) |  | `4` | food items to keep for itself |
+| `chat` | boolean |  | `true` | short callouts in chat (fed you, ...) |
+
+### `feed_player`
+
+Walk up to a player and toss them food from the inventory (the best food, 1-2 items), keeping some for itself.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `player` | string |  |  | who to feed; defaults to the requesting player |
+| `keepFood` | integer (0..64) |  | `4` | food items to keep for itself |
 
 ## building
 
