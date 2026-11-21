@@ -38,3 +38,10 @@ test('adaptive weapon choice', async () => {
   assert.equal(hitDamage(smite, 'spider'), 5, 'smite does nothing to spiders')
   assert.equal(pickMelee([], { name: 'zombie' }), null)
 })
+
+test('a door top half in an air cell of a blueprint with that door is not "player-made"', async () => {
+  const { cellState } = await import('../src/skills/blueprint.ts')
+  const roles = { door: { item: 'oak_door', accept: /_door$/ } } as any
+  assert.equal(cellState({ role: 'air' }, 'spruce_door', roles, true), 'done')
+  assert.equal(cellState({ role: 'air' }, 'spruce_door', {}, true), 'blocked', 'no door in this blueprint: not ours')
+})

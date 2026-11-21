@@ -277,6 +277,9 @@ export function cellState (cell: { role: string }, current: string | undefined, 
   const name = current ?? 'air'
   if (cell.role === 'air') {
     if (isReplaceableName(name)) return 'done'
+    // The upper half of a door (or the other half of a bed) sits in a cell the blueprint marks as
+    // air; when the blueprint itself has that door/bed, it's ours, not a player's block.
+    if (/_door$|_bed$/.test(name) && Object.values(roles).some(r => r.accept.test(name) || r.item === name)) return 'done'
     if (isNaturalBlock(name)) return canDig ? 'clear' : 'blocked'
     return 'blocked'
   }
