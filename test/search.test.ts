@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import {
   resolveTarget, isResolveError, normalizeTarget, singulars, searchPhases, prospectable, villageVerdict, portalVerdict,
-  describeFind, gatherSource, bringSteps, isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, itemOfBlock,
+  describeFind, gatherSource, bringSteps, ingredientFor, isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, itemOfBlock,
   type RegistryNames, type ResolvedTarget, type BringState
 } from '../src/skills/searchPlan.ts'
 import { scoutWaypoints, scoutStopReason, nextWaypoint, DEFAULT_SCOUT_LIMITS, type ScoutProgress } from '../src/skills/foodPlan.ts'
@@ -204,9 +204,11 @@ test('bring order: inventory, own chests, craft, gather, find', () => {
   assert.deepEqual(bringSteps(st({ have: 4 })), ['inventory'])
   assert.deepEqual(bringSteps(st({ have: 1, inOwnChests: 2, recipe: true, source: gatherSource('raw_iron') })), ['inventory', 'chest', 'craft', 'gather', 'find'])
   assert.deepEqual(bringSteps(st({ item: 'bread', recipe: true, source: gatherSource('bread') })), ['craft'])
-  // planks come from the materials pipeline (chop, then craft), not a bare craft first
-  assert.deepEqual(bringSteps(st({ item: 'oak_planks', recipe: true, source: gatherSource('oak_planks') })), ['gather', 'find'])
-  assert.deepEqual(bringSteps(st({ item: 'oak_planks', recipe: true, source: gatherSource('oak_planks'), canDig: false })), ['craft'])
+  // any planks come from the materials pipeline (chop any tree, then craft); oak planks are crafted from oak logs fetched first
+  assert.deepEqual(bringSteps(st({ item: 'planks', recipe: false, source: gatherSource('planks') })), ['gather', 'find'])
+  assert.deepEqual(bringSteps(st({ item: 'oak_planks', recipe: true, source: gatherSource('oak_planks') })), ['craft'])
+  assert.deepEqual(ingredientFor('oak_planks'), { item: 'oak_log', per: 1, makes: 4 })
+  assert.equal(ingredientFor('bread')!.item, 'wheat')
   // crops are harvested, not dug: fine with digging off
   assert.deepEqual(bringSteps(st({ item: 'wheat', source: gatherSource('wheat'), canDig: false })), ['gather', 'find'])
   assert.deepEqual(bringSteps(st({ item: 'raw_iron', source: gatherSource('raw_iron'), canDig: false })), [])
@@ -218,7 +220,9 @@ test('bring order: inventory, own chests, craft, gather, find', () => {
 
 test('gather sources', () => {
   assert.deepEqual(gatherSource('raw_iron'), { how: 'collect', block: 'iron_ore', target: 'iron' })
-  assert.equal(gatherSource('oak_planks')!.how, 'materials')
+  assert.equal(gatherSource('oak_planks'), null)
+  assert.equal(gatherSource('planks')!.how, 'materials')
+  assert.deepEqual(gatherSource('oak_log'), { how: 'chop', block: 'oak_log', target: 'oak_log' })
   assert.equal(gatherSource('birch_log')!.how, 'chop')
   assert.equal(gatherSource('wheat')!.how, 'harvest')
   assert.equal(gatherSource('cobblestone')!.block, 'stone')

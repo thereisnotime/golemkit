@@ -29,7 +29,7 @@ import {
 } from './foodPlan.ts'
 import {
   resolveTarget, isResolveError, searchPhases, villageVerdict, portalVerdict, describeFind, gatherSource, bringSteps,
-  isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, ORES, SIMPLE_INGREDIENTS, SMELTS,
+  isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, ORES, SMELTS, ingredientFor,
   type ResolvedTarget, type RegistryNames, type SearchPhase, type GatherSource
 } from './searchPlan.ts'
 
@@ -483,6 +483,10 @@ async function fetchTarget (ctx: Ctx, t: ResolvedTarget, at: Pos | null, count: 
   } else if (t.fetch === 'bucket') {
     if (!findItem(bot, 'bucket')) return { got: 0, message: `I need an empty bucket to bring ${t.label}` }
     await fillBuckets(ctx, t.blocks![0]!, count)
+  } else if (t.fetch === 'chop' && t.blocks?.length === 1) {
+    if (!agent.canDig) return { got: 0, message: 'digging is disabled for this bot' }
+    const r = await tidyStations(ctx, () => collectBlocks(ctx, t.blocks![0]!, Math.min(64, count)))
+    if (!r.ok) notes.push(r.message)
   } else if (t.fetch === 'chop') {
     if (!agent.canDig) return { got: 0, message: 'digging is disabled for this bot' }
     for (let trees = 0; got() < count && trees < Math.ceil(count / 3) + 3; trees++) {
@@ -796,7 +800,7 @@ async function obtain (ctx: Ctx, item: string, want: number, depth: number, say:
     if (step === 'craft') {
       say(`crafting ${missing()} ${item}`)
       let r = await tidyStations(ctx, () => craftItem(bot, signal, item, missing())).catch(e => { checkAborted(signal); return fail((e as Error).message) })
-      const ing = SIMPLE_INGREDIENTS[item]
+      const ing = ingredientFor(item)
       if ((!r.ok || missing() > 0) && ing && depth < 1) {
         const need = Math.ceil(missing() / ing.makes) * ing.per - invCount(bot, matcher(ing.item))
         if (need > 0) {
@@ -864,6 +868,11 @@ async function gatherOnce (ctx: Ctx, item: string, source: GatherSource, want: n
     return n ? `filled ${n} buckets` : `couldn't fill a bucket (${findItem(bot, 'bucket') ? `no ${source.block} nearby` : 'no empty bucket'})`
   }
   if (!agent.canDig) return 'digging is disabled for this bot'
+  if (source.how === 'chop' && source.block) {
+    // one kind of wood: dig those logs (felling takes whatever tree is nearest)
+    const r = await tidyStations(ctx, () => collectBlocks(ctx, source.block!, Math.min(64, want)))
+    return r.message
+  }
   if (source.how === 'chop') {
     const start = invCount(bot, matcher(item))
     let last = ''

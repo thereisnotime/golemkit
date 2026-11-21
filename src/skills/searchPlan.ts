@@ -391,8 +391,11 @@ export interface GatherSource {
 /** How an item can be got from the world, or null when it can't (only from chests or crafting). */
 export function gatherSource (item: string): GatherSource | null {
   for (const [fam, o] of Object.entries(ORES)) if (o.drop === item || o.blocks.includes(item)) return { how: 'collect', block: o.blocks[0], target: fam }
+  // planks of one wood are crafted from that wood's logs (ingredientFor), any planks come from any tree
+  if (/_planks$/.test(item) && WOODS.some(w => item === `${w}_planks`)) return null
   if (/_planks$/.test(item) || item === 'planks' || item === 'stick' || item === 'crafting_table' || item === 'chest') return { how: 'materials', target: 'logs' }
-  if (/_log$/.test(item) || item === 'log' || item === 'logs') return { how: 'chop', block: item === 'log' || item === 'logs' ? 'oak_log' : item, target: 'logs' }
+  if (item === 'log' || item === 'logs') return { how: 'chop', target: 'logs' }
+  if (/_log$/.test(item)) return { how: 'chop', block: item, target: item }
   const crop = Object.values(CROP_BLOCKS).find(c => c.item === item)
   if (crop) return { how: 'harvest', block: crop.block, target: crop.item }
   if (item === 'wheat_seeds') return { how: 'harvest', block: 'wheat', target: 'wheat' }
@@ -418,6 +421,13 @@ export const SMELTS: Record<string, string> = {
   iron_ingot: 'raw_iron', gold_ingot: 'raw_gold', copper_ingot: 'raw_copper', glass: 'sand', stone: 'cobblestone',
   charcoal: 'log', cooked_beef: 'beef', cooked_porkchop: 'porkchop', cooked_chicken: 'chicken', cooked_mutton: 'mutton',
   baked_potato: 'potato', smooth_stone: 'stone', brick: 'clay_ball'
+}
+
+/** The one-level ingredient bring_item fetches before crafting an item, if it has one. */
+export function ingredientFor (item: string): { item: string, per: number, makes: number } | null {
+  const wood = WOODS.find(w => item === `${w}_planks`)
+  if (wood) return { item: `${wood}_log`, per: 1, makes: 4 }
+  return SIMPLE_INGREDIENTS[item] ?? null
 }
 
 export interface BringState {
