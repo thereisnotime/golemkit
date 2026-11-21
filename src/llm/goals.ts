@@ -211,9 +211,20 @@ export class GoalStore {
     return g.failures[sig]
   }
 
-  /** Owner silent for ownerWaitMin while we wait for them: go on by ourselves (max 3 times). Returns true if resumed. */
+  /** Tells whether a player is on the server (set by the runtime). Unknown = assume online. */
+  isOnline: (name: string) => boolean = () => true
+
+  /** Owner offline, or silent for ownerWaitMin while we wait for them: go on by ourselves. Returns true if resumed. */
   resumeIfOwnerSilent (): boolean {
     const g = this.active
+    if (g?.paused === 'waiting for the owner' && g.owner && !this.isOnline(g.owner)) {
+      delete g.paused
+      delete g.pausedAt
+      g.notes.push(`${g.owner} is offline: don't ask them or wait for them; decide yourself`)
+      g.notes = g.notes.slice(-12)
+      this.save(g)
+      return true
+    }
     const mins = this.opts.ownerWaitMin
     if (!g || g.paused !== 'waiting for the owner' || !mins) return false
     if ((g.selfResumes ?? 0) >= 3 || this.now() - (g.pausedAt ?? g.updatedAt) < mins * 60_000) return false
@@ -247,6 +258,7 @@ export class GoalStore {
     if (g.notes.length) lines.push(`Notes: ${g.notes.join(' | ')}`)
     const mins = Math.round((this.now() - g.createdAt) / 60_000)
     lines.push(`Started ${mins} min ago, ${g.autoTurns}/${this.opts.maxTurns} turns on your own since ${g.owner ?? 'the owner'} last spoke.${g.paused ? ` Paused: ${g.paused}.` : ''}`)
+    if (g.owner && !this.isOnline(g.owner)) lines.push(`${g.owner} is NOT on the server right now: don't address them, ask them anything or wait for them. Work on your own; tell them what happened when they're back.`)
     return lines.join('\n')
   }
 

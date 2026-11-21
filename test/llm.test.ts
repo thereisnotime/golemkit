@@ -711,3 +711,15 @@ test('goal goes on alone when the owner stays silent', async () => {
   g.touchOwner(); g.update({ wait: true }); now += 16 * 60_000
   assert.equal(g.resumeIfOwnerSilent(), true, 'owner talking resets the count')
 })
+
+test('goal does not wait for an owner who is offline', async () => {
+  const { GoalStore } = await import('../src/llm/goals.ts')
+  const mem: Record<string, unknown> = {}
+  const st = { get: (k: string) => mem[k], set: (k: string, v: unknown) => { mem[k] = v }, delete: (k: string) => { delete mem[k] } } as any
+  const g = new GoalStore(st, {}, () => 1_000_000)
+  g.isOnline = () => false
+  g.set('build', ['a'], 'robin')
+  g.update({ wait: true })
+  assert.equal(g.resumeIfOwnerSilent(), true)
+  assert.match(g.fmtPrompt()!, /NOT on the server/)
+})
