@@ -14,9 +14,9 @@ meta: { tags: [defence, fort, walls, stone], style: medieval, author: mc-buddy, 
 roles:
   stone: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_stone_bricks|andesite|polished_andesite)$" }
   foundation: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_stone_bricks|andesite|polished_andesite)$" }
-  floor: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_stone_bricks|andesite|polished_andesite|[a-z_]+_planks)$" }
+  floor: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_stone_bricks|andesite|polished_andesite|smooth_stone)$" }
   wall: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_stone_bricks|[a-z_]+_planks)$", material: true }
-  walk: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_stone_bricks|[a-z_]+_planks|[a-z_]+_slab)$" }
+  walk: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_stone_bricks|smooth_stone)$" }
   ladder: { default: ladder, kind: attachment }
   door: { default: oak_door, accept: "_door$", kind: door, wood: true }
   light: { default: torch, accept: "^(wall_)?torch$|^lantern$", kind: attachment, optional: true }
