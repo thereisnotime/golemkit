@@ -39,12 +39,28 @@ export async function fight (bot: Bot, target: Entity, signal: AbortSignal, maxM
     while ((target as any).isValid !== false && Date.now() - start < maxMs) {
       checkAborted(signal)
       const dist = bot.entity.position.distanceTo(target.position)
+      // A creeper whose fuse is lit (it swells, ~1.5 s): get away now, finish it after the fizzle.
+      if (target.name === 'creeper' && creeperFuseLit(target) && dist < 5) {
+        bot.pathfinder.setGoal(new goals.GoalInvert(new goals.GoalFollow(target, 7)), true)
+        await sleep(1500, signal)
+        bot.pathfinder.setGoal(new goals.GoalFollow(target, 2), true)
+        continue
+      }
       if (dist > (flying ? 40 : 24)) return false
       if (flying) await bot.lookAt(target.position.offset(0, target.height * 0.5, 0), true).catch(() => {})
       if (dist <= REACH + (flying ? 0.5 : 0)) {
         await equipForTarget(bot, target, flags) // health changes: re-pick (finisher, shield...)
         if (!flying) await bot.lookAt(target.position.offset(0, target.height * 0.8, 0), true)
         bot.attack(target)
+        if (target.name === 'creeper') {
+          // Hit and step back: the knockback plus distance keeps us out of the blast; never stand next to it.
+          bot.pathfinder.setGoal(null)
+          bot.setControlState('back', true)
+          bot.setControlState('sprint', true)
+          await sleep(700, signal).finally(() => { bot.setControlState('back', false); bot.setControlState('sprint', false) })
+          bot.pathfinder.setGoal(new goals.GoalFollow(target, 2), true)
+          continue
+        }
         await sleep(600, signal) // full sword cooldown
       } else if (flags.ranged && hasRanged(bot) && (flying || dist > 6) && dist < 32) {
         await shootAt(bot, target, signal) // flyers and targets out of reach: shoot
@@ -58,6 +74,12 @@ export async function fight (bot: Bot, target: Entity, signal: AbortSignal, maxM
   } finally {
     bot.pathfinder.setGoal(null)
   }
+}
+
+/** Creeper fuse state: metadata "swell direction" is 1 while it is about to explode. */
+function creeperFuseLit (e: Entity): boolean {
+  const md = (e as any).metadata as unknown[] | undefined
+  return !!md && (md[16] === 1 || md[18] === true) // 1.21 creeper: 16 = state (-1 idle, 1 fusing), 17 = charged, 18 = ignited (flint and steel)
 }
 
 const attack = defineAction({
