@@ -137,7 +137,10 @@ export class LlmRuntime {
     this.prices = new PriceTable(opts.prices)
     this.budget = new Budget(opts.limits, { today: () => this.usage.today })
     this.goals = new GoalStore(agent.storage, opts.goals)
-    this.goals.isOnline = name => { const ps = (agent as any).bot?.players; return !ps || name in ps }
+    // Unknown while disconnected (agent.bot throws then): assume online so nothing auto-resumes.
+    this.goals.isOnline = name => {
+      try { const ps = (agent as any).bot?.players; return !ps || name in ps } catch { return true }
+    }
     registerGoalTools(this.tools, this.goals, what => this.log.info(`goal ${what}`, { goal: this.goals.active?.text }))
     const l = opts.limits ?? {}
     this.limits = {
