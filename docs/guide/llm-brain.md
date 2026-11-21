@@ -204,6 +204,15 @@ llmBrain({
 })
 ```
 
+Listen modes (`listen: mention | conversation | all`): `conversation` answers mentions and,
+for `conversationMs` after an exchange, follow-ups without the name. **When the only other
+player online is an owner**, everything they say in public chat counts as addressed (in
+`conversation` and `all`), so "where are you?" works without the name. An owner talking also
+outranks the bot's behaviours (see [goals and behaviours](./goals-and-building#goals-and-behaviours)).
+
+The bot sees itself in `observe()` (`selfAware`, on by default): [variant](/concepts/variants-profiles), profile, brains,
+owners, LLM provider, model and modes, the key settings, and which were changed in game.
+
 Lines starting with the command prefix (`!`) are left to the command brain. One turn runs at a
 time per bot; up to 3 triggers queue, chat ahead of ticks and events, and several messages
 from the same player while a turn runs are merged into one.

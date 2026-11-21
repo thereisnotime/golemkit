@@ -84,8 +84,34 @@ While a goal is active the runtime starts **goal turns** by itself (trigger kind
 A turn "made progress" when it ran an action that succeeded or updated the plan; looking
 around and chatting don't count. While a goal is active the plain `actionDone` report is
 replaced by the goal turn, so a finished action costs one turn, not two. Nothing starts while
-a turn runs, while any action holds the body (yours, a player's `!command`, a reflex), or
-while the bot is disconnected.
+a turn runs, while its own action, a player's `!command` or a reflex holds the body, or while
+the bot is disconnected.
+
+### Goals and behaviours
+
+[Armed behaviours](/guide/behaviors) (hunting, scouting, tools, farm) keep a bot busy most of the time, so a goal
+that waited for a fully idle body would never get a turn. The rule:
+
+| situation | who wins |
+|---|---|
+| not in danger | the owner's goal: goal turns run while a behaviour holds the body, and goal actions run above behaviours (priority 40 vs 35) |
+| in danger: health or food 6 or less, night or thunder, a hostile within 12 blocks | behaviours (eat, go home, stay safe) and [reflexes](/concepts/world#reflexes); the goal waits |
+| the owner is talking right now | the owner's request, always (above behaviours, below reflexes and `!commands`) |
+
+### Owner away, things that keep failing
+
+- **The owner is offline.** The goal block in the prompt says so: the model doesn't address
+  them or wait for them. A wait for an offline owner resumes after a minute (at most 3 times
+  until they're back).
+- **No answer.** After `update_goal wait_for_owner=true`, the goal goes on alone after
+  `llm.goals.ownerWaitMin` minutes (default 15, 0 = wait forever), at most 3 times per owner reply.
+- **The same failure 3 times** (e.g. `hunt` with no animals around) puts **that action on hold
+  for 10 minutes** (calls are refused with the reason) and the goal carries on with other steps;
+  it doesn't stop the whole goal any more.
+- **Only the owner can cancel** a goal they gave: `abandon_goal` works only in a turn where the
+  owner is talking. Dying, failures or the owner being away aren't reasons to drop it.
+- **What it already did:** the last finished goals (2 days) and saved places with coordinates are
+  in every prompt, so "did you build the fortress?" gets a true answer.
 
 ### Guardrails
 
@@ -99,7 +125,7 @@ while the bot is disconnected.
 | `idleBaseMs` / `idleMaxMs` | 20000 / 300000 | idle backoff |
 | `enabled` | true | false: goals are kept and shown, but no follow-up turns |
 
-When a limit trips, the goal is **paused** and one `stop` turn runs: the model tells the owner
+When a limit trips (turns, time; repeated failures put the action on hold instead, see above), the goal is **paused** and one `stop` turn runs: the model tells the owner
 where things stand and asks whether to go on. When the owner talks to the bot again, the turn
 counter, the deadline and the failure counts start over and the pause is lifted. The model can
 also pause itself with `update_goal wait_for_owner=true` after asking something.

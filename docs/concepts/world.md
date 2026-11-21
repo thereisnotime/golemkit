@@ -154,6 +154,23 @@ pathing to buried blocks (never straight down, never next to lava or water), and
 climbed so no logs stay up there. The upgrade path, the safety checks and how speed is measured
 are in [Tool progression and gathering](../guide/progression).
 
+## Whose blocks
+
+By default bots may dig and use **any** block they need (`respectBuilds` off). With
+`respectBuilds: true` (profile key, or `!config_set respectBuilds on`) `build` refuses footprints
+with blocks that look player-made, unless they're the bot's own work (remembered in `build.own`)
+or an owner passes `replace=true`. Spawn protection applies either way: the server enforces it.
+
+Other places still prefer natural sources whatever the setting: woodcutting fells real trees,
+strip mining digs natural stone, farm sites avoid builds.
+
+## Falling and drops
+
+The pathfinder never plans drops over 4 blocks, also not into water (mineflayer allows any
+height into water by default; off here). Scouting legs aim at the open-sky ground and climb out
+with `climb_out` when a leg ends up in a cave or ravine. Death whispers say how many items
+dropped (or that there were none); `goto_death` refuses traps where it died twice in 10 minutes.
+
 ## Game modes
 
 Bots know their game mode (`gameMode` and a short `gameModeNote` in `observe()`) and notice
