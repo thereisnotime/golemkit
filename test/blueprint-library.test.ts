@@ -152,6 +152,10 @@ test('import: Sponge v2/v3, Litematica and structure .nbt all give the same blue
     assert.equal(bp.roles[door[0]!.role]!.kind, 'door')
     assert.ok(door.some(c => c.passive), 'upper half is passive')
     assert.equal(bp.roles['block:create:shaft']!.default, 'create:shaft', 'modded blocks keep their namespace')
+    assert.equal(door[0]!.role, 'wood_door', 'wooden blocks get a role that takes any wood')
+    assert.ok(new RegExp(bp.roles.wood_door!.accept!).test('spruce_door') && bp.roles.wood_door!.wood)
+    const exact = parseBlueprint(importStructure(s, { name: 'sample', maxBlocks: 4000, anyWood: false }).yaml)
+    assert.ok(exact.roles['block:oak_door'] && !exact.roles.wood_door, 'anyWood=false keeps every block exact')
     assert.deepEqual(unplaceableCells(bp).map(c => c.role), [], 'converted blueprint is placeable in order')
   }
   assert.equal(new Set(outs).size, 1, 'every format converts to the same YAML')

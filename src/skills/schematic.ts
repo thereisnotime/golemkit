@@ -6,6 +6,7 @@
 //   const s = await readSchematic(buffer)            // -> Structure (palette + dense grid)
 //   const { yaml, warnings } = structureToYaml(s, { name: 'tower' })
 import { createRequire } from 'node:module'
+import { gunzipSync } from 'node:zlib'
 import YAML from 'yaml'
 import nbt from 'prismarine-nbt'
 import { validStateValue, facingToward, kindForBlock, itemForBlock, parseBlueprint, type BlockState, type Facing } from './blueprint.ts'
@@ -69,10 +70,16 @@ export function parseBlockString (text: string): PaletteEntry {
 
 /** Largest box any reader will expand (air included), so a huge file can't eat the memory. */
 export const MAX_VOLUME = 4_000_000
+/** Largest unzipped NBT read. */
+const MAX_UNZIPPED = 64 * 1024 * 1024
 
 /** Reads a .schem, .litematic or structure .nbt (gzipped or not) into a Structure. Throws a readable Error. */
 export async function readSchematic (buf: Buffer): Promise<Structure> {
   let root: any
+  if (buf[0] === 0x1f && buf[1] === 0x8b) {
+    // unzip here, with a cap, so a small file can't inflate into gigabytes
+    try { buf = gunzipSync(buf, { maxOutputLength: MAX_UNZIPPED }) } catch (e) { throw new Error(`can't unzip it (${(e as Error).message.slice(0, 80)})`) }
+  }
   try {
     const { parsed } = await nbt.parse(buf, 'big')
     root = nbt.simplify(parsed)
@@ -330,6 +337,10 @@ function pickGlyphs (entries: PaletteEntry[]): string[] {
   })
 }
 
+const WOOD_NAMES = 'oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak'
+/** Overworld wooden building blocks: wood and kind. */
+const WOODEN = new RegExp(`^(${WOOD_NAMES})_(planks|stairs|slab|log|wood|fence|fence_gate|door|trapdoor|pressure_plate|button)$`)
+
 export interface ToBlueprintOptions {
   name: string
   description?: string
@@ -338,6 +349,11 @@ export interface ToBlueprintOptions {
   /** Keep air cells as "must be clear" (.); false leaves them as don't care. Default true. */
   air?: boolean
   meta?: Record<string, unknown>
+  /**
+   * Wooden blocks accept any wood and follow the build's wood theme (default true), when the
+   * structure uses one wood per kind of block; false keeps every block exact.
+   */
+  anyWood?: boolean
   /** Known block names (vanilla registry); unknown ones are kept with a warning. Default: minecraft-data 1.21.1. */
   knownBlock?: (name: string) => boolean
 }
@@ -453,8 +469,32 @@ export function structureToYaml (input: Structure, opts: ToBlueprintOptions): Bl
   // short lists and the materials map on one line each
   const doc = new YAML.Document(head)
   YAML.visit(doc, { Seq (_, n) { n.flow = true }, Map (_, n, path) { if (path.length > 3) n.flow = true } })
-  const lines = [doc.toString({ lineWidth: 0 }).trimEnd(), 'roles: {}', 'palette:']
-  entries.forEach((e, i) => lines.push(`  ${JSON.stringify(glyphs[i])}: ${JSON.stringify(e.state ? { block: e.name, state: e.state } : { block: e.name })}`))
+  // spruce stairs from a capture should be fine as oak stairs in survival: one role per kind of
+  // wooden block, unless the build mixes woods for that kind on purpose
+  const woodRole = new Map<string, string>()
+  if (opts.anyWood !== false) {
+    const bySuffix = new Map<string, Set<string>>()
+    for (const e of entries) {
+      const m = WOODEN.exec(e.name)
+      if (m) bySuffix.set(m[2]!, (bySuffix.get(m[2]!) ?? new Set()).add(m[1]!))
+    }
+    for (const e of entries) {
+      const m = WOODEN.exec(e.name)
+      if (m && bySuffix.get(m[2]!)!.size === 1) woodRole.set(e.name, m[2]!)
+    }
+  }
+  const roles = [...new Set(woodRole.values())].map(suffix => {
+    const item = itemForBlock(entries.find(e => woodRole.get(e.name) === suffix)!.name)
+    const isLog = /^(log|wood)$/.test(suffix)
+    const kind = kindForBlock(item)
+    return `  wood_${suffix}: { default: ${item}, accept: "^(${WOOD_NAMES})_${isLog ? '(log|wood)' : suffix}$", wood: true${kind === 'block' ? '' : `, kind: ${kind}`} }`
+  })
+  const lines = [doc.toString({ lineWidth: 0 }).trimEnd(), roles.length ? 'roles:' : 'roles: {}', ...roles, 'palette:']
+  entries.forEach((e, i) => {
+    const r = woodRole.get(e.name)
+    const v = r ? (e.state ? { role: `wood_${r}`, state: e.state } : { role: `wood_${r}` }) : (e.state ? { block: e.name, state: e.state } : { block: e.name })
+    lines.push(`  ${JSON.stringify(glyphs[i])}: ${JSON.stringify(v)}`)
+  })
   if (keepAir && s.grid.some(i => i >= 0 && cls[i] === 'air')) lines.push('  ".": air')
   lines.push('layers:')
   layers.forEach((rows, y) => {

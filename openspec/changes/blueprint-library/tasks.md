@@ -1,0 +1,10 @@
+- [x] Library folders, cached index, search, policy, design checks and safe file handling (`blueprint-library.ts`)
+- [x] Schematic readers (Sponge v1-v3, Litematica, structure .nbt), converter, crop/limit, capture conversion (`schematic.ts`)
+- [x] Plain blocks get a kind and the item that places them (`blueprint.ts`); meta fields typed
+- [x] Actions: blueprint_list, blueprint_search, blueprint_show, blueprint_pick, blueprint_import, blueprint_capture, blueprint_design, blueprint_rename, blueprint_delete (`library.ts`)
+- [x] build/build_plan load every library; skill added to extendedSkills
+- [x] `building` toggle and profile keys `building` / `blueprints`; Pax on library; prompt and build-house skill
+- [x] CLI `scripts/blueprint-import.ts` and `just blueprint-import`; sample `blueprints/import/well.schem`
+- [x] Unit tests: three formats, limit/crop, capture, design checks, search ranking, policy, path safety, learned library, actions
+- [x] Live test on mc02 (`scripts/library-test.ts`)
+- [x] Docs: `docs/guide/blueprints.md`, sidebar, interlinks, action reference, vitepress build

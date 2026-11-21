@@ -134,6 +134,7 @@ const blueprintImport = defineAction({
     crop: z.string().optional().describe('keep only "x1 y1 z1 x2 y2 z2" (the file\'s own coordinates)'),
     max_blocks: z.number().int().min(1).optional().describe('block limit for this import (default settings.build.importMaxBlocks, 4000)'),
     air: z.boolean().default(true).describe('false: empty space in the file is "don\'t care" instead of "must be clear"'),
+    exact: z.boolean().default(false).describe('keep the exact wood of wooden blocks (default: any wood, following the build theme)'),
     facing: facingSchema.optional().describe('the side its entrance is on as drawn; default the side of the first door'),
     tags: tagsSchema,
     description: z.string().optional(),
@@ -150,7 +151,9 @@ const blueprintImport = defineAction({
       const there = existsSync(root) ? readdirSync(root).filter(f => /\.(schem|schematic|litematic|nbt)$/i.test(f)) : []
       return fail(`no ${p.file} in the import folder${there.length ? `; there: ${there.join(', ')}` : ' (it is empty)'}`)
     }
-    if (!lstatSync(path).isFile()) return fail(`${p.file} is not a regular file`)
+    const st = lstatSync(path)
+    if (!st.isFile()) return fail(`${p.file} is not a regular file`)
+    if (st.size > 16 * 1024 * 1024) return fail(`${p.file} is ${Math.round(st.size / 1048576)} MB; schematics over 16 MB aren't read`)
     const name = (p.name ?? p.file.replace(/\.[^.]+$/, '')).toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48)
     const bad = checkName(name)
     if (bad) return fail(bad)
@@ -166,7 +169,7 @@ const blueprintImport = defineAction({
       const names = [...new Set(s.palette.map(e => e.name.replace(/^minecraft:/, '')))]
       const tags = tagList(p.tags) ?? guessTags(`${name} ${p.description ?? ''}`, names)
       const out = importStructure(s, {
-        name, description: p.description, facing: p.facing, air: p.air, maxBlocks: max, ...(crop ? { crop } : {}),
+        name, description: p.description, facing: p.facing, air: p.air, anyWood: !p.exact, maxBlocks: max, ...(crop ? { crop } : {}),
         meta: { tags, author: author(ctx), source: `imported from ${p.file} (${s.format})`, created: today() }
       })
       const saved = writeLearned(learnedDir(ctx.agent), name, out.yaml, p.overwrite)
@@ -196,6 +199,7 @@ const blueprintCapture = defineAction({
     size: z.number().int().min(1).optional().describe('footprint side around the centre (default 11)'),
     height: z.number().int().min(1).optional().describe('height from the floor up around the centre (default 10)'),
     all: z.boolean().default(false).describe('keep natural blocks (ground, plants, leaves) too'),
+    exact: z.boolean().default(false).describe('keep the exact wood of wooden blocks (default: any wood, following the build theme)'),
     facing: facingSchema.optional().describe('the side its entrance is on; default the side of the first door'),
     description: z.string().optional(),
     tags: tagsSchema,
@@ -241,7 +245,7 @@ const blueprintCapture = defineAction({
       if (n > lim.captureMaxBlocks) return fail(`${n} blocks, over the limit of ${lim.captureMaxBlocks}; capture a smaller region`)
       const names = [...new Set(s.palette.map(e => e.name))]
       const out = structureToYaml(s, {
-        name: p.name, description: p.description ?? `${p.name.replace(/_/g, ' ')}, captured at ${fmtPos(min)}`, facing: p.facing,
+        name: p.name, description: p.description ?? `${p.name.replace(/_/g, ' ')}, captured at ${fmtPos(min)}`, facing: p.facing, anyWood: !p.exact,
         meta: { tags: tagList(p.tags) ?? guessTags(`${p.name} ${p.description ?? ''}`, names), author: author(ctx), source: `captured at ${fmtPos(min)} to ${fmtPos(max)}`, created: today() }
       })
       parseBlueprint(out.yaml, p.name)

@@ -94,6 +94,10 @@ Gzipped or not, all three come out the same:
   with a mnemonic character where one is free. Only states the builder can place or check are
   kept (facing, half, slab type, axis, hinge, open, hanging, part, stair shape...); waterlogged,
   fence sides, chest type and rail shape follow from the neighbours anyway.
+- Wooden blocks (planks, stairs, slabs, logs, fences, doors, trapdoors...) get one role per kind
+  that takes any overworld wood and follows the build's wood theme, so a captured spruce hut can
+  be rebuilt in oak by a survival bot that only finds oak. A structure that mixes woods for the
+  same kind keeps them exact, and `exact=true` (`--exact`) keeps every block as it is.
 - A plain block knows when it goes in (doors last, torches and ladders after the walls, beds and
   chests with the furniture) and which item places it (a wall torch comes from a torch).
 - Air stays "must be clear" (`.`); `air=false` (`--no-air`) makes it "don't care". The empty margin
@@ -224,8 +228,9 @@ node scripts/library-test.ts clean
 
 ## Limitations
 
-- Captured and imported blueprints name exact blocks, so a survival bot needs those very items;
-  `gather_materials` knows wood, stone, glass and the common crafted pieces, not every block.
+- Apart from wood, captured and imported blueprints name exact blocks, so a survival bot needs
+  those very items; `gather_materials` knows wood, stone, glass and the common crafted pieces, not
+  every block (it can't make a cobblestone wall, for one).
 - `rotation=0..15` (signs, banners, skulls) isn't turned when a blueprint is rotated.
 - Imports keep blocks, not block entities: chests come empty, signs blank.
 - A design is checked for placeability and support, not for looks; the preview is there for the

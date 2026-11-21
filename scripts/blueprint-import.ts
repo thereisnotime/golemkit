@@ -1,6 +1,6 @@
 // Converts a schematic (Sponge .schem, Litematica .litematic, structure .nbt) into a blueprint.
 //   node scripts/blueprint-import.ts <file> [--name tower] [--crop "x1 y1 z1 x2 y2 z2"] [--max-blocks 4000]
-//        [--no-air] [--facing south] [--tags house,stone] [--out <dir> | --bot <username>] [--force]
+//        [--no-air] [--exact] [--facing south] [--tags house,stone] [--out <dir> | --bot <username>] [--force]
 // Without --out or --bot it prints the YAML and a preview. --bot writes into that bot's learned
 // library (data/bots/<username>/blueprints/), --out into any folder (e.g. one listed in
 // settings.build.blueprintDirs).
@@ -18,6 +18,7 @@ const { values, positionals } = parseArgs({
     crop: { type: 'string' },
     'max-blocks': { type: 'string', default: '4000' },
     'no-air': { type: 'boolean', default: false },
+    exact: { type: 'boolean', default: false },
     facing: { type: 'string' },
     tags: { type: 'string' },
     description: { type: 'string' },
@@ -40,7 +41,7 @@ try {
   const names = [...new Set(s.palette.map(e => e.name.replace(/^minecraft:/, '')))]
   const tags = values.tags ? values.tags.split(',').map(t => t.trim()).filter(Boolean) : guessTags(`${name} ${values.description ?? ''}`, names)
   const out = importStructure(s, {
-    name, description: values.description, facing: values.facing as Facing | undefined, air: !values['no-air'], maxBlocks: Number(values['max-blocks']), ...(crop ? { crop } : {}),
+    name, description: values.description, facing: values.facing as Facing | undefined, air: !values['no-air'], anyWood: !values.exact, maxBlocks: Number(values['max-blocks']), ...(crop ? { crop } : {}),
     meta: { tags, author: process.env.USER ?? 'cli', source: `imported from ${basename(file)} (${s.format})`, created: today() }
   })
   const bp = parseBlueprint(out.yaml, name)
