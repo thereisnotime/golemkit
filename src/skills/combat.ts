@@ -85,6 +85,8 @@ export function threats (bot: Bot, radius = 24): Entity[] {
     const d = e.position.distanceTo(me)
     if (d > radius) continue
     if (combatRefusal(bot, e)) continue
+    const hp = ((e as any).metadata as unknown[] | undefined)?.[9]
+    if (typeof hp === 'number' && hp <= 0) continue // dying (the body stays ~1 s)
     const ground = !FLYING.has(e.name ?? '') && !isRangedMob(e.name)
     if (ground && d > 8 && !recentAttacker(bot, e.id)) continue // melee mobs far away aren't a fight yet
     if (FLYING.has(e.name ?? '') && d > 20) continue
@@ -212,6 +214,8 @@ const defend = defineAction({
     const killed: string[] = []
     const notes: string[] = []
     let heals = 0
+    let hits = 0
+    let crits = 0
     const until = Date.now() + 60_000
     while (Date.now() < until) {
       checkAborted(signal)
@@ -220,6 +224,8 @@ const defend = defineAction({
       const drift = bot.entity.position.distanceTo(origin)
       const long = FLYING.has(mob.name ?? '') || isRangedMob(mob.name)
       const r: FightResult = await fightTarget(bot, mob, signal, { maxMs: long ? 25000 : 12000, flags: { ...flags, maxChase: Math.max(3, maxChase - drift) } })
+      hits += r.hits
+      crits += r.crits
       if (bot.health <= 0) return fail(`died fighting ${mob.name}`)
       if (r.killed) { killed.push(mob.name ?? 'mob'); continue }
       if (r.end === 'heal' && heals < 3) {
@@ -245,7 +251,7 @@ const defend = defineAction({
     }
     if (!killed.length && !notes.length) return fail('nothing to fight')
     const k = killed.length ? `killed ${[...new Set(killed)].map(n => `${killed.filter(x => x === n).length} ${n}`).join(', ')}` : 'killed nothing'
-    return ok([k, ...notes].join('; '))
+    return ok([k + (hits ? ` (${hits} hits, ${crits} crits)` : ''), ...notes].join('; '))
   }
 })
 

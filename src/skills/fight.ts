@@ -171,6 +171,10 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
   let hazardSince = 0
   let lastEat = 0
   let shieldUp = false
+  // a death animation (entity_status 3) for the target: removed without one = exploded or despawned
+  let died = false
+  const onDead = (e: Entity) => { if (e.id === target.id) died = true }
+  bot.on('entityDead', onDead)
 
   const usePath = () => {
     if (mode === 'path') return
@@ -206,8 +210,8 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
   try {
     while (true) {
       checkAborted(signal)
-      // removed: died if it was close, else it left our view distance
-      if ((target as any).isValid === false) return finish(lastDist < 16 ? 'killed' : 'escaped')
+      if (died) return finish('killed') // death animation started: next target, don't wait for the body to go
+      if ((target as any).isValid === false) return finish('escaped', lastDist < 16 ? 'gone (exploded or despawned)' : 'out of sight')
       if (Date.now() - start > maxMs) return finish('timeout')
       if (bot.health <= 0) return finish('gave_up', 'died')
       const me = bot.entity.position
@@ -405,6 +409,7 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
       await sleep(50, signal)
     }
   } finally {
+    bot.off('entityDead', onDead)
     lowerShield()
     clearMoves(bot)
     bot.pathfinder.setGoal(null)
