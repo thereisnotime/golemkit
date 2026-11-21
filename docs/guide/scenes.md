@@ -44,6 +44,29 @@ over the scene, and goes back to its routine once the scene ends. Actors don't n
 brain, but it combines well: villagers living their lives who drop everything when the market
 scene starts.
 
+```mermaid
+sequenceDiagram
+  autonumber
+  participant O as Owner
+  participant D as Director (lowest name)
+  participant H as Hauler
+  participant F as Foreman
+  participant P as Passing player
+  O->>D: !scene_start broken_cart
+  D->>D: cast roles from free actors
+  D->>H: scene:do goto mark "cart"
+  D->>F: scene:do goto mark "office"
+  H-->>D: scene:done
+  D->>H: say "the wheel's gone again!"
+  Note over D: chat pacer ≥1.6 s between lines
+  D->>F: say "you broke it, you fix it"
+  P->>H: walks within 8 blocks
+  D->>D: pause timeline (approach hook)
+  D->>H: say "hey, got a spare plank?"
+  D->>D: resume
+  D-->>O: scene finished, cast released
+```
+
 ## Writing your first scene
 
 Create `scenes/hello.yaml`:

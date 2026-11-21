@@ -30,6 +30,29 @@ owner: "Apprentice, learn: when someone says hello, jump and greet them"
                  programs/v001.json  -->  interpreter + NPC controller (no LLM)
 ```
 
+```mermaid
+flowchart LR
+  OWN["owner: 'learn: greet people<br/>who say hello'"] --> INT{"owner?"}
+  INT -- no --> IGN(["ignored"])
+  INT -- yes --> LLM["one LLM call<br/>spec + program + instruction"]
+  LLM --> SUB["submit_program<br/>(full or patch)"]
+  SUB --> GATE{"gate: zod, catalog,<br/>deny list, limits,<br/>dry run x8 worlds"}
+  GATE -- errors --> LLM
+  GATE -- ok --> VER[("vNNN.json<br/>history + rollback")]
+  VER --> RUN["interpreter runs the program<br/>NPC controller, no LLM"]
+  RUN --> RUN
+  classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef l fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+  classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
+  classDef r fill:#f1f5f9,stroke:#94a3b8,color:#334155
+  class OWN a
+  class LLM,SUB l
+  class INT,GATE d
+  class VER,RUN g
+  class IGN r
+```
+
 ## Safety model
 
 Chat on a server is untrusted input, and an LLM that reads it can be talked into things. So

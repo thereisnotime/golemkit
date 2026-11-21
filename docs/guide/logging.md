@@ -4,6 +4,25 @@ Every bot, brain, skill and the fleet log through one system. You can tune what 
 bot and per subsystem, write files per bot, switch to JSON for tooling, and subscribe to the
 log stream from code.
 
+```mermaid
+flowchart LR
+  SRC["log.info(msg, fields)<br/>McBuddy/action/goto"] --> LVL{"level rule<br/>most specific match"}
+  LVL -- below --> DROP(["dropped"])
+  LVL -- passes --> RED["redact secrets"]
+  RED --> BUF[("ring buffer<br/>recentLogs()")]
+  RED --> SUB["subscribers<br/>(UI, streams)"]
+  RED --> CON["console<br/>pretty / plain / json"]
+  RED --> FILE["files<br/>combined + per bot<br/>rotation"]
+  classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
+  classDef r fill:#f1f5f9,stroke:#94a3b8,color:#334155
+  class SRC,RED a
+  class LVL d
+  class BUF,SUB,CON,FILE g
+  class DROP r
+```
+
 ## Logger names
 
 Loggers are hierarchical, `<username>/<component>/...`:

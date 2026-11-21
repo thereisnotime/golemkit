@@ -47,6 +47,44 @@ chat / events / timer ──► LlmRuntime ──► provider.run(turn) ──�
 - Chat only goes through `agent.say/whisper` (rate limited, max 3 messages and 400 chars per
   turn). If the model sends no chat but returns text, that text is the reply.
 
+```mermaid
+flowchart LR
+  subgraph trig["Triggers"]
+    T1["chat / whisper<br/>(listen mode)"]
+    T2["events: death,<br/>joins, action done"]
+    T3["timer tick"]
+  end
+  Q["queue<br/>one turn at a time"]
+  BUD{"budget<br/>ok?"}
+  PR["prompt: rules, persona,<br/>observation, memory"]
+  subgraph prov["Provider"]
+    direction TB
+    API["anthropic / openai<br/>in-process tool loop"]
+    CLI["claude / codex / opencode<br/>isolated login, sandboxed"]
+  end
+  PX(["proxy: caveman /<br/>gateway (optional)"])
+  MCP["MCP bridge<br/>127.0.0.1, token"]
+  TOOLS["tools = actions<br/>observe, remember,<br/>say, whisper"]
+  ACT["agent.act<br/>priority llm (30)"]
+  U[("usage + budget<br/>tokens, cost")]
+  trig --> Q --> BUD -- yes --> PR --> prov
+  API --> TOOLS
+  CLI --> MCP --> TOOLS --> ACT
+  prov -.-> PX
+  prov --> U
+  BUD -- no --> X["pause, say once"]
+  classDef t fill:#f1f5f9,stroke:#475569,color:#0f172a
+  classDef p fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+  classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef w fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef r fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+  class T1,T2,T3,Q t
+  class API,CLI,PR p
+  class MCP,TOOLS,ACT a
+  class PX,U w
+  class X r
+```
+
 ## Providers
 
 | Provider | Auth | How tools reach the model | Sandboxing | Status |

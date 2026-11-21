@@ -7,6 +7,31 @@ in `src/core/neoforge/`. Skills and brains never see it.
 Everything here is written against NeoForge's 1.21.1 source
 (`neoforged/NeoForge`, branch `1.21.1`, `network/payload/` and `network/registration/`).
 
+```mermaid
+sequenceDiagram
+  autonumber
+  participant B as Bot (mc-buddy)
+  participant S as NeoForge server
+  Note over B: first ever connection, no cache
+  B->>S: login (offline / microsoft)
+  S->>B: neoforge:register (empty query)
+  B->>S: channel list (empty)
+  S-->>B: setup_failed: 210 channels missing
+  Note over B: learn names, save data/channels-*.json
+  B->>S: reconnect, offer 210 channels
+  S-->>B: setup_failed: flow mismatch on some
+  B->>S: reconnect, fixed flows
+  S-->>B: setup_failed: version mismatch on some
+  B->>S: reconnect, fixed versions
+  S->>B: neoforge:network (accepted)
+  S->>B: frozen registries (items, entities, blocks)
+  B->>S: registry sync completed, enum/flag acks
+  S->>B: tags, finish_configuration
+  Note over B,S: play: tolerant parser drops packets with modded item data
+```
+
+Later logins start from the cache and are accepted on the first try.
+
 ## 1. Channel negotiation
 
 During the configuration phase the server sends an empty `neoforge:register` query and the
