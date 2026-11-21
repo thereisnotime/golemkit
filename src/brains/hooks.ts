@@ -88,7 +88,10 @@ export const hooksBrain = (opts: HooksBrainOptions = {}) => {
       let lastHurt = 0
       const hurtMs = opts.hurtDebounceMs ?? 3000
 
-      const onHealth = () => run(engine.health(bot.health))
+      // The first health readings after login/respawn aren't news (we may log in hurt): skip 5 s.
+      let healthQuietUntil = Date.now() + 5000
+      bot.on('spawn', () => { healthQuietUntil = Date.now() + 5000 })
+      const onHealth = () => { if (Date.now() >= healthQuietUntil) run(engine.health(bot.health)) }
       const onHurt = (entity: any) => {
         if (entity !== bot.entity || Date.now() - lastHurt < hurtMs) return
         lastHurt = Date.now()
