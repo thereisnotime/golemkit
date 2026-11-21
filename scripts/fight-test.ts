@@ -82,7 +82,16 @@ async function main (): Promise<void> {
       if (measuring && t && Date.now() - t < 4000 && e !== b.entity) { stats.kills++; stats.killed[e.name] = (stats.killed[e.name] ?? 0) + 1; log(`KILL ${e.name}`) }
     })
     let last = b.health
-    b.on('health', () => { if (measuring && b.health < last) stats.damage += last - b.health; last = b.health })
+    b.on('health', () => {
+      if (b.health < last) {
+        if (measuring) stats.damage += last - b.health
+        const near = Object.values(b.entities).filter((e: any) => e !== b.entity && e.position && e.type !== 'object' && e.type !== 'orb' && e.position.distanceTo(b.entity.position) < 8)
+          .map((e: any) => `${e.name}@${e.position.distanceTo(b.entity.position).toFixed(1)}`).join(' ')
+        log(`hurt ${Math.round(last)} -> ${Math.round(b.health)} (${a()}) near: ${near || '-'}`)
+      }
+      last = b.health
+    })
+    const a = () => bot.currentAction?.name ?? 'idle'
     b.on('death', () => {
       if (!measuring) return
       stats.deaths++
