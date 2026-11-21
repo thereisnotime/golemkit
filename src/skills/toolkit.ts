@@ -168,6 +168,18 @@ export async function ensureTool (bot: Bot, signal: AbortSignal, kind: ToolKind,
 
 /** Equips the best tool for breaking a block, if the inventory has one. */
 export async function equipFor (bot: Bot, block: Block): Promise<void> {
+  // By name first: on modded servers the registry sync renumbers items, so the pathfinder's
+  // id-based bestHarvestTool can come back empty and the bot mines stone with a block in hand.
+  const kind = toolKindFor(block as any)
+  if (kind) {
+    const items = bot.inventory.items()
+    const name = bestToolIn(items.map(i => itemName(i)), kind)
+    const tool = name ? items.find(i => itemName(i) === name) : undefined
+    if (tool) {
+      if ((bot.heldItem ? itemName(bot.heldItem) : '') !== name) await bot.equip(tool, 'hand').catch(() => {})
+      return
+    }
+  }
   const tool = (bot.pathfinder as any)?.bestHarvestTool?.(block)
   if (tool && bot.heldItem?.type !== tool.type) await bot.equip(tool, 'hand').catch(() => {})
 }
