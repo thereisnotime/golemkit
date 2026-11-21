@@ -93,7 +93,10 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
       got++
       misses = 0
       const why = watch.dug(target)
-      if (why) { nothing = why; break }
+      if (why) {
+        if (/lying around/.test(why)) await pickupNearby(bot, signal, { radius: 8, maxMs: 8000 })
+        if (!/lying around/.test(why) || !watch.recheck()) { nothing = why; break }
+      }
     } catch (e) {
       checkAborted(signal)
       if (e instanceof DigRefusedError) {

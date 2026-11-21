@@ -196,7 +196,11 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
     if (source) {
       yielded++
       const why = watch.dug(b)
-      if (why) throw new NothingDropsError(why)
+      if (why) {
+        // Drops lying in the tunnel aren't lost: sweep them up and only stop if that gave nothing either.
+        if (/lying around/.test(why)) await pickupNearby(bot, signal, { radius: 8, maxMs: 8000 })
+        if (!/lying around/.test(why) || !watch.recheck()) throw new NothingDropsError(why)
+      }
     }
     return true
   }

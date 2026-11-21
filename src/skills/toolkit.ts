@@ -224,17 +224,25 @@ export function harvestProblem (bot: Bot, block: Block): string | null {
  * inventory grew. If it didn't, it says why (wrong tool in hand, inventory full, drops left lying
  * around), so collectors stop and report instead of mining for nothing.
  */
-export function dropWatch (bot: Bot, window = 5): { dug: (block?: Block) => string | null } {
+export function dropWatch (bot: Bot, window = 5): { dug: (block?: Block) => string | null, recheck: () => boolean } {
   const total = () => bot.inventory.items().reduce((n, i) => n + i.count, 0)
   let base = total()
   let n = 0
   let lastBlock: Block | undefined
+  let checkFrom = base
   return {
+    /** After sweeping up drops: did the inventory grow since the failed check? Resets the window if so. */
+    recheck () {
+      const now = total()
+      if (now > checkFrom) { base = now; n = 0; return true }
+      return false
+    },
     dug (block?: Block) {
       if (block) lastBlock = block
       if (++n < window) return null
       const now = total()
       const gained = now > base
+      checkFrom = now
       base = now
       n = 0
       if (gained) return null
