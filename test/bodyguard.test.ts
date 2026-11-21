@@ -34,6 +34,7 @@ test('threats to the player: ranking is measured from the player, not the bot', 
 
 test('threat signals: archers need a shot, flyers must dive, melee must come for the player', () => {
   assert.equal(threatReason(mob({ name: 'skeleton', distPlayer: 14, losPlayer: false }), 16), null, 'skeleton behind a wall')
+  assert.equal(threatReason(mob({ name: 'skeleton', distPlayer: 10, losPlayer: false, facing: true, approaching: true }), 16), null, 'skeleton in a cave below, looking up')
   assert.equal(threatReason(mob({ name: 'skeleton', distPlayer: 14, losPlayer: true }), 16), 'has a shot at the player')
   assert.equal(threatReason(mob({ name: 'phantom', distPlayer: 18 }), 16), null, 'circling phantom')
   assert.equal(threatReason(mob({ name: 'phantom', distPlayer: 18, diving: true }), 16), 'diving at the player')

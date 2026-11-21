@@ -42,7 +42,12 @@ export function threatReason (t: GuardThreat, range: number): string | null {
   if (t.hurtPlayer) return 'hurt the player'
   if (!t.hostile) return t.hurtBot ? 'attacked me' : null
   if (t.name === 'creeper' && t.distPlayer <= 6) return 'creeper close'
-  if (RANGED.has(t.name) && t.losPlayer && t.distPlayer <= range) return 'has a shot at the player'
+  if (RANGED.has(t.name)) {
+    if (t.losPlayer && t.distPlayer <= range) return 'has a shot at the player'
+    // no shot: not a threat yet (chasing archers through caves for nothing is how bots die)
+    if (t.distPlayer <= 5) return 'next to the player'
+    return t.hurtBot ? 'attacked me' : null
+  }
   if (FLYERS.has(t.name)) {
     if (t.distPlayer <= 6 || (t.diving && t.distPlayer <= 24)) return 'diving at the player'
     return t.hurtBot ? 'attacked me' : null
