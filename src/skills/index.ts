@@ -38,6 +38,7 @@ export { mineStone, planStep, digHazard } from './mining.ts'
 export { blueprintLibrary } from './library.ts'
 export { worldedit } from './worldedit.ts'
 export { roads, buildRoad, scanTerrain, getRoads } from './roads.ts'
+export { search, lookFor, ownChests, recentDeaths } from './search.ts'
 
 import { crafting } from './crafting.ts'
 import { containers } from './containers.ts'
@@ -52,8 +53,9 @@ import { progressionSkill } from './progression.ts'
 import { blueprintLibrary } from './library.ts'
 import { worldedit } from './worldedit.ts'
 import { roads } from './roads.ts'
+import { search } from './search.ts'
 
-/** Extra skills on top of standardSkills(): crafting, containers, farming, food, woodcutting, building, construction, roads, blueprint library, materials, progression, pickup, WorldEdit. */
-export const extendedSkills = () => [crafting(), containers(), farming(), food(), woodcutting(), building(), construction(), roads(), blueprintLibrary(), materialsSkill(), progressionSkill(), pickup(), worldedit()]
+/** Extra skills on top of standardSkills(): crafting, containers, farming, food, search, woodcutting, building, construction, roads, blueprint library, materials, progression, pickup, WorldEdit. */
+export const extendedSkills = () => [crafting(), containers(), farming(), food(), search(), woodcutting(), building(), construction(), roads(), blueprintLibrary(), materialsSkill(), progressionSkill(), pickup(), worldedit()]
 export { modsSkill, installedMods } from './mods.ts'
 export { config } from './config.ts'

@@ -128,3 +128,10 @@ export const modsSkill = () => defineSkill({
     return list.length ? { mods: list.map(m => m.id + (m.version ? ` ${m.version}` : '')).join(', ') } : {}
   }
 })
+
+/** Modded block, item and entity names (namespace:name) from the cached registry sync, for target resolution. */
+export function moddedNames (agent: Agent): { blocks: string[], items: string[], entities: string[] } {
+  const { registries } = serverData(agent)
+  const pick = (reg: string) => Object.values(registries[reg] ?? {}).map(String).filter(n => !n.startsWith('minecraft:'))
+  return { blocks: pick('minecraft:block'), items: pick('minecraft:item'), entities: pick('minecraft:entity_type') }
+}

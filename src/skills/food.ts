@@ -95,7 +95,7 @@ export function inOwnFarm (agent: Agent, p: { x: number, z: number }): boolean {
 
 // ------------------------------------------------------------------ sensing
 
-function spawnOf (bot: Bot): { x: number, z: number } | null {
+export function spawnOf (bot: Bot): { x: number, z: number } | null {
   const s = (bot as { spawnPoint?: { x: number, z: number } }).spawnPoint
   return s && typeof s.x === 'number' ? s : null
 }
@@ -184,7 +184,7 @@ export function surfaceWater (bot: Bot, center: Vec3, radius: number, count = 64
 }
 
 /** Top block of a loaded column near height y, or null when not loaded. */
-function surfaceAt (bot: Bot, x: number, y: number, z: number): Block | null {
+export function surfaceAt (bot: Bot, x: number, y: number, z: number): Block | null {
   for (let dy = 24; dy >= -32; dy--) {
     const b = bot.blockAt(vec(bot, x, y + dy, z))
     if (!b) return null
@@ -194,7 +194,7 @@ function surfaceAt (bot: Bot, x: number, y: number, z: number): Block | null {
 }
 
 /** Height of the open-sky ground (first solid block or water from the top) at x/z, if loaded. */
-function topY (bot: Bot, x: number, z: number): number | null {
+export function topY (bot: Bot, x: number, z: number): number | null {
   const from = Math.min(319, Math.floor(bot.entity.position.y) + 96)
   for (let y = from; y > -64; y--) {
     const b = bot.blockAt(vec(bot, x, y, z))
@@ -211,7 +211,7 @@ const inventory = (bot: Bot): Record<string, number> => {
 }
 
 /** Night, or a thunderstorm (mobs spawn): the same test stay_safe uses, so far trips and night retreat never disagree. */
-const isNight = (bot: Bot) => { const t = bot.time?.timeOfDay ?? 0; return (bot as { thunderState?: number }).thunderState! > 0 || (t >= 12_542 && t <= 23_459) }
+export const isNight = (bot: Bot) => { const t = bot.time?.timeOfDay ?? 0; return (bot as { thunderState?: number }).thunderState! > 0 || (t >= 12_542 && t <= 23_459) }
 
 const here = (bot: Bot): Pos => { const p = bot.entity.position; return { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z) } }
 

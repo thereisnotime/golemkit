@@ -165,7 +165,7 @@ const deposit = defineAction({
   }
 })
 
-const withdraw = defineAction({
+export const withdraw = defineAction({
   name: 'withdraw',
   description: 'Take items out of the nearest chest/barrel (or the one at x y z).',
   params: z.object({
