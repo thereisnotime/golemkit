@@ -9,6 +9,34 @@ export default withMermaid(defineConfig({
   head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }]],
   lastUpdated: false,
   srcExclude: ['**/README.md'],
+  markdown: {
+    // short double-quoted phrases in prose ("pax follow me") become chat chips; code, fences and
+    // diagrams are separate tokens and are left alone
+    config (md) {
+      md.core.ruler.push('chat_phrases', state => {
+        for (const block of state.tokens) {
+          if (block.type !== 'inline' || !block.children) continue
+          const out: typeof block.children = []
+          for (const t of block.children) {
+            if (t.type !== 'text' || !t.content.includes('"')) { out.push(t); continue }
+            const re = /"([^"\n]{1,60})"/g
+            let last = 0
+            let m: RegExpExecArray | null
+            while ((m = re.exec(t.content))) {
+              if (m.index > last) { const a = new state.Token('text', '', 0); a.content = t.content.slice(last, m.index); out.push(a) }
+              const open = new state.Token('html_inline', '', 0); open.content = '<span class="chat-phrase">'; out.push(open)
+              const mid = new state.Token('text', '', 0); mid.content = m[1]!; out.push(mid)
+              const close = new state.Token('html_inline', '', 0); close.content = '</span>'; out.push(close)
+              last = m.index + m[0].length
+            }
+            if (last === 0) { out.push(t); continue }
+            if (last < t.content.length) { const z = new state.Token('text', '', 0); z.content = t.content.slice(last); out.push(z) }
+          }
+          block.children = out
+        }
+      })
+    }
+  },
   themeConfig: {
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
