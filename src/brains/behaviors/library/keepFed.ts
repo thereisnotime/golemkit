@@ -2,6 +2,7 @@
 // some: eat what's there, withdraw from known chests, harvest ripe crops, hunt passive
 // animals, cook raw food, eat. The decision is a pure function (nextFoodStep) so it is
 // unit-tested without a server.
+import { needsSurvival } from '../../../core/index.ts'
 import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
 import { z, type Agent, type ActionResult } from '../../../core/index.ts'
@@ -213,6 +214,7 @@ export const keepFed = defineBehavior({
       failureCooldownMs: 30_000,
       maxFailureCooldownMs: 300_000,
       score ({ bot, bb, current }) {
+        if (!needsSurvival(bot)) return 0 // creative/spectator: no hunger
         const food = typeof bot.food === 'number' ? bot.food : 20
         const health = typeof bot.health === 'number' ? bot.health : 20
         if (current === 'keep_fed' && food < o.until) return 60 + bb.needs.hunger * 30

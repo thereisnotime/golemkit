@@ -13,7 +13,7 @@ export {
 } from './log.ts'
 export { Storage } from './storage.ts'
 export { Fleet, Blackboard, type FleetMessage, type FleetEvents } from './fleet.ts'
-export { goals, Movements, goto, gotoTimed, travel, holdGoal, playerEntity, isHostile, FLYING, nearestHostile, itemName, fmtPos } from './helpers.ts'
+export { goals, Movements, goto, gotoTimed, travel, holdGoal, playerEntity, isHostile, FLYING, nearestHostile, itemName, fmtPos, needsSurvival, gameModeNote } from './helpers.ts'
 export { isModdedBlock, MODDED_BLOCK } from './modded.ts'
 export {
   Journal, JournalCapture, resolveJournalConfig, fleetQuery, parseDeathMessage, parseAdvancement, parseRange,

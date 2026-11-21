@@ -50,3 +50,4 @@ behaviors:
   keep_fed: { below: 14, healBelow: 14 }   # find, cook and eat food when hungry or hurt
   stay_safe: { retreatBelow: 0, avoidWater: false }   # stands its ground like the reflexes above;
                                                       # still pillars up when surrounded, goes home at night
+  follow_owner: { player: robin, distance: 3 }   # stay with robin when there is nothing else to do

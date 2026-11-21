@@ -1,7 +1,7 @@
 // Reflexes: things the bot does on its own regardless of other brains: fight back when hit,
 // eat when hungry. They run at reflex priority, so they briefly preempt everything else and
 // long-running actions (follow, guard) resume afterwards.
-import { defineBrain, PRIORITY, nearestHostile, isHostile, FLYING } from '../core/index.ts'
+import { defineBrain, PRIORITY, nearestHostile, isHostile, FLYING, needsSurvival } from '../core/index.ts'
 import { bestFood } from '../skills/survival.ts'
 
 export interface ReflexOptions {
@@ -40,7 +40,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         (bot.health <= retreatBelow || (inWater(mob) && bot.health < waterFightAbove))
 
       const onHurt = (entity: any) => {
-        if (!selfDefense || entity !== bot.entity) return
+        if (!selfDefense || entity !== bot.entity || !needsSurvival(bot)) return
         // Flyers (phantoms) hit and climb away, so look further for them.
         const mob = nearestHostile(bot, bot.entity.position, 8) ??
           bot.nearestEntity((e: any) => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20)
@@ -65,6 +65,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       bot.on('entityHurt', onHurt)
 
       const timer = setInterval(() => {
+        if (!needsSurvival(bot)) return // creative/spectator: no hunger, no danger
         // Low health with a hostile close by: get away even before the next hit.
         const mob = selfDefense ? nearestHostile(bot, bot.entity.position, 6) : null
         if (mob && !FLYING.has(mob.name ?? '') && bot.health <= retreatBelow && agent.currentAction?.name !== 'retreat' && agent.getAction('retreat')) {

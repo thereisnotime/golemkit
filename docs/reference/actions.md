@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-16 skills, 52 actions.
+17 skills, 55 actions.
 
 ## building
 
@@ -333,6 +333,40 @@ Get the materials for a job in one go: chops as many trees as needed (crafting a
 | `template` | string |  |  | blueprint name (see build_plan) to gather everything it needs |
 | `material` | string |  |  | with template: the main block to use, e.g. spruce_planks or cobblestone |
 | `radius` | integer (8..64) |  | `32` | how far to look for trees and blocks |
+
+## mods
+
+Installed mods, their items, and creative-mode item access.
+
+### `mods`
+
+List the mods this server runs (with versions when known) and how many items/blocks/mobs each adds. Use it before explaining or teaching a mod, so you talk about what is actually installed.
+
+*non-exclusive*
+
+No parameters.
+
+### `mod_items`
+
+Exact item/block/mob names a mod adds on this server, optionally filtered by a search word (e.g. mod=create query=press). Use these names in explanations and with creative_get.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `mod` | string | yes |  | mod id, e.g. create, ars_nouveau |
+| `query` | string |  |  | substring to filter by, e.g. "gear", "press", "spell" |
+| `kind` | `item` \| `block` \| `entity` |  | `"item"` |  |
+| `limit` | integer (1..100) |  | `40` |  |
+
+### `creative_get`
+
+Creative mode only: put any item (vanilla or modded, exact name) into your inventory, e.g. to show or hand it to a player with drop, or to build without gathering.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `item` | string | yes |  | item name, e.g. oak_planks or create:mechanical_press |
+| `count` | integer (1..64) |  | `1` |  |
 
 ## movement
 

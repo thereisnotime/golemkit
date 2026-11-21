@@ -41,3 +41,4 @@ import { materialsSkill } from './materials.ts'
 
 /** Extra skills on top of standardSkills(): crafting, containers, farming, woodcutting, building, construction, materials, pickup. */
 export const extendedSkills = () => [crafting(), containers(), farming(), woodcutting(), building(), construction(), materialsSkill(), pickup()]
+export { modsSkill, installedMods } from './mods.ts'

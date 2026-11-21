@@ -15,7 +15,7 @@
 // backs off at low health between LLM turns. The model (and owners, with !behavior_arm) can
 // arm more: follow_owner, guard_area, farm_loop... See docs/guide/behaviors.md.
 import { defineVariant } from '../src/core/index.ts'
-import { standardSkills, extendedSkills, navigation } from '../src/skills/index.ts'
+import { standardSkills, extendedSkills, navigation, modsSkill } from '../src/skills/index.ts'
 import { commandBrain, reflexes, llmBrain, hooksBrain, behaviorsBrain } from '../src/brains/index.ts'
 
 const num = (v: string | undefined, d: number) => (v && !Number.isNaN(Number(v)) ? Number(v) : d)
@@ -29,7 +29,7 @@ export default defineVariant({
     'exploring and helping friends, gets nervous at night, never boasts. Helps with what players ask, ' +
     'follows or guards people when asked, and admits it when something is beyond its abilities. ' +
     'Takes on bigger jobs (building a hut, gathering wood) as a goal and sees them through.',
-  skills: [...standardSkills(), navigation(), ...extendedSkills()],
+  skills: [...standardSkills(), navigation(), ...extendedSkills(), modsSkill()],
   brains: [
     commandBrain({ verbose: false, whisperNeedsPrefix: true }),
     reflexes(),

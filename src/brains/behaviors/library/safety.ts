@@ -3,6 +3,7 @@
 // things reflexes don't cover (getting surrounded, fighting in water, being out at night).
 // Both use the same retreat/flee actions, and reflex priority (60) always wins over
 // behaviour priority (35), so they never pull the body in different directions.
+import { needsSurvival } from '../../../core/index.ts'
 import type { Bot } from 'mineflayer'
 import { z } from '../../../core/index.ts'
 import { defineBehavior } from '../types.ts'
@@ -62,6 +63,7 @@ export const staySafe = defineBehavior({
       failureCooldownMs: 4000,
       maxFailureCooldownMs: 30_000,
       score (ctx) {
+        if (!needsSurvival(ctx.bot)) return 0 // creative/spectator: mobs can't hurt us
         switch (assessDanger(ctx, o)) {
           case 'surrounded': return 92
           case 'low_health': return 88
@@ -136,7 +138,7 @@ export const avoidMobs = defineBehavior({
     return {
       failureCooldownMs: 2000,
       maxFailureCooldownMs: 10_000,
-      score: ({ bot }) => nearest(bot) ? 80 : 0,
+      score: ({ bot }) => needsSurvival(bot) && nearest(bot) ? 80 : 0,
       async run (ctx) {
         const mob = nearest(ctx.bot)
         if (!mob) return 'nothing close'

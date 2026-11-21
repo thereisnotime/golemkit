@@ -156,3 +156,19 @@ export function itemName (item: { name?: string, type: number }): string {
 export function fmtPos (p: { x: number, y: number, z: number }): string {
   return `${Math.floor(p.x)} ${Math.floor(p.y)} ${Math.floor(p.z)}`
 }
+
+/** True in survival/adventure, where hunger, damage and gathering matter. */
+export function needsSurvival (bot: Bot): boolean {
+  const m = bot.game?.gameMode
+  return m !== 'creative' && m !== 'spectator'
+}
+
+/** One line telling a model what the current game mode means for it. */
+export function gameModeNote (mode: string | undefined): string {
+  switch (mode) {
+    case 'creative': return 'creative: any item via creative_get, can fly, no hunger or damage, blocks break instantly; build freely, do not gather'
+    case 'spectator': return 'spectator: can only fly and watch, cannot interact or build'
+    case 'adventure': return 'adventure: cannot break or place blocks without the right tools/tags; hunger and damage apply'
+    default: return 'survival: hunger and damage apply; gather and craft what you need'
+  }
+}

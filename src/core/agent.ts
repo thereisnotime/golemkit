@@ -19,7 +19,7 @@ import { attachNeoForge } from './neoforge/handshake.ts'
 import { installTolerantParser } from './neoforge/tolerantParser.ts'
 import { solidifyUnknownBlocks } from './modded.ts'
 import { RegistryCache, applyModdedRegistries, type RegistrySnapshot } from './neoforge/registries.ts'
-import { fmtPos, itemName } from './helpers.ts'
+import { fmtPos, itemName, gameModeNote } from './helpers.ts'
 import type { Fleet } from './fleet.ts'
 import { ProtectedAreas, watchRefusedDigs } from './protection.ts'
 import { resolveRetry, actionAttempts, backoffMs, isRetryableResult, type RetryConfig } from './retry.ts'
@@ -59,6 +59,8 @@ export type AgentEvents = {
   /** The server refused a block break here and the area is now avoided (see markProtected). */
   protectedArea: (pos: { x: number, y: number, z: number }) => void
   stopped: () => void
+  /** The server changed this bot's game mode (survival/creative/adventure/spectator). */
+  gameModeChanged: (mode: string, previous: string) => void
 }
 
 export interface ActOptions {
@@ -461,6 +463,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
       // World spawn (compass target); context packs use it for "don't dig near spawn" rules.
       spawnPoint: bot.spawnPoint ? fmtPos(bot.spawnPoint) : null,
       gameMode: bot.game.gameMode,
+      gameModeNote: gameModeNote(bot.game.gameMode),
       health: Math.round(bot.health),
       food: bot.food,
       timeOfDay: bot.time.timeOfDay,
@@ -598,6 +601,16 @@ export class Agent extends TypedEmitter<AgentEvents> {
         cleanups.push(watchRefusedDigs(bot, (pos) => this.markProtected(pos)))
         try { cleanups.push(this.journalCapture.session(bot)) } catch (e) { this.log.warn(`journal: ${(e as Error).message}`) }
 
+        let lastMode = bot.game.gameMode
+        const onGame = () => {
+          if (bot.game.gameMode === lastMode) return
+          const previous = lastMode
+          lastMode = bot.game.gameMode
+          this.log.info(`game mode changed: ${previous} -> ${lastMode}`)
+          this.emit('gameModeChanged', lastMode, previous)
+        }
+        bot.on('game', onGame)
+        cleanups.push(() => bot.off('game', onGame))
         const chatTimer = setInterval(() => this.pumpChat(), 100)
         cleanups.push(() => clearInterval(chatTimer))
         if (this.humanize?.idleFidget) {
