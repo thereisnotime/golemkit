@@ -194,13 +194,22 @@ build_plan({ template?, material?, theme?, x?, y?, z?, facing?, preview? })
    reported, not fixed.
 8. **Path.** With `path` (default on) and a shovel it can make cheaply, it turns up to three
    grass blocks in front of the door into a dirt path.
-9. **Unreachable blocks.** Placement paths get a 15 s think timeout (the default 5 s times out
-   on a busy machine), each block is tried from up to four standing spots and once more at the
-   end. If after that only a handful of required blocks are left (at most 3, or 3% of the
+9. **Getting there and standing.** Placing starts at the site: a bot more than 6 blocks from
+   the footprint travels there first, and if it stops more than 12 blocks away (a cave on the
+   way back from gathering) the build fails right away with where it got stuck, instead of
+   timing out block by block. While building, the bot places everything it can reach from where
+   it stands before walking anywhere: within a layer the next block is the nearest one that has
+   something to click and is in reach (a floor spreads from the part already laid). Each walk to
+   a stand spot has a budget of 4 to 8 s (the pathfinder still gets a 15 s think timeout and a
+   search limit of 32 blocks around the bot, since a busy machine thinks slowly), at most three
+   spots are tried per clicked block and two clicked blocks per cell, and a spot that couldn't
+   be reached isn't tried again in that build.
+10. **Unreachable blocks.** A block that failed for reach is tried once more at the end, but not
+   in the quality pass. If after that only a handful of required blocks are left (at most 3, or 3% of the
    structure) and every one of them failed because nothing could get there, the build finishes
    ok with an honest note, "built 194/197 ...; 3 blocks unreachable at x y z, ..., skipped",
    instead of failing and being retried forever.
-10. **Result.** "built a small_house at 812 70 41 facing west: 120/121 blocks (placed 118, 2
+11. **Result.** "built a small_house at 812 70 41 facing west: 120/121 blocks (placed 118, 2
    already there, fixed 1); skipped: bed (no wool); used window: oak_fence instead of
    glass_pane" or, truthfully, "built 52/121 blocks of the small_house ..., 69 required still
    missing: out of stairs. Calling build again resumes it". The site is kept in `agent.storage`
@@ -262,9 +271,15 @@ flowchart LR
 | chests, furnaces, barrels | they face the player | yaw opposite to `facing` |
 | fences, panes, walls | connect to neighbours by themselves | plain placement |
 
-The bot side (`placeBlockState` in `src/skills/placement.ts`) picks a spot to stand: its eyes
-within 4.4 blocks of the clicked block's nearest point (the server measures reach that way) and
-not in the cells the block will fill, nearest to the bot first. It walks there, sends the look,
+The bot side (`placeBlockState` in `src/skills/placement.ts`) clicks from where it stands when it
+can (options whose clicked block is in reach go first). Otherwise it picks a spot to stand
+(`standCandidatesIn` and `rankStands` in `blockstate.ts`, pure): solid below and two passable
+blocks, its eyes within 4.4 blocks of the clicked block's nearest point (the server measures
+reach that way), not in the cells the block will fill, not a spot that already failed, and not
+inside another structure in the footprint (under a roof that isn't natural and isn't part of
+the blueprint, like a hut inside a fort). The cheapest spot wins (`standCost`): near the bot,
+with penalties for standing below the target's level, in a sealed pocket (no open side, e.g.
+under a floor) and in a cell still to be built. It walks there, sends the look,
 waits a physics tick so the look reaches the server before the click, clicks, and reads the
 block back (`checkCell`). The quality pass afterwards uses the same check (`fixFor`).
 
@@ -601,8 +616,10 @@ items (`creativeStock`, pure: `planks` becomes the theme's planks, oak by defaul
 bed) and puts what's missing straight into empty inventory slots from the creative inventory
 (`bot.creative.setInventorySlot`). The result says "creative: took 151 items from the creative
 inventory". `build` does that by itself for whatever it's missing, without `gather=true`, and
-when no spot to stand is in reach it flies there (`bot.creative.flyTo`), so tall parts need no
-scaffolding. No tools are made; a shovel for the path comes from the creative inventory too.
+when no spot to stand is in reach it flies there (`flyNear`: up, across, down, never into a
+block, with a time limit; mineflayer's `creative.flyTo` flies through terrain and can wait
+forever for a move event), so tall parts need no scaffolding. A slot the server doesn't confirm
+within 6 s stops the stocking with a note, and what was taken is counted from the inventory. No tools are made; a shovel for the path comes from the creative inventory too.
 Survival is unchanged.
 
 ### ensureTool

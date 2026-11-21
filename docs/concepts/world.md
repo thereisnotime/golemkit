@@ -187,6 +187,14 @@ every other wave), so runs of different versions compare directly.
 The `reflexes()` brain reacts at the highest brain priority (60), preempting everything and
 letting long-running actions resume afterwards.
 
+Climbing out of a cave (`climb_out`, also when `goto` starts underground) is the exception:
+while the bot climbs, an attacker that can't hit it in melee (an archer, a mob below the
+pillar, one still a few blocks off) doesn't start `retreat` or `defend`; going on up is the
+escape (`keepClimbing` in `survival.ts`). A zombie right on it, or a creeper close by, is
+fought as usual. A fight that does preempt `goto` pauses the climb rather than failing it:
+`goto` ends as preempted, and when it resumes it climbs again from wherever the bot is (two
+climbs per run before it gives up).
+
 ```mermaid
 flowchart TB
   H(["bot got hurt"]) --> M{"hostile within 8<br/>(flyers: 20)?"}
