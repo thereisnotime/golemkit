@@ -5,7 +5,149 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-20 skills, 64 actions.
+21 skills, 73 actions.
+
+## blueprint-library
+
+Blueprint libraries: search, show, import schematics, capture builds, save designs, building policy.
+
+### `blueprint_list`
+
+List the blueprints in the libraries (shipped, user folders, and the ones I learned: captured, imported, designed) with size, blocks, tags and main materials.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `library` | `shipped` \| `user` \| `learned` |  |  | only this library |
+
+### `blueprint_search`
+
+Search the blueprint libraries by text, tags, material and size; best match first, with why it matched.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `text` | string |  |  | what is wanted, e.g. "small stone house" or "watchtower" |
+| `tags` | any |  |  | house, defence, farm, decoration, or your own (a list, or comma separated) |
+| `material` | string |  |  | a block it should use, e.g. cobblestone, spruce |
+| `max_size` | integer (1..9007199254740991) |  |  | largest footprint side |
+| `max_height` | integer (1..9007199254740991) |  |  |  |
+| `max_blocks` | integer (1..9007199254740991) |  |  |  |
+| `size` | `small` \| `medium` \| `large` |  |  | small < 150 blocks, medium < 500, large |
+| `library` | `shipped` \| `user` \| `learned` |  |  |  |
+| `limit` | integer (1..20) |  | `5` |  |
+
+### `blueprint_show`
+
+Show one blueprint: library info (author, source, tags, rating), a text drawing (top view and layers) and its materials vs my inventory. build_plan with the same template says where it would go.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `name` | string | yes |  |  |
+| `layers` | boolean |  | `true` | false: top view only |
+| `facing` | `north` \| `east` \| `south` \| `west` |  |  | turn it first |
+
+### `blueprint_pick`
+
+Decide which blueprint to build for a request, following the building policy (config "building"): library = best saved match, creative = design a new one with blueprint_design (a saved match as fallback), ask = offer the owner 2-3 matches when they are online. Call it before build when the request does not name a blueprint.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `text` | string | yes |  | the request, e.g. "a small house by the river" |
+| `tags` | any |  |  | house, defence, farm, decoration, or your own (a list, or comma separated) |
+| `material` | string |  |  | a block it should use, e.g. cobblestone, spruce |
+| `max_size` | integer (1..9007199254740991) |  |  | largest footprint side |
+| `max_height` | integer (1..9007199254740991) |  |  |  |
+| `max_blocks` | integer (1..9007199254740991) |  |  |  |
+| `size` | `small` \| `medium` \| `large` |  |  | small < 150 blocks, medium < 500, large |
+| `library` | `shipped` \| `user` \| `learned` |  |  |  |
+
+### `blueprint_import`
+
+Import a schematic file (Sponge .schem, Litematica .litematic or structure .nbt) from the import folder into my learned blueprints (owners only). Refuses more than the block limit (default 4000) and suggests a crop.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `file` | string | yes |  | file name inside the import folder (blueprints/import/ unless configured) |
+| `name` | string |  |  | blueprint name (default: from the file name) |
+| `crop` | string |  |  | keep only "x1 y1 z1 x2 y2 z2" (the file's own coordinates) |
+| `max_blocks` | integer (1..9007199254740991) |  |  | block limit for this import (default settings.build.importMaxBlocks, 4000) |
+| `air` | boolean |  | `true` | false: empty space in the file is "don't care" instead of "must be clear" |
+| `exact` | boolean |  | `false` | keep the exact wood of wooden blocks (default: any wood, following the build theme) |
+| `facing` | `north` \| `east` \| `south` \| `west` |  |  | the side its entrance is on as drawn; default the side of the first door |
+| `tags` | any |  |  | house, defence, farm, decoration, or your own (a list, or comma separated) |
+| `description` | string |  |  |  |
+| `overwrite` | boolean |  | `false` |  |
+
+### `blueprint_capture`
+
+Save a build in the world as a learned blueprint (owners only), so it can be built again elsewhere: "save this as X". Give two corners (x1 y1 z1 x2 y2 z2), or a centre (x y z, default where the asking player stands) and a size. Keeps only player-made blocks unless all=true; the empty inside stays "must be clear". At most 32 per side.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `name` | string | yes |  | name for the new blueprint (lowercase, digits, _) |
+| `x1` | number |  |  |  |
+| `y1` | number |  |  |  |
+| `z1` | number |  |  |  |
+| `x2` | number |  |  |  |
+| `y2` | number |  |  |  |
+| `z2` | number |  |  |  |
+| `x` | number |  |  | centre instead of corners; y is the level of the floor |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
+| `size` | integer (1..9007199254740991) |  |  | footprint side around the centre (default 11) |
+| `height` | integer (1..9007199254740991) |  |  | height from the floor up around the centre (default 10) |
+| `all` | boolean |  | `false` | keep natural blocks (ground, plants, leaves) too |
+| `exact` | boolean |  | `false` | keep the exact wood of wooden blocks (default: any wood, following the build theme) |
+| `facing` | `north` \| `east` \| `south` \| `west` |  |  | the side its entrance is on; default the side of the first door |
+| `description` | string |  |  |  |
+| `tags` | any |  |  | house, defence, farm, decoration, or your own (a list, or comma separated) |
+| `overwrite` | boolean |  | `false` |  |
+
+### `blueprint_design`
+
+Check and save a blueprint you designed, as YAML (or JSON) in the blueprint format (see blueprint_show small_house for an example): name, description, facing (entrance side), roles {name: {default: block, accept?: regex, kind?: block|door|attachment|furnish, optional?}}, palette {char: role | "role[facing=north]" | {block: oak_stairs, state: {...}}}, layers bottom to top, each a list of rows north to south, columns west to east; " " = don't care, "." = air, ^ v < > = stairs of the roof role. It is validated (format, size, real block names, every block placeable in order, nothing floating); problems come back so you can fix and call again. Data only, nothing runs.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `yaml` | string |  |  | the blueprint as YAML or JSON text |
+| `blueprint` | object |  |  | the blueprint as an object instead of text |
+| `tags` | any |  |  | house, defence, farm, decoration, or your own (a list, or comma separated) |
+| `save` | boolean |  | `true` | false: only check and preview |
+| `overwrite` | boolean |  | `false` | replace a learned blueprint of the same name |
+
+### `blueprint_delete`
+
+Delete one of my learned blueprints (captured, imported or designed). Owners only; shipped and user blueprints are never touched.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `name` | string | yes |  |  |
+
+### `blueprint_rename`
+
+Rename one of my learned blueprints. Owners only.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `from` | string | yes |  |  |
+| `to` | string | yes |  |  |
 
 ## building
 
@@ -138,13 +280,13 @@ Building structures from blueprints.
 
 ### `build`
 
-Build a whole structure from a blueprint. For "build a house" use small_house (cozy 5x5 wooden house: log corners, pitched stair roof, windows, door, torches, crafting table, chest, bed if there is wool). Others: cottage (bigger 7x7 house on a cobblestone foundation with porch, glass windows, furnace), cabin (log cabin), watchtower (ladder, fenced platform), fortress (15x15 walled compound to put a house in), hut (plain box, quick), shelter (emergency 3x3 box around the bot), wall_segment, platform, tower. Picks a flat, clear spot near whoever asked (never in protected areas or over player builds), fills small dips, digs bumps and plants, faces the door to the player (or an open side), places blocks with the right facing (stairs, slabs, logs, doors, torches...), checks every block afterwards and fixes mistakes, and skips blocks that are already right, so calling it again resumes an interrupted build. gather=true first gathers what is missing. Reports blocks built and what was skipped.
+Build a whole structure from a blueprint. For "build a house" use small_house (cozy 5x5 wooden house: log corners, pitched stair roof, windows, door, torches, crafting table, chest, bed if there is wool). Others: cottage (bigger 7x7 house on a cobblestone foundation with porch, glass windows, furnace), cabin (log cabin), watchtower (ladder, fenced platform), fortress (15x15 walled compound to put a house in), hut (plain box, quick), shelter (emergency 3x3 box around the bot), wall_segment, platform, tower. Picks a flat, clear spot near whoever asked (never in protected areas or over player builds), fills small dips, digs bumps and plants, faces the door to the player (or an open side), places blocks with the right facing (stairs, slabs, logs, doors, torches...), checks every block afterwards and fixes mistakes, and skips blocks that are already right, so calling it again resumes an interrupted build. gather=true first gathers what is missing. Reports blocks built and what was skipped. Learned blueprints (captured, imported, designed) build the same way; blueprint_pick chooses one when the request names none.
 
 *long-running*
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `template` | string | yes |  | blueprint name: small_house (default house), cottage, cabin, watchtower, fortress, hut, shelter, wall_segment, platform, tower (build_plan lists all) |
+| `template` | string | yes |  | blueprint name: small_house (default house), cottage, cabin, watchtower, fortress, hut, shelter, wall_segment, platform, tower, or a learned one (blueprint_search finds them) |
 | `x` | number |  |  | centre of the footprint; omit to pick a spot near the player |
 | `y` | number |  |  | level of the floor (layer 0); default the ground there + 1 |
 | `z` | number |  |  |  |

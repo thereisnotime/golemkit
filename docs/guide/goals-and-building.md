@@ -248,7 +248,7 @@ Blueprints are YAML files in `blueprints/`, the owner's folders (`settings.build
 and the bot's learned library (`data/bots/<name>/blueprints/`), later ones win by name. They are
 validated with zod when loaded (cached until a file changes, so new files work without a
 restart). A broken file is reported by name; the others still load. Importing [schematics](/guide/blueprints#import),
-capturing builds, LLM designs and the building policy are on [Blueprint libraries](./blueprints.md).
+capturing builds, LLM designs and the [building policy](/guide/blueprints#building-policy) are on [Blueprint libraries](./blueprints.md).
 
 ```yaml
 name: small_house          # lowercase, digits, _
