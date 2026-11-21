@@ -25,6 +25,17 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
   if (!agent.canDig) return fail('digging is disabled for this bot')
   const type = bot.registry.blocksByName[block]
   if (!type) return fail(`unknown block ${block}`)
+  // Things you get from a different block in the world: cobblestone from stone, dirt from grass.
+  const SOURCES: Record<string, string[]> = {
+    cobblestone: ['stone', 'cobblestone'],
+    cobbled_deepslate: ['deepslate', 'cobbled_deepslate'],
+    dirt: ['dirt', 'grass_block', 'coarse_dirt', 'rooted_dirt'],
+    flint: ['gravel'],
+    clay_ball: ['clay'],
+    sand: ['sand'],
+    gravel: ['gravel']
+  }
+  const matchIds = (SOURCES[block] ?? [block]).map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
   let toolNote = ''
   if (needsTool(type)) {
     const kind = toolKindFor(type) ?? 'pickaxe'
@@ -41,7 +52,7 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
   let leftZone = false
   while (got < count && misses < 3) {
     checkAborted(signal)
-    const found = bot.findBlocks({ matching: type.id, maxDistance: 48, count: 64 })
+    const found = bot.findBlocks({ matching: matchIds, maxDistance: 48, count: 64 })
     const target = found.map(p => bot.blockAt(p)).find(b => b && allowed(b.position))
     if (!target) {
       // Everything around is protected (or we're standing in a protected zone): walk out once and look again.

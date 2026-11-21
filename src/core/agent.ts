@@ -23,6 +23,7 @@ import { fmtPos, itemName, gameModeNote } from './helpers.ts'
 import type { Fleet } from './fleet.ts'
 import { ProtectedAreas, watchRefusedDigs } from './protection.ts'
 import { resolveRetry, actionAttempts, backoffMs, isRetryableResult, type RetryConfig } from './retry.ts'
+import { TOGGLES, findToggle, parseToggleValue, getPath, expandPaths, deepMerge, type ToggleDef } from './toggles.ts'
 import { resolveHumanize, typingDelayMs, styleLine, holdStill, between, type HumanizeOptions } from './humanize.ts'
 import type { UsageSnapshot } from '../llm/usage.ts'
 import { Journal } from './journal/journal.ts'
@@ -59,6 +60,8 @@ export type AgentEvents = {
   /** The server refused a block break here and the area is now avoided (see markProtected). */
   protectedArea: (pos: { x: number, y: number, z: number }) => void
   stopped: () => void
+  /** A setting was changed in game (config_set / config_reset); key is the dotted path or '*'. */
+  settingsChanged: (key: string) => void
   /** The server changed this bot's game mode (survival/creative/adventure/spectator). */
   gameModeChanged: (mode: string, previous: string) => void
 }
@@ -101,16 +104,18 @@ export class Agent extends TypedEmitter<AgentEvents> {
   private readonly logs: { action: Logger, chat: Logger, neoforge: Logger, server: Logger }
   readonly storage: Storage
   readonly dataDir: string
-  readonly settings: Record<string, unknown>
   readonly owners: string[]
-  readonly canDig: boolean
+  /** Settings from the variant, profile and fleet entry (without in-game overrides). */
+  private readonly baseSettings: Record<string, unknown>
+  private readonly baseCanDig: boolean
+  private mergedSettings: Record<string, unknown> = {}
 
   private readonly actions = new Map<string, ActionDef>()
   private readonly aliases = new Map<string, string>()
   private readonly skills: SkillDef[]
   private readonly brains: BrainDef[]
   /** Retry policies (actions, LLM, reconnect) from env + settings.retry. */
-  readonly retry: RetryConfig
+  retry!: RetryConfig
   private readonly channels: ChannelStore
   private readonly registryCache: RegistryCache
   /** Areas where the server refuses block breaking (learned); the pathfinder won't dig there. */
@@ -129,7 +134,8 @@ export class Agent extends TypedEmitter<AgentEvents> {
   private lastChat = 0
   private chatSending = false
   /** Player-like timing (see humanize.ts); null when off. */
-  readonly humanize: HumanizeOptions | null
+  humanize: HumanizeOptions | null = null
+  private reconnectBaseOverride?: number
   private stopping = false
 
   constructor (definition: BotDefinition, server: ServerConfig, opts: InstanceOptions = {}) {
@@ -146,13 +152,12 @@ export class Agent extends TypedEmitter<AgentEvents> {
     }
     this.dataDir = opts.dataDir || join('data', 'bots', this.username)
     this.storage = new Storage(this.dataDir)
-    this.settings = { ...definition.settings, ...opts.settings }
+    this.baseSettings = { ...definition.settings, ...opts.settings }
     const envOwners = listFromEnv(process.env.MC_OWNERS)
     this.owners = (opts.owners ?? (definition.owners?.length ? definition.owners : envOwners)).map(s => s.toLowerCase())
-    this.canDig = opts.canDig ?? definition.canDig ?? process.env.MC_CAN_DIG === 'true'
-    this.humanize = resolveHumanize(this.settings)
-    this.retry = resolveRetry(this.settings)
-    if (opts.reconnectDelayMs) this.retry.reconnect.baseMs = opts.reconnectDelayMs
+    this.baseCanDig = opts.canDig ?? definition.canDig ?? process.env.MC_CAN_DIG === 'true'
+    this.reconnectBaseOverride = opts.reconnectDelayMs
+    this.recomputeSettings()
     this.channels = new ChannelStore(join('data', `channels-${server.host}-${server.port}.json`))
     this.registryCache = new RegistryCache(join('data', `registries-${server.host}-${server.port}.json`))
     this.protectedAreas = new ProtectedAreas(join('data', `protected-${server.host}-${server.port}.json`))
@@ -164,6 +169,74 @@ export class Agent extends TypedEmitter<AgentEvents> {
     for (const skill of this.skills) {
       for (const action of skill.actions ?? []) this.registerAction(action)
     }
+  }
+
+  // ---------------------------------------------------------------- settings / toggles
+
+  /** Effective settings: profile/variant values with in-game overrides (config_set) on top. */
+  get settings (): Record<string, unknown> {
+    return this.mergedSettings
+  }
+
+  get canDig (): boolean {
+    const o = this.overrides().canDig
+    return typeof o === 'boolean' ? o : this.baseCanDig
+  }
+
+  /** In-game overrides, flat dotted keys, persisted in storage. */
+  overrides (): Record<string, unknown> {
+    return this.storage.get<Record<string, unknown>>('settings.overrides', {})
+  }
+
+  private recomputeSettings (): void {
+    const flat = { ...this.overrides() }
+    delete flat.canDig
+    this.mergedSettings = deepMerge(this.baseSettings, expandPaths(flat))
+    this.humanize = resolveHumanize(this.mergedSettings)
+    this.retry = resolveRetry(this.mergedSettings)
+    if (this.reconnectBaseOverride) this.retry.reconnect.baseMs = this.reconnectBaseOverride
+  }
+
+  /** Toggleable settings with their current value and whether an override is active. */
+  listToggles (): { def: ToggleDef, key: string, value: unknown, overridden: boolean }[] {
+    const ov = this.overrides()
+    const rows = TOGGLES.filter(t => !t.key.endsWith('.*')).map(def => ({
+      def, key: def.key, value: def.key === 'canDig' ? this.canDig : getPath(this.settings, def.key), overridden: def.key in ov
+    }))
+    for (const [k, v] of Object.entries(ov)) {
+      const def = findToggle(k)
+      if (def?.key.endsWith('.*')) rows.push({ def, key: k, value: v, overridden: true })
+    }
+    return rows
+  }
+
+  /** Changes a toggle live (validated) and persists it. */
+  setToggle (key: string, raw: unknown): { ok: true, value: unknown } | { ok: false, error: string } {
+    const def = findToggle(key)
+    if (!def) return { ok: false, error: `${key} can't be changed in game (see config_list)` }
+    const parsed = parseToggleValue(def, raw)
+    if (!parsed.ok) return parsed
+    this.storage.set('settings.overrides', { ...this.overrides(), [key]: parsed.value })
+    this.applyToggles(key)
+    return parsed
+  }
+
+  /** Drops one override, or all of them. */
+  resetToggle (key?: string): number {
+    const ov = { ...this.overrides() }
+    const keys = key ? Object.keys(ov).filter(k => k === key || k.startsWith(key + '.')) : Object.keys(ov)
+    for (const k of keys) delete ov[k]
+    this.storage.set('settings.overrides', ov)
+    this.applyToggles(key ?? '*')
+    return keys.length
+  }
+
+  private applyToggles (key: string): void {
+    this.recomputeSettings()
+    const bot = this._bot as any
+    if (bot?.pathfinder?.movements && (key === 'canDig' || key === '*')) bot.pathfinder.movements.canDig = this.canDig
+    this.log.info(`setting changed: ${key}`, { overrides: this.overrides() })
+    this.emit('settingsChanged', key)
   }
 
   // ---------------------------------------------------------------- fleet

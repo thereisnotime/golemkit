@@ -21,14 +21,23 @@ interface Entry { at: number, tokens: number, usd: number }
 const HOUR = 3_600_000
 
 export class Budget {
-  readonly turnsPerHour: number
-  readonly tokensPerHour: number
-  readonly usdPerHour: number
-  readonly tokensPerDay: number
-  readonly usdPerDay: number
+  turnsPerHour: number
+  tokensPerHour: number
+  usdPerHour: number
+  tokensPerDay: number
+  usdPerDay: number
   private entries: Entry[] = []
   private readonly now: () => number
   private readonly today: () => UsageTotals | undefined
+
+  /** Updates limits live (keys left out keep their value). */
+  configure (opts: BudgetOptions): void {
+    if (opts.turnsPerHour !== undefined) this.turnsPerHour = opts.turnsPerHour
+    if (opts.tokensPerHour !== undefined) this.tokensPerHour = opts.tokensPerHour
+    if (opts.usdPerHour !== undefined) this.usdPerHour = opts.usdPerHour
+    if (opts.tokensPerDay !== undefined) this.tokensPerDay = opts.tokensPerDay
+    if (opts.usdPerDay !== undefined) this.usdPerDay = opts.usdPerDay
+  }
 
   constructor (opts: BudgetOptions = {}, deps: { now?: () => number, today?: () => UsageTotals | undefined } = {}) {
     this.turnsPerHour = opts.turnsPerHour ?? 60

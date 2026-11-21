@@ -11,11 +11,12 @@ import { combat } from './combat.ts'
 import { survival } from './survival.ts'
 import { inventorySkill } from './inventory.ts'
 import { status } from './status.ts'
+import { config } from './config.ts'
 import { gather } from './gather.ts'
 import { journal } from './journal.ts'
 
 /** The standard skill set most bots want. */
-export const standardSkills = () => [status(), movement(), combat(), survival(), inventorySkill(), gather(), journal()]
+export const standardSkills = () => [status(), config(), movement(), combat(), survival(), inventorySkill(), gather(), journal()]
 export { navigation, getHome, setHome, getPlaces, setPlace, type Place } from './navigation.ts'
 
 // Extended skills: crafting, storage, farming, woodcutting, building, picking up drops.
@@ -42,3 +43,4 @@ import { materialsSkill } from './materials.ts'
 /** Extra skills on top of standardSkills(): crafting, containers, farming, woodcutting, building, construction, materials, pickup. */
 export const extendedSkills = () => [crafting(), containers(), farming(), woodcutting(), building(), construction(), materialsSkill(), pickup()]
 export { modsSkill, installedMods } from './mods.ts'
+export { config } from './config.ts'

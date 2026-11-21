@@ -167,6 +167,7 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
       for (const a of [llmUsageAction, goalStatusAction, goalCancelAction]) if (!agent.getAction(a.name)) agent.registerAction(a)
       await rt.start()
       agent.on('chat', msg => rt.onChat(msg))
+      agent.on('settingsChanged', () => rt.applySettings(fromSettings(agent)))
       agent.on('actionEnd', (info, result) => rt.onActionEnd(info, result))
     },
 

@@ -21,9 +21,12 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
   return defineBrain({
     name: 'reflexes',
     session (agent, bot) {
-      // Profile `reflexes:` (settings.reflexes) overrides the variant's defaults.
-      const opts: ReflexOptions = { ...defaults, ...(agent.settings.reflexes as ReflexOptions | undefined) }
-      const { selfDefense = true, autoEat = true, eatBelow = 15, retreatBelow = 8, waterFightAbove = 14 } = opts
+      // Profile `reflexes:` (settings.reflexes) overrides the variant's defaults. Read on every
+      // use, so in-game changes (config_set reflexes.*) apply immediately.
+      const cfg = () => {
+        const o: ReflexOptions = { ...defaults, ...(agent.settings.reflexes as ReflexOptions | undefined) }
+        return { selfDefense: o.selfDefense ?? true, autoEat: o.autoEat ?? true, eatBelow: o.eatBelow ?? 15, retreatBelow: o.retreatBelow ?? 8, waterFightAbove: o.waterFightAbove ?? 14 }
+      }
       let busy = false
       const reflex = async (action: string) => {
         if (busy) return
@@ -37,10 +40,10 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       }
       // Running from flyers is pointless (they're faster); fight them even when low.
       const shouldRetreat = (mob: any) => !FLYING.has(mob.name ?? '') &&
-        (bot.health <= retreatBelow || (inWater(mob) && bot.health < waterFightAbove))
+        (bot.health <= cfg().retreatBelow || (inWater(mob) && bot.health < cfg().waterFightAbove))
 
       const onHurt = (entity: any) => {
-        if (!selfDefense || entity !== bot.entity || !needsSurvival(bot)) return
+        if (!cfg().selfDefense || entity !== bot.entity || !needsSurvival(bot)) return
         // Flyers (phantoms) hit and climb away, so look further for them.
         const mob = nearestHostile(bot, bot.entity.position, 8) ??
           bot.nearestEntity((e: any) => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20)
@@ -66,6 +69,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
 
       const timer = setInterval(() => {
         if (!needsSurvival(bot)) return // creative/spectator: no hunger, no danger
+        const { selfDefense, autoEat, eatBelow, retreatBelow } = cfg()
         // Low health with a hostile close by: get away even before the next hit.
         const mob = selfDefense ? nearestHostile(bot, bot.entity.position, 6) : null
         if (mob && !FLYING.has(mob.name ?? '') && bot.health <= retreatBelow && agent.currentAction?.name !== 'retreat' && agent.getAction('retreat')) {

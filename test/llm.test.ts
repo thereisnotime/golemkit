@@ -355,7 +355,7 @@ test('owners only, commands ignored, provider errors handled', async () => {
   await rt.idle()
   assert.equal(p.inputs.length, 1)
   assert.match(rt.reports[0]!.error ?? '', /boom/)
-  assert.match(agent.said[0]?.msg ?? '', /foggy/)
+  assert.match(agent.said[0]?.msg ?? '', /LLM call failed|lost the thread/)
 })
 
 test('events and ticks', async () => {

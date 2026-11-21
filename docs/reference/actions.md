@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-17 skills, 55 actions.
+18 skills, 59 actions.
 
 ## building
 
@@ -87,6 +87,49 @@ Hunt passive animals (cow, pig, sheep, chicken, rabbit, mooshroom) for food and 
 | `count` | integer (1..8) |  | `1` | how many to kill |
 | `radius` | number (4..64) |  | `24` | how far to look, in blocks |
 | `pens` | boolean |  | `false` | also hunt animals inside fences (only your own farm) |
+
+## config
+
+Feature toggles: change settings in game without a restart.
+
+### `config_list`
+
+List the settings that can be changed in game (feature toggles) with their current values.
+
+*non-exclusive*
+
+No parameters.
+
+### `config_get`
+
+Show one setting, what it does and whether it was changed in game.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `key` | string | yes |  |  |
+
+### `config_set`
+
+Change a setting live (owners only), e.g. config_set llm.listen all, config_set reflexes.retreatBelow 6. Persists until config_reset.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `key` | string | yes |  |  |
+| `value` | string | yes |  | new value; lists comma separated |
+
+### `config_reset`
+
+Undo in-game setting changes: one key, or all of them, back to the profile values (owners only).
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `key` | string |  |  |  |
 
 ## construction
 

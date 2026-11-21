@@ -116,7 +116,7 @@ export class LlmRuntime {
   readonly log: Logger
 
   private readonly opts: RuntimeOptions
-  private readonly limits: Required<Omit<LimitOptions, keyof BudgetOptions>>
+  private limits: Required<Omit<LimitOptions, keyof BudgetOptions>>
   private readonly queue: Trigger[] = []
   private busy = false
   private current: AbortController | null = null
@@ -146,6 +146,21 @@ export class LlmRuntime {
       turnTimeoutMs: l.turnTimeoutMs ?? 120_000,
       queueSize: l.queueSize ?? 3
     }
+  }
+
+  /** In-game setting changes (config_set): update triggers, style and limits live. */
+  applySettings (s: Record<string, any>): void {
+    const keys = ['listen', 'aliases', 'conversationMs', 'ownersOnly', 'tickMs', 'mention', 'whisper', 'ambientBatchMs', 'ambientMinGapMs', 'playerCooldownMs']
+    const triggers: Record<string, unknown> = { ...(this.opts.triggers ?? {}) }
+    for (const k of keys) if (s[k] !== undefined) triggers[k] = s[k]
+    ;(this.opts as any).triggers = triggers
+    if (typeof s.immersive === 'boolean') (this.opts as any).immersive = s.immersive
+    const b = s.budget ?? {}
+    this.budget.configure(b)
+    const lim = this.limits as Record<string, number>
+    for (const k of ['maxTurns', 'maxToolCalls', 'maxChatMessages', 'turnTimeoutMs']) if (typeof b[k] === 'number') lim[k] = b[k]
+    this.goals.configure(s.goals ?? {})
+    this.log.info('settings applied live', { listen: triggers.listen, immersive: this.opts.immersive })
   }
 
   get systemPrompt (): string {
@@ -532,8 +547,16 @@ export class LlmRuntime {
       }
     } catch (e) {
       error = (e as Error).message
-      this.log.warn(`turn failed: ${error}`, { provider: this.provider.name })
-      if (chat) this.notice(chat, 'sorry, my head is foggy right now. try again in a bit, or use !commands')
+      const acted = (this.tools.active?.calls.length ?? 0) > 0
+      if (/max_turns|max turns|maximum number of turns/i.test(error) && acted) {
+        // The model ran out of steps for this turn after doing real work: not a failure the
+        // player needs to hear about. Goals continue on their own; otherwise the work stands.
+        this.log.info('turn hit its step limit after acting', { provider: this.provider.name, calls: this.tools.active?.calls.length })
+        error = undefined
+      } else {
+        this.log.warn(`turn failed: ${error}`, { provider: this.provider.name })
+        if (chat) this.notice(chat, acted ? "I got partway and lost the thread; say 'continue' or check !goal" : 'my LLM call failed just now, try again in a bit (or use !commands)')
+      }
     } finally {
       this.current = null
       this.lastTurnAt = Date.now()

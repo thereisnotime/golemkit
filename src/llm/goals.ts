@@ -76,13 +76,18 @@ const HISTORY_KEY = 'llm.goals.history'
 
 export class GoalStore {
   private readonly storage: Storage
-  readonly opts: ResolvedGoalOptions
+  opts: ResolvedGoalOptions
   private readonly now: () => number
 
   constructor (storage: Storage, opts: GoalOptions = {}, now: () => number = Date.now) {
     this.storage = storage
     this.opts = resolveGoalOptions(opts)
     this.now = now
+  }
+
+  /** Updates limits live (in-game config_set llm.goals.*). */
+  configure (opts: GoalOptions): void {
+    this.opts = resolveGoalOptions({ ...this.opts, ...opts })
   }
 
   get active (): Goal | null {
