@@ -5,7 +5,7 @@ import { defineSkill, defineAction, z, noParams, ok, fail, goals, fmtPos, gotoTi
 import { pickupNearby } from './pickup.ts'
 import { isRangedMob, weaponFlags, type WeaponFlags } from './weapons.ts'
 import { fightTarget, eyeReach, lineOfSight, creeperFuseLit, eatNow, fightFood, meleeNear, type FightResult } from './fight.ts'
-import { rankTargets, type ThreatInfo } from './tactics.ts'
+import { rankTargets, attackRefusal, type ThreatInfo } from './tactics.ts'
 import { fillerBlock } from './survival.ts'
 import { getHome } from './navigation.ts'
 import { gearUp, wornArmorPoints } from './gear.ts'
@@ -53,27 +53,25 @@ function noteAttacker (bot: Bot): void {
   m.set(e.id, Date.now())
 }
 
-const NEUTRAL_FIGHTABLE = new Set(['enderman', 'piglin', 'zombified_piglin', 'wolf', 'polar_bear', 'llama', 'trader_llama', 'bee', 'panda', 'goat'])
-const NEVER = new Set(['villager', 'wandering_trader', 'iron_golem', 'snow_golem', 'allay', 'cat', 'parrot', 'horse', 'donkey', 'mule', 'axolotl'])
-
 /**
  * Why an entity must not be attacked, or null when it may: never players, villagers, golems,
- * pets (owner or tamed flag), named mobs; neutral mobs only while they're attacking us.
+ * pets (owner or tamed flag), named mobs; neutral mobs only while they're attacking us (or,
+ * with `attacking`, someone we protect). The rule itself is tactics.attackRefusal().
  */
-export function combatRefusal (bot: Bot, e: Entity): string | null {
-  if (e.type === 'player' || (e as any).username) return 'a player'
+export function combatRefusal (bot: Bot, e: Entity, attacking = false): string | null {
   const name = e.name ?? ''
-  if (NEVER.has(name)) return `a ${name}`
   const keys = (bot.registry as any).entitiesByName?.[name]?.metadataKeys as string[] | undefined
   const md = (e as any).metadata as unknown[] | undefined
   const at = (key: string, fallback: number) => { const i = keys?.indexOf(key) ?? -1; return md?.[i >= 0 ? i : fallback] }
   const custom = at('custom_name', 2)
-  if (custom !== undefined && custom !== null && custom !== '') return 'named'
-  if (at('owneruuid', -1)) return 'someone\'s pet'
-  const id = e.id
-  if (isHostile(e)) return null
-  if (NEUTRAL_FIGHTABLE.has(name) && recentAttacker(bot, id)) return null
-  return 'not hostile'
+  return attackRefusal({
+    name,
+    player: e.type === 'player' || !!(e as any).username,
+    named: custom !== undefined && custom !== null && custom !== '',
+    owned: !!at('owneruuid', -1),
+    hostile: isHostile(e),
+    attacking: attacking || recentAttacker(bot, e.id)
+  })
 }
 
 /** Everything worth fighting around the bot, most threatening first (tactics.rankTargets). */

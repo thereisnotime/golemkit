@@ -7,6 +7,7 @@ import { isRangedMob } from '../skills/weapons.ts'
 import { threats } from '../skills/combat.ts'
 import { fightFood } from '../skills/fight.ts'
 import { gearPlan, hasGearUpgrade } from '../skills/gear.ts'
+import { escorting } from '../skills/bodyguard.ts'
 
 export interface ReflexOptions {
   selfDefense?: boolean
@@ -74,7 +75,9 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         // Phantoms at night with no weapon (or hurt): dig in instead of punching the sky.
         const unarmed = !bot.inventory.items().some(i => /_(sword|axe)$/.test(i.name))
         const night = bot.time.timeOfDay >= 12_500 && bot.time.timeOfDay <= 23_500
-        if (mob.name === 'phantom' && night && (unarmed || bot.health <= 12) && agent.canDig && agent.getAction('bunker') &&
+        // a bodyguard stays with its player unless it is about to die
+        const guarding = !!escorting(agent) && bot.health > 6
+        if (mob.name === 'phantom' && night && (unarmed || bot.health <= 12) && !guarding && agent.canDig && agent.getAction('bunker') &&
             !agent.protectedAreas.isProtected(bot.entity.position) && Date.now() - bunkerFailedAt > 60_000) {
           // A failed bunker (thin ground, nothing to seal with) isn't retried for a minute; fight instead.
           if (!busy) {
@@ -90,7 +93,8 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           if (cur !== 'retreat') void reflex('retreat')
           return
         }
-        if (cur === 'defend' || cur === 'attack' || cur === 'retreat') return
+        // protect (bodyguard) fights for itself and picks targets around the player: don't take over
+        if (cur === 'defend' || cur === 'attack' || cur === 'retreat' || cur === 'protect') return
         void reflex('defend')
       }
       bot.on('entityHurt', onHurt)
@@ -122,7 +126,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         }
         // Don't wait for the first hit: a creeper walking up (its blast is the hit) or a mob at arm's
         // length gets fought now. Same defend action as when hurt.
-        if (selfDefense && bot.health > 0 && !busy && agent.getAction('defend') && !['defend', 'retreat', 'bunker', 'pillar'].includes(agent.currentAction?.name ?? '')) {
+        if (selfDefense && bot.health > 0 && !busy && agent.getAction('defend') && !['defend', 'retreat', 'bunker', 'pillar', 'protect'].includes(agent.currentAction?.name ?? '')) {
           const t = threats(bot, 8)[0]
           const d = t ? t.position.distanceTo(bot.entity.position) : Infinity
           if (t && isHostile(t) && !FLYING.has(t.name ?? '') && (d <= 4 || (t.name === 'creeper' && d <= 7)) && !climbingAway(t)) {

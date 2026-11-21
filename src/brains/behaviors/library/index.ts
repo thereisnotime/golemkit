@@ -2,6 +2,7 @@
 import type { BehaviorDefinition } from '../types.ts'
 import { keepFed } from './keepFed.ts'
 import { staySafe, avoidMobs } from './safety.ts'
+import { bodyguard } from './bodyguard.ts'
 import { followOwner, guardOwner, greetPlayersBehavior, idleLook } from './social.ts'
 import { idleAntics, antiAfk } from './fun.ts'
 import { sleepAtNightBehavior, returnHome, wanderBehavior, guardArea } from './routine.ts'
@@ -11,6 +12,7 @@ import { keepToolsUpgraded } from './tools.ts'
 
 export { keepFed, nextFoodStep, isHungry, senseFood, COOKED, type FoodStep, type FoodWorld, type FoodStepOptions } from './keepFed.ts'
 export { staySafe, avoidMobs, assessDanger } from './safety.ts'
+export { bodyguard } from './bodyguard.ts'
 export { followOwner, guardOwner, greetPlayersBehavior, idleLook } from './social.ts'
 export { sleepAtNightBehavior, returnHome, wanderBehavior, guardArea } from './routine.ts'
 export { idleAntics, antiAfk } from './fun.ts'
@@ -21,7 +23,7 @@ export { keepToolsUpgraded, wornTools } from './tools.ts'
 export function defaultBehaviors (): BehaviorDefinition<any>[] {
   return [
     staySafe, avoidMobs, keepFed,
-    guardOwner, guardArea, followOwner,
+    bodyguard, guardOwner, guardArea, followOwner,
     sleepAtNightBehavior, returnHome, depositWhenFull,
     farmSetup, farmLoop, chopWoodLoop, collectDrops, lightArea, keepToolsUpgraded,
     greetPlayersBehavior, wanderBehavior, idleLook, idleAntics, antiAfk

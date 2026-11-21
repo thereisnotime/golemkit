@@ -113,6 +113,40 @@ export function rankTargets<T extends ThreatInfo> (list: T[]): T[] {
   return list.slice().sort((a, b) => threatScore(b) - threatScore(a))
 }
 
+/** Neutral mobs fought only while they attack (us, or the player a bodyguard protects). */
+export const NEUTRAL_FIGHTABLE = new Set(['enderman', 'piglin', 'zombified_piglin', 'wolf', 'polar_bear', 'llama', 'trader_llama', 'bee', 'panda', 'goat'])
+/** Never attacked, whatever they do. */
+export const NEVER_ATTACK = new Set(['villager', 'wandering_trader', 'iron_golem', 'snow_golem', 'allay', 'cat', 'parrot', 'horse', 'donkey', 'mule', 'axolotl'])
+
+/** What the attack rule looks at; combatRefusal() reads these off a mineflayer entity. */
+export interface AttackCandidate {
+  name: string
+  /** A player (type player or a username). */
+  player: boolean
+  /** Has a custom name (name tag). */
+  named: boolean
+  /** Has an owner (tamed). */
+  owned: boolean
+  /** isHostile(). */
+  hostile: boolean
+  /** Hit us (or the protected player) in the last few seconds. */
+  attacking: boolean
+}
+
+/**
+ * Why an entity must not be attacked, or null when it may: never players, villagers, golems,
+ * pets, named mobs; neutral mobs (endermen, piglins, wolves...) only while they attack.
+ */
+export function attackRefusal (c: AttackCandidate): string | null {
+  if (c.player) return 'a player'
+  if (NEVER_ATTACK.has(c.name) || /golem$/.test(c.name)) return `a ${c.name}`
+  if (c.named) return 'named'
+  if (c.owned) return 'someone\'s pet'
+  if (c.hostile) return null
+  if (NEUTRAL_FIGHTABLE.has(c.name) && c.attacking) return null
+  return 'not hostile'
+}
+
 export interface DisengageState {
   health: number
   maxHealth?: number

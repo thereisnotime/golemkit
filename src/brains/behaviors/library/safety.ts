@@ -14,6 +14,7 @@ import { unpreparedForNight } from '../../../skills/tactics.ts'
 import { findStandable, getHome } from '../../../skills/navigation.ts'
 import { canPlace } from '../runtime.ts'
 import { hostilesNear } from './util.ts'
+import { escorting } from '../../../skills/bodyguard.ts'
 
 type Danger = 'surrounded' | 'low_health' | 'water' | 'night' | 'shelter' | null
 
@@ -59,6 +60,8 @@ export function assessDanger (ctx: Pick<NpcContext, 'agent' | 'bot' | 'bb'> & { 
   const near = hostilesNear(bot, pos, running ? Math.max(20, o.mobRadius) : o.mobRadius)
   if (near.length && o.retreatBelow > 0 && health <= (running ? o.retreatBelow + 2 : o.retreatBelow)) return 'low_health'
   if (o.avoidWater && near.length && health < 16 && inWater(bot)) return 'water'
+  // an armed bodyguard with its player online stays with them at night (the dangers above still apply)
+  if (escorting(agent)) return null
   if (o.homeAtNight && bb.facts.isNight && !bb.facts.sleeping && getHome(agent) && bb.facts.homeDistance !== null && bb.facts.homeDistance > o.homeRange) return 'night'
   // no home to go to and not fit for a night outside: dig in, unless already under a roof
   if (o.shelterUnprepared && bb.facts.isNight && !bb.facts.sleeping && !getHome(agent) && agent.canDig && agent.getAction?.('bunker') &&

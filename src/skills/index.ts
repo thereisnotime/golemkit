@@ -4,6 +4,7 @@ export { survival, bestFood, fillerBlock } from './survival.ts'
 export { inventorySkill } from './inventory.ts'
 export { status } from './status.ts'
 export { gather } from './gather.ts'
+export { guardSkill, escorting, playerThreats } from './bodyguard.ts'
 export { journal, fmtDeath, fmtEventList, resolveTypes, recentEventsObservation } from './journal.ts'
 
 import { movement } from './movement.ts'
@@ -14,9 +15,10 @@ import { status } from './status.ts'
 import { config } from './config.ts'
 import { gather } from './gather.ts'
 import { journal } from './journal.ts'
+import { guardSkill } from './bodyguard.ts'
 
 /** The standard skill set most bots want. */
-export const standardSkills = () => [status(), config(), movement(), combat(), survival(), inventorySkill(), gather(), journal()]
+export const standardSkills = () => [status(), config(), movement(), combat(), survival(), inventorySkill(), gather(), journal(), guardSkill()]
 export { navigation, getHome, setHome, getPlaces, setPlace, type Place } from './navigation.ts'
 
 // Extended skills: crafting, storage, farming, woodcutting, building, picking up drops.
