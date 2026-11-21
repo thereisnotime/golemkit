@@ -187,6 +187,8 @@ export class LlmRuntime {
   /** Checks the provider and starts the MCP bridge if needed. */
   async start (): Promise<void> {
     void this.opts.proxyMetrics?.delta() // baseline for per-turn proxy metrics
+    // A quota pause survives reconnects and restarts (no failing test turn, no repeated whisper).
+    try { const q = this.agent.storage.get<number | undefined>('llm.quotaUntil'); if (q && q > Date.now()) this.quotaUntil = q } catch {}
     this.unavailable = await this.provider.check().catch(e => (e as Error).message)
     if (this.unavailable) this.log.warn(`provider ${this.provider.name} unavailable: ${this.unavailable}`, { provider: this.provider.name })
     if (this.provider.needsMcp || this.opts.mcp?.expose) {
@@ -615,6 +617,7 @@ export class LlmRuntime {
         // further turn would fail the same way, so pause until the reset (or an hour if unknown).
         const until = quotaUntil(error)!
         this.quotaUntil = until
+        try { this.agent.storage.set('llm.quotaUntil', until) } catch {}
         const when = new Date(until).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
         this.log.warn(`provider quota used up; LLM paused until ${when}`, { provider: this.provider.name, error: error.slice(0, 160) })
         try { this.opts.onPause?.(`provider quota: ${error.slice(0, 120)}`) } catch {}
