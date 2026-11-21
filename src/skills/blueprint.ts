@@ -57,12 +57,15 @@ export const BlueprintSchema = z.object({
   stairs: z.string().optional().describe('role used by the ^ v < > stair shorthand (default: a role named roof)'),
   layers: z.array(LayerSchema).min(1),
   meta: z.object({
-    tags: z.array(z.string()).optional(),
+    tags: z.array(z.string()).optional().describe('house, defence, farm, decoration, ...'),
     style: z.string().optional(),
     author: z.string().optional(),
     description: z.string().optional(),
-    source: z.string().optional()
-  }).passthrough().optional().describe('free-form library metadata; not used for building')
+    source: z.string().optional().describe('shipped, designed, captured, imported from <file>, ...'),
+    created: z.string().optional().describe('ISO date'),
+    rating: z.number().min(0).max(5).optional(),
+    notes: z.string().optional()
+  }).passthrough().optional().describe('library metadata (blueprint_search reads it); not used for building')
 })
 
 export type BlueprintFile = z.infer<typeof BlueprintSchema>
@@ -107,6 +110,12 @@ const STATE_VALUES: Record<string, RegExp> = {
   hanging: /^(true|false)$/,
   part: /^(head|foot)$/,
   shape: /^(straight|inner|outer|inner_left|inner_right|outer_left|outer_right)$/
+}
+
+/** False when a known state property has a value the builder can't use (chest type=single, rail shape=ascending_east). */
+export function validStateValue (key: string, value: string): boolean {
+  const re = STATE_VALUES[key]
+  return !re || re.test(value)
 }
 
 function stateProblems (st: BlockState | undefined, where: string): string[] {
@@ -184,11 +193,36 @@ export function parseBlueprint (text: string | unknown, source = 'blueprint'): B
   return bp
 }
 
+/** The item that places a block, when they differ (a wall torch comes from a torch). */
+export function itemForBlock (block: string): string {
+  const n = block.replace(/^minecraft:/, '')
+  if (/^(soul_|redstone_)?wall_torch$/.test(n)) return n.replace('wall_torch', 'torch')
+  const wall = /^(.+)_wall_(sign|hanging_sign|banner|head|skull|fan)$/.exec(n)
+  if (wall) return `${wall[1]}_${wall[2]}`
+  if (n === 'redstone_wire') return 'redstone'
+  if (n === 'tripwire') return 'string'
+  return n
+}
+
+/** When a plain block goes in: doors last, things that hang on a wall after the walls, furniture after that. */
+export function kindForBlock (block: string): Role['kind'] {
+  const n = block.replace(/^[a-z0-9_.-]+:/, '')
+  if (/_door$/.test(n) && !/trapdoor$/.test(n)) return 'door'
+  if (/(^|_)torch$|lantern$|^ladder$|_button$|^lever$|_sign$|_banner$|^tripwire_hook$/.test(n)) return 'attachment'
+  if (/_bed$|^(chest|trapped_chest|barrel|furnace|smoker|blast_furnace|crafting_table|anvil|chipped_anvil|damaged_anvil|enchanting_table|brewing_stand|cauldron|lectern|loom|stonecutter|grindstone|smithing_table|cartography_table|fletching_table|composter|flower_pot)$|^potted_/.test(n)) return 'furnish'
+  return 'block'
+}
+
 /** The implicit role of a plain block name in a palette: exactly that block, nothing else. */
 function blockRole (roles: Record<string, Role>, block: string): string {
   const name = block.replace(/^minecraft:/, '')
   const key = `block:${name}`
-  if (!roles[key]) roles[key] = { default: name, kind: 'block', optional: false, material: false, wood: false, gather: true }
+  if (!roles[key]) {
+    const item = itemForBlock(name)
+    const role: Role = { default: item, kind: kindForBlock(name), optional: false, material: false, wood: false, gather: true }
+    if (item !== name) role.accept = `^(${escapeRe(item)}|${escapeRe(name)})$`
+    roles[key] = role
+  }
   return key
 }
 

@@ -11,14 +11,15 @@ import { defineSkill, defineAction, z, ok, fail, checkAborted, sleep, fmtPos, go
 import { vec, digBlock, DigRefusedError, gotoWithin, isReplaceable, findItem } from './world.ts'
 import { equipFor, inventoryCounts, ensureTool } from './toolkit.ts'
 import {
-  loadBlueprints, rotate, placeCells, bounds, facingToward, facingsToward, pickFacing, resolveRoles, materials, fmtMaterials, orderCells, diffCells,
-  cellState, chooseSite, isNaturalBlock, isSoftBlock, roleAccepts, solidCells, fillCells, pickTheme, renderBlueprint, FACINGS, BLUEPRINTS_DIR, WOODS,
+  rotate, placeCells, bounds, facingToward, facingsToward, pickFacing, resolveRoles, materials, fmtMaterials, orderCells, diffCells,
+  cellState, chooseSite, isNaturalBlock, isSoftBlock, roleAccepts, solidCells, fillCells, pickTheme, renderBlueprint, FACINGS, WOODS,
   type Blueprint, type Column, type Facing, type Pos, type ResolvedRole, type WorldCell, type BlockState
 } from './blueprint.ts'
 import { checkCell, fixFor, familyOf, summarize, skipReason, finishDespiteUnreachable, UNREACHABLE, type QualityRow } from './blockstate.ts'
 import { placeBlockState, toggleBlock, reachToDig, NotPlaceableYet } from './placement.ts'
 import { gatherMaterials, wantsForRoles, type RoleWants } from './materials.ts'
 import { isCreative, takeFromCreative } from './creative.ts'
+import { libraryDirs, loadLibrary } from './blueprint-library.ts'
 
 const ACTIVE_KEY = 'build.active'
 /** Positions of blocks this bot placed for builds, so it never mistakes its own work for a player's. */
@@ -96,11 +97,13 @@ function forbiddenFor (agent: Agent, bot: Bot): (p: Pos) => boolean {
     (!!spawn && Math.abs(p.x - spawn.x) <= keepOut && Math.abs(p.z - spawn.z) <= keepOut)
 }
 
-/** Where blueprints are loaded from: the shipped ones, then `settings.build.blueprintDirs` (later wins). */
-export function blueprintDirs (agent?: Pick<Agent, 'settings'>): string[] {
-  const extra = (agent?.settings.build as { blueprintDirs?: string[] } | undefined)?.blueprintDirs
-  return [BLUEPRINTS_DIR, ...(Array.isArray(extra) ? extra : [])]
+/** Where blueprints are loaded from: shipped, `settings.build.blueprintDirs`, then the learned library (blueprint-library.ts). */
+export function blueprintDirs (agent?: Pick<Agent, 'settings' | 'dataDir'>): string[] {
+  return libraryDirs(agent).map(d => d.dir)
 }
+
+/** Every blueprint this bot can build (cached until a file changes). */
+const allBlueprints = (agent: Pick<Agent, 'settings' | 'dataDir'>) => loadLibrary(libraryDirs(agent))
 
 /** Ground y below a column (for explicit x/z without y). */
 function groundY (bot: Bot, x: number, z: number): number | null {
@@ -152,7 +155,7 @@ function frontOpen (bp: Blueprint, origin: Pos, facing: Facing, column: (x: numb
 
 /** Works out where and how a structure goes. Returns a message string when it can't. */
 function planBuild ({ bot, agent, player }: Pick<ActionContext, 'bot' | 'agent' | 'player'>, p: PlanInput): Plan | string {
-  const { blueprints, errors } = loadBlueprints(blueprintDirs(agent))
+  const { blueprints, errors } = allBlueprints(agent)
   const bp = blueprints.get(p.template)
   if (!bp) return `unknown blueprint "${p.template}"; known: ${[...blueprints.keys()].join(', ') || 'none'}${errors.length ? ` (broken: ${errors.join('; ').slice(0, 200)})` : ''}`
   const me = bot.entity.position
@@ -263,7 +266,7 @@ export function remainingWants (ctx: Pick<ActionContext, 'bot' | 'agent' | 'play
     const done = solidCells(diff.done).length
     return { ...wantsForRoles(left, planned.roles), note: done ? `${done} blocks of the ${template} are already in place` : '' }
   }
-  const bp = loadBlueprints(blueprintDirs(ctx.agent)).blueprints.get(template)
+  const bp = allBlueprints(ctx.agent).blueprints.get(template)
   if (!bp) return planned
   return { ...wantsForRoles(bp.cells, resolveRoles(bp, inventoryCounts(ctx.bot), material, theme)), note: '' }
 }
@@ -671,9 +674,10 @@ const build = defineAction({
     'watchtower (ladder, fenced platform), fortress (15x15 walled compound to put a house in), hut (plain box, quick), shelter (emergency 3x3 box around the bot), wall_segment, platform, tower. ' +
     'Picks a flat, clear spot near whoever asked (never in protected areas or over player builds), fills small dips, digs bumps and plants, faces the door to the player ' +
     '(or an open side), places blocks with the right facing (stairs, slabs, logs, doors, torches...), checks every block afterwards and fixes mistakes, and skips blocks ' +
-    'that are already right, so calling it again resumes an interrupted build. gather=true first gathers what is missing. Reports blocks built and what was skipped.',
+    'that are already right, so calling it again resumes an interrupted build. gather=true first gathers what is missing. Reports blocks built and what was skipped. ' +
+    'Learned blueprints (captured, imported, designed) build the same way; blueprint_pick chooses one when the request names none.',
   params: z.object({
-    template: z.string().describe('blueprint name: small_house (default house), cottage, cabin, watchtower, fortress, hut, shelter, wall_segment, platform, tower (build_plan lists all)'),
+    template: z.string().describe('blueprint name: small_house (default house), cottage, cabin, watchtower, fortress, hut, shelter, wall_segment, platform, tower, or a learned one (blueprint_search finds them)'),
     x: z.number().optional().describe('centre of the footprint; omit to pick a spot near the player'),
     y: z.number().optional().describe('level of the floor (layer 0); default the ground there + 1'),
     z: z.number().optional(),
@@ -703,7 +707,7 @@ const buildPlan = defineAction({
   }),
   exclusive: false,
   run (ctx, p) {
-    const { blueprints, errors } = loadBlueprints(blueprintDirs(ctx.agent))
+    const { blueprints, errors } = allBlueprints(ctx.agent)
     if (!p.template) {
       const list = [...blueprints.values()].map(b => `${b.name} (${b.width}x${b.depth}x${b.height}, ${solidCells(b.cells).length} blocks): ${b.description}`)
       return ok(`blueprints: ${list.join(' | ')}${errors.length ? ` | broken: ${errors.join('; ')}` : ''}`)

@@ -244,9 +244,11 @@ block back (`checkCell`). The quality pass afterwards uses the same check (`fixF
 
 ### Blueprint format
 
-Blueprints are YAML files in `blueprints/` (plus any `settings.build.blueprintDirs`, later
-directories win by name), validated with zod when loaded (on every call, so new files work
-without a restart). A broken file is reported by name; the others still load.
+Blueprints are YAML files in `blueprints/`, the owner's folders (`settings.build.blueprintDirs`)
+and the bot's learned library (`data/bots/<name>/blueprints/`), later ones win by name. They are
+validated with zod when loaded (cached until a file changes, so new files work without a
+restart). A broken file is reported by name; the others still load. Importing [schematics](/guide/blueprints#import),
+capturing builds, LLM designs and the [building policy](/guide/blueprints#building-policy) are on [Blueprint libraries](./blueprints.md).
 
 ```yaml
 name: small_house          # lowercase, digits, _

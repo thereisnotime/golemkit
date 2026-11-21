@@ -47,6 +47,8 @@ All optional except `variant`; see [Profiles](../guide/profiles).
 |---|---|---|
 | `variant` | which variant to run | [Variants, profiles, fleets](../concepts/variants-profiles) |
 | `username`, `persona`, `owners`, `canDig`, `server` | identity, permissions, server override | [Profiles](../guide/profiles) |
+| `building` | library, creative, ask | [Blueprint libraries](../guide/blueprints#building-policy) |
+| `blueprints` | extra blueprint folders | [Blueprint libraries](../guide/blueprints#libraries) |
 | `llm` | provider, model, effort, login, token source, proxy, listen, immersive, aliases, budget | [LLM brain](../guide/llm-brain) |
 | `context` | [context pack](/guide/context-pack) directory (default `profiles/<name>/`) | [Context pack](../guide/context-pack) |
 | `humanize` | reaction/typing delays, stand still while typing, typos, fidgeting | [Profiles](../guide/profiles#humanize-player-like-timing) |

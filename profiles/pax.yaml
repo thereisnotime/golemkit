@@ -40,6 +40,7 @@ llm:
     maxTurns: 80              # turns on its own before it checks back with robin (big builds need many)
     timeoutMin: 120           # minutes on its own before it checks back
     maxSameFailures: 3        # same failure this often: stop and ask
+building: library             # library | creative | ask: reuse a saved blueprint, design one, or let robin pick
 retry:
   actions: { goto: 1, chop_tree: 1 }
 reflexes:

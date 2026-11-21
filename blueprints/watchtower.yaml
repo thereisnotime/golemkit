@@ -5,7 +5,7 @@ name: watchtower
 description: Lookout tower with a ladder inside, side windows and a fenced 5x5 platform 6 blocks up
 facing: south
 site: near
-meta: { tags: [tower, lookout], style: rustic, author: mc-buddy }
+meta: { tags: [defence, tower, lookout], style: rustic, author: mc-buddy }
 roles:
   base: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone_bricks|stone)$" }
   wall: { default: oak_planks, accept: "_planks$", material: true, wood: true }

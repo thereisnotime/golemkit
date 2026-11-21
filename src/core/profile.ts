@@ -61,6 +61,10 @@ export const ProfileSchema = z.object({
     version: z.string().optional()
   }).optional(),
   llm: LlmProfileSchema.optional(),
+  /** Building policy: library (reuse a saved blueprint), creative (design one), ask (the owner picks). Lands in settings.building. */
+  building: z.enum(['library', 'creative', 'ask']).optional(),
+  /** Extra blueprint folders (relative to the profile), added to settings.build.blueprintDirs. */
+  blueprints: z.union([z.string(), z.array(z.string())]).optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
   /** Reflex tuning: { selfDefense, autoEat, eatBelow, retreatBelow (0 = never retreat), waterFightAbove }. */
   reflexes: z.object({
@@ -158,6 +162,11 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (profile.journal !== undefined) settings.journal = profile.journal === false ? false : { ...(settings.journal as object | undefined), ...profile.journal }
   if (profile.retry) settings.retry = { ...(settings.retry as object | undefined), ...profile.retry }
   if (profile.behaviors) settings.behaviors = { ...(settings.behaviors as object | undefined), ...profile.behaviors }
+  if (profile.building) settings.building = profile.building
+  if (profile.blueprints) {
+    const build = (settings.build ?? {}) as { blueprintDirs?: string | string[] }
+    settings.build = { ...build, blueprintDirs: [...[build.blueprintDirs ?? []].flat(), ...[profile.blueprints].flat().map(d => resolveDir(d, file))] }
+  }
   const context = resolveContext(profile.context, name, file)
   if (context !== undefined) settings.context = context
   return {
