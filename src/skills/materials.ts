@@ -543,9 +543,9 @@ export async function gatherMaterials (ctx: Ctx, wants: Record<string, number>, 
     const r = await takeFromCreative(bot, signal, take)
     const inv = inventoryCounts(bot)
     const missing = Object.entries(wants).filter(([k, n]) => countWant(k, inv) < n).map(([k, n]) => `${n - countWant(k, inv)} ${k}`)
-    const msg = `creative: took ${r.taken} items from the creative inventory${r.unknown.length ? ` (unknown: ${r.unknown.join(', ')})` : ''}`
+    const msg = `creative: took ${r.taken} items from the creative inventory${r.unknown.length ? ` (unknown: ${r.unknown.join(', ')})` : ''}${r.error ? ` (${r.error})` : ''}`
     log.debug('gather: creative', { take: JSON.stringify(take), taken: r.taken })
-    return missing.length ? fail(`${msg}; still missing ${missing.join(', ')} (inventory full?)`, { taken: r.taken }) : ok(msg, { taken: r.taken })
+    return missing.length ? fail(`${msg}; still missing ${missing.join(', ')}${r.error ? '' : ' (inventory full?)'}`, { taken: r.taken }) : ok(msg, { taken: r.taken })
   }
   const tableId = bot.registry.blocksByName.crafting_table?.id
   const furnaceId = bot.registry.blocksByName.furnace?.id
