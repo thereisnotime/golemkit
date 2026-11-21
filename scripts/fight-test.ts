@@ -50,7 +50,7 @@ function state (a: Agent): string {
 }
 
 const far = (a: Agent) => Math.hypot(a.bot.entity.position.x - X, a.bot.entity.position.z - Z)
-const isNight = (a: Agent) => { const t = a.bot.time.timeOfDay; return t > 13_000 && t < 23_000 }
+const isNight = (a: Agent) => { const t = a.bot.time.timeOfDay; return t > 13_000 && t < 23_500 }
 
 async function walkThere (bot: Agent): Promise<void> {
   for (let i = 0; i < 10 && far(bot) > 10; i++) {
@@ -104,7 +104,7 @@ async function main (): Promise<void> {
       const food = () => bot.bot.inventory.items().filter(i => /beef|porkchop|mutton|chicken|rabbit|bread|apple|cod|salmon|potato|carrot/.test(i.name)).reduce((n, i) => n + i.count, 0)
       for (let i = 0; i < 4 && food() < 6; i++) {
         const r = await step(bot, 'hunt', { count: 2, radius: 48 })
-        if (!r.ok) await step(bot, 'find_food', { from: 'here', radius: 160, crops: false, maxMinutes: 6 })
+        if (!r.ok) await step(bot, 'find_food', { from: 'here', radius: 160, crops: false, maxMinutes: 6, atNight: true })
       }
       await walkThere(bot)
     } else {
