@@ -46,17 +46,23 @@ export function lastSeen (agent: object, player?: string): (V3 & { dimension?: s
 
 // ---- who hurt whom (damage events carry the source; arrows report the shooter) ----
 
-interface HurtLog { players: Map<string, number>, attackers: Map<number, number>, lastFed: Map<string, number> }
+interface HurtLog { players: Map<string, number>, attackers: Map<number, number>, mine: Map<number, number>, lastFed: Map<string, number> }
 const logs = new WeakMap<Bot, HurtLog>()
 function hurtLog (bot: Bot): HurtLog {
   let l = logs.get(bot)
-  if (!l) logs.set(bot, l = { players: new Map(), attackers: new Map(), lastFed: new Map() })
+  if (!l) logs.set(bot, l = { players: new Map(), attackers: new Map(), mine: new Map(), lastFed: new Map() })
   return l
 }
 
 /** Notes a hurt player and who did it: the damage source, else the nearest mob within 4 blocks of them. */
 export function noteHurt (bot: Bot, entity: Entity | undefined, source: Entity | undefined): void {
-  if (!entity || entity === bot.entity || entity.type !== 'player') return
+  if (!entity) return
+  if (entity === bot.entity) {
+    // the bot's own attackers by damage source: an archer far off isn't caught by combat.ts's 4.5-block guess
+    if (source && source.type !== 'player') hurtLog(bot).mine.set(source.id, Date.now())
+    return
+  }
+  if (entity.type !== 'player') return
   const name = (entity as any).username as string | undefined
   if (!name) return
   const l = hurtLog(bot)
@@ -134,7 +140,7 @@ export function playerThreats (bot: Bot, player: Entity, range: number): ThreatE
       fuseLit: e.name === 'creeper' && creeperFuseLit(e),
       hostile: isHostile(e),
       hurtPlayer,
-      hurtBot: recentAttacker(bot, e.id),
+      hurtBot: recentAttacker(bot, e.id) || Date.now() - (hurtLog(bot).mine.get(e.id) ?? 0) < HURT_MS,
       approaching: m.approaching,
       facing: !FLYING.has(e.name ?? '') && facingTowards((e as any).headYaw ?? e.yaw, e.position, pp),
       diving: FLYING.has(e.name ?? '') && m.descending,
