@@ -527,6 +527,19 @@ Places torches on dark ground around home (or a remembered place) so mobs do not
 | `spacing` | integer (3..16) | `7` | no torch closer than this to another light |
 | `craft` | boolean | `true` | craft torches from coal/charcoal and sticks when out |
 
+### `keep_tools_upgraded`
+
+*work · priority npc (20) · needs `upgrade_tools` · uses `craft` when present*
+
+Keeps tools usable and moving up the tiers when the bot is idle: re-crafts a worn or broken pickaxe/axe/shovel/sword, makes stone tools as soon as it can mine 3 cobblestone, then a furnace, iron (smelted with coal or charcoal) and diamond tools, up to `upTo`. Gathering steps need digging enabled.
+
+| option | type | default | description |
+|---|---|---|---|
+| `upTo` | `stone` \| `iron` \| `diamond` | `"iron"` | highest tier to work towards |
+| `minDurability` | number (0..0.9) | `0.1` | replace a tool when less than this share of its durability is left |
+| `armour` | boolean | `false` | also make iron armour once iron tools are done |
+| `senseSeconds` | number (5..600) | `30` | how often to look around for stone and ore (the scan costs CPU) |
+
 ### `greet_players`
 
 *social · priority idle (10)*

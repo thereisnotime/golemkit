@@ -30,6 +30,7 @@ export default withMermaid(defineConfig({
           { text: 'Behaviours', link: '/guide/behaviors' },
           { text: 'LLM brain', link: '/guide/llm-brain' },
           { text: 'Goals and building', link: '/guide/goals-and-building' },
+          { text: 'Tool progression and gathering', link: '/guide/progression' },
           { text: 'Self-improver', link: '/guide/self-improver' },
           { text: 'Context packs and evals', link: '/guide/context-pack' },
           { text: 'Logging', link: '/guide/logging' },

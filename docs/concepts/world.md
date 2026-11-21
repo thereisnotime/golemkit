@@ -145,6 +145,15 @@ and the bot is unarmed or hurt (and can dig, outside protected areas), reflexes 
 dig straight down 3 blocks, seal the hole with a dug block, wait for morning (or until the mobs
 leave), climb back out with `climb_out` (dig the block above, jump, place a block underneath, until open sky), and check it really is back at the surface. It won't start when the bot is already under cover. Players and LLMs can call `bunker` and `climb_out` too.
 
+## Tools, stone and wood
+
+Bots climb the tool tiers on their own: stone tools as soon as there is a wooden pickaxe and
+three cobblestone, then a furnace, iron (smelted with coal, planks or charcoal) and diamond
+tools when diamonds turn up. Stone comes from a safe staircase and strip mine instead of
+pathing to buried blocks (never straight down, never next to lava or water), and tall trees are
+climbed so no logs stay up there. The upgrade path, the safety checks and how speed is measured
+are in [Tool progression and gathering](../guide/progression).
+
 ## Game modes
 
 Bots know their game mode (`gameMode` and a short `gameModeNote` in `observe()`) and notice
@@ -153,7 +162,7 @@ when it changes (`gameModeChanged` event).
 | mode | what changes |
 |---|---|
 | survival | everything as described on this page |
-| creative | no hunger or damage: reflexes, `keep_fed` and `stay_safe` switch off; `creative_get` puts any item in the inventory; building takes items from the creative inventory instead of gathering |
+| creative | no hunger or damage: reflexes, `keep_fed` and `stay_safe` switch off; `creative_get` puts any item in the inventory; building takes items from the creative inventory instead of gathering; `upgrade_tools` takes the tools instead of mining |
 | adventure | hunger and damage apply; breaking/placing is limited by the game |
 | spectator | can only fly and watch |
 

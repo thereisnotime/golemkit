@@ -42,6 +42,7 @@ can't change their own.
 | `llm.budget.maxToolCalls` | number | tool calls per turn |
 | `llm.goals.maxTurns` / `timeoutMin` | number | how long goals run on their own |
 | `llm.goals.ownerWaitMin` | minutes | after asking the owner, go on alone if no answer (0 = wait forever; default 15) |
+| `pathfinder.thinkTimeoutMs` | 1000–60000 | how long the pathfinder may plan one path (default 10000); raise on a loaded machine, see [tool progression](./progression#speed) |
 | `retry.actions.<action>` | 0–10 | extra attempts after a failed action |
 
 Behaviours have their own live commands: `!behavior_arm`, `!behavior_configure`,

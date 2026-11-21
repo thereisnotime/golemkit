@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-19 skills, 63 actions.
+20 skills, 64 actions.
 
 ## building
 
@@ -641,6 +641,23 @@ Walk over dropped items lying nearby to pick them up.
 |---|---|---|---|---|
 | `radius` | number (1..32) |  | `12` | how far to look for drops, in blocks |
 | `item` | string |  |  | only pick up this item, e.g. oak_log; default everything |
+
+## progression
+
+Tool progression: stone, iron and diamond tools.
+
+### `upgrade_tools`
+
+Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, axe, shovel and sword, armour optionally. Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). In creative it just takes the tools.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `up_to` | `stone` \| `iron` \| `diamond` |  | `"iron"` | highest tier to aim for |
+| `armour` | boolean |  | `false` | also make iron armour once iron tools are done |
+| `kinds` | array |  |  | tool kinds to upgrade; default pickaxe, axe, shovel, sword |
+| `prospect` | boolean |  | `true` | when no iron ore is in sight, dig a staircase and strip mine to look for some |
 
 ## status
 
