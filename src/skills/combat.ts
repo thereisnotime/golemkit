@@ -1,6 +1,6 @@
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
-import { defineSkill, defineAction, z, noParams, ok, fail, goals, gotoTimed, playerEntity, nearestHostile, isHostile, FLYING, sleep, checkAborted } from '../core/index.ts'
+import { defineSkill, defineAction, z, noParams, ok, fail, goals, fmtPos, gotoTimed, playerEntity, nearestHostile, isHostile, FLYING, sleep, checkAborted } from '../core/index.ts'
 import { pickupNearby } from './pickup.ts'
 import { equipForTarget, hasRanged, shootAt, blockWithShield, isRangedMob, weaponFlags, type WeaponFlags } from './weapons.ts'
 
@@ -80,6 +80,18 @@ export async function fight (bot: Bot, target: Entity, signal: AbortSignal, maxM
 function creeperFuseLit (e: Entity): boolean {
   const md = (e as any).metadata as unknown[] | undefined
   return !!md && (md[16] === 1 || md[18] === true) // 1.21 creeper: 16 = state (-1 idle, 1 fusing), 17 = charged, 18 = ignited (flint and steel)
+}
+
+/** Animals a hunt couldn't get to (up a cliff, behind water...): skipped by later hunts for 5 minutes. */
+const unreachable = new WeakMap<Bot, Map<number, number>>()
+function unreachableAnimals (bot: Bot): { has: (id: number) => boolean, add: (id: number) => void } {
+  let m = unreachable.get(bot)
+  if (!m) unreachable.set(bot, m = new Map())
+  const map = m
+  return {
+    has: id => { const t = map.get(id); if (t && t > Date.now()) return true; map.delete(id); return false },
+    add: id => { map.set(id, Date.now() + 5 * 60_000) }
+  }
 }
 
 const attack = defineAction({
@@ -246,7 +258,7 @@ const hunt = defineAction({
   }),
   async run ({ bot, agent, signal, log }, { animal, count, radius, pens, keepAtLeast }) {
     const animals = animal ? [animal] : HUNTABLE
-    const skipped = new Set<number>()
+    const skipped = unreachableAnimals(bot) // shared across hunt runs: keep_fed re-runs hunt every few seconds
     const allowed = (e: any) => {
       const keys = (bot.registry as any).entitiesByName?.[e.name ?? '']?.metadataKeys as string[] | undefined
       if (huntRefusal(e as HuntCandidate, { animals, metadataKeys: keys })) return false
@@ -284,7 +296,7 @@ const hunt = defineAction({
         try { await gotoTimed(bot, new goals.GoalNear(p.x, p.y, p.z, 4), signal, 30_000) } catch { checkAborted(signal) }
       }
       const dead = await fight(bot, target, signal, 25_000)
-      if (!dead) { skipped.add(target.id); continue }
+      if (!dead) { skipped.add(target.id); log.debug('hunt: giving up on this one for 5 min', { animal: target.name, at: fmtPos(target.position) }); continue }
       killed++
       names.push(target.name ?? 'animal')
       await sleep(400, signal)
