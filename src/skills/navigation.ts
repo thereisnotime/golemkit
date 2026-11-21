@@ -4,7 +4,8 @@ import type { Bot } from 'mineflayer'
 import type { Agent } from '../core/index.ts'
 import {
   defineSkill, defineAction, z, noParams, ok, fail, goals, goto, fmtPos, nearestHostile,
-  ActionAbortedError
+  ActionAbortedError,
+  checkAborted
 } from '../core/index.ts'
 
 export interface Place {
@@ -143,8 +144,13 @@ const goHome = defineAction({
     const home = getHome(agent)
     if (!home) return fail('no home set')
     if (!sameDimension(bot, home)) return fail(`home is in ${home.dimension}`)
-    const arrived = await gotoWithin(bot, new goals.GoalNear(home.x, home.y, home.z, range), signal, 60000)
-    return arrived ? ok(`home at ${fmtPos(home)}`) : fail(`couldn't get home in time, at ${fmtPos(bot.entity.position)}`)
+    try {
+      await gotoWithin(bot, new goals.GoalNear(home.x, home.y, home.z, range), signal, 60000)
+    } catch (e) {
+      checkAborted(signal)
+      return fail(`couldn't get home (${(e as Error).message}), at ${fmtPos(bot.entity.position)}`)
+    }
+    return ok(`home at ${fmtPos(home)}`)
   }
 })
 

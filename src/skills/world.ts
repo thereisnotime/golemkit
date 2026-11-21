@@ -59,8 +59,17 @@ export async function gotoWithin (bot: Bot, goal: any, signal: AbortSignal, ms =
   const onAbort = () => ctl.abort()
   signal.addEventListener('abort', onAbort, { once: true })
   const timer = setTimeout(() => ctl.abort(), ms)
+  const started = Date.now()
   try {
-    await goto(bot, goal, ctl.signal)
+    try {
+      await goto(bot, goal, ctl.signal)
+    } catch (e) {
+      // Right after another action hands over, the old path is still being stopped and that stop can
+      // land on our brand-new path ("Path was stopped before it could be completed"). Start again once.
+      if (signal.aborted || ctl.signal.aborted || Date.now() - started > 1500 || !/stopped before it could be completed/i.test((e as Error).message)) throw e
+      await new Promise(r => setTimeout(r, 150))
+      await goto(bot, goal, ctl.signal)
+    }
   } catch (e) {
     checkAborted(signal)
     if (ctl.signal.aborted) throw new Error('took too long to get there')
