@@ -656,8 +656,8 @@ behaviorsBrain({ registry: new BehaviorRegistry([...defaultBehaviors(), fishAtDa
 An LLM + NPC bot keeps playing when its LLM is paused: the provider's quota is used up ("weekly
 limit · resets 12pm"), or its own token budget ran out. While paused it arms extra behaviours
 and disarms exactly those again when the LLM is back (at the reset time, or when the budget
-frees up). The default set is `return_home`, `sleep_at_night`, `chop_wood_loop` and
-`deposit_when_full`; behaviours that were already armed are left alone.
+frees up). The default set is `chop_wood_loop` and `deposit_when_full` (going home at night is
+`stay_safe`'s job); behaviours that were already armed are left alone.
 
 ```yaml
 npcMode:                 # profile key; false turns it off

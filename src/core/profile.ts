@@ -55,7 +55,7 @@ export const ProfileSchema = z.object({
   respectBuilds: z.boolean().optional(),
   /** Show the bot its own variant/profile/model/settings each turn (default on). */
   selfAware: z.boolean().optional(),
-  /** While the LLM is paused (quota/budget): false, or { arm: { behaviour: options } } (default: return_home, sleep_at_night, chop_wood_loop, deposit_when_full). */
+  /** While the LLM is paused (quota/budget): false, or { arm: { behaviour: options } } (default: chop_wood_loop, deposit_when_full). */
   npcMode: z.union([z.literal(false), z.object({ arm: z.record(z.string(), z.record(z.string(), z.unknown())) })]).optional(),
   persona: z.string().optional(),
   server: z.object({

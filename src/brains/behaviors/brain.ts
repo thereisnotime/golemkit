@@ -51,11 +51,12 @@ const interrupt = defineAction({
  * NPC mode: while the LLM brain can't think (provider quota or its own budget used up), arm extra
  * behaviours so the bot keeps playing on its own, and disarm exactly those when the LLM is back.
  * settings.npcMode: false to turn it off, or { arm: { behaviour: options, ... } } to choose them.
+ * Default: chop_wood_loop and deposit_when_full (stay_safe covers going home at night).
  * What it armed is remembered in storage, so a restart in between still cleans up.
  */
+// stay_safe already takes the bot home at night; return_home/sleep_at_night here only fought it
+// over the same go_home trip ("path was stopped") and the bot never got home.
 const NPC_MODE_DEFAULT: Record<string, Record<string, unknown>> = {
-  return_home: {},
-  sleep_at_night: {},
   chop_wood_loop: {},
   deposit_when_full: {}
 }
@@ -82,6 +83,13 @@ function wireNpcMode (agent: Agent, rt: BehaviorRuntime): void {
     for (const name of armedBy) rt.store.disarm(name, 'npc-mode')
     agent.storage.delete(NPC_KEY)
     rt.log.info(`NPC mode off, LLM is back: disarmed ${armedBy.join(', ') || 'nothing'}`)
+  }
+  // Still in NPC mode from before a restart: drop anything we armed that isn't in the set any more.
+  const prev = agent.storage.get<string[] | undefined>(NPC_KEY)
+  if (prev) {
+    const keep = prev.filter(n => n in wanted)
+    for (const n of prev.filter(n => !(n in wanted))) rt.store.disarm(n, 'npc-mode')
+    if (keep.length !== prev.length) agent.storage.set(NPC_KEY, keep)
   }
   ;(agent.on as (ev: string, fn: (...a: unknown[]) => void) => void)('llmPaused', (reason: unknown) => on(String(reason ?? 'LLM paused')))
   ;(agent.on as (ev: string, fn: (...a: unknown[]) => void) => void)('llmResumed', () => off())

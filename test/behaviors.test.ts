@@ -430,7 +430,7 @@ test('NPC mode: arms extra behaviours while the LLM is paused and disarms exactl
   const { behaviorsBrain } = await import('../src/brains/behaviors/brain.ts')
   const mem: Record<string, unknown> = {}
   const agent: any = Object.assign(new EventEmitter(), {
-    definition: { name: 't' }, settings: { behaviors: { return_home: {} } },
+    definition: { name: 't' }, settings: { behaviors: { deposit_when_full: {} } },
     storage: { get: (k: string, d?: unknown) => (k in mem ? mem[k] : d), set: (k: string, v: unknown) => { mem[k] = v }, delete: (k: string) => { delete mem[k] } },
     log: { child: () => agent.log, info () {}, warn () {}, debug () {}, trace () {} },
     getAction: () => undefined, registerAction () {}
@@ -439,7 +439,7 @@ test('NPC mode: arms extra behaviours while the LLM is paused and disarms exactl
   brain.start!(agent)
   agent.emit('llmPaused', 'quota')
   const armedBy = mem['npcMode.armed'] as string[]
-  assert.ok(armedBy.includes('sleep_at_night') && !armedBy.includes('return_home'), 'return_home was already armed: not ours to disarm later')
+  assert.ok(armedBy.includes('chop_wood_loop') && !armedBy.includes('deposit_when_full'), 'deposit_when_full was already armed: not ours to disarm later')
   agent.emit('llmResumed')
   assert.equal(mem['npcMode.armed'], undefined)
 })
