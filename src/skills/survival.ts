@@ -1,6 +1,6 @@
 import type { Bot } from 'mineflayer'
 import { defineSkill, defineAction, z, noParams, ok, fail, goals, goto, fmtPos, sleep, checkAborted, itemName } from '../core/index.ts'
-import { findItem } from './world.ts'
+import { findItem, placeAt, digBlock, DigRefusedError } from './world.ts'
 
 /** Cheap full blocks that don't fall, for pillars and emergency shelters. */
 const FILLER = /^(dirt|coarse_dirt|cobblestone|cobbled_deepslate|netherrack|stone|deepslate|andesite|diorite|granite|tuff|blackstone|end_stone|.*_planks)$/
@@ -108,9 +108,72 @@ const pillar = defineAction({
   }
 })
 
+const isNight = (bot: Bot) => { const t = bot.time.timeOfDay; return t >= 12_500 && t <= 23_500 }
+
+const bunker = defineAction({
+  name: 'bunker',
+  description: 'Hide from phantoms and other mobs: dig straight down 3 blocks, seal the hole above with a dug ' +
+    'block, wait until morning (or until no hostiles are near), then climb out. Needs digging; not in protected areas.',
+  params: z.object({
+    depth: z.number().int().min(2).max(4).default(3),
+    maxMinutes: z.number().min(0.5).max(15).default(8).describe('give up waiting after this long'),
+    untilDay: z.boolean().default(true).describe('stay until morning instead of until mobs leave')
+  }),
+  longRunning: true,
+  async run ({ bot, agent, signal, log }, { depth, maxMinutes, untilDay }) {
+    if (!agent.canDig) return fail('digging is disabled for this bot')
+    if (agent.protectedAreas.isProtected(bot.entity.position)) return fail("can't dig in here (protected area); move away first")
+    const start = bot.entity.position.floored()
+    // Dig down under our feet, but never into liquid, air pockets or bedrock.
+    let dug = 0
+    for (let i = 1; i <= depth; i++) {
+      checkAborted(signal)
+      const feet = bot.entity.position.floored()
+      const below = bot.blockAt(feet.offset(0, -1, 0))
+      const under = bot.blockAt(feet.offset(0, -2, 0))
+      if (!below || below.boundingBox !== 'block' || below.name === 'bedrock' || below.hardness === null || below.hardness < 0) break
+      if (!under || under.boundingBox !== 'block' || /water|lava/.test(under.name)) break // don't open into a cave or liquid
+      try {
+        const tool = (bot.pathfinder as any).bestHarvestTool?.(below)
+        if (tool) await bot.equip(tool, 'hand').catch(() => {})
+        await digBlock(bot, below, signal)
+      } catch (e) {
+        checkAborted(signal)
+        if (e instanceof DigRefusedError) { agent.markProtected(below.position); return fail(e.message) }
+        break
+      }
+      await sleep(500, signal) // fall into the hole
+      dug++
+    }
+    if (dug < 2) return fail('ground here is too thin or unsafe to dig a shelter')
+    // Seal the opening: the block at the original feet level, two above our head is open sky.
+    const feet = bot.entity.position.floored()
+    const cover = feet.offset(0, 2, 0)
+    const filler = fillerBlock(bot)
+    if (!filler) return fail('dug in but have no block to seal the hole with')
+    try { await placeAt(bot, filler, cover, signal) } catch (e) { checkAborted(signal); log.debug('seal failed', { error: (e as Error).message }) }
+    const sealed = bot.blockAt(cover)?.boundingBox === 'block'
+    log.info(`bunkered ${dug} deep${sealed ? ', sealed' : ', NOT sealed'}`, { at: fmtPos(start) })
+    // Wait it out.
+    const until = Date.now() + maxMinutes * 60_000
+    while (Date.now() < until) {
+      checkAborted(signal)
+      const night = isNight(bot)
+      const threat = bot.nearestEntity(e => (e.type === 'hostile' || e.name === 'phantom') && e.position.distanceTo(bot.entity.position) < 24)
+      if (untilDay ? !night : !threat) break
+      await sleep(3000, signal)
+    }
+    // Climb out: break the seal and pillar back up.
+    const lid = bot.blockAt(cover)
+    if (lid && lid.boundingBox === 'block') await digBlock(bot, lid, signal).catch(() => {})
+    const out = await agent.act('pillar', { height: dug }, { caller: { kind: 'system', name: 'bunker' } }).catch(() => null)
+    return ok(`sheltered ${dug} blocks down${sealed ? ' (sealed)' : ''} and ${out?.ok ? 'climbed back out' : 'stayed in the hole (couldn\'t climb out)'}`)
+  }
+})
+
 export const survival = () => defineSkill({
   name: 'survival',
   description: 'Eating, sleeping and emergency pillars.',
-  actions: [eat, sleepInBed, wake, pillar],
+  actions: [eat, sleepInBed, wake, pillar, bunker],
   observe: (_agent, bot) => ({ hasFood: !!bestFood(bot), sleeping: bot.isSleeping })
 })

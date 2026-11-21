@@ -46,6 +46,15 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           bot.nearestEntity((e: any) => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20)
         if (!mob) return
         const cur = agent.currentAction?.name
+        if (cur === 'bunker') return
+        // Phantoms at night with no weapon (or hurt): dig in instead of punching the sky.
+        const unarmed = !bot.inventory.items().some(i => /_(sword|axe)$/.test(i.name))
+        const night = bot.time.timeOfDay >= 12_500 && bot.time.timeOfDay <= 23_500
+        if (mob.name === 'phantom' && night && (unarmed || bot.health <= 12) && agent.canDig && agent.getAction('bunker') &&
+            !agent.protectedAreas.isProtected(bot.entity.position)) {
+          void reflex('bunker')
+          return
+        }
         if (shouldRetreat(mob) && agent.getAction('retreat')) {
           if (cur !== 'retreat') void reflex('retreat')
           return
