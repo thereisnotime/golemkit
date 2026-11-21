@@ -668,6 +668,11 @@ async function findEngine (ctx: Ctx, t: ResolvedTarget, o: FindOptions): Promise
       if (own && sameDimension(bot, own)) spots.push(own)
       if (t.kind === 'mob') for (const s of rankSpots(getFoodSpots(agent), ['animals'], Date.now(), origin, dim)) if (s.animals?.some(a => t.mobs?.includes(a))) spots.push(s)
       if (t.structure === 'village' && places['food:village_farm']) spots.push(places['food:village_farm']!)
+      // a remembered tree deep under the surface was a mineshaft beam: forget it
+      if (own && t.fetch === 'chop') {
+        const sy = surfaceY(bot, own.x, own.z)
+        if (sy !== null && sy - own.y > 12) { setPlace(agent, `found:${t.key}`, null); spots.splice(spots.indexOf(own), 1) }
+      }
       const near = spots.filter(p => dist(p, origin) <= o.radius * 1.5).slice(0, 2)
       for (const p of near) {
         checkAborted(signal)
@@ -675,7 +680,7 @@ async function findEngine (ctx: Ctx, t: ResolvedTarget, o: FindOptions): Promise
         const ctl = new AbortController()
         let seen: Sighting | null = null
         try {
-          await travel(bot, p, AbortSignal.any([signal, ctl.signal]), { range: 6, onProgress: () => { seen = look(); if (seen) ctl.abort() } })
+          await travel(bot, t.ore ? p : { x: p.x, z: p.z }, AbortSignal.any([signal, ctl.signal]), { range: 6, onProgress: () => { seen = look(); if (seen) ctl.abort() } })
         } catch (e) { checkAborted(signal); if (!ctl.signal.aborted) log.debug('find_target: remembered spot unreachable', { at: fmtPos(p), error: (e as Error).message }) }
         seen ??= look()
         if (seen) return found(seen, `at a spot I remembered`)
