@@ -54,6 +54,55 @@ export async function gotoTimed (bot: Bot, goal: Goal, signal: AbortSignal, ms: 
   }
 }
 
+/** Height of the open-sky ground (first solid block or water from the top) at x/z, if loaded. */
+export function surfaceY (bot: Bot, x: number, z: number): number | null {
+  const from = Math.min(319, Math.floor(bot.entity.position.y) + 64)
+  for (let y = from; y > -64; y--) {
+    const b = bot.blockAt(bot.entity.position.floored().set(Math.floor(x), y, Math.floor(z)))
+    if (!b) return null
+    if (b.name === 'water' || b.name === 'lava' || (b.boundingBox === 'block' && !b.name.endsWith('_leaves'))) return y + 1
+  }
+  return null
+}
+
+/** A solid roof within `range` blocks above the head (leaves and glass don't count). */
+export function roofed (bot: Bot, range = 24): boolean {
+  const p = bot.entity.position.floored()
+  for (let dy = 2; dy <= range; dy++) {
+    const b = bot.blockAt(p.offset(0, dy, 0))
+    if (b && b.boundingBox === 'block' && !/leaves|glass/.test(b.name)) return true
+  }
+  return false
+}
+
+/**
+ * One travel leg: aims at the ground surface (not just x/z, which lets a digging pathfinder tunnel
+ * straight through the terrain), and stops if the route goes deep underground under a roof.
+ */
+async function surfaceLeg (bot: Bot, x: number, z: number, range: number, signal: AbortSignal, ms: number, startY: number): Promise<void> {
+  const sy = surfaceY(bot, x, z)
+  const goal = sy !== null ? new goals.GoalNear(x, sy, z, range) : new goals.GoalNearXZ(x, z, range)
+  const ctl = new AbortController()
+  const leg = AbortSignal.any([signal, ctl.signal])
+  let under = false
+  const watch = setInterval(() => {
+    const y = bot.entity?.position.y ?? startY
+    if (y < Math.min(startY, sy ?? startY) - 12 && roofed(bot, 32)) { under = true; ctl.abort() }
+  }, 1000)
+  try {
+    await gotoTimed(bot, goal, leg, ms)
+  } catch (e) {
+    checkAborted(signal)
+    if (!under) throw e
+  } finally {
+    clearInterval(watch)
+  }
+  if (under) throw new TravelUndergroundError(`the route went underground at ${fmtPos(bot.entity.position)}; stopped there`)
+}
+
+/** A travel leg went deep underground (caves, ravines): the caller should climb out or give up. */
+export class TravelUndergroundError extends Error {}
+
 export interface TravelOptions {
   /** Length of each leg in blocks (the pathfinder only plans through loaded chunks). Default 64. */
   stepBlocks?: number
@@ -82,10 +131,11 @@ export async function travel (bot: Bot, target: { x: number, y?: number, z: numb
     checkAborted(signal)
     const remaining = flat()
     if (remaining <= step) {
-      const goal = target.y === undefined
-        ? new goals.GoalNearXZ(target.x, target.z, range)
-        : new goals.GoalNear(target.x, target.y, target.z, range)
-      try { await gotoTimed(bot, goal, signal, legMs) } catch (e) { checkAborted(signal) }
+      if (target.y === undefined) {
+        try { await surfaceLeg(bot, target.x, target.z, range, signal, legMs, bot.entity.position.y) } catch (e) { checkAborted(signal); if (e instanceof TravelUndergroundError) throw e }
+      } else {
+        try { await gotoTimed(bot, new goals.GoalNear(target.x, target.y, target.z, range), signal, legMs) } catch (e) { checkAborted(signal) }
+      }
       const d = flat()
       const dy = target.y === undefined ? 0 : Math.abs(target.y - bot.entity.position.y)
       if (d <= range + 1 && dy <= 3) return
@@ -101,9 +151,10 @@ export async function travel (bot: Bot, target: { x: number, y?: number, z: numb
       const wx = pos.x + Math.cos(a) * step
       const wz = pos.z + Math.sin(a) * step
       try {
-        await gotoTimed(bot, new goals.GoalNearXZ(wx, wz, 6), signal, legMs)
-      } catch {
+        await surfaceLeg(bot, wx, wz, 6, signal, legMs, pos.y)
+      } catch (e) {
         checkAborted(signal)
+        if (e instanceof TravelUndergroundError) throw e
       }
       if (flat() < remaining - 8) { progressed = true; break }
     }
