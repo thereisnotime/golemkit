@@ -108,6 +108,55 @@ const pillar = defineAction({
   }
 })
 
+/** Highest solid block above the head (within `range`), or null when the sky is open. */
+export function roofAbove (bot: Bot, range = 24): number | null {
+  const p = bot.entity.position.floored()
+  for (let dy = 2; dy <= range; dy++) {
+    const b = bot.blockAt(p.offset(0, dy, 0))
+    if (b && b.boundingBox === 'block' && !/leaves|glass/.test(b.name)) return p.y + dy
+  }
+  return null
+}
+
+const climbOut = defineAction({
+  name: 'climb_out',
+  description: 'Get out of a pit, shaft or cave straight up to open sky: dig the block above if needed, jump and place ' +
+    'a block underneath, repeat. Needs dirt/cobblestone/planks (digging on the way gives some).',
+  params: z.object({ maxBlocks: z.number().int().min(1).max(64).default(32).describe('give up after rising this many blocks') }),
+  async run (ctx, { maxBlocks }) {
+    const { bot, agent, signal } = ctx
+    const startY = Math.floor(bot.entity.position.y)
+    let fails = 0
+    while (Math.floor(bot.entity.position.y) - startY < maxBlocks) {
+      checkAborted(signal)
+      if (roofAbove(bot) === null && bot.blockAt(bot.entity.position.floored().offset(0, 1, 0))?.boundingBox !== 'block') {
+        // Open sky above: step off the pillar onto solid ground nearby if there is any.
+        return ok(`out in the open at ${fmtPos(bot.entity.position)} (rose ${Math.floor(bot.entity.position.y) - startY} blocks)`)
+      }
+      // Clear the two blocks above the head.
+      for (const dy of [1, 2]) {
+        const b = bot.blockAt(bot.entity.position.floored().offset(0, dy, 0))
+        if (b && b.boundingBox === 'block') {
+          if (!agent.canDig) return fail('a block is in the way above and I may not dig')
+          if (agent.protectedAreas.isProtected(b.position)) return fail('the way up is in a protected area')
+          if (/water|lava/.test(bot.blockAt(b.position.offset(0, 1, 0))?.name ?? '')) return fail(`liquid above at ${fmtPos(b.position)}; not digging into it`)
+          const tool = (bot.pathfinder as any).bestHarvestTool?.(b)
+          if (tool) await bot.equip(tool, 'hand').catch(() => {})
+          try { await digBlock(bot, b, signal) } catch (e) { checkAborted(signal); if (e instanceof DigRefusedError) return fail(e.message); fails++ }
+          await sleep(300, signal)
+        }
+      }
+      const r = await (pillar as any).run(ctx, { height: 1 }).catch(() => null)
+      if (!r?.ok) {
+        if (!fillerBlock(bot)) return fail(`no blocks left to climb with, at ${fmtPos(bot.entity.position)}`)
+        if (++fails > 6) return fail(`couldn't climb further, at ${fmtPos(bot.entity.position)}`)
+        await sleep(400, signal)
+      }
+    }
+    return fail(`rose ${maxBlocks} blocks and still no open sky, at ${fmtPos(bot.entity.position)}`)
+  }
+})
+
 const isNight = (bot: Bot) => { const t = bot.time.timeOfDay; return t >= 12_500 && t <= 23_500 }
 
 const bunker = defineAction({
@@ -125,6 +174,8 @@ const bunker = defineAction({
     if (!agent.canDig) return fail('digging is disabled for this bot')
     if (agent.protectedAreas.isProtected(bot.entity.position)) return fail("can't dig in here (protected area); move away first")
     const start = bot.entity.position.floored()
+    const roof = roofAbove(bot, 12)
+    if (roof !== null) return fail(`already under cover (a block ${roof - start.y} above me); use climb_out to get to the surface`)
     // Only worth it if we'll be able to seal the top: we carry a block, or the ground drops one
     // by hand (dirt, sand...). Stone without a pickaxe drops nothing.
     const top = bot.blockAt(start.offset(0, -1, 0))
@@ -177,15 +228,10 @@ const bunker = defineAction({
     // Climb out. Run pillar inline (agent.act from inside an action would preempt this very
     // action), then check we're really back at the surface; if not, dig a staircase up.
     const outside = () => bot.entity.position.y >= start.y - 0.2
-    await (pillar as any).run(ctx, { height: dug + 1 }).catch(() => null)
-    let how = 'pillared back up'
+    let how = 'climbed back out'
+    if (!outside()) await (climbOut as any).run(ctx, { maxBlocks: dug + 4 }).catch(() => null)
     if (!outside()) {
-      try {
-        await goto(bot, new goals.GoalNear(start.x, start.y, start.z, 1), signal)
-        how = 'dug a staircase out'
-      } catch (e) {
-        checkAborted(signal)
-      }
+      try { await goto(bot, new goals.GoalNear(start.x, start.y, start.z, 1), signal); how = 'dug a staircase out' } catch (e) { checkAborted(signal) }
     }
     const out = { ok: outside() }
     return ok(`sheltered ${dug} blocks down${sealed ? ' (sealed)' : ''} and ${out.ok ? how : `am still in the hole at ${fmtPos(bot.entity.position)} (couldn't climb out)`}`)
@@ -195,6 +241,6 @@ const bunker = defineAction({
 export const survival = () => defineSkill({
   name: 'survival',
   description: 'Eating, sleeping and emergency pillars.',
-  actions: [eat, sleepInBed, wake, pillar, bunker],
+  actions: [eat, sleepInBed, wake, pillar, climbOut, bunker],
   observe: (_agent, bot) => ({ hasFood: !!bestFood(bot), sleeping: bot.isSleeping })
 })

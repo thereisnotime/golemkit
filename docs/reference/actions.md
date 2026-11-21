@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-18 skills, 59 actions.
+18 skills, 60 actions.
 
 ## building
 
@@ -648,6 +648,14 @@ Emergency escape: jump and place blocks underneath to stand on a pillar out of r
 |---|---|---|---|---|
 | `height` | integer (1..8) |  | `3` | how many blocks to rise |
 | `item` | string |  |  | block to use; default the most plentiful dirt/cobblestone/planks |
+
+### `climb_out`
+
+Get out of a pit, shaft or cave straight up to open sky: dig the block above if needed, jump and place a block underneath, repeat. Needs dirt/cobblestone/planks (digging on the way gives some).
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `maxBlocks` | integer (1..64) |  | `32` | give up after rising this many blocks |
 
 ### `bunker`
 

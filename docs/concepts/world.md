@@ -143,7 +143,7 @@ Pax uses `retreatBelow: 0` and `waterFightAbove: 0`: it always fights back.
 Phantoms fly, so a bot without a weapon can't win against them. When phantoms attack at night
 and the bot is unarmed or hurt (and can dig, outside protected areas), reflexes run `bunker`:
 dig straight down 3 blocks, seal the hole with a dug block, wait for morning (or until the mobs
-leave), break out and pillar up. Players and LLMs can call `bunker` too.
+leave), climb back out with `climb_out` (dig the block above, jump, place a block underneath, until open sky), and check it really is back at the surface. It won't start when the bot is already under cover. Players and LLMs can call `bunker` and `climb_out` too.
 
 ## Game modes
 
