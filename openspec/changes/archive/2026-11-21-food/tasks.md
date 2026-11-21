@@ -8,4 +8,4 @@
 - [x] Pax profile and AGENTS.md
 - [x] Unit tests (`test/food.test.ts`)
 - [x] Docs: behaviours (food section, mermaid flow), skills, journal, generated references
-- [x] Live test on mc02 (`scripts/food-test.ts`)
+- [x] Live test on mc02 (`scripts/food-test.ts`): scouting, known spots, hunting and eating verified; farm site selection ran, no farm planted (snowy terrain, no grass for seeds near the only usable shore)

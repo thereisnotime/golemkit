@@ -418,7 +418,7 @@ async function breakPlantsFor (ctx: Pick<ActionContext, 'bot' | 'agent' | 'signa
   let broken = 0
   while (seedCount(inventory(bot)) - before < want && Date.now() < until && broken < 120) {
     checkAborted(signal)
-    const target = bot.findBlocks({ matching: ids, maxDistance: 32, count: 48 })
+    const target = bot.findBlocks({ matching: ids, maxDistance: 64, count: 64 })
       .map(p => bot.blockAt(p)).find(b => b && !skip.has(b.position.toString()) && !offLimits(agent, bot, b.position, clearance))
     if (!target) break
     try {
@@ -439,13 +439,15 @@ async function breakPlantsFor (ctx: Pick<ActionContext, 'bot' | 'agent' | 'signa
 }
 
 /** Gets a hoe: one in the inventory, crafted from what's there, or crafted after chopping a couple of logs. */
-async function getHoe (ctx: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>): Promise<ActionResult> {
+async function getHoe (ctx: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>, clearance = 48): Promise<ActionResult> {
   const { bot, signal } = ctx
   let r = await ensureTool(bot, signal, 'hoe')
   if (r.ok) return r
   const logs = Object.values(bot.registry.blocksByName).filter(b => /_log$/.test(b.name) && !b.name.startsWith('stripped')).map(b => b.id)
-  const tree = bot.findBlocks({ matching: logs, maxDistance: 32, count: 16 }).map(p => bot.blockAt(p)).find(b => b && !offLimits(ctx.agent, bot, b.position, 0))
-  if (!tree) return fail(`${r.message}, and no tree within 32 blocks`)
+  const tree = bot.findBlocks({ matching: logs, maxDistance: 48, count: 32 }).map(p => bot.blockAt(p)).find(b => b && !offLimits(ctx.agent, bot, b.position, clearance))
+  if (!tree) return fail(`${r.message}, and no tree I may chop within 48 blocks`)
+  // walk to the tree first so collect picks this one, not a nearer one in a protected area
+  try { await reachBlock(bot, tree.position, ctx.signal, 3, 30_000) } catch (e) { checkAborted(ctx.signal) }
   const got = await collectBlocks(ctx, tree.name, 3)
   if (!got.ok) return fail(`${r.message}; tried to get logs: ${got.message}`)
   r = await ensureTool(bot, signal, 'hoe')
@@ -613,10 +615,10 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
     inv = inventory(bot)
     if (got.broken) steps.push(`broke ${got.broken} grass for ${got.seeds} seeds`)
   }
-  if (!pickFarmSeed(inv)) return fail(`no seeds to plant${steps.length ? ` (${steps.join(', ')})` : ''}; wheat seeds come from breaking grass`)
+  if (!pickFarmSeed(inv)) return fail(`found a site at ${fmtPos(site.water)} but no seeds to plant: ${steps.length ? steps.join(', ') : 'no grass to break within 64 blocks'} (wheat seeds come from breaking grass)`)
 
   // a hoe
-  const hoe = await getHoe(ctx)
+  const hoe = await getHoe(ctx, p.spawnClearance)
   if (!hoe.ok) return fail(`no hoe: ${hoe.message}`)
   if ((hoe.data as { crafted?: boolean } | undefined)?.crafted || /crafted/.test(hoe.message)) steps.push(hoe.message)
 
