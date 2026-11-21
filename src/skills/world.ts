@@ -170,12 +170,23 @@ export class DigRefusedError extends Error {
  * world and throw DigRefusedError. `settleMs` is how long to wait for that answer (shorter in
  * tunnels, where many blocks are dug in a row and the agent-wide refusal watcher still runs).
  */
+/** Items a creative player can't break blocks with: the server puts the block straight back. */
+export const CREATIVE_NO_BREAK = /_sword$|^trident$|^mace$|^debug_stick$/
+
 export async function digBlock (bot: Bot, block: Block, signal: AbortSignal, settleMs = 250): Promise<void> {
   const pos = block.position
+  // creative: a sword in hand doesn't break anything (seen live: every dig "refused", the build
+  // then stopped as if in a protected area); put it away first
+  if (bot.game?.gameMode === 'creative' && bot.heldItem && CREATIVE_NO_BREAK.test(bot.heldItem.name)) {
+    const other = bot.inventory.items().find(i => !CREATIVE_NO_BREAK.test(i.name) && !/_(helmet|chestplate|leggings|boots)$/.test(i.name))
+    await (other ? bot.equip(other, 'hand') : bot.unequip('hand')).catch(() => {})
+  }
   let refused: number | null = null
   const onChange = (d: any) => {
     const l = d.location
-    if (l && l.x === pos.x && l.y === pos.y && l.z === pos.z && d.type !== 0 && bot.registry.blocksByStateId[d.type]?.name !== 'air') refused = d.type
+    if (!l || l.x !== pos.x || l.y !== pos.y || l.z !== pos.z) return
+    const n = bot.registry.blocksByStateId[d.type]?.name
+    refused = d.type === 0 || n === 'air' || n === 'cave_air' ? null : d.type
   }
   bot._client.on('block_change', onChange)
   try {
@@ -192,7 +203,9 @@ export async function digBlock (bot: Bot, block: Block, signal: AbortSignal, set
   } finally {
     bot._client.removeListener('block_change', onChange)
   }
-  if (refused !== null) {
+  // A refusal is the old block coming back and staying. Some servers (NeoForge) echo the block
+  // when digging starts and then send air, so only the last update counts (onChange resets on air).
+  if (refused !== null && !isReplaceable(bot.blockAt(pos)?.name ?? 'air')) {
     try { (bot.world as any).setBlockStateId(pos, refused) } catch {}
     throw new DigRefusedError(block.name)
   }

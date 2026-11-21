@@ -66,6 +66,10 @@ sequenceDiagram
 - Zones are saved per server and loaded on every start, for every bot on that server.
 - `agent.protectedAreas.isProtected(pos)`, `agent.markProtected(pos)` from code.
 - `digBlock()` (skills/world.ts) throws `DigRefusedError` on a refusal; skills that dig use it.
+- Only the dug block coming back counts. NeoForge echoes the block when digging starts and then
+  sends air, and a creative build places the next block into a dug cell within 200 ms: neither
+  is a refusal. In creative a sword (or trident, mace) is put away before digging, since a
+  creative player can't break blocks with one.
 - Delete `data/protected-*.json` if a server's protection changes.
 
 ## Hostile mobs
