@@ -109,7 +109,7 @@ flowchart TB
   class X a
 ```
 
-Tune per variant (`reflexes({ ... })`) or per profile:
+Tune per variant (`reflexes({ ... })`) or per [profile](/guide/profiles):
 
 ```yaml
 reflexes:

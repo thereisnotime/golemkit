@@ -40,7 +40,7 @@ Every `tickMs` (1.5 s) the brain:
 When it switches, the old behaviour's `signal` aborts and the brain replaces its in-flight
 action with the internal no-op `npc_interrupt`, so the body stops right away.
 
-The brain only acts via `agent.act()` as `brain:npc` at `PRIORITY.npc`, so the action lock
+The brain only acts via `agent.act()` as `brain:npc` at `PRIORITY.npc`, so the [action lock](/concepts/architecture#the-action-lock-and-priorities)
 stays in charge. A player's `!stop` aborts the NPC's action and also makes it back off.
 
 ```mermaid

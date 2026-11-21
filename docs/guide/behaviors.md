@@ -2,8 +2,8 @@
 
 Armed behaviours are things a bot keeps doing on its own until told otherwise: stay fed,
 stay safe, follow its owner, guard a farm, keep wood in stock. You switch them on and tune
-them per profile, from chat, from an LLM tool call, from `hooks.yaml` or from a
-self-improver program. Once armed, a behaviour runs without any more LLM turns or commands.
+them per [profile](/guide/profiles), from chat, from an LLM tool call, from `hooks.yaml` or from a
+[self-improver](/guide/self-improver) program. Once armed, a behaviour runs without any more LLM turns or commands.
 
 The motivating case: an LLM bot sat at 6/20 health with no food and died twice, because
 nothing made it go and get food, and nothing ran between its turns. With `keep_fed` armed
@@ -14,13 +14,13 @@ it hunts, cooks and eats by itself.
 | | what it is | who starts it | how long it runs |
 |---|---|---|---|
 | **action** | one thing the body does (`hunt`, `goto`, `eat`) | anyone, via `agent.act()` | until done, stopped or preempted |
-| **brain** | a decision loop (commands, reflexes, LLM, NPC) | the variant | the whole session |
+| **brain** | a decision loop (commands, [reflexes](/concepts/world#reflexes), LLM, NPC) | the [variant](/concepts/variants-profiles) | the whole session |
 | **behaviour** | a scored, option-validated routine run by the behaviours brain | armed from config, chat, LLM, hooks, programs | until disarmed, across restarts |
 
 A behaviour is an [NPC-brain](npc-brain.md) behaviour (score + run) with a name, a zod
 options schema, a description written for LLMs and some metadata. The behaviours brain
 holds the **armed** set and runs it through the same `NpcController`, so the scoring,
-hysteresis, failure back-off and back-off from other callers are exactly the NPC brain's.
+hysteresis, failure back-off and back-off from other callers are exactly the [NPC brain](/guide/npc-brain)'s.
 
 ```ts
 import { behaviorsBrain } from '../src/brains/index.ts'
@@ -124,7 +124,7 @@ non-owner player, gets `only my owners can change my behaviours`.
 
 Every behaviour action is a tool. The descriptions say *when* to arm what ("arm keep_fed so
 you look after your own food without being asked"), and the LLM arms as `brain:llm` (shown
-in `behavior_status`). Pax's context pack has one rule for it:
+in `behavior_status`). Pax's [context pack](/guide/context-pack) has one rule for it:
 
 > For ongoing needs (staying fed, following or guarding robin, guarding a place, farming,
 > keeping wood stocked) arm a behaviour with behavior_arm instead of doing it turn by turn.
@@ -202,7 +202,7 @@ never pull the body two ways. `keep_fed` likewise leaves "eat what you carry" to
 A behaviour lists the actions it `requires`; if the bot lacks one it is skipped with a
 warning (and `behavior_arm` reports "armed, but it can't run: ..."). `needs: { dig }` checks
 `canDig`, `needs: { place }` checks `settings.canPlace` (default true; set it to false in a
-profile's `settings` to keep a bot from placing blocks). Chores never act in protected areas
+profile's `settings` to keep a bot from placing blocks). Chores never act in [protected areas](/concepts/world#protected-areas)
 (spawn): `chop_tree` skips them, `chop_wood_loop` keeps `spawnClearance` from the world
 spawn, `hunt` skips animals inside protected areas and, by default, animals inside fences.
 

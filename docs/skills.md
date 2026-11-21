@@ -44,7 +44,7 @@ Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actio
 
 ### combat
 
-- `retreat` (internal): back off from hostiles, used by [reflexes](/concepts/world#reflexes) at low health. Flying mobs are fought in place, not chased ([details](concepts/world#hostile-mobs)).
+- `retreat` (internal): back off from hostiles, used by [reflexes](/concepts/world#reflexes) at low health. [Flying mobs](/concepts/world#hostile-mobs) are fought in place, not chased ([details](concepts/world#hostile-mobs)).
 
 | action | |
 |---|---|
@@ -136,7 +136,7 @@ how many were out of reach.
 
 ### building
 
-- `break_block x y z [force]`: break one block with the best tool; refuses storage blocks unless `force`; fails clearly (and teaches the bot the zone) in protected areas.
+- `break_block x y z [force]`: break one block with the best tool; refuses storage blocks unless `force`; fails clearly (and teaches the bot the zone) in [protected areas](/concepts/world#protected-areas).
 
 | action | |
 |---|---|

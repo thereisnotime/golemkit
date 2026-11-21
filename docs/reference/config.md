@@ -19,7 +19,7 @@ fleet bot entry / CLI flags.
 | `MC_RETRY_LLM` | `2` | retries for transient LLM provider errors |
 | `MC_RECONNECT_MAX_MS` | `300000` | reconnect backoff cap |
 | `MC_LLM_PROXY` | | `caveman`, `none` or a gateway URL |
-| `MC_CAVEMAN_BIN` | auto | path to the caveman CLI |
+| `MC_CAVEMAN_BIN` | auto | path to the [caveman](/guide/profiles#llm-proxy-caveman-or-a-gateway) CLI |
 | `MC_MODDED_HOSTILE` | | extra hostile modded mobs, comma-separated globs (`somemod:*_zombie`) |
 | `MC_JOURNAL` | `true` | `false` turns the [journal](../guide/journal) off |
 | `MC_JOURNAL_TYPES` | all | comma-separated event types to record |

@@ -51,7 +51,7 @@ What you get for free:
 
 | flag | default | |
 |---|---|---|
-| `exclusive` | `true` | needs the body; takes the action lock. Use `false` for queries and chat |
+| `exclusive` | `true` | needs the body; takes the [action lock](/concepts/architecture#the-action-lock-and-priorities). Use `false` for queries and chat |
 | `longRunning` | `false` | runs until stopped (follow, guard); resumed after being preempted |
 | `aliases` | | extra command names |
 | `internal` | `false` | hidden from `!help` and LLM tools (e.g. actions only [reflexes](/concepts/world#reflexes) use) |
