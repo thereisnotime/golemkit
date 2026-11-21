@@ -36,6 +36,9 @@ flowchart LR
 - `goto` is **long-running**: LLM brains start it in the background and get an `actionDone`
   follow-up with the real outcome; `!goto` in chat replies when it ends.
 - It only reports arrival when the bot actually stands at the target.
+- It watches the bot's air: the pathfinder walks along lake beds and a sinking bot drowns, so
+  below 12 of 20 air the walk stops, the bot swims straight up, and the trip carries on (after the
+  third time it gives up with "kept running out of air under water").
 - [Retries](/guide/profiles#retries) (`retry.actions.goto`) re-run it after "stuck" failures.
 
 ```ts

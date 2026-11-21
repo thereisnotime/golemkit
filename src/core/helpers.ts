@@ -120,6 +120,46 @@ export interface TravelOptions {
  * when the bot actually stands at the target.
  */
 export async function travel (bot: Bot, target: { x: number, y?: number, z: number }, signal: AbortSignal, opts: TravelOptions = {}): Promise<void> {
+  // The pathfinder walks along lake beds and the bot sinks; bots drowned mid-trip on mc02. When
+  // the air runs low the walk stops, the bot swims up, then carries on (three times at most).
+  for (let surfaced = 0; ; surfaced++) {
+    const air = new AbortController()
+    let low = false
+    const watch = setInterval(() => {
+      if (((bot as { oxygenLevel?: number }).oxygenLevel ?? 20) < LOW_AIR) { low = true; air.abort() }
+    }, 400)
+    try {
+      return await travelLegs(bot, target, AbortSignal.any([signal, air.signal]), opts)
+    } catch (e) {
+      if (signal.aborted || !low) throw e
+    } finally {
+      clearInterval(watch)
+    }
+    await swimUp(bot, signal)
+    if (surfaced >= 2) throw new Error(`kept running out of air under water near ${fmtPos(bot.entity.position)}`)
+  }
+}
+
+/** Air (of 20) below which travel stops and swims up. */
+const LOW_AIR = 12
+
+/** Swims straight up until the bot has its air back (15 s at most). */
+async function swimUp (bot: Bot, signal: AbortSignal): Promise<void> {
+  try { bot.pathfinder.setGoal(null) } catch {}
+  bot.setControlState('jump', true)
+  try {
+    const until = Date.now() + 15_000
+    while (Date.now() < until && ((bot as { oxygenLevel?: number }).oxygenLevel ?? 20) < 20) {
+      checkAborted(signal)
+      await new Promise(resolve => setTimeout(resolve, 250))
+    }
+    await new Promise(resolve => setTimeout(resolve, 800))
+  } finally {
+    bot.setControlState('jump', false)
+  }
+}
+
+async function travelLegs (bot: Bot, target: { x: number, y?: number, z: number }, signal: AbortSignal, opts: TravelOptions): Promise<void> {
   const step = opts.stepBlocks ?? 64
   const legMs = opts.stepTimeoutMs ?? 60_000
   const range = opts.range ?? 2
