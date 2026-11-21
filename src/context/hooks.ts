@@ -370,5 +370,6 @@ function substituteDeep (v: unknown, vars: Record<string, string | number>): unk
 
 /** Numbers in chat templates: whole numbers as-is, anything else rounded ("6.1666" -> "6"). */
 function fmtVar (v: unknown): string {
-  return typeof v === 'number' && !Number.isInteger(v) ? String(Math.round(v)) : String(v)
+  if (typeof v !== 'number' || Number.isInteger(v)) return String(v)
+  return v > 0 && v < 0.5 ? '<1' : String(Math.round(v)) // 0.3 health isn't 0
 }
