@@ -30,6 +30,7 @@ export { placeAt, reachBlock } from './world.ts'
 export { construction, buildStructure } from './construction.ts'
 export { materialsSkill, gatherMaterials, planWood } from './materials.ts'
 export { ensureTool, type ToolKind } from './toolkit.ts'
+export { food, startFarm, getFarms, getFoodSpots, type Farm } from './food.ts'
 
 import { crafting } from './crafting.ts'
 import { containers } from './containers.ts'
@@ -39,8 +40,9 @@ import { building } from './building.ts'
 import { pickup } from './pickup.ts'
 import { construction } from './construction.ts'
 import { materialsSkill } from './materials.ts'
+import { food } from './food.ts'
 
-/** Extra skills on top of standardSkills(): crafting, containers, farming, woodcutting, building, construction, materials, pickup. */
-export const extendedSkills = () => [crafting(), containers(), farming(), woodcutting(), building(), construction(), materialsSkill(), pickup()]
+/** Extra skills on top of standardSkills(): crafting, containers, farming, food, woodcutting, building, construction, materials, pickup. */
+export const extendedSkills = () => [crafting(), containers(), farming(), food(), woodcutting(), building(), construction(), materialsSkill(), pickup()]
 export { modsSkill, installedMods } from './mods.ts'
 export { config } from './config.ts'

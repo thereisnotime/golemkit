@@ -7,7 +7,7 @@ each one is for and how it behaves.
 Two bundles live in `src/skills/index.ts`:
 
 - `standardSkills()`: status, movement, combat, survival, inventory, gather, [journal](/guide/journal).
-- `extendedSkills()`: crafting, containers, farming, woodcutting, building, construction,
+- `extendedSkills()`: crafting, containers, farming, food, woodcutting, building, construction,
   materials, pickup.
 
 `navigation()` is exported on its own (the villager bot uses it).
@@ -52,6 +52,7 @@ Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actio
 | `attack` | Fight the nearest hostile mob, or an entity by id. |
 | `guard` | Protect a player from hostile mobs until stopped (long-running). |
 | `defend` | Fight back at the closest hostile (internal, used by reflexes). |
+| `hunt` | Hunt passive animals for food and pick up the drops. Never pets, named, tamed, leashed or baby animals, villagers or players, never in protected areas; fenced animals only with `pens=true`. `keepAtLeast` spares the last N adults of each kind. |
 
 ### survival
 | action | |
@@ -118,12 +119,29 @@ Observe hook: `containersNearby` (within 16 blocks).
 ### farming
 | action | |
 |---|---|
-| `harvest` | Break ripe wheat, carrots, potatoes and beetroot in a radius (ripeness from the block's `age`), replant with the matching seed, pick up drops, then re-seed any farmland it left bare. |
-| `plant` | Plant seeds (`wheat_seeds`, `carrot`, `potato`, `beetroot_seeds`) on empty farmland. |
+| `harvest` | Break ripe wheat, carrots, potatoes and beetroot in a radius (ripeness from the block's `age`), replant with the matching seed, pick up drops, then re-seed any farmland it left bare. `x y z` limits it to one field (e.g. `farm:1`). |
+| `plant` | Plant seeds (`wheat_seeds`, `carrot`, `potato`, `beetroot_seeds`) on empty farmland (around the bot, or `x y z`). |
 | `till` *dig* | Hoe dirt/grass into farmland at x y z, or the nearest spots within 4 blocks of water. |
 
 Harvest and plant don't change terrain, so they work with digging off. Observe hook:
 `ripeCropsNearby`.
+
+### food
+
+Food self-sufficiency, used by [`keep_fed`](/guide/behaviors#keep-fed) and [`farm_setup`](/guide/behaviors#farm-setup).
+What it finds is remembered in `agent.storage` (`foodSpots`, `farms`), as named places
+(`food:animals`, `food:village_farm`, `food:water`, `farm:<n>`) and in the [journal](/guide/journal)
+(`food_spot`, `farm_started`). The planning is pure and unit-tested (`src/skills/foodPlan.ts`).
+
+| action | |
+|---|---|
+| `find_food` | Scout for animals or a village farm beyond what is in sight: known spots first, then an expanding spiral around home out to `radius` (default 200), by day, skipping water, lava and protected areas, giving up when stuck, at night, at low health or after `maxMinutes`. Remembers what it finds; doesn't hunt. |
+| `start_farm` *dig* | Start a farm of its own: first a site, shore water near home or a place with at least 8 grass/dirt cells at the water's height (or under a one-block bank it digs off), outside protected areas, the spawn and away from builds or fields (or water poured from a bucket); then seeds from breaking grass (or carrots, potatoes, beetroot seeds), a hoe (crafted, chopping logs first if needed), a plot of up to 9x9 tilled and planted around the water, a fence and torches if it has the materials. Saved as `farm:<n>`. |
+| `breed` | Feed two adults of a kind (cows/sheep: wheat, pigs: carrots/potatoes/beetroot, chickens: seeds, rabbits: carrots), leading them to its farm first. Same animal filter as `hunt`; keeps seeds for replanting and stops at `maxHerd`. |
+
+Never taken from other players: crops count only on the bot's own farm or a village farm
+(villagers within 24 blocks), and animals inside fences only on its own farm. Observe hook:
+`farms`, `foodSpots`.
 
 ### woodcutting
 | action | |
@@ -174,7 +192,8 @@ Observe hook: `droppedItemsNearby`.
 Actions that need other actions' work inside their own lock call the shared bodies directly
 (calling `agent.act` from inside an action would replace it): `craftItem` (crafting.ts),
 `fellTree` (woodcutting.ts), `collectBlocks` (gather.ts), `gatherMaterials` (materials.ts),
-`buildStructure` (construction.ts) and `ensureTool(bot, signal, kind)` (toolkit.ts).
+`buildStructure` (construction.ts), `ensureTool(bot, signal, kind)` (toolkit.ts) and
+`startFarm` (food.ts).
 
 ## Trying actions on a live server
 

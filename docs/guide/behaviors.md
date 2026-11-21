@@ -7,7 +7,8 @@ them per [profile](/guide/profiles), from chat, from an LLM tool call, from `hoo
 
 The motivating case: an LLM bot sat at 6/20 health with no food and died twice, because
 nothing made it go and get food, and nothing ran between its turns. With `keep_fed` armed
-it hunts, cooks and eats by itself.
+it hunts, cooks and eats by itself, scouts further out when there is nothing near, and with
+`farm_setup` it grows its own food ([details](#food-keep-fed-scouting-and-farm-setup)).
 
 ## Actions, brains and behaviours
 
@@ -197,6 +198,113 @@ the same `retreat`/`flee` actions and the reflex always outranks the behaviour, 
 never pull the body two ways. `keep_fed` likewise leaves "eat what you carry" to the reflex
 (food < 15) and steps in below 14, or when health is low and food is under 18 (no regen).
 
+## Food: keep_fed, scouting and farm_setup
+
+`keep_fed` used to look only within its `radius`; near a busy spawn there is often nothing,
+so it backed off and the bot starved. It now goes further, step by step, and as a last
+resort grows its own food. The choice is the pure `nextFoodStep(world, options, tried)`;
+a step that fails is added to `tried` and the next one is picked.
+
+```mermaid
+flowchart TB
+  H(["hungry: food below `below`,<br/>or hurt and food below 18"]) --> E{"ready food<br/>in the bag?"}
+  E -- yes --> EAT["1 · eat"]
+  E -- no --> C{"raw meat/potato,<br/>furnace + fuel?"}
+  C -- yes --> COOK["2 · cook (smelt)"]
+  C -- no --> B{"3+ wheat?"}
+  B -- yes --> BREAD["3 · bake bread"]
+  B -- no --> CH{"food in a<br/>known chest?"}
+  CH -- yes --> WD["withdraw"]
+  CH -- no --> F{"own farm ripe<br/>(or due a visit)?<br/>village crops in range?"}
+  F -- yes --> FARM["4 · harvest farm:n<br/>(replants)"]
+  F -- no --> SP{"remembered spot<br/>food:animals ·<br/>food:village_farm?"}
+  SP -- "yes (in range, or nothing<br/>to hunt here)" --> SPOT["5 · go there, look"]
+  SP -- no --> HU{"animals above<br/>keepAtLeast?<br/>(any, if starving)"}
+  HU -- yes --> HUNT["6 · hunt (safety filter)"]
+  HU -- no --> N{"day, or<br/>scoutAtNight?"}
+  N -- no --> BACK(["fail truthfully, back off<br/>stay_safe takes it home"])
+  N -- yes --> SC["7 · scout: find_food<br/>spiral out to scoutRadius"]
+  SC -- "found animals / crops" --> HU
+  SC -- "nothing" --> SF{"no farm yet,<br/>seeds or grass?"}
+  SF -- yes --> START["8 · start_farm by water<br/>(food in a few days)"]
+  SF -- no --> BACK
+  START --> BACK
+  EAT & COOK & BREAD & WD & FARM & SPOT & HUNT -->|"re-sense, loop"| E
+
+  classDef trig fill:#f1f5f9,stroke:#475569,color:#0f172a
+  classDef ask fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef near fill:#dcfce7,stroke:#16a34a,color:#14532d
+  classDef far fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef grow fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+  classDef stop fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+  class H trig
+  class E,C,B,CH,F,SP,HU,N,SF ask
+  class EAT,COOK,BREAD,WD,HUNT near
+  class FARM,SPOT,SC far
+  class START grow
+  class BACK stop
+```
+
+- **Order:** eat, cook, bake, (eat safe raw meat), chest, crops in range, own farm, known
+  food spot, hunt, scout, start a farm. A known spot further than `radius` only wins over
+  hunting when there is nothing to hunt where the bot stands.
+- **Scouting** (`find_food`): known spots first, then an expanding spiral around home (rings
+  every 64 blocks, waypoints every ~96, starting on the side away from the world spawn) out to
+  `scoutRadius`. It skips waypoints over open water or lava and in protected areas, gives up on
+  a direction once a leg gets stuck there, and stops at night, at health 6 or less, with three
+  mobs around, after 4 stuck legs in a row, or after `maxMinutes`. It stops walking as soon as
+  animals or a village farm come into view.
+- **Memory:** sightings are stored with a timestamp (`agent.storage` key `foodSpots`) and as
+  places `food:animals`, `food:village_farm` and `food:water`, plus a `food_spot` [journal](/guide/journal)
+  event. Animal spots go stale after 6 hours, an empty visit pauses a spot for 30 minutes, and
+  two empty visits in a row forget it.
+- **Never from other players:** crops count only on the bot's own farms (`farm:<n>`) or on a
+  village farm (villagers within 24 blocks); `anyCrops: true` lifts that (e.g. for its owner's
+  field). Animals go through the hunt filter (no pets, named, tamed, leashed or baby animals,
+  never villagers, never in protected areas, nothing inside fences except on its own farm).
+- **Herd:** `keepAtLeast` (default 2) adults of each kind are spared; they are only hunted
+  when starving (health or food 6 or less).
+- **Night and reflexes:** far trips (scouting, known spots, its farm out of range, building a
+  farm) only happen by day unless `scoutAtNight`; at night keep_fed fails and backs off, and
+  `stay_safe` (night score 48, below keep_fed's 55+) takes the bot home. Eating what it carries
+  stays with the reflexes, which always outrank behaviours.
+- **Reports** say what happened: `still hungry (food 6/20): scouted 192 blocks east and
+  north-east of home, no animals or village crops; stopped: walked 24 legs; started a 9x9 wheat
+  farm at 812 63 -40 (farm:1): tilled 64, planted 9`.
+
+```
+!behavior_configure keep_fed scout=true scoutRadius=200
+!behavior_configure keep_fed scoutAtNight=false keepAtLeast=3 startFarm=false
+```
+
+### farm_setup
+
+`farm_setup` keeps the bot fed long term. With no farm it runs `start_farm`:
+
+1. a site near home (or `place`), checked first so it doesn't collect seeds for nothing: shore
+   water (a source with land next to it) within `radius`, then out to 96 blocks, each scored on
+   a 9x9 square at the water's height. Protected areas, the world spawn (`spawnClearance`),
+   placed blocks (planks, cobblestone, glass, fences, torches, beds, chests...) and existing
+   farmland within 3 blocks rule a site out. At least 8 cells must be grass/dirt with air or a
+   plant on top, or a one-block grass bank it can dig off (farmland only stays wet with water
+   at its own height or one above); more such cells, closer and fewer extra water holes is
+   better. Without natural water it tries a water spot it saw while scouting, then a water
+   bucket (filling an empty bucket first);
+2. seeds: breaks grass until it has `seeds` (wheat seeds drop 1 in 8), or uses carrots,
+   potatoes or beetroot seeds it carries;
+3. a hoe: from the inventory, crafted, or crafted after chopping a few logs;
+4. till every usable cell around the water (one source hydrates 4 blocks out, so 9x9 is
+   the most), plant, fence the ring outside with a gap on the south side and torch the corners
+   when it has (or can craft) the fences and torches;
+5. save it as `farm:<n>` (place and `farms` storage), journal `farm_started`.
+
+After that it tends the farm when `minRipe` crops are ripe (or every `tendMinutes` when it is
+out of sight and within `tendRange`), bakes bread keeping `keepWheat` for breeding, and breeds
+animals it has food for (`breed`: cows/sheep wheat, pigs carrots/potatoes/beetroot, chickens
+seeds, leading them to the farm first, never past `maxHerd`). It works by day, never while
+hungry (keep_fed's job), and only in survival. `farm_loop` can tend the same field with
+`place: farm:1`.
+
 ## Capabilities
 
 A behaviour lists the actions it `requires`; if the bot lacks one it is skipped with a
@@ -243,9 +351,9 @@ Keeps its distance from dangerous mobs (creepers, wardens by default) instead of
 
 ### `keep_fed`
 
-*survival · priority behavior (35) · needs `eat` · uses `withdraw`, `harvest`, `hunt`, `smelt`, `craft`, `goto`, `goto_place`, `list_container` when present*
+*survival · priority behavior (35) · needs `eat` · uses `withdraw`, `harvest`, `hunt`, `smelt`, `craft`, `goto`, `goto_place`, `list_container`, `find_food`, `start_farm` when present*
 
-Looks after food on its own: when hungry (or hurt and too hungry to heal) it eats, and when it has nothing to eat it takes food from known chests, harvests ripe crops, hunts passive animals and cooks the meat. Arm it so you never starve between turns.
+Looks after food on its own: when hungry (or hurt and too hungry to heal) it eats, and when it has nothing to eat it cooks or bakes, takes food from known chests, harvests its own or a village farm, goes back to remembered food spots, hunts passive animals (sparing a small herd), scouts further out when nothing is near, and as a last resort starts a farm. Arm it so you never starve between turns.
 
 | option | type | default | description |
 |---|---|---|---|
@@ -254,12 +362,19 @@ Looks after food on its own: when hungry (or hurt and too hungry to heal) it eat
 | `until` | number (1..20) | `18` | keep eating until the food bar reaches this |
 | `chests` | boolean | `true` | withdraw food from chests the bot has looked into |
 | `chestPlace` | string |  | a remembered place with a food chest to check first |
-| `harvest` | boolean | `true` | harvest ripe crops nearby |
+| `harvest` | boolean | `true` | harvest ripe crops on its own farms and village farms |
+| `anyCrops` | boolean | `false` | also harvest crops that are not its own or a village's (e.g. its owner's field); off = never touch other players' farms |
 | `hunt` | boolean | `true` | hunt passive animals (never pets, named, tamed or leashed animals) |
+| `keepAtLeast` | integer (0..32) | `2` | leave at least this many adults of each kind (only hunted when starving: health or food 6 or less) |
 | `animals` | list of cow, pig, sheep, chicken, rabbit, mooshroom | `["cow","pig","sheep","chicken","rabbit","mooshroom"]` | animals it may hunt |
 | `cook` | boolean | `true` | cook raw meat/potatoes when a furnace and fuel are available or craftable |
 | `eatRaw` | boolean | `true` | eat raw meat when cooking is not possible (never raw chicken) |
 | `radius` | number (4..64) | `32` | how far to look for crops and animals |
+| `places` | boolean | `true` | go back to remembered food spots (food:animals, food:village_farm) |
+| `scout` | boolean | `true` | when nothing is in range, scout further out (find_food) for animals and village farms |
+| `scoutRadius` | number (32..512) | `200` | how far from home to scout |
+| `scoutAtNight` | boolean | `false` | also make far trips (scouting, known spots, its farm) at night |
+| `startFarm` | boolean | `true` | as a last resort, start a farm (start_farm) when it has none and has or can get seeds |
 
 ### `guard_owner`
 
@@ -336,18 +451,42 @@ When the inventory is nearly full, walks to a chest (a remembered place, coordin
 | `keep` | list | `[]` | items never to store |
 | `returnBack` | boolean | `true` | walk back to where it was afterwards |
 
-### `farm_loop`
+### `farm_setup`
 
-*work · priority npc (20) · needs `harvest`*
+*work · priority npc (20) · needs `start_farm`, `harvest`, digging · uses `craft`, `goto`, `breed` when present*
 
-Tends fields: every few minutes, when enough crops are ripe within the radius, harvests them, picks up the drops and replants. Arm it near a farm.
+Makes the bot self-sufficient for food: when it has no farm it starts one (seeds from grass, a hoe, flat grass by water near home, outside protected areas and away from builds), then harvests and replants it when ripe, bakes bread from the wheat and breeds animals it has food for. By day only. Arm it on any bot that should feed itself long term.
 
 | option | type | default | description |
 |---|---|---|---|
-| `radius` | number (2..32) | `16` | field radius around the bot |
+| `place` | string |  | remembered place to farm near; default home, else where it is |
+| `size` | integer (3..9) | `9` | plot side around one water block |
+| `radius` | number (8..96) | `48` | how far from the centre to look for water |
+| `fence` | boolean | `true` | fence the plot when it has the materials |
+| `light` | boolean | `true` | put torches on the corners when it has torches or coal |
+| `tend` | boolean | `true` | harvest and replant its farm when it is ripe |
+| `tendRange` | number (16..512) | `128` | only walk to the farm from this close |
+| `tendMinutes` | number (5..240) | `20` | check a farm that is out of sight this often |
+| `minRipe` | integer (1..80) | `8` | harvest when at least this many crops are ripe |
+| `bake` | boolean | `true` | bake bread from wheat |
+| `breed` | boolean | `true` | breed animals it has food for (cows/sheep: wheat, pigs: carrots, chickens: seeds) |
+| `keepWheat` | integer (0..64) | `4` | wheat to keep for breeding instead of baking |
+| `maxHerd` | integer (2..64) | `12` | stop breeding a kind at this many adults |
+| `spawnClearance` | number (0..256) | `48` | never farm within this distance of the world spawn |
+
+### `farm_loop`
+
+*work · priority npc (20) · needs `harvest` · uses `goto` when present*
+
+Tends fields: every few minutes, when enough crops are ripe within the radius, harvests them, picks up the drops and replants. Arm it near a farm, or give it a remembered place (e.g. farm:1 from start_farm) to walk to.
+
+| option | type | default | description |
+|---|---|---|---|
+| `radius` | number (2..32) | `16` | field radius around the bot (or the place) |
 | `minRipe` | integer (1..64) | `4` | wait until at least this many crops are ripe |
 | `everyMinutes` | number (0.5..240) | `5` | pause between rounds |
 | `replant` | boolean | `true` | replant from the inventory |
+| `place` | string |  | remembered place of the field (e.g. farm:1); default around the bot |
 
 ### `chop_wood_loop`
 

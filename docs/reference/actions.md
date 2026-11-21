@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-18 skills, 60 actions.
+19 skills, 63 actions.
 
 ## building
 
@@ -87,6 +87,7 @@ Hunt passive animals (cow, pig, sheep, chicken, rabbit, mooshroom) for food and 
 | `count` | integer (1..8) |  | `1` | how many to kill |
 | `radius` | number (4..64) |  | `24` | how far to look, in blocks |
 | `pens` | boolean |  | `false` | also hunt animals inside fences (only your own farm) |
+| `keepAtLeast` | integer (0..32) |  | `0` | leave at least this many adults of each kind alive (sustainable herd) |
 
 ## config
 
@@ -244,13 +245,16 @@ Harvesting, planting and tilling crops.
 
 ### `harvest`
 
-Harvest ripe wheat, carrots, potatoes and beetroot nearby, pick up the drops and replant from the inventory.
+Harvest ripe wheat, carrots, potatoes and beetroot nearby (or within a radius of x y z, e.g. one field), pick up the drops and replant from the inventory.
 
 | param | type | required | default | description |
 |---|---|---|---|---|
 | `radius` | number (1..32) |  | `16` | how far to look for crops, in blocks |
 | `max` | integer (1..256) |  | `64` | stop after this many crops |
 | `replant` | boolean |  | `true` |  |
+| `x` | number |  |  | centre of the field (with y and z); default where the bot stands |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
 
 ### `plant`
 
@@ -261,6 +265,9 @@ Plant seeds (wheat_seeds, carrot, potato, beetroot_seeds) on empty farmland near
 | `seed` | string |  |  | seed item; default whatever seeds the bot has |
 | `count` | integer (1..256) |  | `64` | how many to plant at most |
 | `radius` | number (1..32) |  | `12` |  |
+| `x` | number |  |  | centre of the field (with y and z); default where the bot stands |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
 
 ### `till`
 
@@ -273,6 +280,56 @@ Turn dirt or grass into farmland with a hoe, either at x y z or the nearest spot
 | `z` | number |  |  |  |
 | `count` | integer (1..64) |  | `1` |  |
 | `radius` | number (1..16) |  | `8` |  |
+
+## food
+
+Food self-sufficiency: scouting for animals and village farms, starting a farm of its own, breeding animals.
+
+### `find_food`
+
+Scout for food beyond what is in sight: first known food spots, then an expanding spiral around home (or here) out to `radius` blocks, by day, avoiding water, lava and protected areas, until it sees huntable animals or a village farm. Remembers what it finds as places (food:animals, food:village_farm, food:water). Does not hunt; use hunt or keep_fed after.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `radius` | number (32..512) |  | `200` | how far from home to scout, in blocks |
+| `atNight` | boolean |  | `false` | also scout at night (dangerous) |
+| `animals` | array |  | `["cow","pig","sheep","chicken","rabbit","mooshroom"]` | animals that count as food |
+| `crops` | boolean |  | `true` | village farms (crops with villagers nearby) count as food too |
+| `maxMinutes` | number (1..30) |  | `8` | give up after this long |
+| `keepAtLeast` | integer (0..32) |  | `0` | only count animals above this many adults of a kind (a herd to spare) |
+| `from` | `home` \| `here` |  | `"home"` | centre of the search: home (when set) or where the bot stands |
+
+### `start_farm`
+
+Start a small farm of its own: picks grass or dirt by water near home (or a place), outside protected areas and away from anybody's builds or fields (or pours water from a bucket), then gets seeds by breaking grass (or uses carrots, potatoes, beetroot seeds), makes a hoe if needed, tills a plot around the water, plants it, fences and lights it if it has the materials, and remembers it as farm:1, farm:2... for farm_loop/farm_setup. Needs digging enabled.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `place` | string |  |  | remembered place (or home) to farm near; default home, else here |
+| `x` | number |  |  | farm near this x (with z) instead |
+| `z` | number |  |  |  |
+| `size` | integer (3..9) |  | `9` | plot side, odd, around one water block (9 = 80 farmland) |
+| `radius` | number (8..96) |  | `48` | how far from the centre to look for water |
+| `seeds` | integer (1..64) |  | `10` | seeds to collect before planting (breaks grass until it has them or gives up) |
+| `fence` | boolean |  | `true` | fence the plot when it has (or can craft) enough fences |
+| `light` | boolean |  | `true` | put torches on the corners when it has torches or coal |
+| `spawnClearance` | number (0..256) |  | `48` | never farm within this distance of the world spawn |
+
+### `breed`
+
+Breed two adult animals of a kind it sees (cows/sheep with wheat, pigs with carrots/potatoes/beetroot, chickens with seeds), leading them towards its farm first when it has one nearby. Never feeds pets, named, leashed or fenced animals that are not on its own farm. Keeps seeds for replanting.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `animal` | `cow` \| `mooshroom` \| `sheep` \| `pig` \| `chicken` \| `rabbit` |  |  | which kind; default the best one it has food for |
+| `radius` | number (4..48) |  | `24` | how far to look for animals |
+| `lure` | boolean |  | `true` | lead them to its farm first (when one is within 64 blocks) |
+| `keepSeeds` | integer (0..64) |  | `8` | seeds to keep for replanting |
+| `maxHerd` | integer (2..64) |  | `12` | do not breed a kind with this many adults around |
 
 ## gather
 
@@ -328,7 +385,7 @@ What happened: recent journal events (deaths, damage, kills, items, chat, action
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, connect, disconnect, llm_turn; or deaths, chat, items, blocks, players, combat, connections |
+| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, connect, disconnect, llm_turn; or deaths, chat, items, blocks, players, combat, connections |
 | `since` | string |  |  | how far back: 30m, 1h, 2d, today, yesterday, a date (YYYY-MM-DD); default 24h |
 | `player` | string |  |  | only events involving this player |
 | `near` | string |  |  | only events near "x y z" or "x z", optionally with a radius as 4th number (default 32) |

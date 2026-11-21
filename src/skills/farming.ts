@@ -15,9 +15,11 @@ export const CROPS: Record<string, { ripe: number, seed: string }> = {
 
 export const SEEDS: Record<string, string> = Object.fromEntries(Object.entries(CROPS).map(([crop, c]) => [c.seed, crop]))
 
+/** True for a ripe crop. `age` comes from block properties, which prismarine-block gives as a string ('7'). */
 export function isMature (blockName: string, age: unknown): boolean {
   const c = CROPS[blockName]
-  return !!c && typeof age === 'number' && age >= c.ripe
+  const n = typeof age === 'string' && age !== '' ? Number(age) : age
+  return !!c && typeof n === 'number' && Number.isFinite(n) && n >= c.ripe
 }
 
 export function seedFor (cropName: string): string | null {
@@ -36,8 +38,9 @@ function age (b: Block): unknown {
 }
 
 /** Farmland with air above, nearest first. */
-function emptyFarmland (bot: Bot, radius: number, count: number): Vec3[] {
+function emptyFarmland (bot: Bot, radius: number, count: number, point?: Vec3): Vec3[] {
   return bot.findBlocks({
+    ...(point ? { point } : {}),
     matching: bot.registry.blocksByName.farmland.id,
     maxDistance: radius,
     count: count * 4,
@@ -45,7 +48,7 @@ function emptyFarmland (bot: Bot, radius: number, count: number): Vec3[] {
   }).slice(0, count)
 }
 
-async function plantOn (bot: Bot, farmland: Vec3, seed: string, signal: AbortSignal): Promise<boolean> {
+export async function plantOn (bot: Bot, farmland: Vec3, seed: string, signal: AbortSignal): Promise<boolean> {
   const it = findItem(bot, seed)
   if (!it) return false
   const soil = bot.blockAt(farmland)
@@ -62,19 +65,23 @@ async function plantOn (bot: Bot, farmland: Vec3, seed: string, signal: AbortSig
 
 const harvest = defineAction({
   name: 'harvest',
-  description: 'Harvest ripe wheat, carrots, potatoes and beetroot nearby, pick up the drops and replant from the inventory.',
+  description: 'Harvest ripe wheat, carrots, potatoes and beetroot nearby (or within a radius of x y z, e.g. one field), pick up the drops and replant from the inventory.',
   params: z.object({
     radius: z.number().min(1).max(32).default(16).describe('how far to look for crops, in blocks'),
     max: z.number().int().min(1).max(256).default(64).describe('stop after this many crops'),
-    replant: z.boolean().default(true)
+    replant: z.boolean().default(true),
+    x: z.number().optional().describe('centre of the field (with y and z); default where the bot stands'),
+    y: z.number().optional(),
+    z: z.number().optional()
   }),
-  async run ({ bot, signal, log }, { radius, max, replant }): Promise<ActionResult> {
+  async run ({ bot, signal, log }, { radius, max, replant, x, y, z: cz }): Promise<ActionResult> {
     const ids = Object.keys(CROPS).map(n => bot.registry.blocksByName[n].id)
+    const point = x !== undefined && y !== undefined && cz !== undefined ? vec(bot, x, y, cz) : undefined
     let harvested = 0
     let replanted = 0
     while (harvested < max) {
       checkAborted(signal)
-      const found = bot.findBlock({ matching: ids, maxDistance: radius, useExtraInfo: (b: Block) => isMature(b.name, age(b)) })
+      const found = bot.findBlock({ ...(point ? { point } : {}), matching: ids, maxDistance: radius, useExtraInfo: (b: Block) => isMature(b.name, age(b)) })
       if (!found) break
       const pos = found.position
       const crop = found.name
@@ -96,11 +103,11 @@ const harvest = defineAction({
       // pick up every few crops so drops don't despawn or scatter
       if (harvested % 8 === 0) await pickupNearby(bot, signal, { radius: 6, maxMs: 8000 })
     }
-    if (!harvested) return fail(`no ripe crops within ${radius} blocks`)
+    if (!harvested) return fail(`no ripe crops within ${radius} blocks${point ? ` of ${fmtPos(point)}` : ''}`)
     await pickupNearby(bot, signal, { radius: 8, maxMs: 15000 })
     // seeds may only have arrived with the pickup: fill whatever farmland we left bare
     if (replant) {
-      for (const p of emptyFarmland(bot, Math.min(radius, 12), harvested - replanted)) {
+      for (const p of emptyFarmland(bot, Math.min(radius, 12), harvested - replanted, point)) {
         checkAborted(signal)
         const seed = pickSeed(bot)
         if (!seed) break
@@ -117,12 +124,16 @@ const plant = defineAction({
   params: z.object({
     seed: z.string().optional().describe('seed item; default whatever seeds the bot has'),
     count: z.number().int().min(1).max(256).default(64).describe('how many to plant at most'),
-    radius: z.number().min(1).max(32).default(12)
+    radius: z.number().min(1).max(32).default(12),
+    x: z.number().optional().describe('centre of the field (with y and z); default where the bot stands'),
+    y: z.number().optional(),
+    z: z.number().optional()
   }),
-  async run ({ bot, signal }, { seed, count, radius }): Promise<ActionResult> {
+  async run ({ bot, signal }, { seed, count, radius, x, y, z: cz }): Promise<ActionResult> {
     if (seed && !SEEDS[seed]) return fail(`${seed} is not a seed I can plant`)
     if (!pickSeed(bot, seed)) return fail(seed ? `no ${seed}` : 'no seeds')
-    const spots = emptyFarmland(bot, radius, count)
+    const point = x !== undefined && y !== undefined && cz !== undefined ? vec(bot, x, y, cz) : undefined
+    const spots = emptyFarmland(bot, radius, count, point)
     if (!spots.length) return fail(`no empty farmland within ${radius} blocks`)
     let planted = 0
     for (const p of spots) {
@@ -135,7 +146,7 @@ const plant = defineAction({
   }
 })
 
-const TILLABLE = ['dirt', 'grass_block', 'dirt_path', 'coarse_dirt', 'rooted_dirt']
+export const TILLABLE = ['dirt', 'grass_block', 'dirt_path', 'coarse_dirt', 'rooted_dirt']
 
 const till = defineAction({
   name: 'till',

@@ -17,7 +17,7 @@ const TYPE_ALIASES: Record<string, string[]> = {
   deaths: ['death'], death: ['death'], chat: ['chat_in', 'chat_out', 'whisper'], items: ['item_gained', 'item_lost'],
   blocks: ['block_broken', 'block_placed'], players: ['player_seen', 'player_joined', 'player_left'],
   actions: ['action'], places: ['place_visited'], combat: ['damage', 'kill', 'death'], llm: ['llm_turn'],
-  connections: ['connect', 'disconnect']
+  connections: ['connect', 'disconnect'], food: ['food_spot', 'farm_started']
 }
 
 export function resolveTypes (spec: string | undefined): string[] | undefined {

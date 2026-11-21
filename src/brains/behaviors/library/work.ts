@@ -143,22 +143,39 @@ export const farmLoop = defineBehavior({
   name: 'farm_loop',
   category: 'work',
   description: 'Tends fields: every few minutes, when enough crops are ripe within the radius, harvests them, picks up the drops ' +
-    'and replants. Arm it near a farm.',
+    'and replants. Arm it near a farm, or give it a remembered place (e.g. farm:1 from start_farm) to walk to.',
   options: z.object({
-    radius: z.number().min(2).max(32).default(16).describe('field radius around the bot'),
+    radius: z.number().min(2).max(32).default(16).describe('field radius around the bot (or the place)'),
     minRipe: z.number().int().min(1).max(64).default(4).describe('wait until at least this many crops are ripe'),
     everyMinutes: z.number().min(0.5).max(240).default(5).describe('pause between rounds'),
-    replant: z.boolean().default(true).describe('replant from the inventory')
+    replant: z.boolean().default(true).describe('replant from the inventory'),
+    place: z.string().optional().describe('remembered place of the field (e.g. farm:1); default around the bot')
   }),
   requires: ['harvest'],
+  uses: ['goto'],
   priority: 'npc',
-  create (o) {
+  create (o, { agent }) {
+    const center = (bot: Bot) => o.place ? resolveCenter(agent, bot, { place: o.place }) : bot.entity?.position ?? null
     return {
       cooldownMs: o.everyMinutes * 60_000,
       failureCooldownMs: 120_000,
       maxFailureCooldownMs: 900_000,
-      score: ({ bot }) => bot.entity && ripeCount(bot, bot.entity.position, o.radius) >= o.minRipe ? 30 : 0,
-      run: (ctx) => ctx.act('harvest', { radius: o.radius, replant: o.replant })
+      score: ({ bot }) => {
+        const c = bot.entity ? center(bot) : null
+        return c && ripeCount(bot, c, o.radius) >= o.minRipe ? 30 : 0
+      },
+      async run (ctx) {
+        const c = center(ctx.bot)
+        if (!c) return { ok: false, message: `don't know ${o.place}` }
+        if (o.place) {
+          if (dist(c, ctx.bot.entity.position) > 8 && agent.getAction('goto')) {
+            const there = await ctx.act('goto', { x: c.x, y: c.y + 1, z: c.z })
+            if (!there.ok) return there
+          }
+          return ctx.act('harvest', { radius: o.radius, replant: o.replant, x: c.x, y: c.y + 1, z: c.z })
+        }
+        return ctx.act('harvest', { radius: o.radius, replant: o.replant })
+      }
     }
   }
 })

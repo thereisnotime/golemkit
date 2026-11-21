@@ -1,16 +1,22 @@
 // keep_fed: when hungry (or hurt and not full enough to heal) and out of food, go and get
-// some: eat what's there, withdraw from known chests, harvest ripe crops, hunt passive
-// animals, cook raw food, eat. The decision is a pure function (nextFoodStep) so it is
+// some: eat what's there, cook, bake, withdraw from known chests, harvest its own or a
+// village farm, go back to known food spots, hunt (sparing a herd), scout further out, and
+// as a last resort start a farm. The decision is a pure function (nextFoodStep) so it is
 // unit-tested without a server.
-import { needsSurvival } from '../../../core/index.ts'
+import { needsSurvival, fmtPos } from '../../../core/index.ts'
 import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
 import { z, type Agent, type ActionResult } from '../../../core/index.ts'
 import { defineBehavior } from '../types.ts'
+import { getHome } from '../../../skills/navigation.ts'
 import type { BehaviorContext } from '../../npc/index.ts'
 import { bestFood } from '../../../skills/survival.ts'
-import { huntRefusal, HUNTABLE, type HuntCandidate } from '../../../skills/combat.ts'
+import { HUNTABLE, herdSurplus } from '../../../skills/combat.ts'
 import { CROPS, isMature } from '../../../skills/farming.ts'
+import {
+  animalsAround, ownFarmRipe, villageCrops, getFarms, nearestFarm, saveFarm, getFoodSpots, forgetEmptySpot
+} from '../../../skills/food.ts'
+import { rankSpots, seedCount } from '../../../skills/foodPlan.ts'
 import { pickFuel } from '../../../skills/crafting.ts'
 import { knownContainers } from '../../../skills/containers.ts'
 import { getPlaces } from '../../../skills/navigation.ts'
@@ -32,7 +38,7 @@ export const COOKED: Record<string, string> = {
 const SAFE_RAW = new Set(['beef', 'porkchop', 'mutton', 'rabbit', 'cod', 'salmon', 'potato'])
 const BAD = new Set(['rotten_flesh', 'spider_eye', 'poisonous_potato', 'pufferfish', 'suspicious_stew', 'chorus_fruit'])
 
-export type FoodStep = 'eat' | 'cook' | 'bread' | 'withdraw' | 'harvest' | 'hunt'
+export type FoodStep = 'eat' | 'cook' | 'bread' | 'withdraw' | 'harvest' | 'farm' | 'spot' | 'hunt' | 'scout' | 'start_farm'
 
 /** What keep_fed knows about the bot and its surroundings when choosing the next step. */
 export interface FoodWorld {
@@ -48,8 +54,26 @@ export interface FoodWorld {
   canBake: boolean
   /** A known chest with food that the bot may withdraw from. */
   foodChest: boolean
+  /** Ripe crops in range it may take: its own farm, a village farm (or any, with anyCrops). */
   ripeCrops: number
+  /** Animals in range it may hunt now: adults above keepAtLeast per kind. */
   animals: number
+  /** All huntable adults in range, herd included (hunted only when starving). */
+  herd?: number
+  /** Health or food critically low: the herd minimum no longer applies. */
+  starving?: boolean
+  /** Distance to its own farm when that has ripe crops (or is due a visit), else null. */
+  farmDistance?: number | null
+  /** Distance to the best remembered food spot (animals, village farm), else null. */
+  spotDistance?: number | null
+  /** Night: no long trips unless scoutAtNight. */
+  night?: boolean
+  /** The find_food action is there. */
+  canScout?: boolean
+  /** It has a farm of its own (farm:<n>). */
+  hasFarm?: boolean
+  /** start_farm is there, digging is allowed and it has seeds or grass to get them from. */
+  canStartFarm?: boolean
 }
 
 export interface FoodStepOptions {
@@ -58,21 +82,44 @@ export interface FoodStepOptions {
   hunt: boolean
   cook: boolean
   eatRaw: boolean
+  /** Go and harvest its own farm (default true). */
+  farms?: boolean
+  /** Go back to remembered food spots (default true). */
+  places?: boolean
+  /** Scout beyond the radius (default false here; keep_fed's option defaults to true). */
+  scout?: boolean
+  scoutAtNight?: boolean
+  /** Start a farm when it has none (default false here; keep_fed's option defaults to true). */
+  startFarm?: boolean
+  /** Beyond this distance a trip counts as far (no far trips at night). */
+  radius?: number
 }
 
 /**
  * The next step towards being fed, or null when nothing is left to try. `tried` holds steps
- * that already failed this run, so the loop moves on instead of repeating them.
+ * that already failed this run, so the loop moves on instead of repeating them. Order: eat,
+ * cook, bake, (eat raw), chest, crops in range, own farm, known food spot, hunt, scout, start
+ * a farm. A known spot further than `radius` only wins over hunting when there is nothing to
+ * hunt here; no far trips (farm, spot, scouting, farm building) at night unless scoutAtNight.
  */
 export function nextFoodStep (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<FoodStep> = new Set()): FoodStep | null {
   const ok = (s: FoodStep) => !tried.has(s)
+  const far = (d: number) => o.radius !== undefined && d > o.radius
+  const dayOrBold = !w.night || !!o.scoutAtNight
+  const mayGo = (d: number) => !far(d) || dayOrBold
+  const huntable = w.animals > 0 || (!!w.starving && (w.herd ?? 0) > 0)
   if (w.hasReadyFood && ok('eat')) return 'eat'
   if (o.cook && w.raw.length && w.canCook && ok('cook')) return 'cook'
   if (w.canBake && ok('bread')) return 'bread'
   if (o.eatRaw && w.safeRaw && ok('eat')) return 'eat'
   if (o.chests && w.foodChest && ok('withdraw')) return 'withdraw'
   if (o.harvest && w.ripeCrops > 0 && ok('harvest')) return 'harvest'
-  if (o.hunt && w.animals > 0 && ok('hunt')) return 'hunt'
+  if (o.harvest && o.farms !== false && w.farmDistance != null && mayGo(w.farmDistance) && ok('farm')) return 'farm'
+  // a spot counts only when we are not standing at it already (within 16 blocks the hunt/harvest steps see it)
+  if (o.places !== false && w.spotDistance != null && w.spotDistance > 16 && mayGo(w.spotDistance) && (!huntable || !far(w.spotDistance)) && ok('spot')) return 'spot'
+  if (o.hunt && huntable && ok('hunt')) return 'hunt'
+  if (o.scout && w.canScout && dayOrBold && ok('scout')) return 'scout'
+  if (o.startFarm && !w.hasFarm && w.canStartFarm && dayOrBold && ok('start_farm')) return 'start_farm'
   return null
 }
 
@@ -86,20 +133,7 @@ function isFood (bot: Bot, name: string): boolean {
   return !!foods[name] && !BAD.has(name)
 }
 
-function huntable (bot: Bot, agent: Agent, radius: number, animals: readonly string[]): number {
-  const pos = bot.entity.position
-  let n = 0
-  for (const e of Object.values(bot.entities ?? {})) {
-    if (!e.position || e.position.distanceTo(pos) > radius) continue
-    const keys = (bot.registry as any).entitiesByName?.[e.name ?? '']?.metadataKeys as string[] | undefined
-    if (huntRefusal(e as HuntCandidate, { animals, metadataKeys: keys })) continue
-    if (agent.protectedAreas?.isProtected(e.position)) continue
-    n++
-  }
-  return n
-}
-
-function ripeCrops (bot: Bot, radius: number): number {
+function anyRipeCrops (bot: Bot, radius: number): number {
   const ids = Object.keys(CROPS).map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
   return bot.findBlocks({
     matching: ids,
@@ -108,6 +142,9 @@ function ripeCrops (bot: Bot, radius: number): number {
     useExtraInfo: (b: Block) => isMature(b.name, (b.getProperties() as Record<string, unknown>).age)
   }).length
 }
+
+/** A farm counts as due a visit when its chunk is out of sight and it was last tended this long ago. */
+const FARM_DUE_MS = 20 * 60_000
 
 /** Food in a remembered chest (nearest first). */
 function foodChests (bot: Bot, agent: Agent): { x: number, y: number, z: number, item: string }[] {
@@ -124,15 +161,25 @@ const options = z.object({
   until: z.number().min(1).max(20).default(18).describe('keep eating until the food bar reaches this'),
   chests: z.boolean().default(true).describe('withdraw food from chests the bot has looked into'),
   chestPlace: z.string().optional().describe('a remembered place with a food chest to check first'),
-  harvest: z.boolean().default(true).describe('harvest ripe crops nearby'),
+  harvest: z.boolean().default(true).describe('harvest ripe crops on its own farms and village farms'),
+  anyCrops: z.boolean().default(false).describe('also harvest crops that are not its own or a village\'s (e.g. its owner\'s field); off = never touch other players\' farms'),
   hunt: z.boolean().default(true).describe('hunt passive animals (never pets, named, tamed or leashed animals)'),
+  keepAtLeast: z.number().int().min(0).max(32).default(2).describe('leave at least this many adults of each kind (only hunted when starving: health or food 6 or less)'),
   animals: z.array(z.enum(HUNTABLE)).default([...HUNTABLE]).describe('animals it may hunt'),
   cook: z.boolean().default(true).describe('cook raw meat/potatoes when a furnace and fuel are available or craftable'),
   eatRaw: z.boolean().default(true).describe('eat raw meat when cooking is not possible (never raw chicken)'),
-  radius: z.number().min(4).max(64).default(32).describe('how far to look for crops and animals')
+  radius: z.number().min(4).max(64).default(32).describe('how far to look for crops and animals'),
+  places: z.boolean().default(true).describe('go back to remembered food spots (food:animals, food:village_farm)'),
+  scout: z.boolean().default(true).describe('when nothing is in range, scout further out (find_food) for animals and village farms'),
+  scoutRadius: z.number().min(32).max(512).default(200).describe('how far from home to scout'),
+  scoutAtNight: z.boolean().default(false).describe('also make far trips (scouting, known spots, its farm) at night'),
+  startFarm: z.boolean().default(true).describe('as a last resort, start a farm (start_farm) when it has none and has or can get seeds')
 })
 
 type O = z.infer<typeof options>
+
+/** Night, or a thunderstorm (mobs spawn): the same test stay_safe uses, so far trips and night retreat never disagree. */
+const isNightTime = (bot: Bot) => { const t = bot.time?.timeOfDay ?? 0; return (bot as { thunderState?: number }).thunderState! > 0 || (t >= 12_542 && t <= 23_459) }
 
 /** Reads the world into a FoodWorld. */
 export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
@@ -145,6 +192,44 @@ export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
   const furnace = !!bot.findBlock({ matching: bot.registry.blocksByName.furnace.id, maxDistance: 32 }) ||
     has('furnace') > 0 || (has('cobblestone') + has('cobbled_deepslate') + has('blackstone') >= 8 && !!agent.getAction('craft'))
   const fuel = raw.some(r => pickFuel(names, r))
+  const pos = bot.entity.position
+  const food = typeof bot.food === 'number' ? bot.food : 20
+  const health = typeof bot.health === 'number' ? bot.health : 20
+  const starving = food <= 6 || health <= 6
+
+  let ripe = 0
+  let farmDistance: number | null = null
+  if (o.harvest && agent.getAction('harvest')) {
+    const own = ownFarmRipe(agent, bot, o.radius)
+    ripe = own?.ripe ?? 0
+    if (!ripe) ripe = villageCrops(bot, pos, o.radius).length
+    if (!ripe && o.anyCrops) ripe = anyRipeCrops(bot, o.radius)
+    // its own farm further out: ripe if we can see it, else due after a while
+    const farm = nearestFarm(agent, bot)
+    if (farm && !own) {
+      const d = Math.hypot(farm.x - pos.x, farm.z - pos.z)
+      const visible = !!bot.blockAt?.(pos.offset(farm.x - pos.x, farm.y - pos.y, farm.z - pos.z))
+      const seenRipe = visible && !!ownFarmRipe(agent, bot, d + 1)
+      if (d <= o.scoutRadius && (seenRipe || (!visible && Date.now() - (farm.tended ?? farm.created) >= FARM_DUE_MS))) farmDistance = Math.round(d)
+    }
+  }
+  let animals = 0
+  let herd = 0
+  if (o.hunt && agent.getAction('hunt')) {
+    const seen = animalsAround(agent, bot, pos, o.radius, o.animals)
+    herd = seen.total
+    animals = Object.values(herdSurplus(seen.adults, o.keepAtLeast)).reduce((a, b) => a + b, 0)
+  }
+  const spot = o.places && agent.getAction('goto')
+    ? rankSpots(getFoodSpots(agent), ['animals', 'village_farm'], Date.now(), pos, bot.game?.dimension)
+      .find(s => Math.hypot(s.x - pos.x, s.z - pos.z) <= o.scoutRadius * 1.5)
+    : undefined
+  const grass = () => {
+    const ids = ['short_grass', 'grass', 'tall_grass'].map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
+    return !!bot.findBlock({ matching: ids, maxDistance: 32 })
+  }
+  const inv: Record<string, number> = {}
+  for (const i of items) inv[i.name] = (inv[i.name] ?? 0) + i.count
   return {
     hasReadyFood: ready && !!best,
     raw,
@@ -152,8 +237,16 @@ export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
     canCook: !!agent.getAction('smelt') && furnace && fuel,
     canBake: has('wheat') >= 3 && !!agent.getAction('craft'),
     foodChest: !!agent.getAction('withdraw') && (foodChests(bot, agent).length > 0 || (!!o.chestPlace && !!getPlaces(agent)[o.chestPlace.toLowerCase()])),
-    ripeCrops: o.harvest && agent.getAction('harvest') ? ripeCrops(bot, o.radius) : 0,
-    animals: o.hunt && agent.getAction('hunt') ? huntable(bot, agent, o.radius, o.animals) : 0
+    ripeCrops: ripe,
+    animals,
+    herd,
+    starving,
+    farmDistance,
+    spotDistance: spot ? Math.round(Math.hypot(spot.x - pos.x, spot.z - pos.z)) : null,
+    night: isNightTime(bot),
+    canScout: o.scout && !!agent.getAction('find_food'),
+    hasFarm: getFarms(agent).some(f => !f.dim || f.dim === bot.game?.dimension),
+    canStartFarm: o.startFarm && !!agent.getAction('start_farm') && !!agent.canDig && (seedCount(inv) > 0 || grass() || !!getHome(agent))
   }
 }
 
@@ -191,12 +284,51 @@ async function doStep (ctx: BehaviorContext, step: FoodStep, o: O): Promise<Acti
       }
       return ctx.act('withdraw', { item: chest.item, count: 16, x: chest.x, y: chest.y, z: chest.z })
     }
-    case 'harvest':
-      return ctx.act('harvest', { radius: o.radius, max: 24 })
+    case 'harvest': {
+      const own = ownFarmRipe(agent, bot, o.radius)
+      if (own) {
+        const r = await ctx.act('harvest', { radius: Math.ceil((own.farm.size - 1) / 2 * 1.5) + 1, max: 81, x: own.farm.x, y: own.farm.y + 1, z: own.farm.z })
+        if (r.ok) saveFarm(agent, { ...own.farm, tended: Date.now() })
+        return r
+      }
+      const village = villageCrops(bot, bot.entity.position, o.radius)[0]
+      if (village) return ctx.act('harvest', { radius: 10, max: 24, x: village.x, y: village.y, z: village.z })
+      if (o.anyCrops) return ctx.act('harvest', { radius: o.radius, max: 24 })
+      return { ok: false, message: 'no ripe crops of my own or a village nearby' }
+    }
+    case 'farm': {
+      const farm = nearestFarm(agent, bot)
+      if (!farm) return { ok: false, message: 'no farm of my own' }
+      if (Math.hypot(farm.x - bot.entity.position.x, farm.z - bot.entity.position.z) > 8) {
+        const there = await ctx.act('goto', { x: farm.x, y: farm.y + 1, z: farm.z })
+        if (!there.ok) return { ok: false, message: `couldn't get to ${farm.name}: ${there.message}` }
+      }
+      saveFarm(agent, { ...farm, tended: Date.now() })
+      const r = await ctx.act('harvest', { radius: Math.ceil((farm.size - 1) / 2 * 1.5) + 1, max: 81, x: farm.x, y: farm.y + 1, z: farm.z })
+      return r.ok ? { ok: true, message: `${farm.name}: ${r.message}` } : { ok: false, message: `${farm.name} has nothing ripe yet` }
+    }
+    case 'spot': {
+      const pos = bot.entity.position
+      const spot = rankSpots(getFoodSpots(agent), ['animals', 'village_farm'], Date.now(), pos, bot.game?.dimension)[0]
+      if (!spot) return { ok: false, message: 'no food spots remembered' }
+      const label = spot.kind === 'animals' ? `animal spot (${(spot.animals ?? []).join(', ') || 'animals'})` : 'village farm'
+      const there = await ctx.act('goto', { x: spot.x, y: spot.y, z: spot.z })
+      const w = senseFood(agent, bot, o)
+      if (w.animals > 0 || (w.starving && (w.herd ?? 0) > 0) || w.ripeCrops > 0) return { ok: true, message: `went to the ${label} at ${fmtPos(spot)}, food is there` }
+      forgetEmptySpot(agent, spot.kind, spot)
+      return { ok: false, message: `${there.ok ? 'went to' : 'tried to reach'} the ${label} at ${fmtPos(spot)}: nothing there now` }
+    }
     case 'hunt': {
       const animal = o.animals.length === 1 ? o.animals[0] : undefined
-      return ctx.act('hunt', { count: 2, radius: o.radius, ...(animal ? { animal } : {}) })
+      const w = senseFood(agent, bot, o)
+      return ctx.act('hunt', { count: 2, radius: o.radius, keepAtLeast: w.starving ? 0 : o.keepAtLeast, ...(animal ? { animal } : {}) })
     }
+    case 'scout': {
+      const w = senseFood(agent, bot, o)
+      return ctx.act('find_food', { radius: o.scoutRadius, atNight: o.scoutAtNight, animals: o.animals, crops: o.harvest, keepAtLeast: w.starving ? 0 : o.keepAtLeast })
+    }
+    case 'start_farm':
+      return ctx.act('start_farm', {})
   }
 }
 
@@ -204,10 +336,12 @@ export const keepFed = defineBehavior({
   name: 'keep_fed',
   category: 'survival',
   description: 'Looks after food on its own: when hungry (or hurt and too hungry to heal) it eats, and when it has nothing to eat it ' +
-    'takes food from known chests, harvests ripe crops, hunts passive animals and cooks the meat. Arm it so you never starve between turns.',
+    'cooks or bakes, takes food from known chests, harvests its own or a village farm, goes back to remembered food spots, ' +
+    'hunts passive animals (sparing a small herd), scouts further out when nothing is near, and as a last resort starts a farm. ' +
+    'Arm it so you never starve between turns.',
   options,
   requires: ['eat'],
-  uses: ['withdraw', 'harvest', 'hunt', 'smelt', 'craft', 'goto', 'goto_place', 'list_container'],
+  uses: ['withdraw', 'harvest', 'hunt', 'smelt', 'craft', 'goto', 'goto_place', 'list_container', 'find_food', 'start_farm'],
   priority: 'behavior',
   create (o, { agent }) {
     return {
@@ -224,24 +358,32 @@ export const keepFed = defineBehavior({
       async run (ctx) {
         const tried = new Set<FoodStep>()
         const done: string[] = []
-        for (let i = 0; i < 10; i++) {
+        // what the far-reaching steps said, for a truthful report ("scouted 180 blocks east, no animals; started a farm at ...")
+        const notes: string[] = []
+        for (let i = 0; i < 12; i++) {
           if (ctx.bot.food >= o.until) break
           const world = senseFood(agent, ctx.bot, o)
           const step = nextFoodStep(world, o, tried)
           if (!step) break
           const r = await doStep(ctx, step, o)
           ctx.log.debug(`keep_fed ${step}: ${r.message}`, { step, ok: r.ok })
+          if (['farm', 'spot', 'scout', 'start_farm'].includes(step) && r.message) notes.push(r.message)
           if (r.ok) {
             done.push(step)
             // eating succeeded: the next pass may eat again; anything else changes the world, so retry all
-            if (step !== 'eat') tried.clear()
+            // (a farm was just planted: nothing to harvest yet, so don't scout or plant again this run)
+            if (step !== 'eat') { tried.clear(); if (step === 'start_farm') { tried.add('start_farm'); tried.add('scout') } }
+            // scouted: don't scout again this run, but do walk to what it found (spot); been at a spot: don't go again
+            if (step === 'scout') tried.add('scout')
+            if (step === 'spot') { tried.add('scout'); tried.add('spot') }
           } else {
             tried.add(step)
           }
         }
         const food = ctx.bot.food
-        if (food >= o.until || (done.includes('eat') && !isHungry(food, ctx.bot.health, o))) return { ok: true, message: `fed, food ${food}/20 (${done.join(', ')})` }
-        return { ok: false, message: `still hungry (food ${food}/20): ${done.length ? `did ${done.join(', ')}, ` : ''}no more food to get nearby` }
+        const note = notes.length ? `; ${notes.join('; ')}` : ''
+        if (food >= o.until || (done.includes('eat') && !isHungry(food, ctx.bot.health, o))) return { ok: true, message: `fed, food ${food}/20 (${done.join(', ')})${note}` }
+        return { ok: false, message: `still hungry (food ${food}/20): ${done.length ? `did ${done.join(', ')}, ` : ''}no more food to get${notes.length ? '' : ' nearby'}${note}` }
       }
     }
   }

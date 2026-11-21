@@ -1,6 +1,6 @@
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
-import { defineSkill, defineAction, z, noParams, ok, fail, goals, playerEntity, nearestHostile, isHostile, FLYING, sleep, checkAborted } from '../core/index.ts'
+import { defineSkill, defineAction, z, noParams, ok, fail, goals, gotoTimed, playerEntity, nearestHostile, isHostile, FLYING, sleep, checkAborted } from '../core/index.ts'
 import { pickupNearby } from './pickup.ts'
 import { equipForTarget, hasRanged, shootAt, blockWithShield, isRangedMob, weaponFlags, type WeaponFlags } from './weapons.ts'
 
@@ -209,6 +209,16 @@ export function huntRefusal (e: HuntCandidate, opts: { animals?: readonly string
   return null
 }
 
+/**
+ * How many of each kind may be hunted so that at least `keepAtLeast` adults stay (a
+ * sustainable herd). `adults` counts huntable adults by animal name.
+ */
+export function herdSurplus (adults: Record<string, number>, keepAtLeast: number): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const [k, n] of Object.entries(adults)) out[k] = Math.max(0, n - Math.max(0, keepAtLeast))
+  return out
+}
+
 /** True if a fence or fence gate is within `r` blocks: animals there are probably someone's farm. */
 export function inPen (bot: Bot, e: Entity, r = 3): boolean {
   const base = e.position.floored()
@@ -231,26 +241,48 @@ const hunt = defineAction({
     animal: z.enum(HUNTABLE).optional().describe('which animal; default the nearest huntable one'),
     count: z.number().int().min(1).max(8).default(1).describe('how many to kill'),
     radius: z.number().min(4).max(64).default(24).describe('how far to look, in blocks'),
-    pens: z.boolean().default(false).describe('also hunt animals inside fences (only your own farm)')
+    pens: z.boolean().default(false).describe('also hunt animals inside fences (only your own farm)'),
+    keepAtLeast: z.number().int().min(0).max(32).default(0).describe('leave at least this many adults of each kind alive (sustainable herd)')
   }),
-  async run ({ bot, agent, signal, log }, { animal, count, radius, pens }) {
+  async run ({ bot, agent, signal, log }, { animal, count, radius, pens, keepAtLeast }) {
     const animals = animal ? [animal] : HUNTABLE
     const skipped = new Set<number>()
+    const allowed = (e: any) => {
+      const keys = (bot.registry as any).entitiesByName?.[e.name ?? '']?.metadataKeys as string[] | undefined
+      if (huntRefusal(e as HuntCandidate, { animals, metadataKeys: keys })) return false
+      if (agent.protectedAreas.isProtected(e.position)) return false
+      return pens || !inPen(bot, e)
+    }
+    // with keepAtLeast, count the herd once per kill and spare kinds at the minimum
+    const surplus = () => {
+      if (!keepAtLeast) return null
+      const adults: Record<string, number> = {}
+      for (const e of Object.values(bot.entities)) {
+        if (e.position && e.position.distanceTo(bot.entity.position) <= radius + 16 && allowed(e)) adults[e.name!] = (adults[e.name!] ?? 0) + 1
+      }
+      return herdSurplus(adults, keepAtLeast)
+    }
     const total = () => bot.inventory.items().reduce((n, i) => n + i.count, 0)
     const before = total()
     let killed = 0
     const names: string[] = []
+    let spared = false
     while (killed < count) {
       checkAborted(signal)
+      const left = surplus()
       const target = bot.nearestEntity(e => {
         if (skipped.has(e.id) || e.position.distanceTo(bot.entity.position) > radius) return false
-        const keys = (bot.registry as any).entitiesByName?.[e.name ?? '']?.metadataKeys as string[] | undefined
-        if (huntRefusal(e as HuntCandidate, { animals, metadataKeys: keys })) return false
-        if (agent.protectedAreas.isProtected(e.position)) return false
-        return pens || !inPen(bot, e)
+        if (!allowed(e)) return false
+        if (left && !(left[e.name!]! > 0)) { spared = true; return false }
+        return true
       })
       if (!target) break
       log.debug('hunting', { animal: target.name, id: target.id })
+      // fight() gives up on targets more than 24 blocks away: walk closer first
+      if (target.position.distanceTo(bot.entity.position) > 16) {
+        const p = target.position
+        try { await gotoTimed(bot, new goals.GoalNear(p.x, p.y, p.z, 4), signal, 30_000) } catch { checkAborted(signal) }
+      }
       const dead = await fight(bot, target, signal, 25_000)
       if (!dead) { skipped.add(target.id); continue }
       killed++
@@ -258,7 +290,7 @@ const hunt = defineAction({
       await sleep(400, signal)
       await pickupNearby(bot, signal, { radius: 6, maxMs: 8000 })
     }
-    if (!killed) return fail(`no animal I may hunt within ${radius} blocks${animal ? ` (${animal})` : ''}`)
+    if (!killed) return fail(`no animal I may hunt within ${radius} blocks${animal ? ` (${animal})` : ''}${spared ? `, sparing the last ${keepAtLeast} of each kind` : ''}`)
     await sleep(500, signal) // drops can arrive a moment after the last pickup walk
     const picked = Math.max(0, total() - before)
     const tally = [...new Set(names)].map(n => `${names.filter(x => x === n).length} ${n}`).join(', ')

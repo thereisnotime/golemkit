@@ -48,7 +48,9 @@ reflexes:
 # Behaviours that run on their own between LLM turns (docs/guide/behaviors.md). Pax or robin
 # can arm more at runtime (behavior_arm / !behavior_arm follow_owner); those changes persist.
 behaviors:
-  keep_fed: { below: 14, healBelow: 14, radius: 64 }   # find, cook and eat food when hungry or hurt
+  keep_fed:                   # find, cook and eat food when hungry or hurt; scouts up to 200 blocks
+    { below: 14, healBelow: 14, radius: 64, scout: true, scoutRadius: 200, keepAtLeast: 2 }   # when nothing is near, starts a farm last
+  farm_setup: { tendRange: 128 }   # starts its own wheat farm near home (or where it is), tends it, bakes bread, breeds animals
   stay_safe: { retreatBelow: 0, avoidWater: false }   # stands its ground like the reflexes above;
                                                       # still pillars up when surrounded, goes home at night
   follow_owner: { player: robin, distance: 3 }   # stay with robin when there is nothing else to do

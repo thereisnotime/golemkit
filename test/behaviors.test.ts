@@ -135,11 +135,12 @@ behaviors:
   assert.throws(() => parseProfile('variant: x\nbehaviors: [keep_fed]\n'), /behaviors/)
 })
 
-test('the shipped pax profile arms keep_fed and stay_safe', async () => {
+test('the shipped pax profile arms keep_fed (with scouting), stay_safe and farm_setup', async () => {
   const { loadProfile } = await import('../src/core/profile.ts')
   const p = loadProfile('pax')!
   const v = validateBehaviorConfig((p.options.settings as any).behaviors, defaultBehaviorRegistry())
-  assert.ok(v.keep_fed?.enabled && v.stay_safe?.enabled)
+  assert.ok(v.keep_fed?.enabled && v.stay_safe?.enabled && v.farm_setup?.enabled)
+  assert.equal(v.keep_fed?.options.scout, true)
 })
 
 // ------------------------------------------------------------------ hunt filter

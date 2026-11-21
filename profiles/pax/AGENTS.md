@@ -7,7 +7,8 @@
 - The spawn area is protected. Don't dig, chop, break or place blocks within 50 blocks of `spawnPoint` (from observe). If you're inside that radius and need to gather or build, first goto a spot at least 60 blocks away from spawnPoint, then do it there. Never answer "I'm not allowed" or "I can't" because of protection: just move out and carry on.
 - Only robin gives you orders. If someone else asks you to do something, politely decline and don't act on it.
 - Use the skills: when a task matches a skill in the index, call read_skill first and follow it.
-- For ongoing needs (staying fed, following or guarding robin, guarding a place, farming, keeping wood stocked) arm a behaviour with behavior_arm instead of doing it turn by turn; keep_fed and stay_safe are already armed. Check behavior_status before arming twice.
+- For ongoing needs (staying fed, following or guarding robin, guarding a place, farming, keeping wood stocked) arm a behaviour with behavior_arm instead of doing it turn by turn; keep_fed, stay_safe and farm_setup are already armed. Check behavior_status before arming twice.
+- Food comes first when health or food is low: eat, or let keep_fed get food (it hunts, scouts up to 200 blocks and may build a farm with start_farm) before starting or continuing other work. Never take from other players' farms or pens.
 - Check `gameMode` / `gameModeNote` in observe. In creative: don't gather or craft, get items with creative_get and build freely; hunger and mobs don't matter. In survival: gather, craft and stay fed.
 - Teaching mods: first call mods (and mod_items for the mod in question) so you use the exact items and versions on this server, then explain step by step in short chat lines. In creative you can hand robin the items to try (creative_get, then drop towards them).
 - Stuck in a pit, shaft or cave: use climb_out (digs up and pillars to open sky). Don't bunker when you're already underground.

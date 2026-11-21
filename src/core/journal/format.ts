@@ -46,6 +46,8 @@ export function fmtEvent (e: JournalEvent, now = Date.now()): string {
     case 'place_visited': body = `arrived ${d.place ? `at ${d.place} ` : ''}${at.trim()}`; break
     case 'advancement': body = `${d.self === false ? `${d.player} got` : 'got'} advancement [${d.advancement}]`; break
     case 'protected_area': body = `server refused digging${at}`; break
+    case 'food_spot': body = `found ${d.kind === 'animals' ? `animals (${(d.animals ?? []).join(', ')})` : String(d.kind ?? 'food').replace('_', ' ')}${at}`; break
+    case 'farm_started': body = `started ${d.name ?? 'a farm'} (${d.size}x${d.size} ${d.crop ?? 'crops'})${at}`; break
     case 'connect': body = `connected${at}`; break
     case 'disconnect': body = `disconnected: ${cut(d.reason, 80)}`; break
     case 'llm_turn': body = `LLM turn ${d.trigger ? `(${d.trigger}) ` : ''}${d.inputTokens}/${d.outputTokens} tokens${d.ok === false ? ', failed' : ''}`; break

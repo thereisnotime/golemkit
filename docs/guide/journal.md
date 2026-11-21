@@ -60,6 +60,8 @@ coordinates).
 | `place_visited` | entering a 64x64 region not visited in the last 30 min, coming within 12 blocks of a named place (`remember_place`, `set_home`), or changing dimension | `region` / `place` / `dimension`, `new` |
 | `advancement` | "X has made the advancement [Y]" | `advancement`, `player`, `self` |
 | `protected_area` | the server refused a block break and the area is now avoided | |
+| `food_spot` | `find_food` / `keep_fed` saw huntable animals, a village farm or water to farm by (also kept as places `food:animals`, `food:village_farm`, `food:water`) | `kind`, `count`, `animals` |
+| `farm_started` | `start_farm` planted a new farm (also a place `farm:<n>`) | `name`, `size`, `crop`, `tilled`, `planted` |
 | `connect` / `disconnect` | each session | `server`, `gameMode` / `reason` (kick text when kicked) |
 | `llm_turn` | after every LLM turn | `provider`, `model`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `toolCalls`, `ms`, `ok`, `trigger` if the brain reports one |
 | `journal_dropped` | a type went over its per-minute cap | `type`, `count` |
@@ -143,7 +145,7 @@ The journal skill's actions are chat commands and LLM tools like every other act
 
 | action | |
 |---|---|
-| `recall_events` (`!events`) | recent events, filtered: `type` (`death`, `chat`, `items`, `blocks`, `players`, `combat`, `connections` or any type), `since` (`30m`, `1h`, `today`, `yesterday`, `2026-11-20`; default 24 h), `player`, `near` (`"x y z"` or `"x z"`, optional radius), `text`, `limit`, `fleet` |
+| `recall_events` (`!events`) | recent events, filtered: `type` (`death`, `chat`, `items`, `blocks`, `players`, `combat`, `connections`, `food` or any type), `since` (`30m`, `1h`, `today`, `yesterday`, `2026-11-20`; default 24 h), `player`, `near` (`"x y z"` or `"x z"`, optional radius), `text`, `limit`, `fleet` |
 | `last_death` (`!death`) | where, when, what killed it, what it was doing, what it lost and whether the drops may still be there (items despawn 5 minutes after death) |
 | `history` (`!summary`) | a summary of `today`, `yesterday`, a date, `3h`, or hours today like `10-12` |
 | `goto_death` | walk back to the last death position and pick up the drops (exclusive, long-running) |
