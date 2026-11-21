@@ -130,7 +130,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
   private sessionController: AbortController | null = null
   private current: Running | null = null
   private suspended: Running[] = []
-  private chatQueue: { to?: string, msg: string, face?: string }[] = []
+  private chatQueue: { to?: string, msg: string, face?: string, command?: (sent: boolean) => void }[] = []
   private lastChat = 0
   private chatSending = false
   /** Player-like timing (see humanize.ts); null when off. */
@@ -482,6 +482,24 @@ export class Agent extends TypedEmitter<AgentEvents> {
     this.enqueueChat({ ...(to.whisper ? { to: to.from } : {}), msg, face: to.from })
   }
 
+  /**
+   * Sends a server command (`/...`, `//...` for WorldEdit) through the same rate-limited queue
+   * as chat, without humanize styling or line splitting, and logs it. Resolves true once it
+   * went out, false when it was refused (too long, queue full, no session).
+   */
+  command (cmd: string): Promise<boolean> {
+    const line = cmd.trim()
+    if (!line.startsWith('/') || line.length > 256 || /[\r\n]/.test(line)) {
+      this.logs.chat.warn('refused command', { command: line.slice(0, 80) })
+      return Promise.resolve(false)
+    }
+    if (!this._bot || this.chatQueue.length >= CHAT_QUEUE_MAX) {
+      this.logs.chat.warn(this._bot ? 'chat queue full, dropping command' : 'not connected, dropping command', { command: line })
+      return Promise.resolve(false)
+    }
+    return new Promise(resolve => this.chatQueue.push({ msg: line, command: resolve }))
+  }
+
   private enqueueChat (item: { to?: string, msg: string, face?: string }): void {
     for (const line of splitChat(item.msg)) {
       if (this.chatQueue.length >= CHAT_QUEUE_MAX) { this.logs.chat.warn('chat queue full, dropping message', { dropped: line }); return }
@@ -493,6 +511,19 @@ export class Agent extends TypedEmitter<AgentEvents> {
     const bot = this._bot
     if (!bot || this.chatSending || !this.chatQueue.length || Date.now() - this.lastChat < CHAT_INTERVAL_MS) return
     const item = this.chatQueue.shift()!
+    if (item.command) {
+      this.lastChat = Date.now()
+      let sent = true
+      try {
+        bot.chat(item.msg)
+        this.logs.chat.info(`command ${item.msg}`)
+      } catch (e) {
+        sent = false
+        this.logs.chat.warn(`command failed: ${(e as Error).message}`)
+      }
+      item.command(sent)
+      return
+    }
     if (!this.humanize) return this.sendChat(bot, item.to, item.msg)
     // Humanize: react, maybe turn to the person and stand still, "type", then send.
     const h = this.humanize
@@ -662,6 +693,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
         session.abort('session ended')
         this.current = null
         this.suspended = []
+        for (const q of this.chatQueue) q.command?.(false)
         this.chatQueue = []
         for (const c of cleanups.reverse()) { try { c() } catch {} }
         try { bot.quit() } catch {}

@@ -19,3 +19,4 @@
 - Our fortress (place "fortress") is the old 15x15 plank ring at 560 68 -43. To upgrade it to fortress v2 (floor, stone towers, walkway, gate torches) run build template=fortress x=560 y=67 z=-43 replace=true: y=67 is ground level, one lower than the old walls, so the new walls land exactly on the old ones. Don't build it at y=68.
 - You may dig and use any block you need (respectBuilds is off on this server). Spawn protection still applies.
 - Gear matters: you keep dying at night. With iron, make an iron sword and armour (chestplate first, then helmet, leggings, boots) before long jobs; a shield (1 iron + 6 planks) helps against skeletons.
+- WorldEdit: use the we_ actions (or we_build) only when robin asks for WorldEdit and we_status says the server has it. Otherwise build and dig the normal way, and never claim a WorldEdit change worked unless its result says so.

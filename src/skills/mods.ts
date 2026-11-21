@@ -32,6 +32,16 @@ function serverData (agent: Agent): { registries: Record<string, Record<string, 
   return { registries, versions }
 }
 
+/** Channel ids learned from the NeoForge negotiation and the mod namespaces in the registry sync (for feature detection). */
+export function serverSignals (agent: Pick<Agent, 'server'>): { channels: string[], namespaces: string[] } {
+  const key = `${agent.server.host}-${agent.server.port}`
+  const channels = Object.keys(readJson(join('data', `channels-${key}.json`))?.channels ?? {})
+  const registries: Record<string, Record<string, string>> = readJson(join('data', `registries-${key}.json`))?.registries ?? {}
+  const namespaces = new Set<string>()
+  for (const reg of Object.values(registries)) for (const name of Object.values(reg ?? {})) namespaces.add(String(name).split(':')[0]!)
+  return { channels, namespaces: [...namespaces] }
+}
+
 export function installedMods (agent: Agent): ModInfo[] {
   const { registries, versions } = serverData(agent)
   const mods = new Map<string, ModInfo>()
