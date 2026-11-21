@@ -1,0 +1,118 @@
+name: yungs_wood_bridge
+description: "yungs wood bridge: 17 long; the mod swaps some stand-in blocks (stained glass, warped fence, prismarine wall) when it places it, here they stay as they are"
+facing: south
+site: near
+meta:
+  tags: [ bridge ]
+  author: YUNGNICKYOUNG
+  source: https://github.com/YUNGNICKYOUNG/YUNGs-Bridges
+  url: https://raw.githubusercontent.com/YUNGNICKYOUNG/YUNGs-Bridges/1e47f9fcdbf0c05e3b5225eda8ab0405c398533d/Common/src/main/resources/data/yungsbridges/structure/bridge/wood/17_0.nbt
+  license: LGPL-3.0
+  sha256: 74fdc4a0589797a3a7715674c3189d566c22388ca9dac2f1963c077a9aedfd21
+  created: 2026-11-21
+  size: [ 4, 17, 5 ]
+  blocks: 138
+  materials: { oak_slab: 102, oak_fence: 20, warped_fence: 8, prismarine_wall: 4, cobblestone_wall: 4 }
+roles:
+  wood_slab: { default: oak_slab, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_slab$", wood: true }
+  wood_fence: { default: oak_fence, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence$", wood: true }
+palette:
+  "S": {"role":"wood_slab","state":{"type":"double"}}
+  "P": {"block":"prismarine_wall"}
+  "W": {"block":"warped_fence"}
+  "s": {"role":"wood_slab","state":{"type":"bottom"}}
+  "A": {"role":"wood_slab","state":{"type":"top"}}
+  "C": {"block":"cobblestone_wall"}
+  "F": {"role":"wood_fence"}
+  ".": air
+layers:
+  # y=0
+  - ["PssP",
+     ".ss.",
+     ".AA.",
+     "WAAW",
+     "....",
+     "....",
+     "W..W",
+     "....",
+     "....",
+     "....",
+     "W..W",
+     "....",
+     "....",
+     "WAAW",
+     ".AA.",
+     ".ss.",
+     "PssP"]
+  # y=1
+  - ["C..C",
+     "....",
+     "....",
+     "F..F",
+     ".ss.",
+     ".ss.",
+     "FSSF",
+     ".AA.",
+     ".AA.",
+     ".AA.",
+     "FSSF",
+     ".ss.",
+     ".ss.",
+     "F..F",
+     "....",
+     "....",
+     "C..C"]
+  # y=2
+  - ["sAAs",
+     "A..A",
+     "A..A",
+     "F..F",
+     "....",
+     "....",
+     "F..F",
+     "....",
+     "....",
+     "....",
+     "F..F",
+     "....",
+     "....",
+     "F..F",
+     "A..A",
+     "A..A",
+     "sAAs"]
+  # y=3
+  - ["",
+     " ss",
+     " ss",
+     "sAAs",
+     "A..A",
+     "....",
+     "F..F",
+     "....",
+     "....",
+     "....",
+     "F..F",
+     "A...",
+     "A..A",
+     "sAAs",
+     " ss",
+     " ss",
+     ""]
+  # y=4
+  - ["",
+     "",
+     "",
+     "",
+     " ss",
+     "sAAs",
+     "sAAs",
+     "sAAs",
+     "sAAs",
+     "sAAs",
+     "sAAs",
+     " AAs",
+     " ss",
+     "",
+     "",
+     "",
+     ""]

@@ -1,0 +1,223 @@
+name: hui_well
+description: "hui well: covered well with tuff brick stairs (1.21 blocks); water left out"
+facing: south
+site: near
+meta:
+  tags: [ well, decoration ]
+  author: Silicon23
+  source: https://github.com/Silicon23/MoreChineseStructures
+  url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/data/mcs/structure/village/hui/plains_well_1.nbt
+  license: MIT
+  sha256: 53c48a26cb633e924f1e05cf4e8cfc663d05125d51b03add40883b74117ba130
+  created: 2026-11-21
+  size: [ 11, 11, 12 ]
+  blocks: 491
+  materials: { dirt: 92, polished_andesite: 80, tuff_brick_stairs: 48, polished_andesite_stairs: 36, spruce_planks: 36, oak_stairs: 28 }
+roles:
+  wood_fence_gate: { default: oak_fence_gate, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence_gate$", wood: true }
+  wood_slab: { default: spruce_slab, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_slab$", wood: true }
+  wood_fence: { default: spruce_fence, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence$", wood: true }
+palette:
+  "D": {"block":"deepslate_bricks"}
+  "d": {"block":"polished_deepslate"}
+  "S": {"block":"stone_bricks"}
+  "A": {"block":"polished_andesite"}
+  "s": {"block":"chiseled_stone_bricks"}
+  "B": {"block":"dirt"}
+  "P": {"block":"oak_planks"}
+  "p": {"block":"spruce_planks"}
+  "C": {"block":"birch_planks"}
+  "T": {"block":"chiseled_tuff_bricks"}
+  "c": {"block":"chipped_anvil","state":{"facing":"south"}}
+  "a": {"block":"anvil","state":{"facing":"north"}}
+  "E": {"block":"stone_brick_wall"}
+  "F": {"block":"polished_andesite_stairs","state":{"facing":"north","half":"bottom","shape":"inner_left"}}
+  "G": {"block":"polished_andesite_stairs","state":{"facing":"west","half":"bottom","shape":"straight"}}
+  "H": {"block":"polished_andesite_stairs","state":{"facing":"west","half":"bottom","shape":"inner_left"}}
+  "I": {"block":"polished_andesite_stairs","state":{"facing":"north","half":"bottom","shape":"straight"}}
+  "J": {"block":"polished_andesite_stairs","state":{"facing":"south","half":"bottom","shape":"straight"}}
+  "K": {"block":"polished_andesite_stairs","state":{"facing":"east","half":"bottom","shape":"inner_left"}}
+  "L": {"block":"polished_andesite_stairs","state":{"facing":"east","half":"bottom","shape":"straight"}}
+  "M": {"block":"polished_andesite_stairs","state":{"facing":"east","half":"bottom","shape":"inner_right"}}
+  "N": {"block":"nether_brick_wall"}
+  "f": {"role":"wood_fence_gate","state":{"facing":"east","open":"true"}}
+  "O": {"role":"wood_fence_gate","state":{"facing":"south","open":"true"}}
+  "Q": {"role":"wood_fence_gate","state":{"facing":"north","open":"true"}}
+  "R": {"role":"wood_fence_gate","state":{"facing":"west","open":"true"}}
+  "U": {"block":"polished_andesite_slab","state":{"type":"top"}}
+  "V": {"block":"oak_stairs","state":{"facing":"north","half":"top","shape":"straight"}}
+  "W": {"block":"oak_stairs","state":{"facing":"east","half":"top","shape":"straight"}}
+  "X": {"block":"oak_stairs","state":{"facing":"west","half":"top","shape":"straight"}}
+  "Y": {"block":"spruce_stairs","state":{"facing":"west","half":"top","shape":"inner_right"}}
+  "Z": {"block":"spruce_stairs","state":{"facing":"west","half":"top","shape":"straight"}}
+  "l": {"block":"lantern","state":{"hanging":"true"}}
+  "b": {"block":"spruce_stairs","state":{"facing":"west","half":"top","shape":"inner_left"}}
+  "e": {"block":"spruce_stairs","state":{"facing":"north","half":"top","shape":"straight"}}
+  "g": {"block":"spruce_stairs","state":{"facing":"south","half":"top","shape":"straight"}}
+  "h": {"block":"spruce_stairs","state":{"facing":"east","half":"top","shape":"inner_left"}}
+  "i": {"block":"spruce_stairs","state":{"facing":"east","half":"top","shape":"straight"}}
+  "j": {"block":"spruce_stairs","state":{"facing":"south","half":"top","shape":"inner_left"}}
+  "k": {"block":"oak_stairs","state":{"facing":"south","half":"top","shape":"straight"}}
+  "m": {"block":"polished_andesite_slab","state":{"type":"bottom"}}
+  "n": {"role":"wood_slab","state":{"type":"top"}}
+  "t": {"block":"tuff_brick_stairs","state":{"facing":"south","half":"bottom","shape":"straight"}}
+  "o": {"block":"tuff_brick_stairs","state":{"facing":"west","half":"bottom","shape":"straight"}}
+  "q": {"block":"tuff_brick_stairs","state":{"facing":"east","half":"bottom","shape":"straight"}}
+  "r": {"block":"tuff_brick_stairs","state":{"facing":"north","half":"bottom","shape":"straight"}}
+  "u": {"role":"wood_fence"}
+  "w": {"block":"polished_andesite_stairs","state":{"facing":"south","half":"bottom","shape":"inner_left"}}
+  "x": {"block":"iron_trapdoor","state":{"facing":"north","half":"bottom","open":"false"}}
+  "y": {"block":"iron_trapdoor","state":{"facing":"west","half":"bottom","open":"false"}}
+  "z": {"block":"iron_trapdoor","state":{"facing":"east","half":"bottom","open":"false"}}
+  "0": {"block":"iron_trapdoor","state":{"facing":"south","half":"bottom","open":"false"}}
+  "1": {"block":"chest","state":{"facing":"north"}}
+  "2": {"block":"lectern","state":{"facing":"east"}}
+  "3": {"block":"lectern","state":{"facing":"south"}}
+  "4": {"block":"lectern","state":{"facing":"north"}}
+  "5": {"block":"lectern","state":{"facing":"west"}}
+  ".": air
+layers:
+  # y=0
+  - ["BBBBDdSBBBB",
+     "BBBBdAsBBBB",
+     "BBBBBBBBBBB",
+     "BBBBBBBBBBB",
+     "DSBBBABBBsd",
+     "dABBA1ABBAD",
+     "SsBBBABBBds",
+     "BBBBBBBBBBB",
+     "BBBBBBBBBBB",
+     "BBBBDsSBBBB",
+     "BBBBSdABBBB"]
+  # y=1
+  - ["..... .....",
+     "...c.a.....",
+     "..AAAAAAA..",
+     "..AAAAAAA..",
+     "..AAAAAAA..",
+     " .AAA AAA.",
+     "..AAAAAAA..",
+     "..AAAAAAA..",
+     "..AAAAAAA..",
+     "...........",
+     "..... ....."]
+  # y=2
+  - ["...........",
+     "...........",
+     "..E.....E..",
+     "...........",
+     "....FIK....",
+     "....G.L....",
+     "....HJM....",
+     "...........",
+     "..E.....E..",
+     "...........",
+     "..........."]
+  # y=3
+  - ["...........",
+     "...........",
+     "..N.....N..",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     "..N.....N..",
+     "...........",
+     "..........."]
+  # y=4
+  - ["...........",
+     "...........",
+     "..N.....N..",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     "..N.....N..",
+     "...........",
+     "..........."]
+  # y=5
+  - ["...........",
+     "...........",
+     "..N.....N..",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     "..N.....N..",
+     "...........",
+     "..........."]
+  # y=6
+  - ["...........",
+     "..O.....O..",
+     ".fP33333PR.",
+     "..2.....5..",
+     "..2.....5..",
+     "..2.....5..",
+     "..2.....5..",
+     "..2.....5..",
+     ".fP44444PR.",
+     "..Q.....Q..",
+     "..........."]
+  # y=7
+  - ["...U.U.U...",
+     "..WWWWWWW..",
+     ".VpppCpppk.",
+     "UVpYelehpkU",
+     ".VpZ...ipk.",
+     "UVCl...lCkU",
+     ".VpZ...ipk.",
+     "UVpbglgjpkU",
+     ".VpppCpppk.",
+     "..XXXXXXX..",
+     "...U.U.U..."]
+  # y=8
+  - ["..G.m.m.L..",
+     ".nooooooon.",
+     "ItTTTTTTTrI",
+     ".tTpppppTr.",
+     "mtTpEEEpTrm",
+     ".tTpE.EpTr.",
+     "mtTpEEEpTrm",
+     ".tTpppppTr.",
+     "JtTTTTTTTrJ",
+     ".nqqqqqqqn.",
+     "..G.m.m.L.."]
+  # y=9
+  - ["uE.......Eu",
+     "EA.......AE",
+     "..AoooooA..",
+     "..tAAAAAr..",
+     "..tAFIKAr..",
+     "..tAG.LAr..",
+     "..tAHJwAr..",
+     "..tAAAAAr..",
+     "..AqqqqqA..",
+     "EA.......AE",
+     "uE.......Eu"]
+  # y=10
+  - ["...........",
+     "...........",
+     "..x.....z..",
+     "...sJJJs...",
+     "...L...G...",
+     "...L...G...",
+     "...L...G...",
+     "...sIIIs...",
+     "..y.....0..",
+     "...........",
+     "..........."]
+  # y=11
+  - ["...........",
+     "...........",
+     "...........",
+     "...m...m...",
+     "...........",
+     "...........",
+     "...........",
+     "...m...m...",
+     "...........",
+     "...........",
+     "..........."]

@@ -1,0 +1,385 @@
+name: mvs_sunzi_gate
+description: "mvs sunzi gate: dark prismarine and red terracotta, expensive in survival"
+facing: south
+site: near
+meta:
+  tags: [ defence, gate, wall ]
+  author: FinnDog_123 (Moog's Mods)
+  source: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+  url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/sunzi_gate.nbt
+  license: LGPL-3.0
+  sha256: 1db264a9d70ceac9591fef31424c1de6d1babca1c883139d2dc37f9d4551fd13
+  created: 2026-11-21
+  size: [ 11, 17, 17 ]
+  blocks: 915
+  materials: { dark_prismarine: 208, red_terracotta: 153, dark_prismarine_slab: 105, acacia_stairs: 44, birch_planks: 44, birch_trapdoor: 40 }
+roles:
+  wood_planks: { default: birch_planks, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_planks$", wood: true }
+  wood_slab: { default: acacia_slab, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_slab$", wood: true }
+  wood_fence: { default: acacia_fence, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence$", wood: true }
+  wood_stairs: { default: acacia_stairs, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_stairs$", wood: true }
+palette:
+  "S": {"block":"stone_bricks"}
+  "s": {"block":"stone"}
+  "D": {"block":"dirt"}
+  "A": {"block":"mossy_stone_bricks"}
+  "R": {"block":"red_terracotta"}
+  "H": {"block":"hay_block","state":{"axis":"y"}}
+  "B": {"block":"brown_glazed_terracotta","state":{"facing":"west"}}
+  "b": {"block":"bookshelf"}
+  "C": {"block":"brown_glazed_terracotta","state":{"facing":"north"}}
+  "E": {"block":"brown_glazed_terracotta","state":{"facing":"east"}}
+  "F": {"block":"brown_glazed_terracotta","state":{"facing":"south"}}
+  "P": {"role":"wood_planks"}
+  "d": {"block":"dark_prismarine"}
+  "T": {"block":"birch_trapdoor","state":{"half":"bottom","facing":"west","open":"true"}}
+  "G": {"role":"wood_slab","state":{"type":"bottom"}}
+  "t": {"block":"birch_trapdoor","state":{"half":"bottom","facing":"north","open":"true"}}
+  "I": {"block":"birch_trapdoor","state":{"half":"bottom","facing":"south","open":"true"}}
+  "J": {"block":"birch_trapdoor","state":{"half":"bottom","facing":"east","open":"true"}}
+  "K": {"block":"acacia_trapdoor","state":{"half":"bottom","facing":"west","open":"true"}}
+  "L": {"block":"acacia_trapdoor","state":{"half":"bottom","facing":"north","open":"true"}}
+  "M": {"block":"acacia_trapdoor","state":{"half":"bottom","facing":"south","open":"true"}}
+  "N": {"block":"acacia_trapdoor","state":{"half":"bottom","facing":"east","open":"true"}}
+  "O": {"block":"acacia_trapdoor","state":{"half":"top","facing":"east","open":"true"}}
+  "Q": {"block":"acacia_trapdoor","state":{"half":"top","facing":"west","open":"true"}}
+  "U": {"block":"acacia_trapdoor","state":{"half":"top","facing":"north","open":"true"}}
+  "V": {"block":"acacia_trapdoor","state":{"half":"top","facing":"south","open":"true"}}
+  "W": {"block":"birch_trapdoor","state":{"half":"top","facing":"west","open":"true"}}
+  "X": {"block":"birch_trapdoor","state":{"half":"top","facing":"north","open":"true"}}
+  "Y": {"block":"birch_trapdoor","state":{"half":"top","facing":"south","open":"true"}}
+  "Z": {"block":"birch_trapdoor","state":{"half":"top","facing":"east","open":"true"}}
+  "f": {"role":"wood_fence"}
+  "c": {"block":"cobblestone_wall"}
+  "a": {"role":"wood_slab","state":{"type":"top"}}
+  "e": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"south"}}
+  "g": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "h": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"east"}}
+  "i": {"block":"dark_prismarine_slab","state":{"type":"top"}}
+  "j": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"west"}}
+  "k": {"block":"stone_brick_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "l": {"block":"dark_prismarine_slab","state":{"type":"bottom"}}
+  "m": {"block":"stone_brick_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "n": {"block":"stone_brick_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "o": {"block":"stone_brick_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "p": {"block":"dark_prismarine_stairs","state":{"half":"top","shape":"straight","facing":"south"}}
+  "q": {"block":"dark_prismarine_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "r": {"block":"mossy_cobblestone_wall"}
+  "u": {"block":"dark_prismarine_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "w": {"block":"anvil","state":{"facing":"north"}}
+  "x": {"block":"dark_prismarine_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "y": {"block":"stone_brick_slab","state":{"type":"bottom"}}
+  "z": {"block":"lectern","state":{"facing":"east"}}
+  "0": {"block":"jukebox"}
+  "1": {"block":"chest","state":{"facing":"east"}}
+  "2": {"block":"chest","state":{"facing":"west"}}
+  "3": {"block":"barrel","state":{"facing":"west","open":"false"}}
+  "4": {"block":"chest","state":{"facing":"north"}}
+  ".": air
+layers:
+  # y=0
+  - ["",
+     "",
+     "  DsAASAD",
+     "  ssSSAAA",
+     "  sSsAAAA",
+     "  sSSSsSA",
+     "  DsASAsD",
+     " SDAASSsDS",
+     " sDsAASsDs",
+     " SDSAAAsDs",
+     "  DsAssAD",
+     "  sAsASSs",
+     "  SssAAsA",
+     "  ASSAAAS",
+     "  DSsSSSD",
+     "",
+     ""]
+  # y=1
+  - ["...........",
+     "...........",
+     "..RttRttR..",
+     "..T.....J..",
+     "..T.....J..",
+     "..T.....J..",
+     "..R.....R..",
+     "..G.....G..",
+     "..G..z..G..",
+     "..G.....G..",
+     "..R.....R..",
+     "..T.....J..",
+     "..T.....J..",
+     "..T.....J..",
+     "..RIIRIIR..",
+     "...........",
+     "..........."]
+  # y=2
+  - ["...........",
+     "...........",
+     "..RLLRLLR..",
+     "..K.....N..",
+     "..K.....O..",
+     "..K.....O..",
+     "..R.....R..",
+     "...........",
+     "...........",
+     "...........",
+     "..R.....R..",
+     "..K.....N..",
+     "..K.....N..",
+     "..K.....N..",
+     "..RMMRMMR..",
+     "...........",
+     "..........."]
+  # y=3
+  - ["...........",
+     "...........",
+     "..RUURUUR..",
+     "..Q.....O..",
+     "..Q.....O..",
+     "..Q.....O..",
+     "..R.....R..",
+     "...........",
+     "...........",
+     "...........",
+     "..R.....R..",
+     "..Q.....N..",
+     "..Q.....N..",
+     "..Q.....N..",
+     "..RVVRVVR..",
+     "...........",
+     "..........."]
+  # y=4
+  - ["...........",
+     "...........",
+     "..RXXRXXR..",
+     "..W.....Z..",
+     "..W.....Z..",
+     "..W.....Z..",
+     "..R.....R..",
+     "...........",
+     "...........",
+     "...........",
+     "..R.....R..",
+     "..W.....Z..",
+     "..W.....Z..",
+     "..W.....Z..",
+     "..RYYRYYR..",
+     "...........",
+     "..........."]
+  # y=5
+  - ["...........",
+     "...........",
+     "..R00R00R..",
+     "..0.....0..",
+     "..0.....0..",
+     "..0.....0..",
+     "..R.....R..",
+     "..f.....f..",
+     "..f.....f..",
+     "..f.....f..",
+     "..R.....R..",
+     "..0.....0..",
+     "..0.....0..",
+     "..0.....0..",
+     "..R00000R..",
+     "...........",
+     "..........."]
+  # y=6
+  - ["...........",
+     "..c.....c..",
+     ".cRRRRRRRc.",
+     "..R.....R..",
+     "..R.....R..",
+     "..R.....R..",
+     ".cR.....Rc.",
+     "..R.....R..",
+     "..R.....R..",
+     "..R.....R..",
+     ".cR.....Rc.",
+     "..R.....R..",
+     "..R.....R..",
+     "..R.....R..",
+     ".cRRRRRRRc.",
+     "..c.....c..",
+     "..........."]
+  # y=7
+  - ["...........",
+     "..R.....R..",
+     ".HREbbbFRH.",
+     "..B.....E..",
+     "..b.....b..",
+     "..B.....C..",
+     ".HR.....RH.",
+     "..B.....E..",
+     "..b.....b..",
+     "..C.....E..",
+     ".HR.....RH.",
+     "..B.....E..",
+     "..b.....b..",
+     "..B.....E..",
+     ".HREbbbCRH.",
+     "..R.....R..",
+     "..........."]
+  # y=8
+  - ["...........",
+     ".fRfffffRf.",
+     ".RRRRRRRRR.",
+     ".fR.....Rf.",
+     ".fR.....Rf.",
+     ".fR.....Rf.",
+     ".RR.....RR.",
+     ".fR.....Rf.",
+     ".fR.....Rf.",
+     ".fR.....Rf.",
+     ".RR.....RR.",
+     ".fR.....Rf.",
+     ".fR.....Rf.",
+     ".fR.....Rf.",
+     ".RRRRRRRRR.",
+     ".fRfffffRf.",
+     "..........."]
+  # y=9
+  - ["ahhhhajjjja",
+     "ePPPPPPPPPe",
+     "ePdddddddPe",
+     "ePdiiiiidPe",
+     "ePdiiiiidPe",
+     "ePdiiiiidPe",
+     "ePdiiiiidPe",
+     "ePdiiiiidPe",
+     "aPdiiiiidPa",
+     "gPdiiiiidPg",
+     "gPdiiiiidPg",
+     "gPdiiiiidPg",
+     "gPdiiiiidPg",
+     "gPdiiiiidPg",
+     "gPdddddddPg",
+     "gPPPPPPPPPg",
+     "ahhhhajjjja"]
+  # y=10
+  - ["klllllllllk",
+     "lSdddddddSl",
+     "ldddddddddl",
+     "ldddddddddl",
+     "ldd....3ddl",
+     "ldd.....ddl",
+     "ldd.....ddl",
+     "ldd.....ddl",
+     "ldd.....ddl",
+     "ldd..2..ddl",
+     "ldd1....ddl",
+     "ldd1...4ddl",
+     "ldd.....ddl",
+     "ldd.....ddl",
+     "ldddddddddl",
+     "lSdddddddSl",
+     "mlllllllllm"]
+  # y=11
+  - ["...........",
+     "...........",
+     ".nd.....do.",
+     "..dRCbCRd..",
+     "..d.....d..",
+     "..d.....d..",
+     "..d.....d..",
+     "..d.....d..",
+     "..d.....d..",
+     "..d.....d..",
+     "..d.....d..",
+     "..d.....d..",
+     "..d.....d..",
+     "..dRFbFRd..",
+     ".nd.....do.",
+     "...........",
+     "..........."]
+  # y=12
+  - ["...........",
+     "...........",
+     "...d...d...",
+     "..ndRbRdo..",
+     "...d...d...",
+     "...d...d...",
+     "...d...d...",
+     "...d...d...",
+     "...d...d...",
+     "...d...d...",
+     "...d...d...",
+     "...d...d...",
+     "...d...d...",
+     "..ndRbRdo..",
+     "...d...d...",
+     "...........",
+     "..........."]
+  # y=13
+  - ["...........",
+     "...........",
+     "....did....",
+     "...ndbdo...",
+     "....d.d....",
+     "....d.d....",
+     "....d.d....",
+     "....d.d....",
+     "....d.d....",
+     "....d.d....",
+     "....d.d....",
+     "....d.d....",
+     "....d.d....",
+     "...ndbdo...",
+     "....did....",
+     "...........",
+     "..........."]
+  # y=14
+  - ["...........",
+     ".....p.....",
+     ".....d.....",
+     "....ndo....",
+     ".....d.....",
+     ".....d.....",
+     ".....d.....",
+     ".....d.....",
+     ".....d.....",
+     ".....d.....",
+     ".....d.....",
+     ".....d.....",
+     ".....d.....",
+     "....ndo....",
+     ".....d.....",
+     ".....q.....",
+     "..........."]
+  # y=15
+  - ["...........",
+     ".....u.....",
+     ".....r.....",
+     "....rSr....",
+     ".....w.....",
+     ".....w.....",
+     ".....w.....",
+     ".....w.....",
+     ".....w.....",
+     ".....w.....",
+     ".....w.....",
+     ".....w.....",
+     ".....w.....",
+     "....rSr....",
+     ".....r.....",
+     ".....x.....",
+     "..........."]
+  # y=16
+  - ["...........",
+     "...........",
+     ".....y.....",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     "...........",
+     ".....y.....",
+     "...........",
+     "..........."]

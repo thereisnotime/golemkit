@@ -1,0 +1,267 @@
+name: cinch_taiga_house
+description: cinch taiga house (structure)
+facing: north
+site: near
+meta:
+  tags: [ house, cottage, spruce ]
+  author: Cinchtail
+  source: https://github.com/cinchtail/Cinchs_Abandoned_Houses
+  url: https://raw.githubusercontent.com/cinchtail/Cinchs_Abandoned_Houses/632b78eb97e1a93cf6af7502e8412425250dc15f/src/main/resources/data/cinchsabandonedhouses/structures/abandoned_houses/abandoned_taiga_houses/abandoned_taiga_house_1.nbt
+  license: MIT
+  sha256: 32d817a43a152c37cb44dabe2da6d26ac2688cb902a7287875480ff306fa4cb5
+  created: 2026-11-21
+  size: [ 12, 13, 14 ]
+  blocks: 688
+  materials: { cobblestone: 234, spruce_stairs: 125, spruce_planks: 76, spruce_log: 68, cobblestone_stairs: 44, spruce_trapdoor: 39 }
+roles:
+  wood_log: { default: spruce_log, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_(log|wood)$", wood: true }
+  wood_planks: { default: spruce_planks, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_planks$", wood: true }
+  wood_door: { default: spruce_door, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_door$", wood: true, kind: door }
+  wood_trapdoor: { default: spruce_trapdoor, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_trapdoor$", wood: true }
+  wood_stairs: { default: spruce_stairs, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_stairs$", wood: true }
+  wood_slab: { default: spruce_slab, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_slab$", wood: true }
+palette:
+  "L": {"role":"wood_log","state":{"axis":"y"}}
+  "C": {"block":"cobblestone"}
+  "B": {"block":"bookshelf"}
+  "c": {"block":"crafting_table"}
+  "P": {"role":"wood_planks"}
+  "S": {"block":"stripped_spruce_log","state":{"axis":"y"}}
+  "A": {"block":"cobblestone_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "D": {"role":"wood_door","state":{"hinge":"left","half":"lower","facing":"north","open":"false"}}
+  "l": {"block":"ladder","state":{"facing":"north"}}
+  "T": {"role":"wood_trapdoor","state":{"half":"top","facing":"west","open":"true"}}
+  "E": {"block":"light_gray_stained_glass_pane"}
+  "d": {"role":"wood_door","state":{"hinge":"left","half":"upper","facing":"north","open":"false"}}
+  "t": {"role":"wood_trapdoor","state":{"half":"top","facing":"east","open":"true"}}
+  "F": {"role":"wood_trapdoor","state":{"half":"top","facing":"south","open":"true"}}
+  "s": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "G": {"role":"wood_stairs","state":{"half":"bottom","shape":"outer_left","facing":"east"}}
+  "H": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"west"}}
+  "I": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "J": {"role":"wood_trapdoor","state":{"half":"top","facing":"north","open":"true"}}
+  "K": {"role":"wood_slab","state":{"type":"top"}}
+  "M": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"east"}}
+  "N": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "O": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"south"}}
+  "Q": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "R": {"role":"wood_stairs","state":{"half":"bottom","shape":"inner_left","facing":"west"}}
+  "U": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "V": {"role":"wood_slab","state":{"type":"bottom"}}
+  "W": {"block":"cobblestone_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "X": {"block":"mossy_cobblestone_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "Y": {"block":"cobblestone_stairs","state":{"half":"top","shape":"straight","facing":"west"}}
+  "Z": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"south","open":"true"}}
+  "a": {"block":"cobblestone_stairs","state":{"half":"top","shape":"straight","facing":"east"}}
+  "b": {"block":"cobblestone_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "e": {"block":"mossy_cobblestone_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "f": {"block":"mossy_cobblestone_stairs","state":{"half":"top","shape":"straight","facing":"west"}}
+  "g": {"block":"mossy_cobblestone_stairs","state":{"half":"top","shape":"straight","facing":"east"}}
+  "h": {"block":"cobblestone_stairs","state":{"half":"top","shape":"straight","facing":"south"}}
+  "i": {"block":"cobblestone_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "j": {"block":"cobblestone_slab","state":{"type":"bottom"}}
+  "k": {"block":"mossy_cobblestone_slab","state":{"type":"bottom"}}
+  "m": {"block":"chiseled_bookshelf","state":{"facing":"east"}}
+  "n": {"block":"chest","state":{"facing":"south"}}
+  "o": {"block":"furnace","state":{"facing":"west"}}
+  "w": {"block":"white_bed","state":{"part":"head","facing":"north"}}
+  "p": {"block":"white_bed","state":{"part":"foot","facing":"north"}}
+  "q": {"block":"dirt"}
+  ".": air
+layers:
+  # y=0
+  - ["    C qq",
+     "  LCCCLqq",
+     "  CCCCCqqq",
+     "  CCCCCqqqq",
+     "  CCCCCqqqq",
+     "  LCCCLCCCL",
+     "  CCCCCCCCC",
+     "  CCCCCCCCC",
+     "  CCCCCCCCC",
+     "  CCCCCCCCC",
+     "  LCCCLCCCL",
+     "",
+     ""]
+  # y=1
+  - ["   .A.",
+     "  LCCCL",
+     "  CCCCC",
+     "  CCCCC",
+     "  CCCCC",
+     "  LCCCLCCCL",
+     " .CCCCCCCCC",
+     "  CCCCCCCCC",
+     "  CCCCCCCCC",
+     "  CCCCCCCCC",
+     "  LCCCLCCCL",
+     "    .",
+     ""]
+  # y=2
+  - ["   ...",
+     "  LCDCL",
+     "  C...C",
+     "  C...C",
+     "  C...C",
+     "  L...LCCCL",
+     "  CB...nncC",
+     "  Cm......C",
+     "  CB......C",
+     "  CBl....oC",
+     "  LCCCLCCCL",
+     "",
+     ""]
+  # y=3
+  - ["   ...",
+     "  LCdCL",
+     " TC...Ct",
+     "  E...E",
+     " TC...Ct",
+     "  L...LCCCL",
+     "  C ......Ct",
+     "  CB......E",
+     "  CB......E",
+     "  Cml.....Ct",
+     "  LCCCLCECL",
+     "       F F",
+     ""]
+  # y=4
+  - ["   ...",
+     "  LCCCL",
+     " TC...Ct",
+     "  E...E",
+     " TC...Ct",
+     "  L...LCCCL",
+     "  C.......Ct",
+     "  C ......E",
+     "  CB......E",
+     "  CBl.....Ct",
+     "  LCCCLCECL",
+     "       F F",
+     ""]
+  # y=5
+  - [" sHJ.JMQ",
+     " sLCECLQ",
+     " sC...CQ",
+     " sC...CQ",
+     " sC.. CRUUUU",
+     " sLHKMLCCCLN",
+     " sCKKKN.. C",
+     " sCKKKK...C",
+     " sCKKKK...C",
+     " sCKlKO...C",
+     " sLCCCLCCCLO",
+     " GIIIIIIIIII",
+     ""]
+  # y=6
+  - ["  sH.MQ",
+     "  sCCCQ",
+     "  sH MQ",
+     "  sH.MQ",
+     "  sH.MQ",
+     "  LPPPLUUUUU",
+     "  PSwSPNNNCN",
+     " MP.p.P...C",
+     " MP...P.. C",
+     "  P.l POOOCO",
+     "  LPPPLIIIII",
+     "    N",
+     ""]
+  # y=7
+  - ["   sOQ",
+     "   sCQ",
+     "   sPQ",
+     "   sPQ",
+     "   sPQ",
+     "  LPPPL",
+     " JP ..PUUUUU",
+     "TqP...PNNNCN",
+     "TqP...POOOCO",
+     " FP...PIIIII",
+     "  LPPPL",
+     "   Tqt",
+     "    F"]
+  # y=8
+  - ["    V",
+     "    V",
+     "    V",
+     "    V",
+     "    V",
+     "  LPPPL",
+     " TP...P",
+     "  E...PUUUUU",
+     "  E...PIIIII",
+     " TP...P",
+     "  LPEPL",
+     "   F F",
+     ""]
+  # y=9
+  - ["",
+     "",
+     "",
+     "",
+     "   J J",
+     "  LPEPL",
+     " TP...P",
+     "  E...P",
+     "  E...P",
+     " TP...P",
+     "  LPEPL",
+     "   F F",
+     ""]
+  # y=10
+  - ["",
+     "",
+     "",
+     "",
+     " WYJ Jab",
+     " WLPEPLe",
+     " XP.. Pb",
+     " WP...Pb",
+     " WP...Pb",
+     " WP...Pb",
+     " XLPEPLe",
+     " XYZ Fab",
+     ""]
+  # y=11
+  - ["",
+     "",
+     "",
+     "",
+     "  XY gb",
+     "  WPPPb",
+     "  WH.Mb",
+     "  WH.Mb",
+     "  XH.Me",
+     "  WH Mb",
+     "  WPPPb",
+     "  Wf ae",
+     ""]
+  # y=12
+  - ["",
+     "",
+     "",
+     "",
+     "   Whb",
+     "   XPe",
+     "   WPb",
+     "   XPb",
+     "   WPb",
+     "   WPe",
+     "   WPb",
+     "   Wib",
+     ""]
+  # y=13
+  - ["",
+     "",
+     "",
+     "",
+     "    j",
+     "    j",
+     "    k",
+     "    j",
+     "    k",
+     "    j",
+     "    j",
+     "    k",
+     ""]

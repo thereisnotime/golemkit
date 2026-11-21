@@ -1,0 +1,159 @@
+name: cinch_farm_house
+description: cinch farm house (structure)
+facing: north
+site: near
+meta:
+  tags: [ house, farm ]
+  author: Cinchtail
+  source: https://github.com/cinchtail/Cinchs_Abandoned_Houses
+  url: https://raw.githubusercontent.com/cinchtail/Cinchs_Abandoned_Houses/632b78eb97e1a93cf6af7502e8412425250dc15f/src/main/resources/data/cinchsabandonedhouses/structures/abandoned_houses/normal_abandoned_houses/abandoned_farm_house.nbt
+  license: MIT
+  sha256: 5008ef283e63c11a794d6f4bcb4249209dd32e606a1784d7bca912dc9e799f6e
+  created: 2026-11-21
+  size: [ 12, 12, 8 ]
+  blocks: 446
+  materials: { oak_stairs: 173, cobblestone: 92, oak_log: 68, oak_slab: 51, glass_pane: 23, oak_planks: 21 }
+roles:
+  wood_log: { default: oak_log, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_(log|wood)$", wood: true }
+  wood_planks: { default: oak_planks, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_planks$", wood: true }
+  wood_slab: { default: oak_slab, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_slab$", wood: true }
+  wood_door: { default: oak_door, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_door$", wood: true, kind: door }
+  wood_stairs: { default: oak_stairs, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_stairs$", wood: true }
+palette:
+  "L": {"role":"wood_log","state":{"axis":"y"}}
+  "C": {"block":"cobblestone"}
+  "c": {"block":"mossy_cobblestone"}
+  "O": {"block":"stripped_oak_log","state":{"axis":"y"}}
+  "A": {"block":"crafting_table"}
+  "l": {"role":"wood_log","state":{"axis":"z"}}
+  "B": {"role":"wood_log","state":{"axis":"x"}}
+  "P": {"role":"wood_planks"}
+  "S": {"role":"wood_slab","state":{"type":"top"}}
+  "D": {"role":"wood_door","state":{"hinge":"right","half":"lower","facing":"north","open":"false"}}
+  "G": {"block":"glass_pane"}
+  "d": {"role":"wood_door","state":{"hinge":"right","half":"upper","facing":"north","open":"false"}}
+  "R": {"block":"red_candle"}
+  "s": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "E": {"role":"wood_stairs","state":{"half":"bottom","shape":"inner_left","facing":"south"}}
+  "F": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "H": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"south"}}
+  "I": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "J": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"west"}}
+  "K": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"east"}}
+  "M": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "N": {"role":"wood_stairs","state":{"half":"bottom","shape":"inner_left","facing":"west"}}
+  "Q": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "T": {"role":"wood_stairs","state":{"half":"top","shape":"outer_left","facing":"north"}}
+  "U": {"role":"wood_stairs","state":{"half":"top","shape":"outer_right","facing":"north"}}
+  "V": {"role":"wood_stairs","state":{"half":"bottom","shape":"inner_right","facing":"south"}}
+  "W": {"role":"wood_stairs","state":{"half":"bottom","shape":"inner_right","facing":"east"}}
+  "X": {"role":"wood_slab","state":{"type":"bottom"}}
+  "f": {"block":"furnace","state":{"facing":"west"}}
+  "Y": {"block":"chest","state":{"facing":"west"}}
+  "Z": {"block":"dirt"}
+  ".": air
+layers:
+  # y=0
+  - ["",
+     " LCCCLcCcCC",
+     " CSSSCZZZZC",
+     " CSSSC    C",
+     " CSSSCZZZZc",
+     " LSSSLCCCCL",
+     " CSSSSSSSSC",
+     " CSSSSSSSSC",
+     " CSSSSSSSSC",
+     " CSSSSSSSSC",
+     " LCCCLCCCCL",
+     ""]
+  # y=1
+  - [" .........",
+     " LDCCL.....",
+     " C...C    ..",
+     " C...C......",
+     " C...C    ..",
+     " L...LCCCCL",
+     " C.......AC",
+     " C.......fC",
+     " C.......YC",
+     " CO......OC",
+     " LCCCLCCCCL",
+     ""]
+  # y=2
+  - [" .........",
+     " LdCGL.....",
+     " C...C......",
+     " G...G......",
+     " C...C......",
+     " L...LCGGCL.",
+     " C........C",
+     " G........G",
+     " G........G",
+     " CR...... C",
+     " LCGCLCGGCL",
+     ""]
+  # y=3
+  - [" .........",
+     " LCCCL.....",
+     " C...C......",
+     " G...G......",
+     " C...C......",
+     " L...LCGGCL",
+     " C........C",
+     " G........G",
+     " G........G",
+     " C........C",
+     " LCGCLCGGCL",
+     ""]
+  # y=4
+  - ["sJ...KM...",
+     "sLBBBLM....",
+     "sl...lM.....",
+     "sl...lM.....",
+     "El...lNQQQQQ",
+     "FL...LBBBBLF",
+     " l........l",
+     " l........l",
+     " l........l",
+     " l........l",
+     "HLBBBLBBBBLH",
+     "IIIIIIIIIIII"]
+  # y=5
+  - [" sJ.KM",
+     " sPPPM  ..",
+     " sJ.KM  ..",
+     " sJ.KM",
+     " sJ.KM",
+     "QEJ.KVQQQQQQ",
+     "FPT.UFFFFFPF",
+     " P........P",
+     " P........P",
+     "HPHHHHHHHHPH",
+     "IIIIIIIIIIII",
+     ""]
+  # y=6
+  - ["  sHM .",
+     "  sPM",
+     "  sPM",
+     "  sPM",
+     "  sPM",
+     "  sPM",
+     "QQWPNQQQQQQQ",
+     "FPFFFFFFFFPF",
+     "HPHHHHHHHHPH",
+     "IIIIIIIIIIII",
+     "",
+     ""]
+  # y=7
+  - ["   X",
+     "   X",
+     "   X",
+     "   X",
+     "   X",
+     "   X",
+     "   X",
+     "QQQQQQQQQQQQ",
+     "IIIIIIIIIIII",
+     "",
+     "",
+     ""]

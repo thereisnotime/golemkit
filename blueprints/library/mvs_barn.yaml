@@ -1,0 +1,271 @@
+name: mvs_barn
+description: mvs barn (structure)
+facing: north
+site: near
+meta:
+  tags: [ farm, barn, house ]
+  author: FinnDog_123 (Moog's Mods)
+  source: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+  url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/houses/barn.nbt
+  license: LGPL-3.0
+  sha256: 1ae87acee01763027ba45f3fec1d0e96f02990f08fb0d098b4adea9c4b79f653
+  created: 2026-11-21
+  size: [ 15, 18, 10 ]
+  blocks: 803
+  materials: { spruce_slab: 178, oak_planks: 109, spruce_trapdoor: 99, spruce_stairs: 96, stripped_spruce_log: 86, spruce_planks: 64 }
+roles:
+  wood_slab: { default: spruce_slab, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_slab$", wood: true }
+  wood_trapdoor: { default: spruce_trapdoor, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_trapdoor$", wood: true }
+  wood_door: { default: spruce_door, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_door$", wood: true, kind: door }
+  wood_fence: { default: spruce_fence, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence$", wood: true }
+palette:
+  "G": {"block":"gravel"}
+  "S": {"block":"stone"}
+  "P": {"block":"spruce_planks"}
+  "s": {"block":"stripped_spruce_log","state":{"axis":"y"}}
+  "A": {"block":"stripped_spruce_log","state":{"axis":"z"}}
+  "B": {"block":"stripped_spruce_log","state":{"axis":"x"}}
+  "C": {"role":"wood_slab","state":{"type":"double"}}
+  "p": {"block":"oak_planks"}
+  "L": {"block":"loom","state":{"facing":"south"}}
+  "b": {"block":"bookshelf"}
+  "l": {"block":"loom","state":{"facing":"north"}}
+  "T": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"west","open":"true"}}
+  "t": {"role":"wood_trapdoor","state":{"half":"top","facing":"west","open":"true"}}
+  "D": {"role":"wood_slab","state":{"type":"bottom"}}
+  "E": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"north","open":"true"}}
+  "F": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"south","open":"false"}}
+  "H": {"role":"wood_slab","state":{"type":"top"}}
+  "I": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"south","open":"true"}}
+  "J": {"role":"wood_trapdoor","state":{"half":"top","facing":"north","open":"false"}}
+  "K": {"role":"wood_trapdoor","state":{"half":"top","facing":"south","open":"false"}}
+  "M": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"east","open":"true"}}
+  "N": {"role":"wood_trapdoor","state":{"half":"top","facing":"east","open":"false"}}
+  "O": {"role":"wood_trapdoor","state":{"half":"top","facing":"east","open":"true"}}
+  "Q": {"role":"wood_trapdoor","state":{"half":"top","facing":"north","open":"true"}}
+  "R": {"block":"spruce_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "U": {"block":"spruce_stairs","state":{"half":"top","shape":"straight","facing":"south"}}
+  "d": {"role":"wood_door","state":{"hinge":"left","half":"lower","facing":"north","open":"false"}}
+  "V": {"role":"wood_door","state":{"hinge":"right","half":"lower","facing":"south","open":"false"}}
+  "W": {"role":"wood_door","state":{"hinge":"right","half":"lower","facing":"north","open":"false"}}
+  "r": {"block":"red_carpet"}
+  "X": {"role":"wood_door","state":{"hinge":"left","half":"lower","facing":"south","open":"false"}}
+  "Y": {"block":"ladder","state":{"facing":"west"}}
+  "w": {"block":"water_cauldron"}
+  "f": {"role":"wood_fence"}
+  "Z": {"block":"lantern","state":{"hanging":"false"}}
+  "a": {"block":"lightning_rod","state":{"facing":"down"}}
+  "c": {"role":"wood_door","state":{"hinge":"left","half":"upper","facing":"north","open":"false"}}
+  "e": {"role":"wood_door","state":{"hinge":"right","half":"upper","facing":"south","open":"false"}}
+  "g": {"role":"wood_door","state":{"hinge":"right","half":"upper","facing":"north","open":"false"}}
+  "h": {"role":"wood_door","state":{"hinge":"left","half":"upper","facing":"south","open":"false"}}
+  "i": {"block":"lantern","state":{"hanging":"true"}}
+  "j": {"block":"oak_stairs","state":{"half":"top","shape":"straight","facing":"south"}}
+  "k": {"block":"oak_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "m": {"block":"spruce_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "n": {"block":"spruce_stairs","state":{"half":"top","shape":"straight","facing":"west"}}
+  "o": {"block":"spruce_stairs","state":{"half":"top","shape":"straight","facing":"east"}}
+  "q": {"block":"spruce_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "u": {"role":"wood_trapdoor","state":{"half":"top","facing":"west","open":"false"}}
+  "x": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"west","open":"false"}}
+  "y": {"role":"wood_trapdoor","state":{"half":"bottom","facing":"east","open":"false"}}
+  "z": {"block":"barrel","state":{"facing":"up","open":"false"}}
+  "0": {"block":"barrel","state":{"facing":"west","open":"false"}}
+  "1": {"block":"furnace","state":{"facing":"west"}}
+  "2": {"block":"barrel","state":{"facing":"east","open":"false"}}
+  "3": {"block":"oak_wall_sign","state":{"facing":"east"}}
+  "4": {"block":"red_bed","state":{"part":"head","facing":"west"}}
+  "5": {"block":"red_bed","state":{"part":"foot","facing":"west"}}
+  "6": {"block":"dirt"}
+  ".": air
+layers:
+  # y=0
+  - ["  G   66    G",
+     "     6PGG 6  6",
+     "  G SS   SS",
+     "    SS  SS   6",
+     "  S  SS",
+     "  S",
+     "  GG       S",
+     "       ..     6",
+     "  S      S S",
+     "        S   S",
+     "  S    SS",
+     "    S       S",
+     "   SS S S S  G",
+     "    SS",
+     "     6PP6  6 6",
+     "    6 666G6 G",
+     "     6G  6 6",
+     "       6G   6"]
+  # y=1
+  - ["...............",
+     "....E DD.JJ.E..",
+     "...EsBBBBBBBsM.",
+     "..D6AHHHHHHHA..",
+     ".D66AHHHHHHzAN.",
+     "T666HCHHHHHzAN.",
+     "T6 6AHHHHHHHAN.",
+     "T666AHHP HHHA..",
+     "T666AHHHHHHHA..",
+     "t666AHHHHHHHAN.",
+     "T6 6HCHHHHHHAN.",
+     ".D66AHHHHHHHAN.",
+     "..D6AHHHHHHHA..",
+     "...FsBBBBBBBsO.",
+     "....I DD.KK.I..",
+     "...............",
+     "...............",
+     "..............."]
+  # y=2
+  - [".........EE....",
+     "....  ..T66M ..",
+     "....spdWpppps .",
+     "... pQ..E...pE.",
+     "..  pP.TD..Rp6M",
+     ".   pP.TD..Up6M",
+     ". . pD..I..Qp6M",
+     ".   pI.....YpI.",
+     ".   p..rrr.0pE.",
+     ".   pR.rrr.1p6M",
+     ". . pH.rrr.0p6M",
+     "..  pU.rrr.wp6M",
+     "... p......0pI.",
+     "....spVXpppps .",
+     "....   .T66M ..",
+     ".........II....",
+     "...............",
+     "..............."]
+  # y=3
+  - ["...............",
+     "....  ...  . ..",
+     "....spcgpffps .",
+     "....pE......p .",
+     "....pZ......f .",
+     "....pE..... f .",
+     "....pa.....Ef .",
+     "....pI.....Yp .",
+     "....p......Ip .",
+     "....f ......f .",
+     "....f.......f .",
+     "....fZ......f .",
+     "....p......Zp..",
+     "....spehpffps .",
+     "....   ..    ..",
+     "...............",
+     "...............",
+     "..............."]
+  # y=4
+  - ["...............",
+     "...i  ...  ..i.",
+     "....spjjpppps .",
+     "....pQ......p..",
+     "....pP3.....p..",
+     "....pP3.....p..",
+     "....p2.....Ep .",
+     "....pI.....Yp .",
+     "....p......Ip .",
+     "....p.......p..",
+     "....p.......p..",
+     "....p.......p..",
+     "....p.......p..",
+     "....spkkpppps..",
+     "...i.  ..    i.",
+     "...............",
+     "...............",
+     "..............."]
+  # y=5
+  - ["...............",
+     "...mn...H  .oq.",
+     "...msBBBBBBBsq.",
+     "...mA.......Aq.",
+     "...mA.......Aq.",
+     "...mA.......Aq.",
+     "...mAD.....EAq.",
+     "...mA......YAq.",
+     "...mACHHHHHCAq.",
+     "...mAHHHHHHHAq.",
+     "...mACHHHHHCAq.",
+     "...mAHHHHHHHAq.",
+     "...mACHCHCHCAq.",
+     "...msBBBBBBBsq.",
+     "...mn  .H   oq.",
+     "...............",
+     "...............",
+     "..............."]
+  # y=6
+  - ["...............",
+     "....PDDDZDDDP..",
+     "....PpppppppP..",
+     "....P.......P..",
+     "....P.......P..",
+     "....P.......P..",
+     "....P......EP..",
+     "....PEEEEEE.P..",
+     "....PL......P..",
+     "....P2..rr.EP..",
+     "....P2..rr.uP..",
+     "....P45.rr.uP..",
+     "....P45....uP..",
+     "....PpppppppP..",
+     "....PDDDZDDDP..",
+     "...............",
+     "...............",
+     "..............."]
+  # y=7
+  - ["...............",
+     "....mn.....oq..",
+     "....mpppfpppq..",
+     "....m.......q..",
+     "....m.......q..",
+     "....m.......q..",
+     "....m......Eq..",
+     "....m.......q..",
+     "....mb......q..",
+     "....ml......q..",
+     "....mb.....Zq..",
+     "....m.......q..",
+     "....m...... q..",
+     "....mpppfpppq..",
+     "....mn.....oq..",
+     "...............",
+     "...............",
+     "..............."]
+  # y=8
+  - ["...............",
+     ".....mPHHHPq...",
+     ".....mPpppPq...",
+     ".....mP...Pq...",
+     ".....mP.i.Pq...",
+     ".....mP...Pq...",
+     ".....mP...Pq...",
+     ".....mP...Pq...",
+     ".....mP...Pq...",
+     ".....mP...Pq...",
+     ".....mP.i.Pq...",
+     ".....mP...Pq...",
+     ".....mP...Pq...",
+     ".....mPpppPq...",
+     ".....mPHHHPq...",
+     "...............",
+     "...............",
+     "..............."]
+  # y=9
+  - ["...............",
+     "......xDCDx....",
+     "......xDCDx....",
+     "......xDCDy....",
+     "......xDCDy....",
+     "......xDCDy....",
+     "......xDCDy....",
+     "......xDCDy....",
+     "......xDCDy....",
+     "......xDCDy....",
+     "......xDCDy....",
+     "......xDCDy....",
+     "......xDCDy....",
+     "......yDCDx....",
+     "......yDCDx....",
+     "...............",
+     "...............",
+     "..............."]

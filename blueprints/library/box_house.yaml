@@ -1,0 +1,85 @@
+name: box_house
+description: box house (structure)
+facing: south
+site: near
+meta:
+  tags: [ house, hut, tiny ]
+  author: dr-where
+  source: https://github.com/dr-where/custom-structure-example-datapack
+  url: https://raw.githubusercontent.com/dr-where/custom-structure-example-datapack/bee69ce613f62f13b038a6c06c00e82779e3bc2d/structure_tutorial/data/tutorial/structure/box_house.nbt
+  license: CC0-1.0
+  sha256: 3ea624cbb38bda10c758ee85ec025a1938a25576406a0ac85c38703332c7f59c
+  created: 2026-11-21
+  size: [ 5, 6, 6 ]
+  blocks: 98
+  materials: { birch_planks: 31, oak_stairs: 25, cobblestone: 21, spruce_log: 16, oak_slab: 5 }
+roles:
+  wood_log: { default: spruce_log, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_(log|wood)$", wood: true }
+  wood_planks: { default: birch_planks, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_planks$", wood: true }
+  wood_stairs: { default: oak_stairs, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_stairs$", wood: true }
+  wood_slab: { default: oak_slab, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_slab$", wood: true }
+palette:
+  "L": {"role":"wood_log","state":{"axis":"y"}}
+  "C": {"block":"cobblestone"}
+  "P": {"role":"wood_planks"}
+  "S": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "s": {"role":"wood_stairs","state":{"half":"bottom","shape":"outer_right","facing":"east"}}
+  "A": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "B": {"role":"wood_stairs","state":{"half":"bottom","shape":"outer_left","facing":"east"}}
+  "D": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "E": {"role":"wood_stairs","state":{"half":"top","shape":"inner_right","facing":"west"}}
+  "F": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"west"}}
+  "G": {"role":"wood_stairs","state":{"half":"top","shape":"inner_right","facing":"south"}}
+  "H": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "I": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"south"}}
+  "J": {"role":"wood_stairs","state":{"half":"top","shape":"inner_left","facing":"east"}}
+  "K": {"role":"wood_stairs","state":{"half":"top","shape":"straight","facing":"east"}}
+  "M": {"role":"wood_stairs","state":{"half":"top","shape":"inner_right","facing":"east"}}
+  "N": {"role":"wood_stairs","state":{"half":"bottom","shape":"outer_left","facing":"west"}}
+  "O": {"role":"wood_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "Q": {"role":"wood_stairs","state":{"half":"bottom","shape":"outer_right","facing":"west"}}
+  "R": {"role":"wood_slab","state":{"type":"bottom"}}
+  ".": air
+layers:
+  # y=0
+  - ["LCCCL",
+     "CCCCC",
+     "CCCCC",
+     "CCCCC",
+     "LCCCL",
+     "..S.."]
+  # y=1
+  - ["LPPPL",
+     "P...P",
+     "P...P",
+     "P...P",
+     "LP.PL",
+     "....."]
+  # y=2
+  - ["LP.PL",
+     "P...P",
+     ".....",
+     "P...P",
+     "LP.PL",
+     "....."]
+  # y=3
+  - ["LPPPL",
+     "P...P",
+     "P...P",
+     "P...P",
+     "LPPPL",
+     "....."]
+  # y=4
+  - ["sDDDN",
+     "AEHJO",
+     "AF.KO",
+     "AGIMO",
+     "BSSSQ",
+     "....."]
+  # y=5
+  - [".....",
+     "..R..",
+     ".RRR.",
+     "..R..",
+     ".....",
+     "....."]

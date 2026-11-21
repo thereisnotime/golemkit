@@ -1,0 +1,169 @@
+name: yurt
+description: "yurt: round tent house; smooth quartz, glazed terracotta, banners"
+facing: south
+site: near
+meta:
+  tags: [ house, hut, round ]
+  author: Silicon23
+  source: https://github.com/Silicon23/MoreChineseStructures
+  url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/data/mcs/structure/village/yurt/buildings/yurt_05.nbt
+  license: MIT
+  sha256: eb3d18cc1155f5c713e5623cfa35a7999227db8df4954f9c038d2d566e4e8c35
+  created: 2026-11-21
+  size: [ 13, 13, 8 ]
+  blocks: 373
+  materials: { smooth_quartz: 162, blue_glazed_terracotta: 59, smooth_quartz_slab: 53, oak_fence: 30, white_banner: 29, smooth_quartz_stairs: 13 }
+roles:
+  wood_slab: { default: spruce_slab, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_slab$", wood: true }
+  wood_trapdoor: { default: spruce_trapdoor, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_trapdoor$", wood: true }
+palette:
+  "B": {"block":"blue_glazed_terracotta","state":{"facing":"west"}}
+  "b": {"block":"blue_glazed_terracotta","state":{"facing":"south"}}
+  "A": {"block":"blue_glazed_terracotta","state":{"facing":"east"}}
+  "Q": {"block":"smooth_quartz"}
+  "C": {"block":"blue_glazed_terracotta","state":{"facing":"north"}}
+  "q": {"block":"smooth_quartz_slab","state":{"type":"double"}}
+  "L": {"block":"loom","state":{"facing":"north"}}
+  "S": {"role":"wood_slab","state":{"type":"double"}}
+  "D": {"block":"smooth_quartz_stairs","state":{"facing":"south","half":"bottom","shape":"straight"}}
+  "s": {"role":"wood_slab","state":{"type":"bottom"}}
+  "E": {"block":"scaffolding"}
+  "F": {"block":"oak_fence"}
+  "f": {"block":"spruce_fence"}
+  "G": {"block":"stone_button","state":{"facing":"north","face":"wall"}}
+  "T": {"role":"wood_trapdoor","state":{"facing":"west","half":"bottom","open":"true"}}
+  "H": {"block":"stone_button","state":{"facing":"west","face":"wall"}}
+  "t": {"role":"wood_trapdoor","state":{"facing":"south","half":"bottom","open":"true"}}
+  "I": {"block":"blue_carpet"}
+  "l": {"block":"lantern","state":{"hanging":"false"}}
+  "J": {"block":"smooth_quartz_slab","state":{"type":"top"}}
+  "K": {"block":"smooth_quartz_slab","state":{"type":"bottom"}}
+  "M": {"block":"smooth_quartz_stairs","state":{"facing":"east","half":"bottom","shape":"straight"}}
+  "N": {"block":"smooth_quartz_stairs","state":{"facing":"north","half":"bottom","shape":"straight"}}
+  "O": {"block":"smooth_quartz_stairs","state":{"facing":"west","half":"bottom","shape":"straight"}}
+  "P": {"block":"smooth_quartz_stairs","state":{"facing":"south","half":"bottom","shape":"outer_left"}}
+  "R": {"block":"smooth_quartz_stairs","state":{"facing":"east","half":"bottom","shape":"outer_left"}}
+  "U": {"block":"smooth_quartz_stairs","state":{"facing":"south","half":"bottom","shape":"outer_right"}}
+  "V": {"block":"smooth_quartz_stairs","state":{"facing":"north","half":"bottom","shape":"outer_left"}}
+  "g": {"block":"green_bed","state":{"facing":"south","part":"foot"}}
+  "W": {"block":"green_bed","state":{"facing":"south","part":"head"}}
+  "X": {"block":"barrel","state":{"facing":"up","open":"false"}}
+  "Y": {"block":"barrel","state":{"facing":"west","open":"false"}}
+  "w": {"block":"white_wall_banner","state":{"facing":"west"}}
+  "Z": {"block":"white_wall_banner","state":{"facing":"north"}}
+  "a": {"block":"white_wall_banner","state":{"facing":"south"}}
+  "c": {"block":"white_wall_banner","state":{"facing":"east"}}
+  ".": air
+layers:
+  # y=0
+  - [".............",
+     "....BBDCC....",
+     "...BbbbbBC...",
+     "..BAAQQQbBC..",
+     ".BAAQQQQQBBC.",
+     ".bAQQQQQQQBC.",
+     ".bAQQQQQQQBC.",
+     ".bAQQQQQQQBA.",
+     ".bACQQQQQCBA.",
+     "..bACQQQCCA..",
+     "...bCCBCCA...",
+     "....bAAAA....",
+     "............."]
+  # y=1
+  - ["...... ......",
+     "....qq.qq....",
+     "...QF...Fq...",
+     "..Q.......q..",
+     ".Qs......TSq.",
+     ".QEs......tQ.",
+     ".QF...f...FQ.",
+     ".Qgg.....HYQ.",
+     ".QWW.....HYQ.",
+     "..QX...GG.Q..",
+     "...Q..FLLQ...",
+     "....QQQQQ....",
+     "............."]
+  # y=2
+  - [".............",
+     "....QQ.QQ....",
+     "...QF...FQ...",
+     "..Q.......Q..",
+     ".Q........lQ.",
+     ".QI........Q.",
+     ".QF...f...FQ.",
+     ".Q........sQ.",
+     ".Q........sQ.",
+     "..Ql......Q..",
+     "...Q..F. Q...",
+     "....QQQQQ....",
+     "............."]
+  # y=3
+  - ["....Z.Z.Z....",
+     "...ZQQQQQZ...",
+     "...QF...FQ...",
+     ".wQ.......Qc.",
+     "wQ.........Qc",
+     "wQ.........Qc",
+     "wQF...f...FQc",
+     "wQ.........Qc",
+     "wQ.........Qc",
+     ".wQ......JQc.",
+     "...Q..F..Q...",
+     "...aQQQQQa...",
+     "....aaaaa...."]
+  # y=4
+  - [".....ZZZ.....",
+     ".....KDK.....",
+     "....KQQQK....",
+     "...QQF.FQQ...",
+     "..KQ.....QK..",
+     ".KQ.......QK.",
+     ".MQF..f..FQO.",
+     ".KQ.......QK.",
+     "..KQ.....qK..",
+     "...QQ.F.Qq...",
+     "....KQQQK....",
+     ".....KNK.....",
+     "............."]
+  # y=5
+  - [".............",
+     ".............",
+     "......K......",
+     "....KQQQK....",
+     "...KQF.FQK...",
+     "..KQ.....QK..",
+     "..KQF.f.FQK..",
+     "..KQ.....QK..",
+     "...KQ.F.QK...",
+     "....KQQQK....",
+     ".....KKK.....",
+     ".............",
+     "............."]
+  # y=6
+  - [".............",
+     ".............",
+     ".............",
+     "......K......",
+     ".....QQQ.....",
+     "....Q.F.Q....",
+     "...KQFFFQK...",
+     "....Q.F.Q....",
+     ".....QQQ.....",
+     "......K......",
+     ".............",
+     ".............",
+     "............."]
+  # y=7
+  - [".............",
+     ".............",
+     ".............",
+     ".............",
+     "......K......",
+     ".....PDU.....",
+     "....KMqOK....",
+     ".....RNV.....",
+     "......K......",
+     ".............",
+     ".............",
+     ".............",
+     "............."]

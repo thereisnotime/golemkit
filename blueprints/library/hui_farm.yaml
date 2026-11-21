@@ -1,0 +1,101 @@
+name: hui_farm
+description: "hui farm: wheat and sugar cane field with a trapdoor border; the water channels are left out"
+facing: south
+site: near
+meta:
+  tags: [ farm ]
+  author: Silicon23
+  source: https://github.com/Silicon23/MoreChineseStructures
+  url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/data/mcs/structure/village/hui/plains_farm_1.nbt
+  license: MIT
+  sha256: 4614b13861ad42eae0bab4ba613d3d019a06c85dcd52af810a3ac3aea3cb667f
+  created: 2026-11-21
+  size: [ 13, 9, 7 ]
+  blocks: 146
+  materials: { dirt: 109, spruce_trapdoor: 24, jungle_fence: 7, lantern: 2, jungle_trapdoor: 2, composter: 1 }
+roles:
+  wood_fence: { default: jungle_fence, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence$", wood: true }
+  wood_slab: { default: jungle_slab, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_slab$", wood: true }
+palette:
+  "D": {"block":"dirt"}
+  "T": {"block":"spruce_trapdoor","state":{"facing":"west","half":"bottom","open":"false"}}
+  "t": {"block":"spruce_trapdoor","state":{"facing":"south","half":"bottom","open":"false"}}
+  "A": {"block":"spruce_trapdoor","state":{"facing":"north","half":"bottom","open":"false"}}
+  "C": {"block":"composter"}
+  "B": {"block":"spruce_trapdoor","state":{"facing":"east","half":"bottom","open":"false"}}
+  "F": {"role":"wood_fence"}
+  "L": {"block":"lantern","state":{"hanging":"true"}}
+  "E": {"block":"jungle_trapdoor","state":{"facing":"north","half":"bottom","open":"false"}}
+  "S": {"role":"wood_slab","state":{"type":"bottom"}}
+  ".": air
+layers:
+  # y=0
+  - ["DDDDDDDDDDDDD",
+     "DDDDDDDDDDDDD",
+     "DDDDDDDDDDDDD",
+     "DDDDD  DDDDDD",
+     "DDD D  DD DDD",
+     "DDDDD  DDDDDD",
+     "DDDDDDDDDDDDD",
+     "DDDDDDDDDDDDD",
+     "DDDDDDDDDDDDD"]
+  # y=1
+  - ["... CATT ....",
+     "...AA   AA.F.",
+     "..T       A..",
+     ".T   ..    A.",
+     " T . ..  . A",
+     ".t   ..    A.",
+     "..t       B..",
+     "...tt   BB...",
+     ".... ttt ...."]
+  # y=2
+  - [".............",
+     "...........F.",
+     ".....  ......",
+     ".... .. .....",
+     ".... .. .....",
+     ".... .. .....",
+     ".....  ......",
+     ".............",
+     "............."]
+  # y=3
+  - [".............",
+     "...........F.",
+     ".....  ......",
+     ".... .. .....",
+     ".... .. .....",
+     ".... .. .....",
+     ".....  ......",
+     ".............",
+     "............."]
+  # y=4
+  - [".............",
+     "..........LFL",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "............."]
+  # y=5
+  - [".............",
+     "..........FFF",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "............."]
+  # y=6
+  - [".............",
+     "..........ESE",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     ".............",
+     "............."]

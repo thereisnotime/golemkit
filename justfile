@@ -102,11 +102,17 @@ llm-eval *args:
 blueprint-preview name="" *args:
     @node scripts/blueprint-preview.ts {{name}} {{args}}
 
-# Convert a .schem / .litematic / .nbt into a blueprint (--bot <name> or --out <dir> to save, else print)
+# Convert a .schem / .schematic / .litematic / .nbt / .bp into a blueprint (--bot <name> or --out <dir> to save, else print)
 [group('blueprints')]
 blueprint-import file *args:
     @echo "{{BOLD}}{{CYAN}}==> importing {{file}}{{NORMAL}}"
     node scripts/blueprint-import.ts "{{file}}" {{args}}
+
+# Download the schematics in blueprints/sources.yaml and convert them (--only a,b --force --check --keep-raw)
+[group('blueprints')]
+blueprint-fetch *args:
+    @echo "{{BOLD}}{{CYAN}}==> fetching blueprints from blueprints/sources.yaml{{NORMAL}}"
+    node scripts/blueprint-fetch.ts {{args}}
 
 # Build the container image (podman)
 [group('deploy')]

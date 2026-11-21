@@ -1,0 +1,178 @@
+name: mvs_small_swamp_house
+description: "mvs small swamp house: has vines and leaves"
+facing: north
+site: near
+meta:
+  tags: [ house, hut ]
+  author: FinnDog_123 (Moog's Mods)
+  source: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+  url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/houses/small_swamp_house.nbt
+  license: LGPL-3.0
+  sha256: d66c7617dda5991c16d4495db3f210a6a70e0945fc33084cafe4a428b9226b2e
+  created: 2026-11-21
+  size: [ 10, 9, 11 ]
+  blocks: 281
+  materials: { spruce_slab: 67, dirt: 63, spruce_log: 31, oak_stairs: 22, dark_oak_log: 19, beehive: 15 }
+roles:
+  wood_wood: { default: oak_wood, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_(log|wood)$", wood: true }
+  wood_trapdoor: { default: spruce_trapdoor, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_trapdoor$", wood: true }
+  wood_fence: { default: spruce_fence, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_fence$", wood: true }
+  wood_door: { default: spruce_door, accept: "^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|pale_oak)_door$", wood: true, kind: door }
+palette:
+  "D": {"block":"dirt"}
+  "L": {"block":"dark_oak_log","state":{"axis":"y"}}
+  "l": {"block":"spruce_log","state":{"axis":"y"}}
+  "A": {"block":"spruce_log","state":{"axis":"x"}}
+  "B": {"block":"dark_oak_log","state":{"axis":"x"}}
+  "C": {"block":"spruce_log","state":{"axis":"z"}}
+  "E": {"block":"dark_oak_log","state":{"axis":"z"}}
+  "W": {"role":"wood_wood","state":{"axis":"y"}}
+  "P": {"block":"oak_planks"}
+  "p": {"block":"spruce_planks"}
+  "c": {"block":"cobblestone"}
+  "S": {"block":"spruce_slab","state":{"type":"top"}}
+  "s": {"block":"spruce_slab","state":{"type":"bottom"}}
+  "T": {"role":"wood_trapdoor","state":{"half":"top","facing":"west","open":"false"}}
+  "F": {"role":"wood_fence"}
+  "d": {"role":"wood_door","state":{"hinge":"left","half":"lower","facing":"west","open":"false"}}
+  "G": {"block":"birch_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "t": {"role":"wood_trapdoor","state":{"half":"top","facing":"south","open":"false"}}
+  "H": {"block":"ladder","state":{"facing":"north"}}
+  "I": {"role":"wood_trapdoor","state":{"half":"top","facing":"south","open":"true"}}
+  "J": {"block":"birch_stairs","state":{"half":"bottom","shape":"straight","facing":"east"}}
+  "K": {"role":"wood_door","state":{"hinge":"left","half":"upper","facing":"west","open":"false"}}
+  "M": {"block":"oak_stairs","state":{"half":"top","shape":"straight","facing":"east"}}
+  "N": {"block":"cobblestone_wall"}
+  "O": {"block":"torch"}
+  "Q": {"block":"oak_stairs","state":{"half":"bottom","shape":"straight","facing":"south"}}
+  "R": {"block":"oak_stairs","state":{"half":"top","shape":"straight","facing":"west"}}
+  "U": {"block":"oak_stairs","state":{"half":"bottom","shape":"straight","facing":"north"}}
+  "V": {"block":"oak_slab","state":{"type":"top"}}
+  "X": {"block":"oak_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "Y": {"block":"spruce_stairs","state":{"half":"top","shape":"straight","facing":"east"}}
+  "Z": {"block":"oak_stairs","state":{"half":"top","shape":"outer_right","facing":"north"}}
+  "a": {"block":"spruce_stairs","state":{"half":"top","shape":"straight","facing":"north"}}
+  "b": {"block":"oak_stairs","state":{"half":"top","shape":"straight","facing":"south"}}
+  "e": {"block":"oak_stairs","state":{"half":"top","shape":"outer_right","facing":"south"}}
+  "f": {"block":"spruce_stairs","state":{"half":"top","shape":"straight","facing":"west"}}
+  "g": {"block":"spruce_stairs","state":{"half":"bottom","shape":"straight","facing":"west"}}
+  "h": {"block":"beehive","state":{"facing":"north"}}
+  "i": {"block":"beehive","state":{"facing":"south"}}
+  "j": {"block":"beehive","state":{"facing":"east"}}
+  "k": {"block":"chest","state":{"facing":"south"}}
+  "m": {"block":"beehive","state":{"facing":"west"}}
+  "n": {"block":"smoker","state":{"facing":"south"}}
+  "o": {"block":"brown_bed","state":{"part":"head","facing":"west"}}
+  "q": {"block":"brown_bed","state":{"part":"foot","facing":"west"}}
+  ".": air
+layers:
+  # y=0
+  - ["    DD",
+     "  L L  DLD",
+     "DD   DDDD",
+     " DDDDDDDDD",
+     "  DDDDDDD",
+     " DDDDDDD",
+     "DDDDDDD",
+     " DDDDD DL",
+     "   DD"]
+  # y=1
+  - ["..     ...",
+     ". L l ..L.",
+     "   ....D..",
+     ".....DDD.",
+     "...DDDDD.",
+     ".S.D D....",
+     " s .D.....",
+     ". L.l...l",
+     ".... ..  ."]
+  # y=2
+  - ["...    ...",
+     "..lALBAAl.",
+     ". STSSSSC.",
+     ".SSSSST E",
+     ".sSSSSSSE",
+     "..S S SSC.",
+     "..sSSSSSC.",
+     "..LBlABAL",
+     ".... ..  ."]
+  # y=3
+  - ["...    ...",
+     "..lFLjjjl.",
+     ".. .hknti.",
+     "....d.. i",
+     "....i..Hi",
+     "... h .Ii.",
+     "....hGWJi.",
+     "...Flmmml",
+     ".... ..  ."]
+  # y=4
+  - ["...    ...",
+     "... lpPQl.",
+     "....P.N.P",
+     "....K...R",
+     "....P..Hp",
+     "... M..IP.",
+     "....p.O.P.",
+     "... LPPpl",
+     ".... ..  ."]
+  # y=5
+  - ["...   ....",
+     "... lPRpl.",
+     "....P.N.p",
+     "....M...P",
+     "....p .HX.",
+     "....PVVXp.",
+     "... UVVVP.",
+     "... lpPPL",
+     "....  .  ."]
+  # y=6
+  - ["...   ....",
+     "... l bbl.",
+     "... Y.N X",
+     "....M...e.",
+     "....Z...R.",
+     "....Y ..R.",
+     "... Moq.R.",
+     "... laXXl",
+     ".... ... ."]
+  # y=7
+  - [".... . .Ss",
+     "... lfVMls",
+     "...sS N  .",
+     "...sS.. s.",
+     "...sS ..g.",
+     "....s ..Ss",
+     ".... ...Dg",
+     "...sLRVYls",
+     "...s  ..Ss"]
+  # y=8
+  - [".....s s..",
+     "....  Ds..",
+     ".... scs..",
+     ".....sa ..",
+     ".....sSs..",
+     ".....sSs..",
+     ".....sSs .",
+     "....  SDs.",
+     ".....sSs.."]
+  # y=9
+  - ["..........",
+     "..........",
+     "......N...",
+     "..........",
+     "..........",
+     "..........",
+     "..........",
+     "....... ..",
+     ".........."]
+  # y=10
+  - ["..........",
+     "..........",
+     "......N...",
+     "..........",
+     "..........",
+     "..........",
+     "..........",
+     "..........",
+     ".........."]

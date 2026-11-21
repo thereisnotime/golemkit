@@ -1,0 +1,262 @@
+# Schematics from the internet that `just blueprint-fetch` downloads and converts into
+# blueprints (scripts/blueprint-fetch.ts, docs/guide/blueprints.md#fetching-blueprints).
+#
+#   redistribute: true    the license lets us share the converted file (CC0, CC-BY, MIT, Apache,
+#                         LGPL, public domain, or explicit permission): written to
+#                         blueprints/library/ and committed, attribution in its meta and in
+#                         blueprints/library/LICENSES.md
+#   redistribute: false   unknown, non-commercial or no-derivatives licenses: written to
+#                         blueprints/downloaded/ (gitignored, add it to settings.build.blueprintDirs
+#                         or the profile's `blueprints:` key to use it). Only this entry is committed.
+#   manual: true          the site doesn't allow automated downloads (login, captcha, robots.txt or
+#                         terms): download it from `page` yourself, put it in blueprints/downloaded/raw/
+#                         under `file`, and the next fetch converts it.
+#
+# Every url is pinned to a commit, so the file can't change under us; sha256 is checked when set.
+# Checked on 2026-11-21: licenses from each repo's LICENSE file (or the mod page where noted).
+# Fields: name, url, page, author, license, license_url (its text, saved to blueprints/library/licenses/),
+# redistribute, manual, file, tags, notes, sha256, terrain (keep ground and plants as they are),
+# crop ("x1 y1 z1 x2 y2 z2"), facing, exact (keep exact woods), max_blocks.
+sources:
+  # --- MoreChineseStructures (MIT) -------------------------------------------------------------
+  - name: hui_small_house
+    url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/data/mcs/structure/village/hui/plains_small_house_1.nbt
+    sha256: 40b59d400652ff07aa8ee91ab207bc85af799eb4c6ad166e1efd5bba213732cb
+    page: https://github.com/Silicon23/MoreChineseStructures
+    author: Silicon23
+    license: MIT
+    license_url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/LICENSE
+    redistribute: true
+    tags: [house, small]
+    notes: Hui-style village house; deepslate tile slabs, smooth quartz, andesite
+  - name: ganlan_stilt_house
+    url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/data/mcs/structure/village/ganlan/buildings/ganlan_house_4.nbt
+    sha256: fe3bc324180efddc1f3f758929bbfad3293fe6cb8c753670a88fbcda96995306
+    page: https://github.com/Silicon23/MoreChineseStructures
+    author: Silicon23
+    license: MIT
+    license_url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/LICENSE
+    redistribute: true
+    tags: [house, hut, stilts]
+    notes: house on stilts; oak logs, spruce, deepslate tile stairs
+  - name: hui_farm
+    url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/data/mcs/structure/village/hui/plains_farm_1.nbt
+    sha256: 4614b13861ad42eae0bab4ba613d3d019a06c85dcd52af810a3ac3aea3cb667f
+    page: https://github.com/Silicon23/MoreChineseStructures
+    author: Silicon23
+    license: MIT
+    license_url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/LICENSE
+    redistribute: true
+    tags: [farm]
+    notes: wheat and sugar cane field with a trapdoor border; the water channels are left out
+  - name: hui_well
+    url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/data/mcs/structure/village/hui/plains_well_1.nbt
+    sha256: 53c48a26cb633e924f1e05cf4e8cfc663d05125d51b03add40883b74117ba130
+    page: https://github.com/Silicon23/MoreChineseStructures
+    author: Silicon23
+    license: MIT
+    license_url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/LICENSE
+    redistribute: true
+    tags: [well, decoration]
+    notes: covered well with tuff brick stairs (1.21 blocks); water left out
+  - name: yurt
+    url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/data/mcs/structure/village/yurt/buildings/yurt_05.nbt
+    sha256: eb3d18cc1155f5c713e5623cfa35a7999227db8df4954f9c038d2d566e4e8c35
+    page: https://github.com/Silicon23/MoreChineseStructures
+    author: Silicon23
+    license: MIT
+    license_url: https://raw.githubusercontent.com/Silicon23/MoreChineseStructures/3da53915cd7658b5085f5926ff0205ebd30ee9d9/LICENSE
+    redistribute: true
+    tags: [house, hut, round]
+    notes: round tent house; smooth quartz, glazed terracotta, banners
+  # --- Moog's Voyager Structures (LGPL-3.0 on GitHub, MIT on Modrinth) ---------------------------
+  - name: mvs_desert_house
+    url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/houses/desert_house.nbt
+    sha256: 4536d39fea6bdc99940087e91b0839639802d7cd52fb1d711fb951ec46f8db8f
+    page: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+    author: FinnDog_123 (Moog's Mods)
+    license: LGPL-3.0
+    license_url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/LICENSE
+    redistribute: true
+    tags: [house, hut, sandstone]
+  - name: mvs_small_swamp_house
+    url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/houses/small_swamp_house.nbt
+    sha256: d66c7617dda5991c16d4495db3f210a6a70e0945fc33084cafe4a428b9226b2e
+    page: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+    author: FinnDog_123 (Moog's Mods)
+    license: LGPL-3.0
+    license_url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/LICENSE
+    redistribute: true
+    tags: [house, hut]
+    notes: has vines and leaves
+  - name: mvs_barn
+    url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/houses/barn.nbt
+    sha256: 1ae87acee01763027ba45f3fec1d0e96f02990f08fb0d098b4adea9c4b79f653
+    page: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+    author: FinnDog_123 (Moog's Mods)
+    license: LGPL-3.0
+    license_url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/LICENSE
+    redistribute: true
+    tags: [farm, barn, house]
+  - name: mvs_house
+    url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/houses/house.nbt
+    sha256: 31a2a55a9a529be7e419d84cc09051f4ca30f1909f033fa5e8d641b9b7c59e87
+    page: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+    author: FinnDog_123 (Moog's Mods)
+    license: LGPL-3.0
+    license_url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/LICENSE
+    redistribute: true
+    tags: [house, cottage, large]
+  - name: mvs_wheat_farm
+    url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/other_decoration/wooden_wheat_farm.nbt
+    sha256: 72aebeb4b7744049d72d59cec55fd352e8a4a21075d03d894f0682e4baa28dd6
+    page: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+    author: FinnDog_123 (Moog's Mods)
+    license: LGPL-3.0
+    license_url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/LICENSE
+    redistribute: true
+    tags: [farm]
+    notes: farmland and wheat in a log frame
+  - name: mvs_small_well
+    url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/well/small_well.nbt
+    sha256: 52b8c27439e2f563d1ecda0887db9144ee853add7ab928bf6d5036857901c4f5
+    page: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+    author: FinnDog_123 (Moog's Mods)
+    license: LGPL-3.0
+    license_url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/LICENSE
+    redistribute: true
+    tags: [well, decoration, small]
+  - name: mvs_horse_pen
+    url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/horse_pen.nbt
+    sha256: 2c3f9907896d698cd14ef954cb792feae8cd7bcb012a75ca76c59b07b4a0744b
+    page: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+    author: FinnDog_123 (Moog's Mods)
+    license: LGPL-3.0
+    license_url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/LICENSE
+    redistribute: true
+    tags: [farm, pen, animals]
+  - name: mvs_sunzi_gate
+    url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/sunzi_gate.nbt
+    sha256: 1db264a9d70ceac9591fef31424c1de6d1babca1c883139d2dc37f9d4551fd13
+    page: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+    author: FinnDog_123 (Moog's Mods)
+    license: LGPL-3.0
+    license_url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/LICENSE
+    redistribute: true
+    tags: [defence, gate, wall]
+    notes: dark prismarine and red terracotta, expensive in survival
+  - name: mvs_watchtower
+    url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/src/main/resources/data/mvs/structure/1_21_0/small_pillager_tower.nbt
+    sha256: 27d4c0dcb24fde99cc8f177144a9d9aa349e6c835eaece76c2295d2aae6a9276
+    page: https://github.com/Moog-s-Mods/MoogsVoyagerStructures
+    author: FinnDog_123 (Moog's Mods)
+    license: LGPL-3.0
+    license_url: https://raw.githubusercontent.com/Moog-s-Mods/MoogsVoyagerStructures/5edd298fec7bd7e07d950f448f95cac2a92e0dbe/LICENSE
+    redistribute: true
+    tags: [defence, tower, watchtower]
+    notes: tall; the spawners are left out
+  # --- Cinch's Abandoned Houses (MIT) ------------------------------------------------------------
+  - name: cinch_basic_house
+    url: https://raw.githubusercontent.com/cinchtail/Cinchs_Abandoned_Houses/632b78eb97e1a93cf6af7502e8412425250dc15f/src/main/resources/data/cinchsabandonedhouses/structures/abandoned_houses/normal_abandoned_houses/abandoned_house_basic_1.nbt
+    sha256: de02f1974fa1cec1771881498ed8637e0458712b9cd46a3d9a9efcf89bf4786d
+    page: https://github.com/cinchtail/Cinchs_Abandoned_Houses
+    author: Cinchtail
+    license: MIT
+    license_url: https://raw.githubusercontent.com/cinchtail/Cinchs_Abandoned_Houses/632b78eb97e1a93cf6af7502e8412425250dc15f/LICENSE
+    redistribute: true
+    tags: [house, cottage, small]
+    notes: oak stairs, cobblestone, bricks
+  - name: cinch_farm_house
+    url: https://raw.githubusercontent.com/cinchtail/Cinchs_Abandoned_Houses/632b78eb97e1a93cf6af7502e8412425250dc15f/src/main/resources/data/cinchsabandonedhouses/structures/abandoned_houses/normal_abandoned_houses/abandoned_farm_house.nbt
+    sha256: 5008ef283e63c11a794d6f4bcb4249209dd32e606a1784d7bca912dc9e799f6e
+    page: https://github.com/cinchtail/Cinchs_Abandoned_Houses
+    author: Cinchtail
+    license: MIT
+    license_url: https://raw.githubusercontent.com/cinchtail/Cinchs_Abandoned_Houses/632b78eb97e1a93cf6af7502e8412425250dc15f/LICENSE
+    redistribute: true
+    tags: [house, farm]
+  - name: cinch_taiga_house
+    url: https://raw.githubusercontent.com/cinchtail/Cinchs_Abandoned_Houses/632b78eb97e1a93cf6af7502e8412425250dc15f/src/main/resources/data/cinchsabandonedhouses/structures/abandoned_houses/abandoned_taiga_houses/abandoned_taiga_house_1.nbt
+    sha256: 32d817a43a152c37cb44dabe2da6d26ac2688cb902a7287875480ff306fa4cb5
+    page: https://github.com/cinchtail/Cinchs_Abandoned_Houses
+    author: Cinchtail
+    license: MIT
+    license_url: https://raw.githubusercontent.com/cinchtail/Cinchs_Abandoned_Houses/632b78eb97e1a93cf6af7502e8412425250dc15f/LICENSE
+    redistribute: true
+    tags: [house, cottage, spruce]
+  # --- small ones ---------------------------------------------------------------------------------
+  - name: box_house
+    url: https://raw.githubusercontent.com/dr-where/custom-structure-example-datapack/bee69ce613f62f13b038a6c06c00e82779e3bc2d/structure_tutorial/data/tutorial/structure/box_house.nbt
+    sha256: 3ea624cbb38bda10c758ee85ec025a1938a25576406a0ac85c38703332c7f59c
+    page: https://github.com/dr-where/custom-structure-example-datapack
+    author: dr-where
+    license: CC0-1.0
+    license_url: https://raw.githubusercontent.com/dr-where/custom-structure-example-datapack/bee69ce613f62f13b038a6c06c00e82779e3bc2d/LICENSE
+    redistribute: true
+    tags: [house, hut, tiny]
+  - name: rs_mossy_well
+    url: https://raw.githubusercontent.com/TelepathicGrunt/RepurposedStructures/2b6e218b92ba8d7e77c4a3a3e95dc41d177fe386/common/src/main/resources/data/repurposed_structures/structure/wells/mossy_stone.nbt
+    sha256: 3a9926420fe52c9a76a5e0949363cc221f67cdbb09f94dd7eefc5177f80ed9c5
+    page: https://github.com/TelepathicGrunt/RepurposedStructures
+    author: TelepathicGrunt
+    license: LGPL-3.0
+    license_url: https://raw.githubusercontent.com/TelepathicGrunt/RepurposedStructures/2b6e218b92ba8d7e77c4a3a3e95dc41d177fe386/LICENSE.txt
+    redistribute: true
+    tags: [well, decoration, small]
+    notes: stone bricks and a bell; its palette names blocks with "id" instead of "Name"
+  - name: yungs_wood_bridge
+    url: https://raw.githubusercontent.com/YUNGNICKYOUNG/YUNGs-Bridges/1e47f9fcdbf0c05e3b5225eda8ab0405c398533d/Common/src/main/resources/data/yungsbridges/structure/bridge/wood/17_0.nbt
+    sha256: 74fdc4a0589797a3a7715674c3189d566c22388ca9dac2f1963c077a9aedfd21
+    page: https://github.com/YUNGNICKYOUNG/YUNGs-Bridges
+    author: YUNGNICKYOUNG
+    license: LGPL-3.0
+    license_url: https://raw.githubusercontent.com/YUNGNICKYOUNG/YUNGs-Bridges/1e47f9fcdbf0c05e3b5225eda8ab0405c398533d/LICENSE
+    redistribute: true
+    tags: [bridge]
+    notes: 17 long; the mod swaps some stand-in blocks (stained glass, warped fence, prismarine wall) when it places it, here they stay as they are
+  # --- local only ---------------------------------------------------------------------------------
+  - name: abridged_stone_bridge
+    url: https://raw.githubusercontent.com/CelestiumMC/abridged/696cbfff9dbf2325167dad82de35425091e961f8/src/common/main/resources/data/abridged/structures/stone/base.nbt
+    sha256: 67cc06fc8bd9acfd300e5411c0e81487e849039f51b084e91d30eb268feac2a4
+    page: https://modrinth.com/mod/abridged
+    author: Apollo / CelestiumMC
+    license: MIT (Modrinth page only)
+    redistribute: false
+    tags: [bridge, wall]
+    notes: MIT is stated on Modrinth but the repo has no LICENSE file, so it stays local; a tileable stone bridge segment
+  - name: totw_tower_bottom
+    url: https://raw.githubusercontent.com/WaldiNet/Towers_Of_The_Wild_Reworked/af8aab4d5d13aff208782dc4b6fba65105215f93/data/totw_reworked/structure/regular/regular_tower_bottom.nbt
+    sha256: 0884fe18d24c04c993ba9854be01f273f600ffcaee1a1c442c0cdce6ba02a073
+    page: https://github.com/WaldiNet/Towers_Of_The_Wild_Reworked
+    author: xPand4B / Rainerle3000, after Towers of the Wild by idrae_
+    license: CC-BY-NC-SA-4.0
+    redistribute: false
+    tags: [defence, tower]
+    notes: the fork says MIT but the original Towers of the Wild is CC-BY-NC-SA-4.0; bottom half of a two-piece tower
+  - name: mineflayer_smallhouse1
+    url: https://raw.githubusercontent.com/PrismarineJS/mineflayer-builder/f268deed675aa0ee6da96602ac0158281d9d6a9b/schematics/smallhouse1.schem
+    sha256: 37c3437a30ed0dfc40f8a15bda5283e2aa675bbc6e9ce87b9146fc3bf6e08a9d
+    page: https://github.com/PrismarineJS/mineflayer-builder
+    author: unknown
+    license: unknown
+    redistribute: false
+    tags: [house]
+    notes: Sponge v2 test file of unknown origin in an MIT repo; the MIT license likely doesn't cover the build
+  - name: cbp_small_cottage
+    url: https://raw.githubusercontent.com/Kirotsuky/Community-Blueprint-Pack/e30ee5f6830d370945a7ccb72cba68d3f3b12e5d/Community%20Blueprint%20Pack/Themed%20Structures/Medieval/small_cottage.bp
+    sha256: eafbc1c251237a5e32c4d95104843490112912b8d1ac573f26c17bdf52b6db9e
+    page: https://github.com/Kirotsuky/Community-Blueprint-Pack
+    author: WILLATRONIX
+    license: unknown
+    redistribute: false
+    tags: [house, cottage]
+    notes: Axiom blueprint; the pack collects builds from many creators, so the repo's BSD license is doubtful
+  - name: planet_minecraft_pick
+    page: https://www.planetminecraft.com/projects/
+    author: (per entry)
+    license: (per entry)
+    redistribute: false
+    manual: true
+    file: planet_minecraft_pick.schem
+    tags: [house]
+    notes: Cloudflare challenge and click-to-download; pick an entry, check its license field, save the file as blueprints/downloaded/raw/planet_minecraft_pick.schem

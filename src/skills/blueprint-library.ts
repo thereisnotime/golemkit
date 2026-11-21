@@ -3,7 +3,7 @@
 // file handling for the bot's own (learned) library. Pure or plain fs; the actions are in
 // library.ts.
 //
-//   shipped   blueprints/                         read only, comes with the code
+//   shipped   blueprints/, blueprints/library/    read only, comes with the code (library/: fetched, freely licensed)
 //   user      settings.build.blueprintDirs        read only, the owner's folders (profile `blueprints:`)
 //   learned   data/bots/<name>/blueprints/        written by the bot: captured, imported, designed
 //
@@ -12,7 +12,7 @@ import { readdirSync, readFileSync, existsSync, statSync, lstatSync, realpathSyn
 import { join, resolve, sep, isAbsolute, basename } from 'node:path'
 import YAML from 'yaml'
 import {
-  parseBlueprint, resolveRoles, solidCells, orderCells, BLUEPRINTS_DIR, type Blueprint
+  parseBlueprint, resolveRoles, solidCells, orderCells, isBlueprintFile, BLUEPRINTS_DIR, type Blueprint
 } from './blueprint.ts'
 import { planPlacement, DIR_VEC, type PlaceEnv } from './blockstate.ts'
 
@@ -29,9 +29,14 @@ export const learnedDir = (agent: Pick<SettingsHolder, 'dataDir'>) => resolve(ag
 /** The only folder blueprint_import reads from: settings.build.importDir, default blueprints/import/. */
 export const importDir = (agent: Pick<SettingsHolder, 'settings'>) => resolve(buildSettings(agent).importDir ?? join(BLUEPRINTS_DIR, 'import'))
 
-/** Shipped, then the user's folders, then the learned library (later wins by name). */
+/** Freely licensed blueprints fetched with `just blueprint-fetch` and committed (blueprints/sources.yaml). */
+export const COMMUNITY_DIR = join(BLUEPRINTS_DIR, 'library')
+/** Fetched blueprints whose license doesn't allow committing them; gitignored, add it to blueprintDirs to use it. */
+export const DOWNLOADED_DIR = join(BLUEPRINTS_DIR, 'downloaded')
+
+/** Shipped (blueprints/ and blueprints/library/), then the user's folders, then the learned library (later wins by name). */
 export function libraryDirs (agent?: SettingsHolder): LibraryDir[] {
-  const out: LibraryDir[] = [{ kind: 'shipped', dir: BLUEPRINTS_DIR }]
+  const out: LibraryDir[] = [{ kind: 'shipped', dir: BLUEPRINTS_DIR }, { kind: 'shipped', dir: COMMUNITY_DIR }]
   if (!agent) return out
   const extra = buildSettings(agent).blueprintDirs
   for (const d of [extra ?? []].flat()) if (typeof d === 'string' && d) out.push({ kind: 'user', dir: resolve(d) })
@@ -118,7 +123,7 @@ export function loadLibrary (dirs: LibraryDir[]): Library {
   const files: { kind: LibraryKind, path: string, mtime: number }[] = []
   for (const { kind, dir } of dirs) {
     if (!existsSync(dir)) continue
-    for (const f of readdirSync(dir).filter(f => /\.ya?ml$/.test(f)).sort()) {
+    for (const f of readdirSync(dir).filter(isBlueprintFile).sort()) {
       const path = join(dir, f)
       try {
         const st = lstatSync(path)
@@ -220,7 +225,8 @@ export function searchLibrary (entries: IndexEntry[], q: SearchQuery): SearchHit
     }
     if (q.size && sizeClass(e.blocks) === q.size) { score += 2; why.push(q.size) }
     if (hasQuery && score === 0) continue
-    score += (e.rating ?? 2.5) * 0.1 + (e.library === 'learned' ? 0.2 : 0)
+    // ties: the bot's own first, the fetched community library after the hand-made shipped set
+    score += (e.rating ?? 2.5) * 0.1 + (e.library === 'learned' ? 0.2 : 0) - (e.file.startsWith(COMMUNITY_DIR) ? 0.15 : 0)
     hits.push({ entry: e, score: Math.round(score * 100) / 100, why })
   }
   return hits.sort((a, b) => b.score - a.score || a.entry.blocks - b.entry.blocks || a.entry.name.localeCompare(b.entry.name))
