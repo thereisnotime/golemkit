@@ -3,7 +3,7 @@ import { defineSkill, defineAction, z, noParams, ok, fail, goals, goto, fmtPos, 
 import { findItem, placeAt, digBlock, DigRefusedError } from './world.ts'
 
 /** Cheap full blocks that don't fall, for pillars and emergency shelters. */
-const FILLER = /^(dirt|coarse_dirt|cobblestone|cobbled_deepslate|netherrack|stone|deepslate|andesite|diorite|granite|tuff|blackstone|end_stone|.*_planks)$/
+const FILLER = /^(dirt|coarse_dirt|grass_block|rooted_dirt|mud|clay|cobblestone|cobbled_deepslate|mossy_cobblestone|netherrack|stone|deepslate|andesite|diorite|granite|calcite|tuff|blackstone|basalt|end_stone|sandstone|red_sandstone|terracotta|.*_terracotta|.*_planks|.*_log|snow_block)$/
 
 /** The most plentiful cheap filler block in the inventory, or null. */
 export function fillerBlock (bot: Bot): string | null {
@@ -146,6 +146,7 @@ const bunker = defineAction({
       dug++
     }
     if (dug < 2) return fail('ground here is too thin or unsafe to dig a shelter')
+    await sleep(900, signal) // let the dug blocks drop into our inventory
     // Seal the opening: the block at the original feet level, two above our head is open sky.
     const feet = bot.entity.position.floored()
     const cover = feet.offset(0, 2, 0)

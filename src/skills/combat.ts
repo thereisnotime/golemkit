@@ -2,6 +2,7 @@ import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
 import { defineSkill, defineAction, z, noParams, ok, fail, goals, playerEntity, nearestHostile, isHostile, FLYING, sleep, checkAborted } from '../core/index.ts'
 import { pickupNearby } from './pickup.ts'
+import { equipForTarget, hasRanged, shootAt, blockWithShield, isRangedMob, weaponFlags, type WeaponFlags } from './weapons.ts'
 
 const REACH = 3.2
 const WEAPONS = ['netherite_sword', 'diamond_sword', 'iron_sword', 'stone_sword', 'golden_sword', 'wooden_sword',
@@ -17,9 +18,14 @@ export async function equipBestWeapon (bot: Bot): Promise<void> {
   }
 }
 
-/** Walks up to the target and swings until it dies, escapes or the signal aborts. */
-export async function fight (bot: Bot, target: Entity, signal: AbortSignal, maxMs = 20000): Promise<boolean> {
-  await equipBestWeapon(bot)
+/**
+ * Walks up to the target and swings until it dies, escapes or the signal aborts. With
+ * adaptive weapons (default) it re-picks the best item for this target before each swing,
+ * shoots flyers and out-of-reach targets when it has a bow and arrows, and blocks ranged mobs
+ * with a shield between swings. Flags: settings.combat (live via !config_set combat.*).
+ */
+export async function fight (bot: Bot, target: Entity, signal: AbortSignal, maxMs = 20000, flags: WeaponFlags = { adaptive: true, ranged: true, shield: true }): Promise<boolean> {
+  await equipForTarget(bot, target, flags)
   const start = Date.now()
   // Flyers (phantoms...) can't be chased on foot: hold position, track them and swing when
   // they dive into reach. Ground mobs: follow and hit.
@@ -32,9 +38,14 @@ export async function fight (bot: Bot, target: Entity, signal: AbortSignal, maxM
       if (dist > (flying ? 40 : 24)) return false
       if (flying) await bot.lookAt(target.position.offset(0, target.height * 0.5, 0), true).catch(() => {})
       if (dist <= REACH + (flying ? 0.5 : 0)) {
+        await equipForTarget(bot, target, flags) // health changes: re-pick (finisher, shield...)
         if (!flying) await bot.lookAt(target.position.offset(0, target.height * 0.8, 0), true)
         bot.attack(target)
         await sleep(600, signal) // full sword cooldown
+      } else if (flags.ranged && hasRanged(bot) && (flying || dist > 6) && dist < 32) {
+        await shootAt(bot, target, signal) // flyers and targets out of reach: shoot
+      } else if (flags.shield && isRangedMob(target.name) && dist > REACH) {
+        await blockWithShield(bot, 600) // skeleton aiming at us while we close in
       } else {
         await sleep(flying ? 100 : 300, signal) // flyers dive fast: check often
       }
@@ -52,10 +63,10 @@ const attack = defineAction({
     entityId: z.number().optional().describe('entity id; default nearest hostile mob'),
     radius: z.number().default(16)
   }),
-  async run ({ bot, signal }, { entityId, radius }) {
+  async run ({ bot, agent, signal }, { entityId, radius }) {
     const target = entityId !== undefined ? bot.entities[entityId] : nearestHostile(bot, bot.entity.position, radius)
     if (!target) return fail('no target nearby')
-    const killed = await fight(bot, target, signal)
+    const killed = await fight(bot, target, signal, 20000, weaponFlags(agent))
     return killed ? ok(`killed ${target.name}`) : ok(`stopped fighting ${target.name}`)
   }
 })
@@ -92,12 +103,12 @@ const defend = defineAction({
   description: 'Fight back against whatever hostile mob is closest (used by reflexes).',
   params: noParams,
   internal: true,
-  async run ({ bot, signal }) {
+  async run ({ bot, agent, signal }) {
     // Flyers hit and climb away, so look further for them.
     const mob = nearestHostile(bot, bot.entity.position, 6) ??
       bot.nearestEntity(e => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20)
     if (!mob) return fail('nothing to fight')
-    await fight(bot, mob, signal, FLYING.has(mob.name ?? '') ? 20000 : 10000)
+    await fight(bot, mob, signal, FLYING.has(mob.name ?? '') ? 20000 : 10000, weaponFlags(agent))
     return ok(`fought ${mob.name}`)
   }
 })

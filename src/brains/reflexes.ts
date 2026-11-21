@@ -28,6 +28,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         return { selfDefense: o.selfDefense ?? true, autoEat: o.autoEat ?? true, eatBelow: o.eatBelow ?? 15, retreatBelow: o.retreatBelow ?? 8, waterFightAbove: o.waterFightAbove ?? 14 }
       }
       let busy = false
+      let bunkerFailedAt = 0
       const reflex = async (action: string) => {
         if (busy) return
         busy = true
@@ -54,8 +55,14 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         const unarmed = !bot.inventory.items().some(i => /_(sword|axe)$/.test(i.name))
         const night = bot.time.timeOfDay >= 12_500 && bot.time.timeOfDay <= 23_500
         if (mob.name === 'phantom' && night && (unarmed || bot.health <= 12) && agent.canDig && agent.getAction('bunker') &&
-            !agent.protectedAreas.isProtected(bot.entity.position)) {
-          void reflex('bunker')
+            !agent.protectedAreas.isProtected(bot.entity.position) && Date.now() - bunkerFailedAt > 60_000) {
+          // A failed bunker (thin ground, nothing to seal with) isn't retried for a minute; fight instead.
+          if (!busy) {
+            busy = true
+            void agent.act('bunker', {}, { caller, priority: PRIORITY.reflex })
+              .then(r => { if (!r.ok) bunkerFailedAt = Date.now() })
+              .finally(() => { busy = false })
+          }
           return
         }
         if (shouldRetreat(mob) && agent.getAction('retreat')) {

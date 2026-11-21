@@ -26,6 +26,9 @@ can't change their own.
 | `reflexes.eatBelow` | 0–20 | eat when food drops below this |
 | `reflexes.retreatBelow` | 0–20 | back off at or below this health (0 = stand ground) |
 | `reflexes.waterFightAbove` | 0–20 | don't fight mobs in water below this health (0 = always fight) |
+| `combat.adaptiveWeapon` | on/off | best weapon per target (damage × speed, enchantments, one-hit finishers, axe vs shields) |
+| `combat.ranged` | on/off | bow/crossbow for flyers and targets out of reach, if it has arrows |
+| `combat.shield` | on/off | raise a shield against ranged mobs between swings |
 | `humanize.enabled` | on/off | player-like reaction and typing delays |
 | `humanize.typoRate` | 0–1 | chance of a typo per message |
 | `humanize.lowercase` | on/off | write chat in lower case |

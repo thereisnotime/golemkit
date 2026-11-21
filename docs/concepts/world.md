@@ -84,6 +84,22 @@ sequenceDiagram
 position, tracks them and swings when they dive into reach. Reflexes look up to 20 blocks for
 flyers that hit and climbed away, and never try to outrun them.
 
+## Weapons
+
+`fight()` picks what to hit with for each target and re-checks before every swing
+(feature flags `combat.*`, live via [`!config_set`](../guide/live-config)):
+
+- **adaptive melee** (`combat.adaptiveWeapon`): scores swords, axes, tridents, maces and tools by
+  damage × attack speed with enchantments that apply to this target (Sharpness everywhere,
+  Smite vs undead, Bane of Arthropods vs spiders); switches to the hardest single hit when one
+  hit kills, and to an axe against shield users. Off: the old fixed sword > axe order.
+- **ranged** (`combat.ranged`): with a bow or crossbow and arrows, shoots flyers (phantoms,
+  ghasts) and targets more than 6 blocks away, leading moving targets.
+- **shield** (`combat.shield`): raises a shield against skeletons, pillagers, blazes and other
+  ranged mobs while closing in.
+
+Unknown modded weapons count as a generic sword/axe by name.
+
 ## Reflexes
 
 The `reflexes()` brain reacts at the highest brain priority (60), preempting everything and
