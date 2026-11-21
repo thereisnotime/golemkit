@@ -161,12 +161,15 @@ flowchart TB
   blocks, go home if it is within 48 blocks, else back off.
 - **Sustain**: in a lull (nothing within 4 blocks) it eats when hunger blocks regeneration
   (food < 18), or a golden apple when health ≤ 10. With `combat.disengageToHeal` (default on)
-  and health ≤ 4 with food it backs off ~10 blocks, eats and re-engages, even with
-  `retreatBelow: 0`. Standing ground doesn't mean dying.
+  and health ≤ 4 it backs off ~10 blocks, eats (or, with a full hunger bar, waits a few seconds
+  for natural regeneration) and re-engages, even with `retreatBelow: 0`. Standing ground doesn't mean dying.
 - **Gear** (`combat.autoArmor`, default on): the reflexes run `gear_up` whenever the inventory
   holds better armour than what is worn (armour points, toughness, Protection; nearly broken
   pieces don't count), and put a totem (health ≤ 10 or no shield) or a shield in the offhand.
   Before this, bots crafted iron armour and never wore it.
+- **Reacting**: reflexes start `defend` when hurt (also on any health drop, the backstop for a
+  missed hurt event), and before the first hit when a creeper is within 7 blocks or any hostile
+  within 4.
 - **Night**: `stay_safe` heads home at night with higher priority when the bot has no armour,
   weapon or food; without a home it digs in with `bunker` until morning (needs digging, not
   under a roof already).

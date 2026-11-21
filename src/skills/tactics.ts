@@ -126,13 +126,14 @@ export function outnumbered (s: DisengageState): boolean {
 }
 
 /**
- * combat.disengageToHeal: at 4 health or less, back off briefly and eat, then come back. Only
- * when there is something to eat right now (normal food needs a hunger bar below 20, golden
- * apples always work). This is independent of reflexes.retreatBelow (0 = stand ground).
+ * combat.disengageToHeal: at 4 health or less, back off briefly to heal, then come back. Only
+ * when backing off actually heals: something edible right now (normal food needs a hunger bar
+ * below 20, golden apples always work), or a hunger bar of 18+ so natural regeneration runs.
+ * Independent of reflexes.retreatBelow (0 = stand ground).
  */
 export function shouldDisengageToHeal (s: { enabled: boolean, health: number, food: number, hasFood: boolean, hasGoldenApple: boolean }): boolean {
-  if (!s.enabled || s.health > 4) return false
-  return s.hasGoldenApple || (s.hasFood && s.food < 20)
+  if (!s.enabled || s.health > 4 || s.health <= 0) return false
+  return s.hasGoldenApple || (s.hasFood && s.food < 20) || s.food >= 18
 }
 
 /**

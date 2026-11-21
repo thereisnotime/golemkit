@@ -44,7 +44,7 @@ The bot SHALL stop chasing a mob more than `combat.maxChase` blocks from where t
 - **THEN** the bot neither attacks nor looks at it
 
 ### Requirement: Disengage
-The bot SHALL escape when 3 or more melee mobs are within 6 blocks and health is under half: a 2-block pillar if it has blocks, else home if within 48 blocks, else back off. With `combat.disengageToHeal` on and health at 4 or less, it SHALL back off, eat, and fight on, regardless of `reflexes.retreatBelow`.
+The bot SHALL escape when 3 or more melee mobs are within 6 blocks and health is under half: a 2-block pillar if it has blocks, else home if within 48 blocks, else back off. With `combat.disengageToHeal` on and health at 4 or less, it SHALL back off, eat (or let natural regeneration work when the hunger bar is 18 or more), and fight on, regardless of `reflexes.retreatBelow`.
 
 #### Scenario: Stand ground but not die
 - **WHEN** Pax (`retreatBelow: 0`) is at 3 health with bread and a zombie close
@@ -70,3 +70,10 @@ The bot SHALL aim arrows with gravity and drag and lead moving targets by their 
 #### Scenario: Unprepared without a home
 - **WHEN** night falls and the bot has no armour and no home
 - **THEN** it bunkers until morning
+
+### Requirement: Engage early
+Reflexes SHALL start `defend` when a creeper comes within 7 blocks or any hostile within 4 blocks, before it lands a hit, and on any health drop with a threat around.
+
+#### Scenario: Creeper walks up
+- **WHEN** the bot is idle and a creeper walks to 6 blocks
+- **THEN** it fights the creeper before the fuse is lit

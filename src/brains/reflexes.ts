@@ -82,6 +82,15 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         void reflex('defend')
       }
       bot.on('entityHurt', onHurt)
+      // Health going down is a hit too. entityHurt for our own entity was seen missing after a
+      // respawn (the bot stood idle for 5 s while two mobs hit it), so this is the backstop.
+      let lastHealth = bot.health
+      const onHealth = () => {
+        const dropped = bot.health < lastHealth && bot.health > 0
+        lastHealth = bot.health
+        if (dropped && cfg().selfDefense && needsSurvival(bot) && !busy && bot.food > 0) setImmediate(() => { try { onHurtNow() } catch {} })
+      }
+      bot.on('health', onHealth)
 
       const timer = setInterval(() => {
         if (!needsSurvival(bot)) return // creative/spectator: no hunger, no danger
@@ -120,6 +129,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
 
       return () => {
         bot.off('entityHurt', onHurt)
+        bot.off('health', onHealth)
         clearInterval(timer)
       }
     }

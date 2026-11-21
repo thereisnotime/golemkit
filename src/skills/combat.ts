@@ -220,14 +220,19 @@ const defend = defineAction({
       const drift = bot.entity.position.distanceTo(origin)
       const long = FLYING.has(mob.name ?? '') || isRangedMob(mob.name)
       const r: FightResult = await fightTarget(bot, mob, signal, { maxMs: long ? 25000 : 12000, flags: { ...flags, maxChase: Math.max(3, maxChase - drift) } })
+      if (bot.health <= 0) return fail(`died fighting ${mob.name}`)
       if (r.killed) { killed.push(mob.name ?? 'mob'); continue }
       if (r.end === 'heal' && heals < 3) {
-        // standing ground doesn't mean dying: step back, eat, come back
+        // standing ground doesn't mean dying: step back, eat (or let regeneration work), come back
         heals++
         await backOff(bot, mob, signal, 10, 5000)
         const ate = await eatNow(bot, signal)
         if (ate && bot.health <= 8 && fightFood(bot)) await eatNow(bot, signal)
-        notes.push(ate ? 'backed off to eat' : 'backed off but could not eat')
+        if (!ate) {
+          const until = Date.now() + 5000
+          while (Date.now() < until && bot.health <= 8 && bot.health > 0 && mob.position.distanceTo(bot.entity.position) > 4) await sleep(250, signal)
+        }
+        notes.push(ate ? 'backed off to eat' : `backed off to heal (health ${Math.ceil(bot.health)})`)
         continue
       }
       if (r.end === 'outnumbered') { notes.push(await escapeCrowd(ctx)); break }
