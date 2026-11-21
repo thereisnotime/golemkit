@@ -650,3 +650,21 @@ behaviorsBrain({ registry: new BehaviorRegistry([...defaultBehaviors(), fishAtDa
 - `!behavior_status`: armed set with non-default options, what runs, last outcome per
   behaviour, cooldowns and back-off. The result `data` has the full JSON.
 - `-l info,<bot>/behaviors=debug` logs every start, switch, stop, back-off and cooldown.
+
+## NPC mode (when the LLM can't think)
+
+An LLM + NPC bot keeps playing when its LLM is paused: the provider's quota is used up ("weekly
+limit · resets 12pm"), or its own token budget ran out. While paused it arms extra behaviours
+and disarms exactly those again when the LLM is back (at the reset time, or when the budget
+frees up). The default set is `return_home`, `sleep_at_night`, `chop_wood_loop` and
+`deposit_when_full`; behaviours that were already armed are left alone.
+
+```yaml
+npcMode:                 # profile key; false turns it off
+  arm:
+    farm_loop: {}
+    guard_area: { radius: 24 }
+```
+
+A quota pause is kept in storage, so reconnects and restarts don't start failing turns, and the
+bot's `observe()` (`self.mode`) says it's in NPC mode. `!` commands work the whole time.

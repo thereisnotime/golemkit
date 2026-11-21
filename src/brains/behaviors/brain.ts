@@ -47,6 +47,46 @@ const interrupt = defineAction({
   run: () => ok('')
 })
 
+/**
+ * NPC mode: while the LLM brain can't think (provider quota or its own budget used up), arm extra
+ * behaviours so the bot keeps playing on its own, and disarm exactly those when the LLM is back.
+ * settings.npcMode: false to turn it off, or { arm: { behaviour: options, ... } } to choose them.
+ * What it armed is remembered in storage, so a restart in between still cleans up.
+ */
+const NPC_MODE_DEFAULT: Record<string, Record<string, unknown>> = {
+  return_home: {},
+  sleep_at_night: {},
+  chop_wood_loop: {},
+  deposit_when_full: {}
+}
+const NPC_KEY = 'npcMode.armed'
+
+function wireNpcMode (agent: Agent, rt: BehaviorRuntime): void {
+  const cfg = (agent.settings as { npcMode?: false | { arm?: Record<string, Record<string, unknown>> } }).npcMode
+  if (cfg === false) return
+  const wanted = (cfg && cfg.arm) ?? NPC_MODE_DEFAULT
+  const on = (reason: string) => {
+    if (agent.storage.get<string[] | undefined>(NPC_KEY)) return // already in NPC mode
+    const armedNow: string[] = []
+    for (const [name, options] of Object.entries(wanted)) {
+      if (!rt.registry.get(name) || rt.store.isArmed(name)) continue
+      const r = rt.store.arm(name, options, 'npc-mode')
+      if (r.ok) armedNow.push(name)
+    }
+    agent.storage.set(NPC_KEY, armedNow)
+    rt.log.info(`NPC mode on (${reason}): armed ${armedNow.join(', ') || 'nothing new'}`)
+  }
+  const off = () => {
+    const armedBy = agent.storage.get<string[] | undefined>(NPC_KEY)
+    if (!armedBy) return
+    for (const name of armedBy) rt.store.disarm(name, 'npc-mode')
+    agent.storage.delete(NPC_KEY)
+    rt.log.info(`NPC mode off, LLM is back: disarmed ${armedBy.join(', ') || 'nothing'}`)
+  }
+  ;(agent.on as (ev: string, fn: (...a: unknown[]) => void) => void)('llmPaused', (reason: unknown) => on(String(reason ?? 'LLM paused')))
+  ;(agent.on as (ev: string, fn: (...a: unknown[]) => void) => void)('llmResumed', () => off())
+}
+
 export const behaviorsBrain = (opts: BehaviorsBrainOptions = {}) => {
   const name = opts.name ?? 'behaviors'
   const tickMs = opts.tickMs ?? 1000
@@ -62,6 +102,7 @@ export const behaviorsBrain = (opts: BehaviorsBrainOptions = {}) => {
       const rt = new BehaviorRuntime(agent, registry, config, name)
       attachRuntime(agent, rt)
       for (const a of [...behaviorActions, interrupt]) if (!agent.getAction(a.name)) agent.registerAction(a)
+      wireNpcMode(agent, rt)
       const armed = rt.armed()
       rt.log.info(armed.length ? `armed: ${armed.map(a => a.name).join(', ')}` : 'no behaviours armed', {
         armed: armed.map(a => { const o = fmtOptions(registry, a.name, a.options); return o ? `${a.name}(${o})` : a.name }).join(' ') || undefined

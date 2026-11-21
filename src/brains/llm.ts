@@ -168,7 +168,8 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
           try { return { proxyMetrics: ProxyMetrics.forBase(px === 'caveman' ? CAVEMAN_URL : px) } } catch { return {} }
         })(),
         ...(ctx ? { context: () => ctx.promptContext() } : {}),
-        onPause: reason => emitLlmBudgetExhausted(agent, reason)
+        onPause: reason => { emitLlmBudgetExhausted(agent, reason); (agent.emit as (ev: string, ...a: unknown[]) => void)('llmPaused', reason) },
+        onResume: () => (agent.emit as (ev: string, ...a: unknown[]) => void)('llmResumed')
       })
       runtimes.set(agent, rt)
       allRuntimes.set(agent, rt)

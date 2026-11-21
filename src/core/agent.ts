@@ -198,6 +198,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
         ...(s.humanize?.enabled !== undefined ? { humanize: s.humanize.enabled } : {})
       },
       changedInGame: Object.keys(this.overrides()),
+      ...(this.storage.get<string[] | undefined>('npcMode.armed') ? { mode: 'NPC mode (LLM paused): extra behaviours armed: ' + this.storage.get<string[]>('npcMode.armed')!.join(', ') } : {}),
       howToChange: 'owners: !config_list / !config_set <key> <value>; behaviours: !behavior_configure'
     }
   }

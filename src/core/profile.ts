@@ -55,6 +55,8 @@ export const ProfileSchema = z.object({
   respectBuilds: z.boolean().optional(),
   /** Show the bot its own variant/profile/model/settings each turn (default on). */
   selfAware: z.boolean().optional(),
+  /** While the LLM is paused (quota/budget): false, or { arm: { behaviour: options } } (default: return_home, sleep_at_night, chop_wood_loop, deposit_when_full). */
+  npcMode: z.union([z.literal(false), z.object({ arm: z.record(z.string(), z.record(z.string(), z.unknown())) })]).optional(),
   persona: z.string().optional(),
   server: z.object({
     host: z.string().optional(),
@@ -161,6 +163,7 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   const settings: Record<string, unknown> = { ...profile.settings }
   if (profile.respectBuilds !== undefined) settings.respectBuilds = profile.respectBuilds
   if (profile.selfAware !== undefined) settings.selfAware = profile.selfAware
+  if (profile.npcMode !== undefined) settings.npcMode = profile.npcMode
   settings.profileName = name   // so the bot can tell which profile it is (observe: profile)
   if (profile.llm) settings.llm = { ...(settings.llm as object | undefined), ...profile.llm }
   if (profile.humanize !== undefined) settings.humanize = profile.humanize

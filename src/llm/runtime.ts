@@ -84,6 +84,8 @@ export interface RuntimeOptions {
   onUsage?: (snapshot: UsageSnapshot) => void
   /** Context pack sections for the system prompt (src/context). Called per turn, so hot reloads apply. */
   context?: () => PromptContext | undefined
+  /** Called when turns can run again after a pause (budget or provider quota). */
+  onResume?: () => void
   /** Called once when turns pause because a budget ran out (hooks: llmBudgetExhausted). */
   onPause?: (reason: string) => void
   /** Persistent goals and continuation (goals.ts). Profile: llm.goals. */
@@ -189,6 +191,7 @@ export class LlmRuntime {
     void this.opts.proxyMetrics?.delta() // baseline for per-turn proxy metrics
     // A quota pause survives reconnects and restarts (no failing test turn, no repeated whisper).
     try { const q = this.agent.storage.get<number | undefined>('llm.quotaUntil'); if (q && q > Date.now()) this.quotaUntil = q } catch {}
+    if (this.quotaUntil > Date.now()) this.scheduleQuotaResume(true)
     this.unavailable = await this.provider.check().catch(e => (e as Error).message)
     if (this.unavailable) this.log.warn(`provider ${this.provider.name} unavailable: ${this.unavailable}`, { provider: this.provider.name })
     if (this.provider.needsMcp || this.opts.mcp?.expose) {
@@ -423,6 +426,28 @@ export class LlmRuntime {
     return !!bot && inDanger(bot)
   }
 
+  private quotaTimer: NodeJS.Timeout | null = null
+  /** While a provider quota is used up: announce the pause (NPC mode) and resume at the reset time. */
+  private scheduleQuotaResume (announce: boolean): void {
+    if (announce) {
+      const when = new Date(this.quotaUntil).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+      // Only the NPC-mode signal here: the owner was already told when the quota ran out.
+      try { (this.agent as unknown as { emit: (ev: string, ...a: unknown[]) => void }).emit('llmPaused', `provider quota used up until ${when}`) } catch {}
+    }
+    if (this.quotaTimer) clearTimeout(this.quotaTimer)
+    this.quotaTimer = setTimeout(() => {
+      this.quotaTimer = null
+      this.quotaUntil = 0
+      try { this.agent.storage.delete('llm.quotaUntil') } catch {}
+      this.paused = null
+      this.pauseAnnounced = false
+      this.log.info('provider quota reset time reached; LLM back on')
+      try { this.opts.onResume?.() } catch (e) { this.log.warn(`onResume: ${(e as Error).message}`) }
+      if (this.goals.active) this.scheduleGoal('resume', undefined, 5000)
+    }, Math.max(1000, this.quotaUntil - Date.now() + 30_000))
+    this.quotaTimer.unref?.()
+  }
+
   /** Every few seconds: if a goal is active and nothing has happened for a while, nudge it (backoff grows with stalled turns). */
   private goalIdleCheck (): void {
     if (this.goals.resumeIfOwnerSilent()) this.log.info('owner silent; going on with the goal by myself')
@@ -540,6 +565,7 @@ export class LlmRuntime {
     }
     if (this.paused) {
       this.log.info('resumed, budget available again')
+      try { this.opts.onResume?.() } catch (e) { this.log.warn(`onResume: ${(e as Error).message}`) }
       this.paused = null
       this.pauseAnnounced = false
     }
@@ -618,6 +644,7 @@ export class LlmRuntime {
         const until = quotaUntil(error)!
         this.quotaUntil = until
         try { this.agent.storage.set('llm.quotaUntil', until) } catch {}
+        this.scheduleQuotaResume(false)
         const when = new Date(until).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
         this.log.warn(`provider quota used up; LLM paused until ${when}`, { provider: this.provider.name, error: error.slice(0, 160) })
         try { this.opts.onPause?.(`provider quota: ${error.slice(0, 120)}`) } catch {}
