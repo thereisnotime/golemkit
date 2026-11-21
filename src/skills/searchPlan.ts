@@ -519,7 +519,8 @@ export function tossAccount (t: TossCount, item: string, player: string): { give
   else if (picked > 0) message = `tossed ${given} ${item}; ${player} picked up ${picked}, the rest is on the ground by them`
   else message = `tossed ${given} ${item} next to ${player}; they haven't picked it up yet`
   const short = given < t.requested ? ` (${t.requested} asked for, I had ${t.before})` : ''
-  return { given, pickedUp: picked, ok: given >= t.requested && given > 0, message: message + short }
+  // ok only when it all reached the player (or pickups couldn't be watched): items on the ground aren't delivered
+  return { given, pickedUp: picked, ok: given >= t.requested && given > 0 && (picked === null || picked >= given), message: message + short }
 }
 
 // ------------------------------------------------------------------ owner drops

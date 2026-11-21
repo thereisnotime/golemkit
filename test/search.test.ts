@@ -255,11 +255,13 @@ test('toss: counts what left the inventory and what the player picked up', () =>
   const lying = tossAccount({ requested: 2, before: 2, after: 0, pickedUp: 0 }, 'bread', 'Steve')
   assert.equal(lying.given, 2)
   assert.match(lying.message, /haven't picked it up/)
+  assert.equal(lying.ok, false, 'items on the ground are not delivered')
   const part = tossAccount({ requested: 4, before: 4, after: 0, pickedUp: 3 }, 'bread', 'Steve')
   assert.match(part.message, /picked up 3/)
   const unwatched = tossAccount({ requested: 1, before: 1, after: 0, pickedUp: null }, 'bread', 'Steve')
   assert.equal(unwatched.pickedUp, null)
   assert.match(unwatched.message, /tossed 1 bread/)
+  assert.equal(unwatched.ok, true)
   const none = tossAccount({ requested: 1, before: 1, after: 1, pickedUp: 0 }, 'bread', 'Steve')
   assert.equal(none.ok, false)
   // pickups of other items never count for more than was tossed
