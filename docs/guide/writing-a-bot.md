@@ -1,6 +1,6 @@
 # Writing a variant
 
-A variant is a kind of bot: a file in `variants/` that default-exports `defineVariant(...)`,
+A [variant](/concepts/variants-profiles) is a kind of bot: a file in `variants/` that default-exports `defineVariant(...)`,
 saying which skills it has (what it can do) and which brains it runs (who decides). To run the
 same variant with a different name, owner, model or server, write a
 [profile](./profiles) instead; no code needed.
@@ -36,9 +36,9 @@ just run guard
 |---|---|
 | `name` | id of the bot type |
 | `description` | shown by `just bots` |
-| `username` | default Minecraft username (override with `--username` or the fleet file) |
+| `username` | default Minecraft username (override with `--username` or the [fleet file](/guide/running#a-fleet)) |
 | `skills` | array of skills, e.g. `standardSkills()` or `[movement(), combat()]` |
-| `brains` | array of brains; they run together, priorities decide who moves the bot |
+| `brains` | array of brains; they run together, [priorities](/concepts/architecture#the-action-lock-and-priorities) decide who moves the bot |
 | `persona` | personality/role text; LLM brains put it in their prompt |
 | `owners` | players allowed to command it (empty = everyone, or `MC_OWNERS`) |
 | `canDig` | let the pathfinder break blocks |
@@ -65,13 +65,13 @@ prints what a specific bot ends up with.
 | `commandBrain()` | player assistant: every action becomes a `!command` |
 | `reflexes()` | fight back when hit, eat when hungry |
 
-More brains (NPC loops, LLM agents, scenes) plug in the same way; see their guides.
+More brains (NPC loops, LLM agents, [scenes](/guide/scenes)) plug in the same way; see their guides.
 A typical layering:
 
 - **assistant**: `commandBrain()` + `reflexes()`
-- **self-sufficient NPC**: NPC brain + `reflexes()` + `commandBrain()` (players can still
+- **self-sufficient NPC**: [NPC brain](/guide/npc-brain) + `reflexes()` + `commandBrain()` (players can still
   take over)
-- **LLM companion**: LLM brain + `reflexes()` + `commandBrain()` (so `!stop` always works)
+- **LLM companion**: [LLM brain](/guide/llm-brain) + `reflexes()` + `commandBrain()` (so `!stop` always works)
 
 ## Settings and storage
 

@@ -38,7 +38,7 @@ chat / events / timer ──► LlmRuntime ──► provider.run(turn) ──�
   it in-process; CLI agents reach it through the **MCP bridge** (`src/llm/mcp.ts`), a
   streamable-HTTP MCP server on `127.0.0.1` with a random port and a bearer token.
 - Actions run with `caller: { kind: 'brain', name: 'llm' }` at `PRIORITY.llm` (30): above NPC
-  loops, below player commands (50) and reflexes (60). A `busy: ...` result goes back to the
+  loops, below player commands (50) and [reflexes](/concepts/world#reflexes) (60). A `busy: ...` result goes back to the
   model as the tool result.
 - **Long-running actions** (`follow`, `guard`) start in the background: the tool waits 1.5 s
   for an immediate failure, then reports `started follow`. Short actions are awaited up to 30 s,
@@ -89,7 +89,7 @@ flowchart LR
 
 | Provider | Auth | How tools reach the model | Sandboxing | Status |
 |---|---|---|---|---|
-| `claude-subscription` | Login in its own profile (`just llm-login claude`) or `CLAUDE_CODE_OAUTH_TOKEN`. Isolated env, no API keys; the turn aborts if Claude Code still reports an API key | Claude Agent SDK with an in-process SDK MCP server (default), or the HTTP bridge (`MC_CLAUDE_TRANSPORT=http`), or `claude -p --mcp-config` (`MC_CLAUDE_MODE=cli`) | `tools: []` / `--tools ""`, strict MCP config, only `mcp__minecraft` allowed, permission mode `dontAsk`, no settings/hooks/plugins/CLAUDE.md, no session persistence, empty scratch cwd | Wiring checked (tool list, MCP connected, auth source, API key stripping); no model turn run, the login on the dev machine had expired |
+| `claude-subscription` | Login in its own [profile](/guide/profiles) (`just llm-login claude`) or `CLAUDE_CODE_OAUTH_TOKEN`. Isolated env, no API keys; the turn aborts if Claude Code still reports an API key | Claude Agent SDK with an in-process SDK MCP server (default), or the HTTP bridge (`MC_CLAUDE_TRANSPORT=http`), or `claude -p --mcp-config` (`MC_CLAUDE_MODE=cli`) | `tools: []` / `--tools ""`, strict MCP config, only `mcp__minecraft` allowed, permission mode `dontAsk`, no settings/hooks/plugins/CLAUDE.md, no session persistence, empty scratch cwd | Wiring checked (tool list, MCP connected, auth source, API key stripping); no model turn run, the login on the dev machine had expired |
 | `codex` | Login in its own profile (`just llm-login codex`, ChatGPT) | `codex exec` with `-c mcp_servers.minecraft.*` overrides, token via env | `--ignore-user-config`, shell/exec/browser/computer-use/plugins/hooks features off, web search off, read-only sandbox, empty scratch cwd, `--ephemeral` | Tested end to end (smoke script and live server) |
 | `anthropic` | `ANTHROPIC_API_KEY` | Messages API tool loop, in-process | No built-in tools exist | Unit-tested against a fake server; not run against the API |
 | `opencode` | `opencode auth login` | `opencode --standalone run` with a project `opencode.jsonc` (V2 schema) | Agent permissions: deny `*`, allow `minecraft_*` | Untested (not installed), built from the V2 docs |
@@ -217,7 +217,7 @@ Set `--owners` (or `MC_OWNERS`) on public servers: every trigger spends tokens.
 - **Long term:** notes in `agent.storage` (`llm.notes`, up to 200). The model writes them with
   `remember` and searches them with `recall`; each prompt includes the notes that match the
   message plus the latest few.
-- **With a context pack** (`profiles/<name>/`), notes live in its `MEMORY.md` instead, which
+- **With a [context pack](/guide/context-pack)** (`profiles/<name>/`), notes live in its `MEMORY.md` instead, which
   is also put in the system prompt. See [Context packs and evals](./context-pack).
 
 ## Prompts
@@ -286,7 +286,7 @@ Cost:
 Totals are kept for this run, today and all time, per bot and per provider, in
 `agent.storage` under `llm.usage` (daily buckets, 90 days kept). Ways to read them:
 
-- `!llm_usage` (alias `!tokens`): one line with today / since start / all time, plus the fleet
+- `!llm_usage` (alias `!tokens`): one line with today / since start / all time, plus the [fleet](/concepts/architecture#fleets-and-multiple-servers)
   total when several LLM bots run in the fleet.
 - `agent.observe().llm`: provider, billing, paused reason, today's turns/tokens/cost, last turn.
 - `agent.on('llmUsage', snapshot => ...)`: after every turn, with the turn and all totals.

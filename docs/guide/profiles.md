@@ -1,6 +1,6 @@
 # Profiles
 
-A profile is a saved instance of a variant: who the bot is (username, persona), who it obeys,
+A profile is a saved instance of a [variant](/concepts/variants-profiles): who the bot is (username, persona), who it obeys,
 where it connects, which LLM it uses and any settings. No code; one YAML file per bot in
 `profiles/`. See [Variants, profiles, fleets](../concepts/variants-profiles) for how the pieces
 fit.
@@ -52,13 +52,13 @@ journal:                      # optional, event journal settings (on by default)
 | `variant` | required; a name in `variants/` or a path |
 | `username`, `persona`, `owners`, `canDig` | identity and permissions |
 | `server` | per-bot server override |
-| `llm` | LLM brain settings: provider, model, effort, login, token source, `listen`, `immersive`, aliases, budget |
+| `llm` | [LLM brain](/guide/llm-brain) settings: provider, model, effort, login, token source, `listen`, `immersive`, aliases, budget |
 | `reflexes` | eat/retreat thresholds, e.g. `retreatBelow: 0` to stand its ground ([details](../concepts/world#reflexes)) |
 | `retry`, `humanize`, `journal`, `context` | see the sections below and the linked guides |
 | `settings` | anything the variant's skills/brains read |
 | `logging` | applied when the profile is run on its own |
-| `journal` | event journal: types, caps, retention, optional LLM summary; `false` turns it off. See [Event journal](./journal) |
-| `context` | context pack dir (default: `profiles/<name>/` if it exists), see [Context packs](./context-pack) |
+| `journal` | [event journal](/guide/journal): types, caps, retention, optional LLM summary; `false` turns it off. See [Event journal](./journal) |
+| `context` | [context pack](/guide/context-pack) dir (default: `profiles/<name>/` if it exists), see [Context packs](./context-pack) |
 
 ## LLM listening modes
 
@@ -107,7 +107,7 @@ finishes or gets stuck.
 ## Humanize (player-like timing)
 
 For bots that should feel like players, especially in immersive mode. It lives in core, so it
-affects every brain (LLM, NPC, scenes, commands).
+affects every brain (LLM, NPC, [scenes](/guide/scenes), commands).
 
 ```yaml
 humanize: true                 # defaults below; on automatically when llm.immersive is true
@@ -160,7 +160,7 @@ retry:
   session lasts a minute.
 
 Layers: env (`MC_RETRY_ACTIONS="*=0,goto=2"`, `MC_RETRY_LLM=2`, `MC_RECONNECT_DELAY_MS`,
-`MC_RECONNECT_MAX_MS`) < variant `settings.retry` < profile `retry:` < fleet entry
+`MC_RECONNECT_MAX_MS`) < variant `settings.retry` < profile `retry:` < [fleet](/concepts/architecture#fleets-and-multiple-servers) entry
 `settings.retry`.
 
 ## LLM proxy (caveman or a gateway)

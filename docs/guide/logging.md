@@ -1,6 +1,6 @@
 # Logging
 
-Every bot, brain, skill and the fleet log through one system. You can tune what you see per
+Every bot, brain, skill and the [fleet](/concepts/architecture#fleets-and-multiple-servers) log through one system. You can tune what you see per
 bot and per subsystem, write files per bot, switch to JSON for tooling, and subscribe to the
 log stream from code.
 
@@ -99,7 +99,7 @@ logging:
   maxSizeMb: 50
 ```
 
-Precedence: environment → fleet file → CLI flags.
+Precedence: environment → [fleet file](/guide/running#a-fleet) → CLI flags.
 
 ## CLI flags
 

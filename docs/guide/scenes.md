@@ -22,7 +22,7 @@ In game:
 
 ## Concepts
 
-- **Actor**: a bot with `sceneBrain()`. Actors on the same server register on the fleet
+- **Actor**: a bot with `sceneBrain()`. Actors on the same server register on the [fleet](/concepts/architecture#fleets-and-multiple-servers)
   blackboard and can be cast into scenes. `variants/actor.ts` is a ready-made one.
 - **Scene**: roles, a place to stage it (anchor + marks), a timeline of beats, and optional
   player interactions and a schedule.
@@ -33,7 +33,7 @@ In game:
   can receive `!scene_start`; it gets routed to the coordinator.
 
 Scene actions run at `PRIORITY.scene` (25): above NPC routines (20), below LLM brains (30),
-player commands (50) and reflexes (60). If you tell an actor to `!follow` you mid-scene, it
+player commands (50) and [reflexes](/concepts/world#reflexes) (60). If you tell an actor to `!follow` you mid-scene, it
 follows you; the scene waits a few seconds for the body and then skips that bot's movement
 beats. Its lines keep going. Reflexes (fighting back, eating) preempt scene beats the same way.
 
@@ -217,7 +217,7 @@ sceneBrain({
 ```
 
 Empty answers, errors and anything slower than 3 s fall back to the default line. Output is
-capped at 240 characters. This is where an LLM brain can improvise.
+capped at 240 characters. This is where an [LLM brain](/guide/llm-brain) can improvise.
 
 ### Options
 
@@ -252,7 +252,7 @@ When a scene starts:
 Actors cast in a run are busy until it ends; another scene can't use them, but a second scene
 with other actors can run at the same time.
 
-Per-bot settings go in the fleet file:
+Per-bot settings go in the [fleet file](/guide/running#a-fleet):
 
 ```yaml
 bots:

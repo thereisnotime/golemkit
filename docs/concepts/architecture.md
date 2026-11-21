@@ -64,7 +64,7 @@ flowchart TB
 ```
 
 Brains decide, skills provide actions, the action lock arbitrates the body, and the NeoForge
-layer gets everything into a modded server. Variants pick skills and brains; profiles and
+layer gets everything into a modded server. [Variants](/concepts/variants-profiles) pick skills and brains; [profiles](/guide/profiles) and
 fleets pick who, where and how many.
 
 ## Agent
@@ -80,7 +80,7 @@ a new *session* with a fresh mineflayer `Bot`, and skills/brains get their `setu
 - the [journal](../guide/journal) (`agent.journal`): typed facts about what happened, with rollups
 - learned [protected areas](./world#protected-areas) (`agent.protectedAreas`) per server
 - `observe()`: a JSON snapshot of the bot and surroundings, extended by skills and brains
-- the event journal (`agent.journal`, JSONL under `data/bots/<username>/journal/`), see [Event journal](../guide/journal.md)
+- the [event journal](/guide/journal) (`agent.journal`, JSONL under `data/bots/<username>/journal/`), see [Event journal](../guide/journal.md)
 - events: `session`, `sessionEnd`, `chat`, `serverMessage`, `actionStart`, `actionEnd`, `llmUsage`, `chatOut`, `protectedArea`
 
 ```mermaid
@@ -132,7 +132,7 @@ Only one exclusive action runs at a time. Callers have priorities (`PRIORITY` in
 |---|---|
 | idle | 10 |
 | npc | 20 |
-| scene | 25 |
+| [scene](/guide/scenes) | 25 |
 | llm | 30 |
 | player | 50 |
 | reflex | 60 |
@@ -199,7 +199,7 @@ Several brains run at once and negotiate through priorities. Shipped:
   order, `key=value` works, last string param takes the rest of the line.
 - `reflexes()` handles self-defence and auto-eat at reflex priority.
 - `npcBrain()` keeps NPCs busy on their own: scored behaviours at npc priority, backs off for
-  players, LLMs and reflexes. See [NPC brain](../guide/npc-brain.md).
+  players, LLMs and [reflexes](/concepts/world#reflexes). See [NPC brain](../guide/npc-brain.md).
 - `sceneBrain()` lets several bots act out scenes together (see [Scenes](../guide/scenes.md)).
 - `llmBrain()` lets a language model drive the bot at llm priority, through the same actions
   (as tools, also over MCP). See [LLM brain](../guide/llm-brain.md).
@@ -219,7 +219,7 @@ export default defineVariant({
 })
 ```
 
-Run with `node src/cli.ts run <bot>`, or many at once with a fleet file (see
+Run with `node src/cli.ts run <bot>`, or many at once with a [fleet file](/guide/running#a-fleet) (see
 `fleets/example.yaml`). Instance overrides (username, owners, canDig, settings) come from CLI
 flags or the fleet file.
 

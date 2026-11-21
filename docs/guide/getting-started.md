@@ -4,7 +4,7 @@
 
 - [asdf](https://asdf-vm.com) (or any way to get the versions in `.tool-versions`: Node 26, just)
 - A Minecraft Java server. The defaults point at **mc02** (NeoForge 1.21.1, offline mode).
-  Vanilla and Paper servers work too; the NeoForge layer simply stays idle.
+  Vanilla and Paper servers work too; the [NeoForge layer](/concepts/neoforge) simply stays idle.
 
 ## Install
 

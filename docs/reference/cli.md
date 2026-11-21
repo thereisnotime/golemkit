@@ -9,15 +9,15 @@
 | setup | `just setup` | `npm ci`, create `.env` |
 | run | `just run [bot] [flags]` | run one bot (default `buddy`) |
 | run | `just dev [bot] [flags]` | same, restart on file changes |
-| run | `just fleet [file]` | run a fleet file (default `fleet.yaml`) |
+| run | `just fleet [file]` | run a [fleet file](/guide/running#a-fleet) (default `fleet.yaml`) |
 | bots | `just bots` | list bot definitions |
 | bots | `just actions [bot]` | list a bot's actions |
 | debug | `just probe` | connect once, print the world snapshot |
 | debug | `just chat-test "!help,!pos"` | join as a second player and send commands |
 | debug | `just reset-channels` | forget learned NeoForge channels |
-| llm | `just llm-eval --dry` | A/B eval of a profile's context pack (real providers need `--yes`) |
+| llm | `just llm-eval --dry` | A/B eval of a [profile](/guide/profiles)'s [context pack](/guide/context-pack) (real providers need `--yes`) |
 | docs | `just docs` | docs site dev server |
-| docs | `just docs-gen` | regenerate the action reference |
+| docs | `just docs-gen` | regenerate the [action reference](/reference/actions) |
 | docs | `just docs-build` | static HTML in `docs/.vitepress/dist` |
 | check | `just check` | typecheck + unit tests |
 

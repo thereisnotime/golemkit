@@ -1,7 +1,7 @@
 # Movement, protection and combat
 
 How bots get around, what they learn about the world, and how they fight. These live in core
-and the standard skills, so every variant gets them.
+and the standard skills, so every [variant](/concepts/variants-profiles) gets them.
 
 ## Long-distance travel
 
@@ -36,7 +36,7 @@ flowchart LR
 - `goto` is **long-running**: LLM brains start it in the background and get an `actionDone`
   follow-up with the real outcome; `!goto` in chat replies when it ends.
 - It only reports arrival when the bot actually stands at the target.
-- Retries (`retry.actions.goto`) re-run it after "stuck" failures.
+- [Retries](/guide/profiles#retries) (`retry.actions.goto`) re-run it after "stuck" failures.
 
 ```ts
 await travel(bot, { x: 640, z: 60 }, signal, { stepBlocks: 64, onProgress: p => log.debug('travel', p) })
@@ -78,7 +78,7 @@ sequenceDiagram
 | hostile (data says so) | zombie, skeleton, creeper, spider, drowned, witch, ... |
 | also hostile | phantom, ghast, slime, magma_cube, shulker, hoglin, ender_dragon |
 | never targeted | enderman, piglin, zombified_piglin (neutral), evoker_fangs, skeleton/zombie horses |
-| modded | from the registry sync; `ars_nouveau:wilden_*` built in, more via `settings.moddedHostile` / `MC_MODDED_HOSTILE` |
+| modded | from the [registry sync](/concepts/neoforge#_4-modded-item-and-entity-names); `ars_nouveau:wilden_*` built in, more via `settings.moddedHostile` / `MC_MODDED_HOSTILE` |
 
 **Flying mobs** (phantom, ghast, vex, blaze, breeze, ...) aren't chased on foot: the bot holds
 position, tracks them and swings when they dive into reach. Reflexes look up to 20 blocks for

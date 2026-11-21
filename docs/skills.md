@@ -6,7 +6,7 @@ each one is for and how it behaves.
 
 Two bundles live in `src/skills/index.ts`:
 
-- `standardSkills()`: status, movement, combat, survival, inventory, gather, journal.
+- `standardSkills()`: status, movement, combat, survival, inventory, gather, [journal](/guide/journal).
 - `extendedSkills()`: crafting, containers, farming, woodcutting, building, pickup.
 
 `navigation()` is exported on its own (the villager bot uses it).
@@ -44,7 +44,7 @@ Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actio
 
 ### combat
 
-- `retreat` (internal): back off from hostiles, used by reflexes at low health. Flying mobs are fought in place, not chased ([details](concepts/world#hostile-mobs)).
+- `retreat` (internal): back off from hostiles, used by [reflexes](/concepts/world#reflexes) at low health. Flying mobs are fought in place, not chased ([details](concepts/world#hostile-mobs)).
 
 | action | |
 |---|---|
@@ -98,7 +98,7 @@ See [Event journal](./guide/journal.md).
 ### crafting
 | action | |
 |---|---|
-| `craft` | Craft N of an item from the inventory. Uses a crafting table within 16 blocks, or places one (from the inventory, or crafted from planks) and says where. Crafts in chunks and switches recipe variants (plank types) as materials run out. |
+| `craft` | Craft N of an item from the inventory. Uses a crafting table within 16 blocks, or places one (from the inventory, or crafted from planks) and says where. Crafts in chunks and switches recipe [variants](/concepts/variants-profiles) (plank types) as materials run out. |
 | `smelt` | Smelt N items in a furnace within 32 blocks (or one placed from the inventory). Picks fuel (coal, charcoal, planks, logs, sticks; never the input), polls the output once a second and takes results until done, the furnace stops burning, or ~10 s per item passes. |
 
 Recipes come from minecraft-data, not the server (its recipe packet carries modded items and

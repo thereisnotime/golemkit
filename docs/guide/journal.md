@@ -66,7 +66,7 @@ coordinates).
 
 Death messages are parsed from the vanilla wording ("Pax was slain by Zombie Villager", "Pax
 hit the ground too hard while trying to escape Skeleton", "Pax tried to swim in lava", about
-50 variants). If none arrives within 3 seconds, the death is still recorded with the last
+50 [variants](/concepts/variants-profiles)). If none arrives within 3 seconds, the death is still recorded with the last
 damage source as the cause.
 
 What is never recorded: prompts and LLM responses (only token counts), and secrets. Every
@@ -121,7 +121,7 @@ closes, at startup if missing, and on demand (`agent.journal.rollup(date)`).
 ### LLM summary (optional)
 
 With `journal.summarize` configured, each finished day gets a short paragraph in its rollup
-(`summary`, `summaryBy`). It goes through the same provider layer as the LLM brain, gets the
+(`summary`, `summaryBy`). It goes through the same provider layer as the [LLM brain](/guide/llm-brain), gets the
 rollup numbers only (no chat text), no tools and one turn. Off by default.
 
 ```yaml
@@ -165,7 +165,7 @@ The tool results also carry the full events (or the rollup section) as data.
 
 ### In the observation
 
-When a context pack is active (see [Context packs](./context-pack)), the bot's `observe()`
+When a [context pack](/guide/context-pack) is active (see [Context packs](./context-pack)), the bot's `observe()`
 gets a `recentEvents` line, for example
 `died 12m ago at 549 87 53: Pax was slain by Phantom, lost 1x ars_nouveau:worn_notebook`, so an
 LLM bot knows about its last death without calling a tool. It only appears when there is
@@ -194,7 +194,7 @@ Without `since`, `query` looks back 7 days. `limit: 0` returns everything that m
 
 ## Configuration
 
-`settings.journal` in a variant, or the `journal:` key in a profile:
+`settings.journal` in a variant, or the `journal:` key in a [profile](/guide/profiles):
 
 ```yaml
 journal:

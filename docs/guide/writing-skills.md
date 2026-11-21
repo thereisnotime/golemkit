@@ -41,7 +41,7 @@ What you get for free:
 | `ctx.` | |
 |---|---|
 | `bot` | the mineflayer bot for this session |
-| `agent` | the Agent (settings, storage, chat, fleet, other actions) |
+| `agent` | the Agent (settings, storage, chat, [fleet](/concepts/architecture#fleets-and-multiple-servers), other actions) |
 | `signal` | AbortSignal: fires on preemption, `!stop`, death or disconnect |
 | `caller` | who asked: `{ kind: 'player' \| 'brain' \| 'reflex' \| 'system', name }` |
 | `player` | the player behind the request, if any |
@@ -54,7 +54,7 @@ What you get for free:
 | `exclusive` | `true` | needs the body; takes the action lock. Use `false` for queries and chat |
 | `longRunning` | `false` | runs until stopped (follow, guard); resumed after being preempted |
 | `aliases` | | extra command names |
-| `internal` | `false` | hidden from `!help` and LLM tools (e.g. actions only reflexes use) |
+| `internal` | `false` | hidden from `!help` and LLM tools (e.g. actions only [reflexes](/concepts/world#reflexes) use) |
 
 ### Honour the signal
 

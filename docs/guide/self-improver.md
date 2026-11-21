@@ -1,6 +1,6 @@
 # Self-improver
 
-`selfImprover()` (src/brains/self/) is an NPC brain that runs its own **program** with no
+`selfImprover()` (src/brains/self/) is an [NPC brain](/guide/npc-brain) that runs its own **program** with no
 language model in the loop. When one of its owners tells it to behave differently, it calls
 an LLM **once** to rewrite that program, checks the result, and from then on runs the new
 version on its own again. `variants/apprentice.ts` (and `profiles/apprentice.yaml`) is the worked example.
@@ -65,12 +65,12 @@ the bot never turns chat or model output into code:
   Its params are checked against that action's zod schema when the program is loaded (unknown
   keys are rejected too) and again by `agent.act()` when it runs. Programs act through the NPC
   controller, so every call is `agent.act(..., { caller: brain:self, priority: PRIORITY.npc })`:
-  players, LLM brains and reflexes always outrank it and it backs off while they hold the body.
+  players, LLM brains and [reflexes](/concepts/world#reflexes) always outrank it and it backs off while they hold the body.
 - **A deny list on top.** By default programs can't call `attack`, `guard`, `defend`,
   `chop_tree`, `till`, `place_block`, `drop`, `stop`, `say`, `craft`, `smelt`, `deposit`,
   `withdraw`, internal actions, any `program_*` action, or any long-running action (they never
   end, so a routine would hang). Configure with `actions: { allow, deny }`.
-- **Reading is limited too.** Conditions read a fixed list of facts (observation, blackboard
+- **Reading is limited too.** Conditions read a fixed list of facts (observation, [blackboard](/concepts/architecture#fleets-and-multiple-servers)
   needs, inventory counts, distances to remembered places, program variables and timers).
 - **Hard caps.** Loops are bounded (`repeat.times` <= 20, `while` needs `max` <= 100), waits
   <= 60 s, no recursion, size limits on every list, and each routine run is cut off after
@@ -79,7 +79,7 @@ the bot never turns chat or model output into code:
   never carry regular expressions.
 - **Only owners change the program.** Instructions from anyone `agent.isOwner()` rejects are
   dropped before they reach the LLM. The `program_teach/rollback/reset` actions refuse brain
-  and reflex callers, so an LLM brain on the same bot can't be used to rewrite it either.
+  and reflex callers, so an [LLM brain](/guide/llm-brain) on the same bot can't be used to rewrite it either.
 - **A gate before every switch** (below). A program that fails it is never run.
 
 The file drop (`data/bots/<username>/inbox/*.txt`) is trusted like the bot definition: anyone
@@ -87,7 +87,7 @@ who can write there can already change the bot's code.
 
 ### Profiles
 
-A profile's `llm:` block (`profiles/apprentice.yaml`) overrides the variant's provider
+A [profile](/guide/profiles)'s `llm:` block (`profiles/apprentice.yaml`) overrides the [variant](/concepts/variants-profiles)'s provider
 settings, the same keys the LLM brain reads: `provider` (`none` turns learning off), `model`,
 `effort`, `login`, `oauthTokenVar`, `oauthTokenFile` and `budget`. Owners come from the
 profile too. With no owners at all, nobody can teach the bot from chat (unlike `!commands`,

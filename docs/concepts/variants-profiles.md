@@ -5,9 +5,9 @@ Five words cover how bots are defined, configured and run.
 | term | what it is | where |
 |---|---|---|
 | **Variant** | a kind of bot: which skills it has, which brains decide, default persona | `variants/<name>.ts` |
-| **Profile** | a saved, named instance config: variant + username, owners, server, LLM, settings | `profiles/<name>.yaml` |
+| **[Profile](/guide/profiles)** | a saved, named instance config: variant + username, owners, server, LLM, settings | `profiles/<name>.yaml` |
 | **Instance** | a running bot (an `Agent`), created from a profile or a variant | runtime |
-| **Fleet** | a set of profiles/variants run together in one process, possibly on several servers | `fleets/<name>.yaml` |
+| **[Fleet](/concepts/architecture#fleets-and-multiple-servers)** | a set of profiles/variants run together in one process, possibly on several servers | `fleets/<name>.yaml` |
 | **Login** | an isolated LLM CLI login (the CLI's HOME, holding only its credentials) | `.auth/<login>` |
 
 ```mermaid
@@ -63,7 +63,7 @@ classDiagram
 |---|---|---|
 | `buddy` | player assistant driven by `!commands` | `example` |
 | `villager` | self-sufficient NPC (needs, routines, chores) | |
-| `actor` | performs scenes with other actors | used by `fleets/scenes.example.yaml` |
+| `actor` | performs [scenes](/guide/scenes) with other actors | used by `fleets/scenes.example.yaml` |
 | `companion` | LLM companion that talks and acts | `pax` (Sonnet 5.5, subscription token, obeys robin) |
 
 ## How a name is resolved

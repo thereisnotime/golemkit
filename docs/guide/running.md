@@ -21,7 +21,7 @@ Flags override the bot definition for this instance:
 
 ## A fleet
 
-A fleet file runs many bots in one process. Copy `fleets/example.yaml` to `fleet.yaml` (it's
+A [fleet](/concepts/architecture#fleets-and-multiple-servers) file runs many bots in one process. Copy `fleets/example.yaml` to `fleet.yaml` (it's
 gitignored) and run `just fleet`.
 
 ```yaml

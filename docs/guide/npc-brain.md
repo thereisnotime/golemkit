@@ -24,7 +24,7 @@ Add `navigation()` to the skills: most built-in behaviours use its actions (`wan
 
 Every `tickMs` (1.5 s) the brain:
 
-1. refreshes the **blackboard** from the bot (needs and facts, below)
+1. refreshes the **[blackboard](/concepts/architecture#fleets-and-multiple-servers)** from the bot (needs and facts, below)
 2. runs the **hooks** (cheap per-tick functions that don't need the body)
 3. checks `agent.currentAction`: if a player, LLM, reflex or system caller holds the body at
    npc priority or above, it aborts its own behaviour and **backs off** (player/brain 20 s,
@@ -129,7 +129,7 @@ It requires the action, so listing chores whose skills the bot doesn't have is h
 | factory | score | needs actions |
 |---|---|---|
 | `fleeOrFight()` | 70-100 with a hostile near; fights within 5 blocks when healthy, flees from creepers or at low health | `attack` / `flee` |
-| `eatWhenHungry()` | 50-90 below food 12 (reflexes eat at 15 first) | `eat` |
+| `eatWhenHungry()` | 50-90 below food 12 ([reflexes](/concepts/world#reflexes) eat at 15 first) | `eat` |
 | `sleepAtNight()` | 70 at night: go home, sleep, stay in bed until morning | `sleep` (+`go_home`) |
 | `goHome()` | 35+ when over 32 blocks away, 50 at night beyond 6 | `go_home` |
 | `followNearbyPlayer()` | 18 when a player is within 10: walk over, look at them for 20 s, 90 s cooldown | `goto_player` |

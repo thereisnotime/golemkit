@@ -1,6 +1,6 @@
 # Context packs and evals
 
-A context pack is a directory of markdown and YAML files next to a profile that shapes an LLM
+A context pack is a directory of markdown and YAML files next to a [profile](/guide/profiles) that shapes an LLM
 bot: operational rules, who it works for, what it remembers, reusable procedures and a few
 deterministic reactions. It is the useful core of the SOUL.md / AGENTS.md / SKILL.md / hooks
 idea, with two ground rules:
@@ -124,7 +124,7 @@ context:
   watch: false                     # no hot reload
 ```
 
-A variant can ship defaults with `settings: { contextDefaults: 'variants/companion.context' }`;
+A [variant](/concepts/variants-profiles) can ship defaults with `settings: { contextDefaults: 'variants/companion.context' }`;
 the profile's directories stack on top. Per markdown file the last directory that has it wins,
 skills merge by name, hooks merge by `id`.
 
@@ -148,7 +148,7 @@ Plain markdown, highest in the prompt. Write rules you could check from the bot'
 ```
 
 `observe` includes `spawnPoint` for rules like the last one. Rules are text: the structural
-limits (owners, `canDig`, action priorities, chat caps) still live in code.
+limits (owners, `canDig`, action [priorities](/concepts/architecture#the-action-lock-and-priorities), chat caps) still live in code.
 
 ## USER.md, IDENTITY.md, SOUL.md
 
@@ -217,8 +217,8 @@ executed.
 
 Deterministic event -> action rules run by the hooks brain, without the LLM, so they work
 while the model is slow, paused or out of budget. Actions go through `agent.act()` with caller
-`brain:hooks` at priority **40**: above the LLM (30), scenes (25) and NPC loops (20), below
-player commands (50) and reflexes (60). So a hook can interrupt the model's `goto` to eat (the
+`brain:hooks` at priority **40**: above the LLM (30), [scenes](/guide/scenes) (25) and NPC loops (20), below
+player commands (50) and [reflexes](/concepts/world#reflexes) (60). So a hook can interrupt the model's `goto` to eat (the
 `goto` resumes, it's long-running), but never a player's `!follow` or a reflex. Chat goes
 through `agent.say/whisper`.
 
@@ -260,7 +260,7 @@ hooks:
 | `lowHealth` | health drops below `below` (default 8); re-arms at `below + 2` | `{health}` |
 | `actionFailed` | an action failed (not preempted/stopped) | `action` (name or list), `match` on the error, `includeOwn` (default false: ignore hooks' own failures), `{action}`, `{error}` |
 | `timer` | every `every` (`30s`, `5m`; at least 5 s) | |
-| `llmBudgetExhausted` | the LLM brain paused on a budget limit | `{reason}` |
+| `llmBudgetExhausted` | the [LLM brain](/guide/llm-brain) paused on a budget limit | `{reason}` |
 
 Hook keys:
 

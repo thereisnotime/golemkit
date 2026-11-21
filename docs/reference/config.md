@@ -1,6 +1,6 @@
 # Configuration
 
-Precedence, lowest to highest: environment (`.env`) → bot definition → fleet `defaults` →
+Precedence, lowest to highest: environment (`.env`) → bot definition → [fleet](/concepts/architecture#fleets-and-multiple-servers) `defaults` →
 fleet bot entry / CLI flags.
 
 ## Environment
@@ -15,7 +15,7 @@ fleet bot entry / CLI flags.
 | `MC_PREFIX` | `!` | chat command prefix |
 | `MC_CAN_DIG` | `false` | let bots break blocks |
 | `MC_RECONNECT_DELAY_MS` | `10000` | wait before reconnecting |
-| `MC_RETRY_ACTIONS` | `*=0` | action retries, e.g. `*=0,goto=2` ([profiles](../guide/profiles#retries)) |
+| `MC_RETRY_ACTIONS` | `*=0` | action [retries](/guide/profiles#retries), e.g. `*=0,goto=2` ([profiles](../guide/profiles#retries)) |
 | `MC_RETRY_LLM` | `2` | retries for transient LLM provider errors |
 | `MC_RECONNECT_MAX_MS` | `300000` | reconnect backoff cap |
 | `MC_LLM_PROXY` | | `caveman`, `none` or a gateway URL |
@@ -23,9 +23,9 @@ fleet bot entry / CLI flags.
 | `MC_MODDED_HOSTILE` | | extra hostile modded mobs, comma-separated globs (`somemod:*_zombie`) |
 | `MC_JOURNAL` | `true` | `false` turns the [journal](../guide/journal) off |
 | `MC_JOURNAL_TYPES` | all | comma-separated event types to record |
-| `MC_JOURNAL_RETENTION_DAYS` | `14` | keep raw journal files this long (rollups much longer) |
+| `MC_JOURNAL_RETENTION_DAYS` | `14` | keep raw [journal](/guide/journal) files this long (rollups much longer) |
 | `MC_JOURNAL_SUMMARIZE` | | LLM provider for daily summaries (off when unset) |
-| `MC_LOG_LEVEL` | `info` | level spec, e.g. `info,McBuddy=debug,*/neoforge=trace` ([logging](../guide/logging)) |
+| `MC_LOG_LEVEL` | `info` | [level spec](/guide/logging#levels), e.g. `info,McBuddy=debug,*/neoforge=trace` ([logging](../guide/logging)) |
 | `MC_LOG_FORMAT` | `pretty` | `pretty`, `plain`, `json` |
 | `MC_LOG_COLOR` | `auto` | `auto`, `always`, `never` (`NO_COLOR` also works) |
 | `MC_LOG_TIME` | `time` | `time`, `iso`, `none` |
@@ -45,7 +45,7 @@ All optional except `variant`; see [Profiles](../guide/profiles).
 | `variant` | which variant to run | [Variants, profiles, fleets](../concepts/variants-profiles) |
 | `username`, `persona`, `owners`, `canDig`, `server` | identity, permissions, server override | [Profiles](../guide/profiles) |
 | `llm` | provider, model, effort, login, token source, proxy, listen, immersive, aliases, budget | [LLM brain](../guide/llm-brain) |
-| `context` | context pack directory (default `profiles/<name>/`) | [Context pack](../guide/context-pack) |
+| `context` | [context pack](/guide/context-pack) directory (default `profiles/<name>/`) | [Context pack](../guide/context-pack) |
 | `humanize` | reaction/typing delays, stand still while typing, typos, fidgeting | [Profiles](../guide/profiles#humanize-player-like-timing) |
 | `reflexes` | eat/retreat/water-fight thresholds | [Movement, protection, combat](../concepts/world#reflexes) |
 | `retry` | action, LLM and reconnect retries | [Profiles](../guide/profiles#retries) |
@@ -61,7 +61,7 @@ All optional except `variant`; see [Profiles](../guide/profiles).
 | `variants/` | bot definitions |
 | `fleet.yaml` | your fleet (gitignored); `fleets/example.yaml` is the template |
 | `data/channels-<host>-<port>.json` | learned NeoForge channels per server |
-| `data/protected-<host>-<port>.json` | learned protected areas (spawn, claims) per server |
+| `data/protected-<host>-<port>.json` | learned [protected areas](/concepts/world#protected-areas) (spawn, claims) per server |
 | `data/registries-<host>-<port>.json` | the server's item / entity / block registries (from the sync) |
 | `data/bots/<username>/store.json` | per-bot storage (`agent.storage`) |
 | `data/bots/<username>/journal/` | journal: daily JSONL files and `rollups/` |

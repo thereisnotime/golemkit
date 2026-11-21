@@ -34,8 +34,8 @@ const result = await agent.act('attack', { radius: 16 }, {
 if (!result.ok) agent.log.debug(`sentry: ${result.message}`)
 ```
 
-This keeps the action lock authoritative: a player's `!stop` aborts whatever the brain
-started, reflexes can interrupt it, and other brains know the body is busy.
+This keeps the [action lock](/concepts/architecture#the-action-lock-and-priorities) authoritative: a player's `!stop` aborts whatever the brain
+started, [reflexes](/concepts/world#reflexes) can interrupt it, and other brains know the body is busy.
 
 | priority | value | typical caller |
 |---|---|---|
@@ -65,7 +65,7 @@ started, reflexes can interrupt it, and other brains know the body is busy.
 | `agent.fleet.subscribe(agent, fn)` | messages from other bots on the same server |
 
 `agent.observe()` returns a JSON snapshot (position, health, food, time, nearby entities,
-inventory, current action, plus whatever skills add). It's what an LLM brain sends to the
+inventory, current action, plus whatever skills add). It's what an [LLM brain](/guide/llm-brain) sends to the
 model, and handy for any decision logic.
 
 ## Talking

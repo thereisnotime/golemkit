@@ -70,6 +70,11 @@ docs: docs-gen
 docs-gen:
     @node scripts/gen-docs.ts
 
+# Add in-text cross links between docs pages (first mention of each concept); safe to re-run
+[group('docs')]
+docs-links:
+    @node scripts/docs-interlink.ts
+
 # Build the static docs site into docs/.vitepress/dist
 [group('docs')]
 docs-build: docs-gen

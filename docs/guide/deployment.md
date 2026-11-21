@@ -55,6 +55,6 @@ The agent already reconnects after disconnects; `Restart=on-failure` only covers
 
 ## Resource use
 
-Roughly 80–150 MB RAM per bot, a few percent of one core while walking. A fleet in one
+Roughly 80–150 MB RAM per bot, a few percent of one core while walking. A [fleet](/concepts/architecture#fleets-and-multiple-servers) in one
 process shares the protocol and block data, so ten bots cost much less than ten processes.
 LLM brains add whatever the provider costs; see the LLM guide for budgets.
