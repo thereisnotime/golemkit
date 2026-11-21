@@ -21,8 +21,11 @@ llm:
   immersive: false            # true = stay in character (reports stay truthful)
   aliases: [pax]
   conversationMs: 120000
+  # proxy: caveman            # route through the local caveman layer
   budget:
     turnsPerHour: 60
     tokensPerHour: 600000
     tokensPerDay: 3000000
     maxToolCalls: 12
+retry:
+  actions: { goto: 1, chop_tree: 1 }

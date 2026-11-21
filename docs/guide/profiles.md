@@ -134,6 +134,42 @@ sequenceDiagram
 Pausing while typing holds the movement keys off without touching the pathfinder's goal, so a
 `goto` or `follow` in progress just continues afterwards.
 
+## Retries
+
+```yaml
+retry:
+  actions: { "*": 0, goto: 2, chop_tree: 1 }   # extra attempts after a failed result (default 0)
+  actionBackoffMs: [1000, 8000]                # first wait, max wait; doubles with jitter
+  llm: { attempts: 2, backoffMs: [2000, 20000] }   # transient provider errors
+  reconnect: { baseMs: 10000, maxMs: 300000 }  # exponential while the server is down
+```
+
+- **Actions** are retried only for failures retrying can fix ("stuck at ...", "took too
+  long"), never for `busy`, bad parameters, stopped/preempted/replaced or disabled
+  capabilities, and never after a player or another brain took over meanwhile.
+- **LLM** retries cover timeouts, rate limits, overload, 5xx and network errors, and only
+  when the failed turn hadn't called any tool yet, so actions are never repeated.
+- **Reconnect** backs off exponentially after quick repeated failures and resets once a
+  session lasts a minute.
+
+Layers: env (`MC_RETRY_ACTIONS="*=0,goto=2"`, `MC_RETRY_LLM=2`, `MC_RECONNECT_DELAY_MS`,
+`MC_RECONNECT_MAX_MS`) < variant `settings.retry` < profile `retry:` < fleet entry
+`settings.retry`.
+
+## LLM proxy (caveman or a gateway)
+
+```yaml
+llm:
+  proxy: caveman        # the local caveman layer; started automatically if it isn't running
+  # proxy: https://gateway.example/v1   # any Anthropic/OpenAI-compatible gateway
+  # proxy: none
+```
+
+Only the base URL is passed to the provider (`ANTHROPIC_BASE_URL` for Claude, a per-run
+`model_provider` override for Codex pointing at caveman's `/chatgpt` route); the login
+isolation stays as it is. Subscription/OAuth logins pass through caveman unchanged. Also
+`MC_LLM_PROXY=caveman` for every bot, and `MC_CAVEMAN_BIN` if caveman isn't found.
+
 ## Profiles in fleets
 
 ```yaml

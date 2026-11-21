@@ -22,6 +22,7 @@ import { RegistryCache, applyModdedRegistries, type RegistrySnapshot } from './n
 import { fmtPos, itemName } from './helpers.ts'
 import type { Fleet } from './fleet.ts'
 import { ProtectedAreas, watchRefusedDigs } from './protection.ts'
+import { resolveRetry, actionAttempts, backoffMs, isRetryableResult, type RetryConfig } from './retry.ts'
 import { resolveHumanize, typingDelayMs, styleLine, holdStill, between, type HumanizeOptions } from './humanize.ts'
 import type { UsageSnapshot } from '../llm/usage.ts'
 
@@ -100,7 +101,8 @@ export class Agent extends TypedEmitter<AgentEvents> {
   private readonly aliases = new Map<string, string>()
   private readonly skills: SkillDef[]
   private readonly brains: BrainDef[]
-  private readonly reconnectDelayMs: number
+  /** Retry policies (actions, LLM, reconnect) from env + settings.retry. */
+  readonly retry: RetryConfig
   private readonly channels: ChannelStore
   private readonly registryCache: RegistryCache
   /** Areas where the server refuses block breaking (learned); the pathfinder won't dig there. */
@@ -138,7 +140,8 @@ export class Agent extends TypedEmitter<AgentEvents> {
     this.owners = (opts.owners ?? (definition.owners?.length ? definition.owners : envOwners)).map(s => s.toLowerCase())
     this.canDig = opts.canDig ?? definition.canDig ?? process.env.MC_CAN_DIG === 'true'
     this.humanize = resolveHumanize(this.settings)
-    this.reconnectDelayMs = opts.reconnectDelayMs ?? Number(process.env.MC_RECONNECT_DELAY_MS || 10000)
+    this.retry = resolveRetry(this.settings)
+    if (opts.reconnectDelayMs) this.retry.reconnect.baseMs = opts.reconnectDelayMs
     this.channels = new ChannelStore(join('data', `channels-${server.host}-${server.port}.json`))
     this.registryCache = new RegistryCache(join('data', `registries-${server.host}-${server.port}.json`))
     this.protectedAreas = new ProtectedAreas(join('data', `protected-${server.host}-${server.port}.json`))
@@ -218,7 +221,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
     const player = opts.player ?? (caller.kind === 'player' ? caller.name : undefined)
     const run: Running = { def, params: parsed.data, caller, priority, player, controller: new AbortController() }
 
-    if (def.exclusive === false) return this.execute(run)
+    if (def.exclusive === false) return this.executeWithRetry(run)
 
     const cur = this.current
     if (cur) {
@@ -237,7 +240,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
       await new Promise(r => setTimeout(r, between(this.humanize!.actionHesitationMs)))
       if (this.current !== run) return fail('replaced')
     }
-    const result = await this.execute(run)
+    const result = await this.executeWithRetry(run)
     if (this.current === run) {
       this.current = null
       this.resumeSuspended()
@@ -272,6 +275,25 @@ export class Agent extends TypedEmitter<AgentEvents> {
       this.resumeSuspended()
     }
     return n
+  }
+
+  /**
+   * Runs the action, re-running it after a retryable failure as configured in
+   * retry.actions (default: no retries). Stops retrying if the action was replaced,
+   * preempted or stopped meanwhile.
+   */
+  private async executeWithRetry (run: Running): Promise<ActionResult> {
+    let result = await this.execute(run)
+    const extra = actionAttempts(this.retry, run.def.name)
+    for (let attempt = 0; attempt < extra && !result.ok && isRetryableResult(result.message); attempt++) {
+      const wait = backoffMs(attempt, this.retry.actionBackoffMs)
+      this.logs.action.info(`retrying ${run.def.name} in ${Math.round(wait / 100) / 10}s`, { attempt: attempt + 1, of: extra, after: result.message })
+      await delay(wait)
+      const exclusive = run.def.exclusive !== false
+      if (run.controller.signal.aborted || (exclusive && this.current !== run) || !this._bot) break
+      result = await this.execute(run)
+    }
+    return result
   }
 
   private async execute (run: Running): Promise<ActionResult> {
@@ -450,7 +472,9 @@ export class Agent extends TypedEmitter<AgentEvents> {
     for (const brain of this.brains) await brain.start?.(this)
     this.log.info(`starting: ${this.skills.length} skills, ${this.actions.size} actions, brains: ${this.brains.map(b => b.name).join(', ') || 'none'}`)
     let learnRounds = 0
+    let failures = 0
     while (!this.stopping) {
+      const startedAt = Date.now()
       const { reason, detail } = await this.runSession()
       if (this.stopping) break
       if (reason === 'learned' && learnRounds++ < 15) {
@@ -458,8 +482,12 @@ export class Agent extends TypedEmitter<AgentEvents> {
         continue
       }
       learnRounds = 0
-      this.log.info(`disconnected${detail ? ` (${detail})` : ''}, reconnecting in ${this.reconnectDelayMs / 1000}s`)
-      await delay(this.reconnectDelayMs)
+      // A session that lasted a while counts as healthy: start the backoff over.
+      failures = Date.now() - startedAt > 60_000 ? 0 : failures + 1
+      const { baseMs, maxMs } = this.retry.reconnect
+      const wait = failures <= 1 ? baseMs : backoffMs(failures - 1, [baseMs, maxMs])
+      this.log.info(`disconnected${detail ? ` (${detail})` : ''}, reconnecting in ${Math.round(wait / 1000)}s`, failures > 1 ? { attempt: failures } : undefined)
+      await delay(wait)
     }
   }
 

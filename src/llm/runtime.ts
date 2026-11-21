@@ -5,6 +5,7 @@ import type { Agent, ActionInfo, ActionResult, ChatMessage, Logger } from '../co
 import { Budget, type BudgetOptions } from './budget.ts'
 import { startMcpHttp, type McpHttpBridge } from './mcp.ts'
 import { Memory, type MemoryOptions } from './memory.ts'
+import { backoffMs, isTransientLlmError } from '../core/retry.ts'
 import { buildSystemPrompt, buildUserMessage, chatTrigger, type ChatTriggerOptions, type Trigger } from './prompt.ts'
 import { BotTools, LLM_CALLER, type BotToolsOptions, type ToolAgent } from './tools.ts'
 import type { LlmProvider, ToolCallRecord, TurnResult } from './types.ts'
@@ -58,6 +59,8 @@ export interface LimitOptions extends BudgetOptions {
 export interface RuntimeOptions {
   provider: LlmProvider
   persona?: string
+  /** Retries for transient provider errors (timeouts, 429, 5xx, network). Default 2 attempts. */
+  retry?: { attempts: number, backoffMs: [number, number] }
   /** Stay in character (see SystemPromptInput.immersive). Default false: factual reports. */
   immersive?: boolean
   rules?: string
@@ -369,15 +372,30 @@ export class LlmRuntime {
     let result: TurnResult | undefined
     let error: string | undefined
     try {
-      result = await this.provider.run({
-        system,
-        userMessage,
-        tools: this.tools,
-        mcp: this.bridge ? { url: this.bridge.url, token: this.bridge.token, serverName: 'minecraft' } : undefined,
-        maxTurns: this.limits.maxTurns,
-        timeoutMs: this.limits.turnTimeoutMs,
-        signal: controller.signal
-      })
+      const retry = this.opts.retry ?? { attempts: 2, backoffMs: [2000, 20_000] as [number, number] }
+      for (let attempt = 0; ; attempt++) {
+        try {
+          result = await this.provider.run({
+            system,
+            userMessage,
+            tools: this.tools,
+            mcp: this.bridge ? { url: this.bridge.url, token: this.bridge.token, serverName: 'minecraft' } : undefined,
+            maxTurns: this.limits.maxTurns,
+            timeoutMs: this.limits.turnTimeoutMs,
+            signal: controller.signal
+          })
+          break
+        } catch (e) {
+          // Retry transient provider errors, but only if nothing happened in the world yet
+          // (re-running a turn that already acted would repeat its actions).
+          const msg = (e as Error).message
+          const acted = (this.tools.active?.calls.length ?? 0) > 0
+          if (attempt >= retry.attempts || acted || controller.signal.aborted || !isTransientLlmError(msg)) throw e
+          const wait = backoffMs(attempt, retry.backoffMs)
+          this.log.info(`provider error, retrying in ${Math.round(wait / 1000)}s`, { attempt: attempt + 1, of: retry.attempts, error: msg.slice(0, 160) })
+          await new Promise(r => setTimeout(r, wait))
+        }
+      }
     } catch (e) {
       error = (e as Error).message
       this.log.warn(`turn failed: ${error}`, { provider: this.provider.name })

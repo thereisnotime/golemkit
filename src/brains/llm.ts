@@ -109,6 +109,7 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
         provider: makeProvider(agent),
         persona: opts.persona,
         immersive: s.immersive ?? opts.immersive ?? false,
+        retry: agent.retry.llm,
         rules: opts.rules,
         triggers: { ...opts.triggers, ...(opts.tickMs !== undefined ? { tickMs: opts.tickMs } : {}), ...triggersFromProfile },
         limits: { ...opts.budget, ...(s.budget ?? {}) },

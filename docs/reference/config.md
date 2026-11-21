@@ -15,6 +15,11 @@ fleet bot entry / CLI flags.
 | `MC_PREFIX` | `!` | chat command prefix |
 | `MC_CAN_DIG` | `false` | let bots break blocks |
 | `MC_RECONNECT_DELAY_MS` | `10000` | wait before reconnecting |
+| `MC_RETRY_ACTIONS` | `*=0` | action retries, e.g. `*=0,goto=2` ([profiles](../guide/profiles#retries)) |
+| `MC_RETRY_LLM` | `2` | retries for transient LLM provider errors |
+| `MC_RECONNECT_MAX_MS` | `300000` | reconnect backoff cap |
+| `MC_LLM_PROXY` | | `caveman`, `none` or a gateway URL |
+| `MC_CAVEMAN_BIN` | auto | path to the caveman CLI |
 | `MC_MODDED_HOSTILE` | | extra hostile modded mobs, comma-separated globs (`somemod:*_zombie`) |
 | `MC_LOG_LEVEL` | `info` | level spec, e.g. `info,McBuddy=debug,*/neoforge=trace` ([logging](../guide/logging)) |
 | `MC_LOG_FORMAT` | `pretty` | `pretty`, `plain`, `json` |

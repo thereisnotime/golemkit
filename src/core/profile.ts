@@ -50,6 +50,13 @@ export const ProfileSchema = z.object({
   }).optional(),
   llm: LlmProfileSchema.optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
+  /** Retry policies (actions, llm, reconnect); see core/retry.ts. */
+  retry: z.object({
+    actions: z.record(z.string(), z.number().int().min(0).max(10)).optional(),
+    actionBackoffMs: z.tuple([z.number(), z.number()]).optional(),
+    llm: z.object({ attempts: z.number().int().min(0).max(10).optional(), backoffMs: z.tuple([z.number(), z.number()]).optional() }).optional(),
+    reconnect: z.object({ baseMs: z.number().optional(), maxMs: z.number().optional() }).optional()
+  }).optional(),
   /** Player-like timing and habits; true/false or options (see core/humanize.ts). Default: on when llm.immersive. */
   humanize: z.union([z.boolean(), z.object({
     enabled: z.boolean().optional(),
@@ -90,6 +97,7 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   const settings: Record<string, unknown> = { ...profile.settings }
   if (profile.llm) settings.llm = { ...(settings.llm as object | undefined), ...profile.llm }
   if (profile.humanize !== undefined) settings.humanize = profile.humanize
+  if (profile.retry) settings.retry = { ...(settings.retry as object | undefined), ...profile.retry }
   return {
     name,
     file,
