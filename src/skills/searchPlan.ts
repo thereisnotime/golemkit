@@ -378,7 +378,7 @@ export function describeFind (f: FoundInfo, from: Pos | null, fromName: string, 
 
 // ------------------------------------------------------------------ bring_item sources
 
-export type BringStep = 'inventory' | 'chest' | 'craft' | 'gather' | 'find'
+export type BringStep = 'inventory' | 'chest' | 'craft' | 'smelt' | 'gather' | 'find'
 
 export interface GatherSource {
   how: FetchHow | 'materials'
@@ -391,7 +391,7 @@ export interface GatherSource {
 /** How an item can be got from the world, or null when it can't (only from chests or crafting). */
 export function gatherSource (item: string): GatherSource | null {
   for (const [fam, o] of Object.entries(ORES)) if (o.drop === item || o.blocks.includes(item)) return { how: 'collect', block: o.blocks[0], target: fam }
-  if (/_planks$/.test(item) || item === 'planks' || item === 'stick' || item === 'crafting_table' || item === 'chest' || item === 'charcoal') return { how: 'materials', target: 'logs' }
+  if (/_planks$/.test(item) || item === 'planks' || item === 'stick' || item === 'crafting_table' || item === 'chest') return { how: 'materials', target: 'logs' }
   if (/_log$/.test(item) || item === 'log' || item === 'logs') return { how: 'chop', block: item === 'log' || item === 'logs' ? 'oak_log' : item, target: 'logs' }
   const crop = Object.values(CROP_BLOCKS).find(c => c.item === item)
   if (crop) return { how: 'harvest', block: crop.block, target: crop.item }
@@ -413,6 +413,13 @@ export const SIMPLE_INGREDIENTS: Record<string, { item: string, per: number, mak
   hay_block: { item: 'wheat', per: 9, makes: 1 }
 }
 
+/** Items bring_item makes in a furnace, with what goes in (obtained the same way first). */
+export const SMELTS: Record<string, string> = {
+  iron_ingot: 'raw_iron', gold_ingot: 'raw_gold', copper_ingot: 'raw_copper', glass: 'sand', stone: 'cobblestone',
+  charcoal: 'log', cooked_beef: 'beef', cooked_porkchop: 'porkchop', cooked_chicken: 'chicken', cooked_mutton: 'mutton',
+  baked_potato: 'potato', smooth_stone: 'stone', brick: 'clay_ball'
+}
+
 export interface BringState {
   item: string
   count: number
@@ -426,6 +433,8 @@ export interface BringState {
   recipe: boolean
   /** The source the item comes from in the world, if any. */
   source: GatherSource | null
+  /** What to smelt to make it, if it comes out of a furnace. */
+  smeltFrom?: string | null
   canDig: boolean
   creative?: boolean
 }
@@ -433,7 +442,7 @@ export interface BringState {
 /**
  * Where to get the item from, in order: what the bot carries, its own chests (only ones it
  * placed or that are configured as its storage), crafting (simple recipes; ingredients come from
- * the world when they're missing), gathering nearby, then a search with find_target. Steps that
+ * the world when they're missing), smelting (iron ingots from raw iron, glass from sand), gathering nearby, then a search with find_target. Steps that
  * can't work are left out, so an empty list means "can't get it at all".
  */
 export function bringSteps (s: BringState): BringStep[] {
@@ -445,6 +454,7 @@ export function bringSteps (s: BringState): BringStep[] {
   const gatherNeedsDig = s.source && s.source.how !== 'bucket' && s.source.how !== 'harvest'
   // wood products come out of the materials pipeline, which crafts as it goes
   if (s.recipe && s.source?.how !== 'materials') out.push('craft')
+  if (s.smeltFrom) out.push('smelt')
   if (s.source && (!gatherNeedsDig || s.canDig)) {
     out.push('gather')
     if (s.source.target) out.push('find')

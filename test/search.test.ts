@@ -211,6 +211,8 @@ test('bring order: inventory, own chests, craft, gather, find', () => {
   assert.deepEqual(bringSteps(st({ item: 'raw_iron', source: gatherSource('raw_iron'), canDig: false })), [])
   assert.deepEqual(bringSteps(st({ uncheckedOwnChests: 1, creative: true, recipe: true })), ['chest'])
   assert.deepEqual(bringSteps(st({ item: 'create:andesite_alloy' })), [])
+  // iron ingots: crafting (from nuggets or a block) is tried, then the furnace from raw iron
+  assert.deepEqual(bringSteps(st({ item: 'iron_ingot', recipe: true, source: gatherSource('iron_ingot'), smeltFrom: 'raw_iron' })), ['craft', 'smelt'])
 })
 
 test('gather sources', () => {

@@ -7,7 +7,7 @@ each one is for and how it behaves.
 Two bundles live in `src/skills/index.ts`:
 
 - `standardSkills()`: status, movement, combat, survival, inventory, gather, [journal](/guide/journal).
-- `extendedSkills()`: crafting, containers, farming, food, woodcutting, building, construction,
+- `extendedSkills()`: crafting, containers, farming, food, search, woodcutting, building, construction,
   roads, materials, pickup.
 
 `navigation()` is exported on its own (the villager bot uses it).
@@ -142,6 +142,20 @@ What it finds is remembered in `agent.storage` (`foodSpots`, `farms`), as named 
 Never taken from other players: crops count only on the bot's own farm or a village farm
 (villagers within 24 blocks), and animals inside fences only on its own farm. Observe hook:
 `farms`, `foodSpots`.
+
+### search
+
+Finding and fetching for players without the LLM; see [Finding and fetching](/guide/search). The
+decisions are pure and unit-tested (`src/skills/searchPlan.ts`). Finds are remembered as named
+places `found:<target>` and as `found` journal events.
+
+| action | |
+|---|---|
+| `find_target` | Find a block family (iron, diamonds, logs, sand, water), a mob, a structure (village, nether portal, chest), a biome or a modded name: what is loaded first, remembered spots, then a surface spiral scout by day (and the strip mine for ores with `prospect`). Reports coordinates, distance and direction from the owner, and comes back (or stays with `go`). `bring` fetches `count` of it and hands it over. |
+| `bring_item` | Get an item from the inventory, its own chests (placed by it or in `settings.storage.chests`), crafting, gathering or a search for its source, then walk to the player, toss it and say how many they picked up. |
+| `fetch_drops` | Go to where a player died and bring their items back, when it can get there before they despawn. |
+
+Observe hook: `found`.
 
 ### woodcutting
 | action | |

@@ -15,8 +15,8 @@ import { digBlock, DigRefusedError, reachBlock, vec, gotoWithin, findItem } from
 import { pickupNearby } from './pickup.ts'
 import { climbOut, roofAbove } from './survival.ts'
 import { collectBlocks } from './gather.ts'
-import { craftItem } from './crafting.ts'
-import { gatherMaterials } from './materials.ts'
+import { craftItem, smeltItem } from './crafting.ts'
+import { gatherMaterials, plankFuel } from './materials.ts'
 import { fellTree } from './woodcutting.ts'
 import { mineStone } from './mining.ts'
 import { CROPS, isMature, plantOn } from './farming.ts'
@@ -29,7 +29,7 @@ import {
 } from './foodPlan.ts'
 import {
   resolveTarget, isResolveError, searchPhases, villageVerdict, portalVerdict, describeFind, gatherSource, bringSteps,
-  isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, ORES, SIMPLE_INGREDIENTS,
+  isOwnChest, parseChestList, tossAccount, dropsTrip, progressDue, ORES, SIMPLE_INGREDIENTS, SMELTS,
   type ResolvedTarget, type RegistryNames, type SearchPhase, type GatherSource
 } from './searchPlan.ts'
 
@@ -775,7 +775,7 @@ async function obtain (ctx: Ctx, item: string, want: number, depth: number, say:
     item, count: want, have: 0,
     inOwnChests: chests.reduce((n, c) => n + (c.known ?? 0), 0),
     uncheckedOwnChests: chests.filter(c => c.known === null).length,
-    recipe, source, canDig: agent.canDig, creative: !needsSurvival(bot)
+    recipe, source, smeltFrom: depth < 1 ? SMELTS[item] ?? null : null, canDig: agent.canDig, creative: !needsSurvival(bot)
   })
   for (const step of steps) {
     if (missing() <= 0) break
@@ -805,6 +805,30 @@ async function obtain (ctx: Ctx, item: string, want: number, depth: number, say:
         }
         r = await tidyStations(ctx, () => craftItem(bot, signal, item, missing())).catch(e => { checkAborted(signal); return fail((e as Error).message) })
       }
+      notes.push(r.message)
+      continue
+    }
+    if (step === 'smelt') {
+      const from = SMELTS[item]!
+      const n = missing()
+      const fromMatch = matcher(from)
+      if (invCount(bot, fromMatch) < n) {
+        say(`need ${n} ${from} to smelt into ${item}, getting it`)
+        notes.push(...(await obtain(ctx, from, n - invCount(bot, fromMatch), depth + 1, say, maxMinutes)))
+      }
+      const input = Object.keys(inventoryMap(bot)).find(fromMatch)
+      if (!input) { notes.push(`no ${from} to smelt`); continue }
+      const furnaceId = bot.registry.blocksByName.furnace?.id
+      if (!findItem(bot, 'furnace') && !(furnaceId !== undefined && bot.findBlock({ matching: furnaceId, maxDistance: 32 }))) {
+        const cobble = invCount(bot, x => x === 'cobblestone')
+        if (cobble < 8) notes.push(...(await obtain(ctx, 'cobblestone', 8 - cobble, depth + 1, say, maxMinutes)))
+        const f = await craftItem(bot, signal, 'furnace', 1).catch(e => { checkAborted(signal); return fail((e as Error).message) })
+        if (!f.ok) { notes.push(`furnace: ${f.message}`); continue }
+      }
+      const fuelOf = () => ['coal', 'charcoal'].find(f => invCount(bot, x => x === f) > 0) ?? plankFuel(bot)
+      if (!fuelOf()) await tidyStations(ctx, () => gatherMaterials(ctx, { planks: Math.ceil(n / 1.5) + 1 }, { radius: 32 }))
+      say(`smelting ${Math.min(n, invCount(bot, x => x === input))} ${input}`)
+      const r = await tidyStations(ctx, () => smeltItem(bot, signal, ctx.log, input, n, fuelOf())).catch(e => { checkAborted(signal); return fail((e as Error).message) })
       notes.push(r.message)
       continue
     }
@@ -883,10 +907,11 @@ const bringItem = defineAction({
     const t0 = Date.now()
     const who = askerOf(ctx, p.player)
     let item = p.item.toLowerCase().replace(/^minecraft:/, '').trim().replace(/\s+/g, '_')
-    if (!bot.registry.itemsByName[item]) {
+    if (item === 'logs' || item === 'wood') item = 'log'
+    if (item !== 'log' && item !== 'planks' && !bot.registry.itemsByName[item]) {
       const t = resolveTarget(p.item, registryNames(ctx.agent, bot))
       const alt = !isResolveError(t) ? t.item : undefined
-      if (!alt || alt === 'log' || !bot.registry.itemsByName[alt]) return fail(`I don't know an item called ${p.item}`)
+      if (!alt || (alt !== 'log' && !bot.registry.itemsByName[alt])) return fail(`I don't know an item called ${p.item}`)
       item = alt
     }
     const say = reporter(ctx, who)
@@ -900,7 +925,11 @@ const bringItem = defineAction({
     if (!have) return fail(`couldn't get any ${item}${how ? `: ${how}` : ''} (${secs})`)
     if (!who || who === bot.username) return ok(`have ${have} ${item}${how ? ` (${how})` : ''} (${secs})`)
     say(`got ${Math.min(have, p.count)} ${item}, bringing it`, true)
-    const d = await deliver(ctx, who, { [item]: Math.min(have, p.count) }, origin)
+    // generic names (any log, any planks) hand over whatever kinds it holds, up to the count
+    const give: Record<string, number> = {}
+    let left = Math.min(have, p.count)
+    for (const [k, v] of Object.entries(inventoryMap(bot))) { if (left > 0 && match(k)) { give[k] = Math.min(v, left); left -= give[k]! } }
+    const d = await deliver(ctx, who, give, origin)
     const msg = `${d.message}${how ? `; ${how}` : ''} (${Math.round((Date.now() - t0) / 1000)}s)`
     checkAborted(signal)
     return d.ok && d.given >= p.count ? ok(msg, { given: d.given, pickedUp: d.pickedUp }) : fail(msg, { given: d.given, pickedUp: d.pickedUp })

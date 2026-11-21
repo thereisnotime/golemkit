@@ -5,7 +5,7 @@
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-24 skills, 99 actions.
+24 skills, 100 actions.
 
 ## blueprint-library
 
@@ -149,34 +149,6 @@ Rename one of my learned blueprints. Owners only.
 |---|---|---|---|---|
 | `from` | string | yes |  |  |
 | `to` | string | yes |  |  |
-
-## bodyguard
-
-Protecting a player: stay with them, fight what threatens them, block arrows, feed them.
-
-### `protect`
-
-Stay with a player as a bodyguard until stopped: keep close (between them and the nearest danger), kill mobs that threaten them (creepers near them first, archers with a shot at them, diving phantoms, mobs coming for them or that hurt them), block arrows with a shield, and toss them food when they look hurt. Never attacks players, pets, villagers, golems or named mobs; neutral mobs only when they attack.
-
-*long-running*
-
-| param | type | required | default | description |
-|---|---|---|---|---|
-| `player` | string |  |  | player to protect; defaults to the requesting player |
-| `distance` | number (1..8) |  | `3` | follow distance, blocks |
-| `range` | number (6..32) |  | `16` | protect this far around them |
-| `feed` | boolean |  | `true` | toss food when their health is low (needs the server to send player health) |
-| `keepFood` | integer (0..64) |  | `4` | food items to keep for itself |
-| `chat` | boolean |  | `true` | short callouts in chat (fed you, ...) |
-
-### `feed_player`
-
-Walk up to a player and toss them food from the inventory (the best food, 1-2 items), keeping some for itself.
-
-| param | type | required | default | description |
-|---|---|---|---|---|
-| `player` | string |  |  | who to feed; defaults to the requesting player |
-| `keepFood` | integer (0..64) |  | `4` | food items to keep for itself |
 
 ## building
 
@@ -911,6 +883,54 @@ The roads this bot built: id, from where to where, length, stairs, and whether i
 *non-exclusive*
 
 No parameters.
+
+## search
+
+Finding things (find_target) and fetching them for players (bring_item, fetch_drops) without an LLM.
+
+### `find_target`
+
+Find something and report where it is: blocks and families (iron, diamonds, coal, logs, sand, water, lava), mobs (sheep, cows, villager), structures (village, nether portal, chest), biomes (desert, snow, ocean) or modded names. Looks at what is loaded around it, then remembered spots, then scouts a spiral on the surface by day (and can strip mine for ores). Remembers the spot as a place (found:iron for iron), reports coordinates, distance and direction from you, and comes back (or stays there with go). With bring it also fetches count of it and hands them over.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `target` | string | yes |  | what to look for, e.g. iron, sheep, water, village, desert |
+| `radius` | number (16..512) |  | `160` | how far to search, in blocks |
+| `max_minutes` | number (1..30) |  | `8` | give up after this long |
+| `bring` | boolean |  | `false` | also fetch some of it (blocks and items only) and hand it over |
+| `count` | integer (1..256) |  | `1` | how many to bring |
+| `go` | boolean |  | `false` | walk there and stay, instead of coming back to report |
+| `prospect` | boolean |  | `false` | ores: strip mine for it when none is in sight (always on with bring) |
+| `at_night` | boolean |  | `false` | also scout at night (dangerous) |
+
+### `bring_item`
+
+Bring a player some of an item: from the inventory, from my own chests (ones I placed or listed in settings.storage.chests, never anyone else's), by crafting it (simple recipes), by gathering it (chop, mine, harvest village or own farms), or by finding its source first. Then walks to the player, follows them if they move, tosses it to them and says how many they really got.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `item` | string | yes |  | item name, e.g. oak_planks, bread, raw_iron, cobblestone |
+| `count` | integer (1..256) |  | `1` | how many |
+| `player` | string |  |  | who to give it to; default whoever asked |
+| `max_minutes` | number (1..30) |  | `10` | time for a search when it has to look for the source |
+
+### `fetch_drops`
+
+Go to where a player (default: whoever asked) died and bring their dropped items back, if the bot can get there before they despawn (5 minutes). Uses the death message and where it last saw them, or coordinates you give.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `player` | string |  |  | whose items; default whoever asked |
+| `x` | number |  |  | where they died (with y and z), if the bot did not see it |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
+| `try_anyway` | boolean |  | `false` | go even when the items have probably despawned (they only age while the area is loaded) |
 
 ## status
 

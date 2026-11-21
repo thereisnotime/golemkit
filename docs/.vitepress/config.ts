@@ -61,6 +61,7 @@ export default withMermaid(defineConfig({
           { text: 'Goals and building', link: '/guide/goals-and-building' },
           { text: 'Roads and stairs', link: '/guide/roads' },
           { text: 'Tool progression and gathering', link: '/guide/progression' },
+          { text: 'Finding and fetching', link: '/guide/search' },
           { text: 'Blueprint libraries', link: '/guide/blueprints' },
           { text: 'WorldEdit', link: '/guide/worldedit' },
           { text: 'Self-improver', link: '/guide/self-improver' },
