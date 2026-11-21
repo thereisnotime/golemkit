@@ -60,6 +60,8 @@ journal:                      # optional, event journal settings (on by default)
 | `logging` | applied when the profile is run on its own |
 | `journal` | [event journal](/guide/journal): types, caps, retention, optional LLM summary; `false` turns it off. See [Event journal](./journal) |
 | `context` | [context pack](/guide/context-pack) dir (default: `profiles/<name>/` if it exists), see [Context packs](./context-pack) |
+| `building` | [building policy](/guide/blueprints#building-policy): `library` (default), `creative` or `ask` |
+| `blueprints` | extra blueprint folders (relative to the profile), added to `settings.build.blueprintDirs` |
 | `behaviors` | armed behaviours for the [behaviours brain](/guide/behaviors): `{ name: true \| false \| { enabled?, ...options } }`, checked against the registry when the profile is run, see [Behaviours](./behaviors) |
 
 ## LLM listening modes

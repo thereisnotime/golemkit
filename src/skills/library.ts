@@ -29,7 +29,9 @@ function ownerDenied (ctx: Ctx, what: string): string | null {
 
 const library = (ctx: Pick<ActionContext, 'agent'>) => loadLibrary(libraryDirs(ctx.agent))
 const facingSchema = z.enum(FACINGS as [Facing, ...Facing[]])
-const tagsSchema = z.array(z.string()).optional().describe('house, defence, farm, decoration, or your own (comma separated in chat)')
+const tagsSchema = z.union([z.array(z.string()), z.string()]).optional().describe('house, defence, farm, decoration, or your own (a list, or comma separated)')
+/** Tags from a list or a comma-separated string (chat). */
+const tagList = (t: string[] | string | undefined) => (t === undefined ? undefined : (Array.isArray(t) ? t : t.split(',')).map(s => s.trim().toLowerCase()).filter(Boolean))
 const kindSchema = z.enum(['shipped', 'user', 'learned'])
 
 function author (ctx: Ctx): string {
@@ -63,7 +65,7 @@ const searchParams = z.object({
 })
 
 const toQuery = (p: z.infer<typeof searchParams>): SearchQuery => ({
-  text: p.text, tags: p.tags, material: p.material, maxSize: p.max_size, maxHeight: p.max_height, maxBlocks: p.max_blocks, size: p.size, library: p.library as LibraryKind | undefined
+  text: p.text, tags: tagList(p.tags), material: p.material, maxSize: p.max_size, maxHeight: p.max_height, maxBlocks: p.max_blocks, size: p.size, library: p.library as LibraryKind | undefined
 })
 
 const blueprintSearch = defineAction({
@@ -80,7 +82,7 @@ const blueprintSearch = defineAction({
 
 const blueprintShow = defineAction({
   name: 'blueprint_show',
-  description: 'Show one blueprint: library info (author, source, tags, rating), a text drawing (top view and layers) and its materials vs my inventory. build_plan template=<name> says where it would go.',
+  description: 'Show one blueprint: library info (author, source, tags, rating), a text drawing (top view and layers) and its materials vs my inventory. build_plan with the same template says where it would go.',
   params: z.object({
     name: z.string(),
     layers: z.boolean().default(true).describe('false: top view only'),
@@ -162,7 +164,7 @@ const blueprintImport = defineAction({
       checkAborted(ctx.signal)
       const max = p.max_blocks ?? limits(ctx.agent).importMaxBlocks
       const names = [...new Set(s.palette.map(e => e.name.replace(/^minecraft:/, '')))]
-      const tags = p.tags ?? guessTags(`${name} ${p.description ?? ''}`, names)
+      const tags = tagList(p.tags) ?? guessTags(`${name} ${p.description ?? ''}`, names)
       const out = importStructure(s, {
         name, description: p.description, facing: p.facing, air: p.air, maxBlocks: max, ...(crop ? { crop } : {}),
         meta: { tags, author: author(ctx), source: `imported from ${p.file} (${s.format})`, created: today() }
@@ -240,7 +242,7 @@ const blueprintCapture = defineAction({
       const names = [...new Set(s.palette.map(e => e.name))]
       const out = structureToYaml(s, {
         name: p.name, description: p.description ?? `${p.name.replace(/_/g, ' ')}, captured at ${fmtPos(min)}`, facing: p.facing,
-        meta: { tags: p.tags ?? guessTags(`${p.name} ${p.description ?? ''}`, names), author: author(ctx), source: `captured at ${fmtPos(min)} to ${fmtPos(max)}`, created: today() }
+        meta: { tags: tagList(p.tags) ?? guessTags(`${p.name} ${p.description ?? ''}`, names), author: author(ctx), source: `captured at ${fmtPos(min)} to ${fmtPos(max)}`, created: today() }
       })
       parseBlueprint(out.yaml, p.name)
       const saved = writeLearned(learnedDir(agent), p.name, out.yaml, p.overwrite)
@@ -295,7 +297,7 @@ const blueprintDesign = defineAction({
     const m = (bp.meta ?? {}) as Record<string, unknown>
     const base = p.blueprint ? YAML.stringify(raw, { lineWidth: 0 }) : p.yaml!
     const yaml = withMeta(base, {
-      tags: p.tags ?? (Array.isArray(m.tags) ? undefined : guessTags(`${bp.name} ${bp.description}`, Object.values(bp.roles).map(r => r.default))),
+      tags: tagList(p.tags) ?? (Array.isArray(m.tags) ? undefined : guessTags(`${bp.name} ${bp.description}`, Object.values(bp.roles).map(r => r.default))),
       author: typeof m.author === 'string' ? undefined : author(ctx),
       source: 'designed',
       created: today(),

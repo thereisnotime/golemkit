@@ -15,6 +15,8 @@
 | debug | `just probe` | connect once, print the world snapshot |
 | debug | `just chat-test "!help,!pos"` | join as a second player and send commands |
 | debug | `just reset-channels` | forget learned NeoForge channels |
+| [blueprints](/guide/goals-and-building#blueprint-format) | `just blueprint-preview [name] [facing]` | print a blueprint as text, or list them |
+| blueprints | `just blueprint-import <file> [--bot name \| --out dir]` | convert a `.schem` / `.litematic` / `.nbt` into a blueprint ([Blueprint libraries](/guide/blueprints#import)) |
 | llm | `just llm-eval --dry` | A/B eval of a [profile](/guide/profiles)'s [context pack](/guide/context-pack) (real providers need `--yes`) |
 | docs | `just docs` | docs site dev server |
 | docs | `just docs-gen` | regenerate the [action reference](/reference/actions) |
