@@ -1,6 +1,6 @@
 // Where does the code touch Minecraft? Counts, per directory, the TypeScript files that import a
 // Mineflayer / PrismarineJS package and the files that reach into the bot (agent.bot, bot.entity,
-// ...), then lists files outside src/skills, src/core/neoforge and scripts that import one of
+// ...), then lists files outside src/adapters, src/skills, src/core/neoforge and scripts that import one of
 // those packages. Informational only: it always exits 0. See docs/concepts/scope.md.
 //   node scripts/scope-check.ts [--files]
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -8,7 +8,7 @@ import { join } from 'node:path'
 
 const ROOTS = ['src', 'variants', 'scripts']
 /** directories where Minecraft packages are expected (today and after the adapter split) */
-const EXPECTED = ['src/skills/', 'src/core/neoforge/', 'scripts/']
+const EXPECTED = ['src/adapters/', 'src/skills/', 'src/core/neoforge/', 'scripts/']
 
 const GAME_IMPORT = /(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"](mineflayer(?:-[\w-]+)?|prismarine-[\w-]+|minecraft-[\w-]+|vec3)['"]/g
 // direct use of the Mineflayer bot: agent.bot / ctx.bot / this.bot, or the bot's own state and calls
@@ -33,6 +33,7 @@ function group (file: string): string {
   if (parts[1] === 'core') return 'src/core/ (top level)'
   if (parts[1] === 'brains' && parts.length > 3) return `src/brains/${parts[2]}/`
   if (parts[1] === 'brains') return 'src/brains/ (top level)'
+  if (parts[1] === 'adapters' && parts.length > 3) return `src/adapters/${parts[2]}/`
   return `src/${parts[1]}/`
 }
 
@@ -59,9 +60,9 @@ for (const file of ROOTS.flatMap(walk).sort()) {
 }
 
 const pad = (s: string | number, n: number) => String(s).padEnd(n)
-console.log(pad('directory', 26) + pad('files', 7) + pad('import', 8) + pad('bot use', 9) + 'either')
+console.log(pad('directory', 30) + pad('files', 7) + pad('import', 8) + pad('bot use', 9) + 'either')
 for (const [g, r] of [...rows].sort((a, b) => a[0].localeCompare(b[0]))) {
-  console.log(pad(g, 26) + pad(r.files, 7) + pad(r.imports, 8) + pad(r.touches, 9) + `${r.either}/${r.files}`)
+  console.log(pad(g, 30) + pad(r.files, 7) + pad(r.imports, 8) + pad(r.touches, 9) + `${r.either}/${r.files}`)
 }
 console.log('\nimport = imports mineflayer*, prismarine-*, minecraft-* or vec3; bot use = agent.bot, bot.entity, bot.inventory, ...')
 

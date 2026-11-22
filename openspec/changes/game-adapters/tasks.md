@@ -12,9 +12,9 @@ Every phase ends with the parity checks below; a phase is done only when they al
 
 ## Phase 1: the line (no behaviour change)
 
-- [ ] `GameAdapter` interface: connect and reconnect, identity, chat, observation, events, capabilities
-- [ ] `ServerPlatform` interface inside the Minecraft adapter: vanilla, Paper, NeoForge (later Fabric)
-- [ ] Lint rule: no `mineflayer` / `prismarine-*` imports or `agent.bot` outside adapters (warning first; the violations are the work list)
+- [x] `GameAdapter` interface: connect and reconnect, identity, chat, observation, events, capabilities
+- [x] `ServerPlatform` interface inside the Minecraft adapter: vanilla, Paper, NeoForge (later Fabric)
+- [x] Lint rule: no `mineflayer` / `prismarine-*` imports or `agent.bot` outside adapters (warning first; the violations are the work list)
 
 ## Phase 2: Minecraft behind the interface
 

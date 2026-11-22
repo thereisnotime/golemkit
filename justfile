@@ -141,9 +141,29 @@ blueprint-fetch *args:
 image tag="golemkit":
     podman build -t {{tag}} .
 
-# Typecheck + unit tests
+# Typecheck + unit tests + the adapter line
 [group('check')]
-check: typecheck test
+check: typecheck test lint-adapters
+
+# No Minecraft imports or agent.bot outside src/adapters and src/skills (warnings until the split is done)
+[group('check')]
+lint-adapters:
+    @node scripts/adapter-lint.ts --warn | tail -1
+
+# Offline parity checks for the adapter split: tsc, tests, golden snapshots, replay, intents bench
+[group('check')]
+parity *args:
+    @node scripts/parity.ts {{args}}
+
+# Live smoke test (connect, follow, chop, find iron, bring planks, go home) with test accounts
+[group('debug')]
+smoke-test *args:
+    node --env-file-if-exists=.env scripts/smoke-test.ts {{args}}
+
+# Record a short real session for the packet replay test (test/fixtures/replay/)
+[group('debug')]
+replay-record *args:
+    node --env-file-if-exists=.env scripts/replay-record.ts {{args}}
 
 # Typecheck everything (tsc, no emit)
 [group('check')]
