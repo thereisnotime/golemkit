@@ -135,7 +135,7 @@ test('critical food: report once (rate limited), then stay put', () => {
   const d = planFood(stuck, opts)
   assert.equal(d.step, 'report')
   assert.equal(d.rung, 'critical')
-  assert.match(d.reason, /food 5\/20 and nothing left to try \(night\)/)
+  assert.match(d.reason, /food 5\/20 and nothing left to try \(night or a storm\)/)
   assert.equal(planFood({ ...stuck, lastReportAt: NOW - 3 * MIN }, opts).step, null, 'reported 3 minutes ago: quiet')
   assert.equal(planFood({ ...stuck, lastReportAt: NOW - 11 * MIN }, opts).step, 'report', 'again after 10 minutes')
   assert.equal(planFood(stuck, opts, new Set(['report'])).step, null, 'once per run')

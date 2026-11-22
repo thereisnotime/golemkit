@@ -597,7 +597,7 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   const ring = nextRing(w.searches ?? [], rings, now, o.ringMemoryMs ?? RING_MEMORY_MS)
   let searchBlocked = ''
   if (!o.scout || !w.canScout) searchBlocked = 'scouting is off'
-  else if (!dayOrBold) searchBlocked = 'night'
+  else if (!dayOrBold) searchBlocked = 'night or a storm'
   else if (w.danger) searchBlocked = 'hostiles near'
   else if (!ring) searchBlocked = `every ring out to ${Math.max(...rings)} came up empty in the last ${Math.round((o.ringMemoryMs ?? RING_MEMORY_MS) / 60_000)} min`
   else if (!ok('scout')) searchBlocked = 'already scouted this run'
