@@ -306,7 +306,7 @@ flowchart TB
 - **Retreat cap**: backing off goes straight away from the shooters, but never more than 24 blocks
   (`RETREAT_CAP`) from where the shooting started (a run that ended less than a minute ago counts
   as the same spell). At the cap it stands its ground with a bow, shield or weapon; with none of
-  those it may go 16 blocks further. Before backing off at all it looks for cover up to 14 blocks
+  those, or at 8 health or less, it may go 16 blocks further. Before backing off at all it looks for cover up to 14 blocks
   out, so cover wins over distance.
 - **Danger zones** (`core/danger.ts`): every shooter it deals with is remembered where it was seen,
   with a radius of its range + 8 (24 for a skeleton), for 5 minutes after the last sighting; a

@@ -212,7 +212,7 @@ export function activeShooters<T extends ShooterView> (list: readonly T[], range
  *  - otherwise hide.
  * Hiding means cover when there is some nearby, else building cover when it can, else backing
  * off; when backing off would pass the retreat cap (canRetreat false) it stands its ground with
- * the bow or shield it has.
+ * the bow, shield or weapon it has, except at RANGED_LOW_HEALTH or less, where it backs off anyway.
  */
 export function rangedResponse (s: RangedState): RangedDecision | null {
   const active = activeShooters(s.shooters)
@@ -223,7 +223,8 @@ export function rangedResponse (s: RangedState): RangedDecision | null {
   const hide = (why: string): RangedDecision => {
     if (s.coverNear) return { act: 'cover', target: nearest.id, why }
     if (s.canBuild) return { act: 'build', target: nearest.id, why }
-    if (s.canRetreat === false) {
+    // at the cap it stands its ground, unless it is about to die: then it keeps running (the caller allows a little more)
+    if (s.canRetreat === false && s.health > RANGED_LOW_HEALTH) {
       if (bow && nearest.dist >= 5) return { act: 'shoot', target: nearest.id, why: `${why}, nowhere left to back off` }
       if (shield) return { act: 'shield_close', target: nearest.id, why: `${why}, nowhere left to back off` }
       if (s.melee && s.health > RANGED_LOW_HEALTH && nearest.name !== 'ghast') return { act: 'charge', target: nearest.id, why: `${why}, nowhere left to back off` }

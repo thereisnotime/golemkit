@@ -117,7 +117,7 @@ When the bot hides from shooters, finds no cover within 8 blocks, may place bloc
 - **THEN** the wall goes one cell further out
 
 ### Requirement: Hide time and retreat cap
-Behind cover the bot SHALL leave as soon as every shooter is gone or, at 16 health or more, nothing shoots at it, and SHALL stay at most 4 s at 16+ health, 8 s at 12+ and 15 s below. After a fight against shooters that went badly it SHALL hide 3 s at 16+ health, 6 s at 12+, 10 s above 8 and 15 s at 8 or less, and stop hiding early when at 16+ health no shooter has a line to it. Backing off SHALL stop 24 blocks from where the shooting started; at that cap it SHALL stand its ground with a bow, shield or weapon.
+Behind cover the bot SHALL leave as soon as every shooter is gone or, at 16 health or more, nothing shoots at it, and SHALL stay at most 4 s at 16+ health, 8 s at 12+ and 15 s below. After a fight against shooters that went badly it SHALL hide 3 s at 16+ health, 6 s at 12+, 10 s above 8 and 15 s at 8 or less, and stop hiding early when at 16+ health no shooter has a line to it. Backing off SHALL stop 24 blocks from where the shooting started; at that cap it SHALL stand its ground with a bow, shield or weapon, except at 8 health or less, where it MAY back off up to 16 blocks more.
 
 #### Scenario: Healthy after a bad fight
 - **WHEN** a charge at a skeleton is broken off and the bot is back to 18 health with the skeleton out of sight

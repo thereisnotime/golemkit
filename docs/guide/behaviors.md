@@ -231,7 +231,8 @@ pillagers, witches, blazes, ghasts, drowned with tridents); the details are unde
   shooters (or a 1-2 block pillar with a wall on it, when that is quicker), if it may place blocks
   and the cells aren't protected. It says so in the log (`ranged: building cover at ...`). Only
   then cover up to 14 blocks out, and only then backing off, at most 24 blocks from where the
-  shooting started. At that cap it stands its ground with a bow, shield or weapon.
+  shooting started. At that cap it stands its ground with a bow, shield or weapon (at 8 health or less it keeps
+  going, up to 16 blocks more).
 - Behind cover it eats; it never stands in the open eating while something shoots at it. It leaves
   cover as soon as the shooters are gone or, at 16+ health, nothing shoots at it, and stays at most
   4 s when healthy, 8 s at 12+ and 15 s below. After a fight that went badly it hides 3 s at full

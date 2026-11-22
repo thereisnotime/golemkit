@@ -242,6 +242,7 @@ test('response: no cover nearby, build some, else back off; at the cap stand wit
   assert.equal(capped.act, 'shield_close')
   assert.match(capped.why, /nowhere left to back off/)
   assert.equal(rangedResponse(st({ shooters: three, coverNear: false, canRetreat: false, melee: false }))!.act, 'retreat', 'nothing to fight with')
+  assert.equal(rangedResponse(st({ shooters: three, coverNear: false, canRetreat: false, shield: true, health: 6 }))!.act, 'retreat', 'about to die: keep running')
 })
 
 test('hide time: short when healthy, long when hurt, over early when out of sight', () => {
