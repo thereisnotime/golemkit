@@ -2,7 +2,7 @@
 // gets hit with the bodyguard armed, with follow_owner only, and with no bot at all.
 //   node scripts/guard-bench.ts [x z] [--minutes 4] [--repeats 2] [--phases guard,follow,none]
 //        [--seed 1] [--sword stone|iron] [--armour] [--tester-food 8] [--interval 30] [--cap 8]
-//        [--time day|night] [--phantoms] [--tag run] [--scout] [--cleanup] [--force]
+//        [--time day|night] [--phantoms] [--waves mixed|ranged] [--bow] [--tag run] [--scout] [--cleanup] [--force]
 // DIRECTOR (default ClaudeTest, an op) runs everything with commands: before every phase it sets
 // the time, kills leftover tagged mobs, fills explosion holes in the arena floor, resets both
 // players to full health and hunger, gives the same gear (GUARD_BOT: a sword, a shield, 16 bread,
@@ -10,7 +10,9 @@
 // blocks east of the tester. It then summons a fixed, seeded schedule of tagged waves 8-14 blocks
 // around the tester (2 zombies, a skeleton with a bow, a spider; a creeper every other wave; a
 // phantom every third with --phantoms), one every --interval seconds while fewer than --cap mobs
-// are alive. The tester stands still (no self-defence, eats). Phases: guard (bodyguard armed for
+// are alive. --waves ranged summons archers only: 2 skeletons and 2 pillagers (crossbows), 3
+// pillagers on every other wave, to see how the bot keeps itself alive under fire. --bow also gives
+// the bot a bow and 32 arrows. The tester stands still (no self-defence, eats). Phases: guard (bodyguard armed for
 // the tester), follow (follow_owner only), none (the bot is offline: the baseline). The phase
 // order flips on every repeat. A tester death is counted, the mobs alive are killed and the
 // tester is reset on the spot. --time day (default) keeps natural spawns out; zombies and
@@ -30,7 +32,7 @@ const AVOID = process.env.MC_OWNER || 'Robin'
 const argv = process.argv.slice(2)
 const flag = (name: string) => argv.includes(`--${name}`)
 const opt = (name: string, def: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : def }
-const BOOL_FLAGS = ['--armour', '--phantoms', '--scout', '--force', '--cleanup']
+const BOOL_FLAGS = ['--armour', '--phantoms', '--scout', '--force', '--cleanup', '--bow']
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i > 0 && argv[i - 1].startsWith('--') && !BOOL_FLAGS.includes(argv[i - 1])))
 const X = Number(positional[0] ?? 1250)
 const Z = Number(positional[1] ?? 445)
@@ -45,6 +47,8 @@ const INTERVAL_S = Number(opt('interval', '30'))
 const CAP = Number(opt('cap', '8'))
 const TIME = opt('time', 'day')
 const PHANTOMS = flag('phantoms')
+const WAVES = opt('waves', 'mixed') as 'mixed' | 'ranged'
+const BOW = flag('bow')
 const RUN_TAG = opt('tag', 'run')
 
 type Phase = 'guard' | 'follow' | 'none'
@@ -53,7 +57,7 @@ const TESTER = process.env.GUARD_TESTER || 'GuardTester'
 const DIRECTOR = process.env.DIRECTOR || 'ClaudeTest'
 const DATA = process.env.GUARD_BENCH_DIR || 'data/guard-bench'
 const TAG = 'guardbench'
-const WAVE_MOBS = new Set(['zombie', 'skeleton', 'spider', 'creeper', 'phantom'])
+const WAVE_MOBS = new Set(['zombie', 'skeleton', 'spider', 'creeper', 'phantom', 'pillager'])
 const KEEP_AWAY: [string, number, number][] = [['spawn', 545, 45], ['village', -2770, 1090], ['fortress', 560, -43]]
 const server = serverFromEnv()
 const t0 = Date.now()
@@ -72,12 +76,12 @@ function mulberry32 (a: number): () => number {
 }
 
 interface Spawn { mob: string, dx: number, dz: number }
-export function waveSchedule (seed: number, count: number, phantoms: boolean): Spawn[][] {
+export function waveSchedule (seed: number, count: number, phantoms: boolean, kind: 'mixed' | 'ranged' = 'mixed'): Spawn[][] {
   const rnd = mulberry32(seed)
   const out: Spawn[][] = []
   for (let w = 0; w < count; w++) {
-    const mobs = ['zombie', 'zombie', 'skeleton', 'spider']
-    if (w % 2 === 1) mobs.push('creeper')
+    const mobs = kind === 'ranged' ? ['skeleton', 'skeleton', 'pillager', 'pillager'] : ['zombie', 'zombie', 'skeleton', 'spider']
+    if (w % 2 === 1) mobs.push(kind === 'ranged' ? 'pillager' : 'creeper')
     if (phantoms && w % 3 === 2) mobs.push('phantom')
     out.push(mobs.map(mob => {
       const a = rnd() * Math.PI * 2
@@ -93,6 +97,7 @@ function summonNbt (mob: string): string {
   // NBT on /summon skips the random spawn setup: no babies, no random gear, and no bow unless given
   if (mob === 'zombie') return `{Tags:["${TAG}"],PersistenceRequired:1b,ArmorItems:[${helmet}]}`
   if (mob === 'skeleton') return `{Tags:["${TAG}"],PersistenceRequired:1b,ArmorItems:[${helmet}],HandItems:[{id:"minecraft:bow",count:1},{}]}`
+  if (mob === 'pillager') return `{Tags:["${TAG}"],PersistenceRequired:1b,HandItems:[{id:"minecraft:crossbow",count:1},{}]}`
   return `{Tags:["${TAG}"],PersistenceRequired:1b}`
 }
 
@@ -147,11 +152,11 @@ function state (a: Agent): string {
 // ---- per-phase stats ----
 
 interface Stats {
-  hits: number, damage: number, testerDeaths: number, botDeaths: number, kills: Record<string, number>,
+  hits: number, damage: number, testerDeaths: number, botDeaths: number, botHits: number, botDamage: number, kills: Record<string, number>,
   explosionsNear: number, explosions: number, warnings: number, feeds: number, said: string[],
   waves: { at: number, mobs: number, firstHitMs: number | null }[], summoned: number, hitBy: Record<string, number>
 }
-const fresh = (): Stats => ({ hits: 0, damage: 0, testerDeaths: 0, botDeaths: 0, kills: {}, explosionsNear: 0, explosions: 0, warnings: 0, feeds: 0, said: [], waves: [], summoned: 0, hitBy: {} })
+const fresh = (): Stats => ({ hits: 0, damage: 0, testerDeaths: 0, botDeaths: 0, botHits: 0, botDamage: 0, kills: {}, explosionsNear: 0, explosions: 0, warnings: 0, feeds: 0, said: [], waves: [], summoned: 0, hitBy: {} })
 
 const median = (xs: number[]) => { if (!xs.length) return null; const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2 }
 
@@ -307,7 +312,13 @@ async function main (): Promise<void> {
         const t = hitAt.get(e.id)
         if (measuring && t && Date.now() - t < 4000 && e !== b.entity && e.type !== 'player') { st.kills[e.name] = (st.kills[e.name] ?? 0) + 1; log(`KILL ${e.name}`) }
       })
-      b.on('death', () => { if (measuring) { st.botDeaths++; botDied = true } log('BOT DIED') })
+      b.on('death', () => { if (measuring) { st.botDeaths++; botDied = true } log(`BOT DIED (${state(a)})`) })
+      // the bot's own hits taken (any drop in health while measuring; hunger can't hurt it, it carries bread)
+      let lastHp = b.health
+      b.on('health', () => {
+        if (b.health < lastHp && measuring) { st.botHits++; st.botDamage += lastHp - b.health }
+        lastHp = b.health
+      })
     })
   }
   watchBot(bot)
@@ -328,6 +339,7 @@ async function main (): Promise<void> {
     await cmd(`/give ${BOT} minecraft:${SWORD}_sword 1`)
     await cmd(`/give ${BOT} minecraft:shield 1`)
     await cmd(`/give ${BOT} minecraft:bread 16`)
+    if (BOW) { await cmd(`/give ${BOT} minecraft:bow 1`); await cmd(`/give ${BOT} minecraft:arrow 32`) }
     if (ARMOUR) for (const p of ['helmet', 'chestplate', 'leggings', 'boots']) await cmd(`/give ${BOT} minecraft:iron_${p} 1`)
     await heal(BOT)
   }
@@ -387,7 +399,7 @@ async function main (): Promise<void> {
     await cmd(`/gamemode survival ${TESTER}`)
     log(`difficulty ${(tester.bot.game as any).difficulty ?? '?'}`)
 
-    const schedule = waveSchedule(SEED, Math.ceil(MINUTES * 60 / INTERVAL_S) + 4, PHANTOMS)
+    const schedule = waveSchedule(SEED, Math.ceil(MINUTES * 60 / INTERVAL_S) + 4, PHANTOMS, WAVES)
     const results: any[] = []
 
     for (let rep = 0; rep < REPEATS; rep++) {
@@ -425,7 +437,7 @@ async function main (): Promise<void> {
         await heal(TESTER)
         if (phase !== 'none') {
           await heal(BOT)
-          const r = await step(bot, 'behavior_arm', { name: phase === 'guard' ? 'bodyguard' : 'follow_owner', options: { player: TESTER } })
+          const r = await step(bot, 'behavior_arm', { name: phase === 'guard' ? 'bodyguard' : 'follow_owner', options: phase === 'guard' ? { player: TESTER, whisper: true } : { player: TESTER } })
           if (!r.ok) throw new Error(`couldn't arm ${phase}: ${r.message}`)
         }
         await pause(2000)
@@ -503,6 +515,8 @@ async function main (): Promise<void> {
           time: TIME,
           sword: SWORD,
           armour: ARMOUR,
+          waveKind: WAVES,
+          bow: BOW,
           waves: st.waves.length,
           summoned: st.summoned,
           testerHits: st.hits,
@@ -510,6 +524,8 @@ async function main (): Promise<void> {
           testerDeaths: st.testerDeaths,
           hitBy: st.hitBy,
           botDeaths: st.botDeaths,
+          botHits: st.botHits,
+          botDamage: Math.round(st.botDamage),
           kills: st.kills,
           killCount: Object.values(st.kills).reduce((a, b) => a + b, 0),
           explosionsNearTester: st.explosionsNear,
@@ -536,14 +552,14 @@ async function main (): Promise<void> {
 
 export function printSummary (results: any[]): void {
   const row = (cells: (string | number)[]) => cells.map((c, i) => String(c).padStart(i === 0 ? 7 : 9)).join(' ')
-  console.log('\n' + row(['phase', 'run', 'summoned', 'hits', 'damage', 'deaths', 'hits/10mob', 'firstHitS', 'botDeath', 'kills', 'boom@6', 'warns', 'feeds']))
+  console.log('\n' + row(['phase', 'run', 'summoned', 'hits', 'damage', 'deaths', 'hits/10mob', 'firstHitS', 'botDeath', 'botHits', 'kills', 'boom@6', 'warns', 'feeds']))
   const phases = [...new Set(results.map(r => r.phase))]
   for (const p of phases) {
     const rs = results.filter(r => r.phase === p)
-    for (const r of rs) console.log(row([p, r.repeat, r.summoned, r.testerHits, r.testerDamage, r.testerDeaths, (r.testerHits / Math.max(1, r.summoned) * 10).toFixed(1), r.firstHitMedianS ?? '-', r.botDeaths, r.killCount, r.explosionsNearTester, r.warnings, r.feeds]))
+    for (const r of rs) console.log(row([p, r.repeat, r.summoned, r.testerHits, r.testerDamage, r.testerDeaths, (r.testerHits / Math.max(1, r.summoned) * 10).toFixed(1), r.firstHitMedianS ?? '-', r.botDeaths, r.botHits ?? '-', r.killCount, r.explosionsNearTester, r.warnings, r.feeds]))
     const m = (k: string) => rs.reduce((a, r) => a + r[k], 0) / rs.length
     const sd = (k: string) => { const mu = m(k); return Math.sqrt(rs.reduce((a, r) => a + (r[k] - mu) ** 2, 0) / Math.max(1, rs.length - 1)) }
-    console.log(row([p, 'mean', m('summoned').toFixed(1), `${m('testerHits').toFixed(1)}±${sd('testerHits').toFixed(1)}`, `${m('testerDamage').toFixed(0)}±${sd('testerDamage').toFixed(0)}`, m('testerDeaths').toFixed(1), (rs.reduce((a, r) => a + r.testerHits, 0) / Math.max(1, rs.reduce((a, r) => a + r.summoned, 0)) * 10).toFixed(1), '', m('botDeaths').toFixed(1), m('killCount').toFixed(1), m('explosionsNearTester').toFixed(1), m('warnings').toFixed(1), m('feeds').toFixed(1)]))
+    console.log(row([p, 'mean', m('summoned').toFixed(1), `${m('testerHits').toFixed(1)}±${sd('testerHits').toFixed(1)}`, `${m('testerDamage').toFixed(0)}±${sd('testerDamage').toFixed(0)}`, m('testerDeaths').toFixed(1), (rs.reduce((a, r) => a + r.testerHits, 0) / Math.max(1, rs.reduce((a, r) => a + r.summoned, 0)) * 10).toFixed(1), '', m('botDeaths').toFixed(1), m('botHits').toFixed(1), m('killCount').toFixed(1), m('explosionsNearTester').toFixed(1), m('warnings').toFixed(1), m('feeds').toFixed(1)]))
   }
 }
 

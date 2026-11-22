@@ -208,6 +208,25 @@ the same `retreat`/`flee` actions and the reflex always outranks the behaviour, 
 never pull the body two ways. `keep_fed` likewise leaves "eat what you carry" to the reflex
 (food < 15) and steps in below 14, or when health is low and food is under 18 (no regen).
 
+### Ranged safety
+
+Every bot, bodyguard or not, deals with mobs that shoot at it (skeletons, strays, bogged,
+pillagers, witches, blazes, ghasts, drowned with tridents); the details are under
+[Ranged threats](/concepts/world#ranged-threats). In short:
+
+- The reflexes start `ranged_defense` on an arrow or bolt on course for the bot, on a hit from
+  range (also a health drop at food 0 when a shooter has a line to it), or when a shooter in
+  range with a line to the bot looks at it. That preempts `find_food`, `find_target`,
+  `chop_wood_loop` or whatever job runs, so the bot no longer walks on through crossbow fire.
+- It answers by health and gear: shoot back with a bow or crossbow and arrows, raise a shield
+  and close in, charge a lone shooter when healthy with a weapon, or take cover behind a block
+  and back out of range when there is none. At 8 health or less, or against 3+ shooters or a
+  pillager patrol of 3+ without iron armour and a shield, it hides instead of fighting.
+- Behind cover it eats; it never stands in the open eating while something shoots at it.
+- `stay_safe` takes cover itself (score 91, above a starving `keep_fed`) when a shooter has a
+  line to the bot and it is at 12 health or less, or outnumbered without good gear. Turn it off
+  with `ranged: false` (stay_safe) or `rangedDefense: false` (reflexes).
+
 Going home at night has some slack so it doesn't flap at the edge of `homeRange`:
 
 - "Home" is measured horizontally from the home block, and a height difference only counts
@@ -271,6 +290,19 @@ flowchart TB
   zombie reaching the player while the bot chases an archer. With a bow (skeletons drop them)
   it never shoots while the player is near the line of fire, up to 4 blocks past the target; it
   closes in instead.
+- **Intercept**: a ground mob walking at the player 6 to 12 blocks out is met on its predicted
+  path (velocity from position samples) instead of at the player, and of similar mobs the one
+  that reaches the player first goes first.
+- **Pulling aggro**: with two or more melee mobs on the player (within 4 blocks, hitting or
+  closing in), it hits each one it hasn't hit in the last 6 s once, so they turn on it, then
+  steps 6 blocks off the player on its own side so they follow. One mob on the player is just
+  fought.
+- **Creepers**: shot from 5+ blocks with a bow and arrows when the player isn't in the line,
+  otherwise hit once and stepped back from; a lit fuse within 5 blocks sends the bot 7 away
+  (never within 3 of it).
+- **Gear**: `protect` puts on the best armour, shield or totem it carries when it starts (armed,
+  or after a respawn) and checks again every few seconds while it is quiet, so gear handed over
+  after a death goes on before the next fight.
 - **Position**: with a mob around but nothing to fight, the bot stands on the line between the
   player and the mob at the follow distance (at most halfway). Flyers are fought from next to
   the player.
@@ -312,12 +344,17 @@ tester every 30 s while fewer than 8 are alive: 2 zombies and a skeleton (leathe
 they don't burn, the skeleton with a bow), a spider, and a creeper every other wave. Phases:
 `guard` (bodyguard armed for the tester), `follow` (`follow_owner` only), `none` (bot offline).
 The order flips on every repeat. A tester death is counted, the mobs alive are killed and the
-tester is reset on the spot.
+tester is reset on the spot. `--waves ranged` summons archers only (2 skeletons and 2 pillagers
+with crossbows, a third pillager every other wave) to measure how the bot keeps itself alive
+under fire; `--bow` also gives the bot a bow and 32 arrows. The bot's own hits taken and deaths
+are counted in every phase. In the guard phase the bodyguard whispers its warnings to the
+tester, so nobody else on the server sees them.
 
 ```sh
 just guard-bench --scout                      # check the spot (flat, dry) and Robin's distance
 just guard-bench                              # 1250 445, 2 repeats x 3 phases x 4 min
 just guard-bench 1250 445 --minutes 4 --repeats 3 --armour --tag mytest
+just guard-bench --phases follow --waves ranged --minutes 3   # the bot's own survival under fire
 just guard-bench --cleanup                    # kill tagged mobs, clear both players
 ```
 
@@ -360,6 +397,40 @@ How to read it:
 - Fairness: in the first "after" follow phase the 8-alive cap held back 2 waves (27 mobs instead
   of 36), so that phase is if anything easier than the others. Spiders don't attack in daylight,
   so the waves are effectively zombies, skeletons and creepers. Zombies did 75-90% of all hits.
+
+**Guard intercept and ranged safety** (mc02, 22-23 Nov 2026, same spot, seed and gear: iron
+sword, shield, 16 bread, no armour, no bow). "Before" is the code above, "after" adds intercept,
+pulling aggro, creeper shooting, gear on arm/respawn and the [ranged reflex](#ranged-safety).
+Guard phases ran 4 minutes with the mixed waves (36 mobs each); the ranged rows are the `follow`
+phase (no bodyguard, so the bot looks after itself) with `--waves ranged` for 3 minutes
+(27 skeletons and pillagers each).
+
+| set | waves, phase | tester hits (each run) | mean tester damage | tester deaths | bot deaths | bot hits taken | bot kills |
+|---|---|---|---|---|---|---|---|
+| before | mixed, guard | 52, 28 | 147 | 5, 3 | 4, 3 | 60, 45 | 4, 14 |
+| after | mixed, guard | 35, 36 | 124 | 3, 3 | 3, 4 | 35, 44 | 18, 15 |
+| before | ranged, follow | 40, 48 | 159 | 4, 4 | 1, 1 | 19, 19 | 5, 6 |
+| after | ranged, follow | 50, 49 | 176 | 5, 5 | 0, 1 | 7, 14 | 4, 2 |
+
+How to read it:
+
+- Bodyguard: the tester took about a tenth fewer hits on average (35.5 against 40) and the
+  spread shrank, with more kills. The "before" pair is 52 and 28 in one session, so the change in
+  the mean is inside the noise; the steadier numbers and the kills are the clearer signal. Bot
+  deaths didn't change (3.5 per 4 minutes): it still dies to crowds and creepers point blank
+  without armour, and the time to the first hit after a wave stays at 4 to 5 s.
+- Ranged: the bot took about half the hits from archers and pillagers (10.5 against 19 per run,
+  41 against 68 damage) and died once in two runs instead of twice. It does that by hiding: every
+  wave is 4 or 5 shooters against a bot without armour, which counts as outnumbered, and the
+  arena is flat with no cover, so it mostly backs out of range. It kills fewer of them and the
+  tester, who stands still in the open, takes more hits. That is the intended trade for a bot's
+  own safety; a bot with iron armour and a shield, or a bow, stands and fights.
+- An earlier "after" guard run (42 tester hits, 3 bot deaths) is left out: it exposed a bug in
+  the first version of `ranged_defense` that spun without yielding and froze the process for
+  45 s twice, so all three accounts timed out. The fix (yield every pass, drop cover spots that
+  turn out to be in sight) is in the code the "after" guard rows ran; the ranged rows ran just
+  before it and had no freeze.
+
 
 ## Food: keep_fed, scouting and farm_setup
 
@@ -487,9 +558,9 @@ behaviour also accepts `priority: idle | npc | behavior`.
 
 ### `stay_safe`
 
-*safety · priority behavior (35) · uses `retreat`, `flee`, `pillar`, `goto`, `go_home`, `bunker` when present*
+*safety · priority behavior (35) · uses `retreat`, `flee`, `pillar`, `goto`, `go_home`, `bunker`, `ranged_defense` when present*
 
-Keeps the bot alive: backs away from mobs at low health, pillars up when surrounded (if it can place blocks), gets out of water when mobs are around, heads home at night if a home is set (sooner when it has no armour, weapon or food), and without a home digs in for the night when it is unprepared. Arm it on any bot that roams.
+Keeps the bot alive: backs away from mobs at low health, pillars up when surrounded (if it can place blocks), takes cover from skeletons, pillagers and other shooters when hurt or outnumbered (and eats behind cover), gets out of water when mobs are around, heads home at night if a home is set (sooner when it has no armour, weapon or food), and without a home digs in for the night when it is unprepared. Arm it on any bot that roams.
 
 | option | type | default | description |
 |---|---|---|---|
@@ -501,6 +572,7 @@ Keeps the bot alive: backs away from mobs at low health, pillars up when surroun
 | `homeAtNight` | boolean | `true` | go home at night if a home is set |
 | `homeRange` | number (2..64) | `8` | how close to home counts as home at night |
 | `shelterUnprepared` | boolean | `true` | at night without armour, a weapon or food and no home: dig in (bunker) until morning |
+| `ranged` | boolean | `true` | take cover (or back out of range) from skeletons, pillagers and other shooters when hurt or outnumbered, and eat behind cover |
 
 ### `avoid_mobs`
 

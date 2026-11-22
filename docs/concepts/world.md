@@ -193,7 +193,9 @@ flowchart TB
   (kept until 20 s pass without a fight), and `defend` walks back there afterwards, so reflex
   fights don't drag the bot away from shelter.
 - **Creepers first**: a creeper coming within 5 blocks ends the current fight so it gets dealt
-  with before its fuse.
+  with before its fuse. With a bow and arrows it shoots a creeper from 5+ blocks (not when a
+  bodyguard's player is in the line); otherwise it hits once and steps back. A lit fuse within 5
+  blocks sends it 7 blocks away until the fizzle (`creeperMove` in `tactics.ts`).
 - **Outnumbered** (3+ melee mobs within 6, health under half): pillar 2 blocks (zombies can't
   reach feet that high, the bot still reaches their heads) and fight from the top; without
   blocks, go home if it is within 48 blocks, else back off.
@@ -207,7 +209,7 @@ flowchart TB
   Before this, bots crafted iron armour and never wore it.
 - **Reacting**: reflexes start `defend` when hurt (also on any health drop, the backstop for a
   missed hurt event), and before the first hit when a creeper is within 7 blocks or any hostile
-  within 4.
+  within 4. Shooters out of reach get `ranged_defense` instead, see [Ranged threats](#ranged-threats).
 - **Night**: `stay_safe` heads home at night with higher priority when the bot has no armour,
   weapon or food; without a home it digs in with `bunker` until morning (needs digging, not
   under a roof already).
@@ -216,6 +218,75 @@ Two live benchmarks: `scripts/fight-test.ts` stands the bot outside for a night 
 deaths and damage taken; `scripts/arena-test.ts` uses an op account to hand out the same gear
 after every death and summon the same waves of mobs (2 zombies, a skeleton, a spider, a creeper
 every other wave), so runs of different versions compare directly.
+
+## Ranged threats
+
+Skeletons, strays, bogged, pillagers, witches, blazes, ghasts and drowned holding a trident shoot
+from range, so waiting for the first hit (or walking on through the fire) is how bots died. Pax,
+starving at food 0 on a find_food leg, was shot by a pillager near its base and only reacted to
+the last bolt: the health-drop backstop ignored every drop at food 0 as starvation, and nothing
+looked at shooters further than 8 blocks.
+
+Every bot with the combat skill now keeps a ranged watch (`skills/ranged.ts`):
+
+- **Shooters**: those within 24 blocks with a clear line between the bot's eyes and theirs, or
+  that hurt it in the last few seconds. A shooter in its range with a line to the bot and looking
+  at it counts as aiming.
+- **Projectiles**: each arrow, bolt, trident, thrown potion or fireball near the bot is simulated
+  forward (gravity and drag per tick, from the spawn packet's velocity or position samples);
+  one that passes through the bot's body is an alarm before it lands. The spawn packet names the
+  owner, so the shooter is known; arrows from players don't count.
+- **Hits from range**: damage events name the shooter. A health drop the event didn't explain
+  is blamed on a shooter with a line to the bot, even at food 0, so starving no longer hides a
+  pillager.
+- **Patrols**: pillagers, vindicators, evokers and ravagers within 24 are counted.
+
+The `ranged_defense` action (reflex priority, so it preempts whatever job runs: find_food,
+find_target, chop_wood_loop; they resume afterwards) answers with `rangedResponse` in
+`ranged-plan.ts`:
+
+```mermaid
+flowchart TB
+  A(["shot at, arrow on course,<br/>or a shooter aiming"]) --> L{"health ≤ 8?"}
+  L -- yes --> H["hide"]
+  L -- no --> O{"3+ shooters or a patrol of 3+,<br/>no iron armour + shield?"}
+  O -- yes --> H
+  O -- no --> B{"bow or crossbow<br/>and arrows?"}
+  B -- yes --> S["shoot back"]
+  B -- no --> SH{"shield?"}
+  SH -- yes --> C["shield up, close in"]
+  SH -- no --> CH{"weapon, health ≥ 14,<br/>≤ 2 shooters?"}
+  CH -- yes --> Z["charge in a zig-zag"]
+  CH -- no --> H
+  H --> CV{"cover within 8?"}
+  CV -- yes --> CO["walk behind the block,<br/>eat there, fight what walks up"]
+  CV -- no --> R["back out of range,<br/>straight away from them"]
+  classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
+  classDef r fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+  class A a
+  class L,O,B,SH,CH,CV d
+  class S,C,Z g
+  class H,CO,R r
+```
+
+- **Cover** (`findCover`): a standable spot within 8 blocks (2 up or down) where a solid block
+  is on the line from the bot's head and chest to every shooter's eyes, cheapest first by walking
+  distance, with a penalty for walking towards them or ending within 4 blocks of one. If a
+  shooter comes round and sees it again it looks for new cover; one walking up within 4 blocks
+  is fought there.
+- **Eating**: only out of every shooter's sight with nothing in flight at it (`canEatUnderFire`),
+  never standing in the open.
+- **Ghasts** without a bow, and **blazes** without a bow or shield: cover.
+- A melee mob within 3 blocks is fought first; a `defend` already running is only taken over to
+  hide, and a bodyguard's `protect` only at 6 health or less.
+- `stay_safe` adds a `ranged` danger (score 91, above a starving keep_fed's 90) when a shooter
+  has a line to the bot and it is at 12 health or less, or outnumbered without good gear: it runs
+  `ranged_defense` in cover mode. Option `ranged` (default on); reflexes have `rangedDefense`.
+
+Flat open ground has no cover, so there the answer is backing off; the bot doesn't build cover
+(placing a block wall) yet.
 
 ## Reflexes
 
@@ -264,6 +335,7 @@ reflexes:
   eatBelow: 15          # eat when food drops below this
   retreatBelow: 8       # back off at or below this health; 0 = stand your ground
   waterFightAbove: 14   # don't fight mobs in water below this health; 0 = always fight
+  rangedDefense: true   # shoot back / shield / cover / back off when mobs shoot at it
 ```
 
 Pax uses `retreatBelow: 0` and `waterFightAbove: 0`: it always fights back. It still backs off

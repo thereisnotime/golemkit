@@ -10,7 +10,7 @@ scopeNote: "Generated from the skills: most are Minecraft; the journal and confi
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-25 skills, 102 actions.
+25 skills, 103 actions.
 
 ## blueprint-library
 
@@ -272,6 +272,17 @@ Put on the best armour in the inventory and put a totem of undying or a shield i
 *non-exclusive*
 
 No parameters.
+
+### `ranged_defense`
+
+Deal with mobs shooting at the bot (skeletons, strays, bogged, pillagers, witches, blazes, ghasts, drowned with tridents): shoot back with a bow or crossbow, raise a shield and close in, take cover behind a block (and eat there), or back out of range, depending on health, gear and how many there are. Used by the reflexes and stay_safe.
+
+*internal*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `cover` | boolean |  | `false` | hide or back off instead of fighting, whatever the gear |
+| `maxSeconds` | number (5..120) |  | `45` | give up after this long |
 
 ## config
 

@@ -18,4 +18,4 @@ point blank without armour.
 
 ## Status
 
-Proposed, not started.
+Implemented (see the bodyguard and stay-safe specs).

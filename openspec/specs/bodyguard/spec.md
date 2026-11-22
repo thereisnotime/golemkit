@@ -35,6 +35,50 @@ A melee mob within 3 blocks of the player that just hurt them SHALL rank above a
 - **WHEN** the zombie that hit the player is 5 blocks from them
 - **THEN** the archer with a shot ranks first
 
+### Requirement: Intercept approaching mobs
+The bodyguard SHALL treat a ground mob moving towards the player between 6 and 12 blocks from them as a threat to intercept, meet it on its predicted path (velocity from position samples) rather than at the player, and among similar mobs SHALL go first for the one that reaches the player soonest.
+
+#### Scenario: Zombie walking at the player
+- **WHEN** a zombie 10 blocks from the player is moving towards them and nothing else threatens the player
+- **THEN** its reason is "intercept" and the bot walks to a point on the zombie's path between it and the player before fighting it
+
+#### Scenario: Two zombies the same distance out
+- **WHEN** two zombies 9 blocks from the player close in, one reaching them in 1.5 s and the other in 4 s
+- **THEN** the faster one ranks first
+
+### Requirement: Pull aggro off the player
+With two or more ground melee mobs within 4 blocks of the player that are hitting or closing on them, the bodyguard SHALL hit each one it has not hit in the last 6 seconds once, so it turns on the bot, and then step to a spot 6 blocks from the player on its own side so the mobs follow it; a single mob on the player SHALL simply be fought.
+
+#### Scenario: Two zombies on the player
+- **WHEN** two zombies stand 1.4 and 2.2 blocks from the player and have hit them
+- **THEN** the bot hits the nearer one once, then the other, then steps 6 blocks off the player
+
+#### Scenario: One zombie
+- **WHEN** only one zombie is on the player
+- **THEN** there is no pull; the bot fights it
+
+### Requirement: Creeper safety
+The bot SHALL back away from a creeper whose fuse is lit within 5 blocks (never staying within 3 of a lit fuse), SHALL shoot a creeper from 5 or more blocks when it has a bow or crossbow and arrows and the player is not in the line of fire, and otherwise SHALL hit it once and step back.
+
+#### Scenario: Lit fuse
+- **WHEN** a creeper 2.5 blocks from the bot starts its fuse
+- **THEN** the bot backs away to 7 blocks before the fuse ends
+
+#### Scenario: Bow available
+- **WHEN** the bot carries a bow and arrows and a creeper 8 blocks away approaches the player
+- **THEN** it shoots the creeper instead of closing to melee
+
+#### Scenario: Player in the line
+- **WHEN** the same creeper has the player behind it on the bot's line
+- **THEN** it closes in and uses the sword
+
+### Requirement: Gear up when armed
+When protect starts (the bodyguard is armed) and every few seconds while it runs quietly, the bot SHALL put on the best armour, shield or totem it carries, so gear handed to it after a respawn is worn before the next fight; the reflexes SHALL also check for gear right after a respawn.
+
+#### Scenario: Armed with armour in inventory
+- **WHEN** an owner arms the bodyguard and the bot carries iron armour it is not wearing
+- **THEN** it wears the armour before escorting
+
 ### Requirement: Retarget mid-fight
 While fighting one mob, the bodyguard SHALL re-rank the threats at least once a second and drop the current target when it is no longer a threat or when another threat scores clearly higher (60 points), so it does not flip between similar mobs.
 
