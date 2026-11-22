@@ -42,12 +42,24 @@ export interface ServerConfig {
   version: string
 }
 
+/** Defaults for a server running on this machine; set MC_HOST etc. in `.env` for anything else. */
+export const DEFAULT_SERVER: ServerConfig = { host: 'localhost', port: 25565, auth: 'offline', version: '1.21.1' }
+
+let envFileTried = false
+/** Loads `.env` from the working directory once, if it exists and the process wasn't started with it. */
+function loadDotEnvOnce (): void {
+  if (envFileTried) return
+  envFileTried = true
+  try { process.loadEnvFile('.env') } catch { /* no .env: defaults apply */ }
+}
+
 export function serverFromEnv (env: NodeJS.ProcessEnv = process.env): ServerConfig {
+  if (env === process.env && !env.MC_HOST) loadDotEnvOnce()
   return {
-    host: env.MC_HOST || 'mc.example.com',
-    port: Number(env.MC_PORT || 25565),
-    auth: (env.MC_AUTH as ServerConfig['auth']) || 'offline',
-    version: env.MC_VERSION || '1.21.1'
+    host: env.MC_HOST || DEFAULT_SERVER.host,
+    port: Number(env.MC_PORT || DEFAULT_SERVER.port),
+    auth: (env.MC_AUTH as ServerConfig['auth']) || DEFAULT_SERVER.auth,
+    version: env.MC_VERSION || DEFAULT_SERVER.version
   }
 }
 

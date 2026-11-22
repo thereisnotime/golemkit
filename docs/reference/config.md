@@ -7,7 +7,7 @@ fleet bot entry / CLI flags.
 
 | variable | default | |
 |---|---|---|
-| `MC_HOST` | `mc.example.com` | server host |
+| `MC_HOST` | `localhost` | server host |
 | `MC_PORT` | `25565` | server port |
 | `MC_AUTH` | `offline` | `offline` or `microsoft` (device-code login, cached in `.auth/`) |
 | `MC_VERSION` | `1.21.1` | protocol version |

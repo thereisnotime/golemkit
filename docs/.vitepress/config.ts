@@ -6,7 +6,9 @@ export default withMermaid(defineConfig({
   title: 'mc-buddy',
   description: 'Minecraft bot framework for NeoForge servers',
   cleanUrls: true,
-  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }]],
+  // '/' locally; the GitHub Pages workflow sets DOCS_BASE=/mc-buddy/ (the site lives under the repo name)
+  base: process.env.DOCS_BASE || '/',
+  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: `${process.env.DOCS_BASE || '/'}favicon.svg` }]],
   lastUpdated: false,
   srcExclude: ['**/README.md'],
   markdown: {

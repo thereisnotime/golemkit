@@ -3,7 +3,8 @@
 ## Requirements
 
 - [asdf](https://asdf-vm.com) (or any way to get the versions in `.tool-versions`: Node 26, just)
-- A Minecraft Java server. The defaults point at **mc02** (NeoForge 1.21.1, offline mode).
+- A Minecraft Java server. The defaults are `localhost:25565`, offline mode, version 1.21.1;
+  put your server in `.env` (`MC_HOST`, `MC_PORT`, `MC_AUTH`, `MC_VERSION`), see below.
   Vanilla and Paper servers work too; the [NeoForge layer](/concepts/neoforge) simply stays idle.
 
 ## Install
@@ -29,7 +30,7 @@ couple of times while it learns the server's mod channels, then caches them in `
 
 ```
 22:39:58 McBuddy starting: 6 skills, 20 actions, brains: command, reflexes
-22:39:58 McBuddy connecting to mc.example.com:25565 (offline), 210 known NeoForge channels
+22:39:58 McBuddy connecting to localhost:25565 (offline), 210 known NeoForge channels
 22:39:59 McBuddy spawned at 541 53 58 (overworld, survival)
 ```
 
