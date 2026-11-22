@@ -332,6 +332,17 @@ export function chaseRefusal (s: { fromStart: number, maxChase: number, targetIn
   return null
 }
 
+/**
+ * What to do about a creeper the bot fights: back off when its fuse is lit within 5 blocks (the
+ * blast hurts out to ~7; never stand within 3 of a lit fuse), shoot it from 5+ blocks with a bow
+ * (unless the shot is held, a bodyguard's player in the line), otherwise hit once and step back.
+ */
+export function creeperMove (s: { dist: number, fuseLit: boolean, bow: boolean, holdFire?: boolean }): 'back_off' | 'shoot' | 'melee' {
+  if (s.fuseLit && s.dist < 5) return 'back_off'
+  if (s.bow && !s.holdFire && s.dist >= 5 && s.dist < 24) return 'shoot'
+  return 'melee'
+}
+
 /** Not fit to be out at night: no armour, no weapon or no food. stay_safe then goes home or digs in. */
 export function unpreparedForNight (s: { armorPoints: number, hasWeapon: boolean, hasFood: boolean }): string | null {
   const missing = [s.armorPoints <= 0 && 'armour', !s.hasWeapon && 'weapon', !s.hasFood && 'food'].filter(Boolean)

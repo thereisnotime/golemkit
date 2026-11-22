@@ -33,7 +33,13 @@ export interface GuardThreat {
   facing?: boolean
   /** A flyer coming down towards the player. */
   diving?: boolean
+  /** Seconds until it reaches the player at the speed it is closing in (undefined: not closing). */
+  eta?: number
 }
+
+/** Intercept band: a ground mob closing in on the player this far out is met before it gets there. */
+export const INTERCEPT_MIN = 6
+export const INTERCEPT_MAX = 12
 
 /**
  * Why a mob is a threat to the player (or to the bot itself while it guards), or null when it
@@ -54,6 +60,7 @@ export function threatReason (t: GuardThreat, range: number): string | null {
     if (t.distPlayer <= 6 || (t.diving && t.distPlayer <= 24)) return 'diving at the player'
     return t.hurtBot ? 'attacked me' : null
   }
+  if (t.approaching && t.distPlayer >= INTERCEPT_MIN && t.distPlayer <= Math.min(INTERCEPT_MAX, range)) return 'intercept'
   if (t.distPlayer <= range && (t.approaching || t.facing)) return 'coming for the player'
   if (t.distPlayer <= 5) return 'next to the player'
   if (t.hurtBot || t.distBot <= 4) return 'on me'
@@ -69,6 +76,8 @@ export function threatReason (t: GuardThreat, range: number): string | null {
 export function guardScore (t: GuardThreat, range = 16): number {
   const base = threatScore({ id: t.id, name: t.name, dist: t.distPlayer, los: t.losPlayer, fuseLit: t.fuseLit, attacking: t.hurtPlayer })
   let s = base + (t.hurtPlayer ? 40 : 0) + (t.approaching || t.diving ? 10 : 0)
+  // the one that reaches the player first goes first among similar mobs (up to +10 for an eta of 0)
+  if (t.eta !== undefined && t.eta < 5) s += Math.round((5 - t.eta) * 2)
   // a melee mob hitting the player right now does more damage than an archer's next arrow, and
   // it is the one next to the bot: it goes before archers (still after a creeper by them)
   if (t.hurtPlayer && t.distPlayer <= MELEE_CONTACT && !RANGED.has(t.name) && t.name !== 'creeper') s += 120
@@ -279,7 +288,7 @@ export function warnKey (name: string, player: V3, mob: V3): string {
 
 // ---- motion ----
 
-export interface Sample { dist: number, y: number, flat: number, at: number }
+export interface Sample { dist: number, y: number, flat: number, at: number, x?: number, z?: number }
 
 /** From two samples of a mob (distance to the player, height), whether it closes in and whether it comes down. */
 export function motion (prev: Sample | undefined, cur: Sample): { approaching: boolean, descending: boolean } {
@@ -299,4 +308,67 @@ export function facingTowards (yaw: number, from: V3, to: V3, tolerance = 0.6): 
   let d = Math.abs(want - yaw) % (2 * Math.PI)
   if (d > Math.PI) d = 2 * Math.PI - d
   return d <= tolerance
+}
+
+/** Horizontal velocity (blocks per second) between two samples with positions, or null. */
+export function velocityOf (prev: Sample | undefined, cur: Sample): { x: number, z: number } | null {
+  if (!prev || prev.x === undefined || prev.z === undefined || cur.x === undefined || cur.z === undefined) return null
+  const dt = (cur.at - prev.at) / 1000
+  if (dt < 0.2 || dt > 4) return null
+  return { x: (cur.x - prev.x) / dt, z: (cur.z - prev.z) / dt }
+}
+
+/** Seconds until a mob closing in at its current speed reaches `reach` blocks from the player, or undefined when it isn't closing. */
+export function etaToPlayer (prev: Sample | undefined, cur: Sample, reach = 2): number | undefined {
+  if (!prev || cur.at - prev.at < 200 || cur.at - prev.at > 4000) return undefined
+  const closing = (prev.dist - cur.dist) / ((cur.at - prev.at) / 1000)
+  if (closing < 0.3) return undefined
+  return Math.max(0, cur.dist - reach) / closing
+}
+
+/**
+ * Where to meet a mob walking towards the player: the first point on its predicted path (straight
+ * on at `vel`, blocks per second) that the bot can reach at `botSpeed` no later than the mob,
+ * stopping 3 blocks short of the player. Without a velocity it is the mob's own position.
+ */
+export function interceptPoint (player: V3, mob: V3, vel: { x: number, z: number } | null, bot: V3, botSpeed = 5): V3 {
+  if (!vel || Math.hypot(vel.x, vel.z) < 0.2) return { ...mob }
+  const flat = (a: V3, b: V3) => Math.hypot(a.x - b.x, a.z - b.z)
+  let best: V3 = { ...mob }
+  for (let t = 0; t <= 4; t += 0.25) {
+    const p = { x: mob.x + vel.x * t, y: mob.y, z: mob.z + vel.z * t }
+    if (flat(p, player) < 3) break // it would be on the player by then: meet it where we are
+    best = p
+    if (flat(bot, p) / botSpeed <= t) return p
+  }
+  return best
+}
+
+// ---- pulling aggro ----
+
+export interface PullCandidate { id: number, name: string, pos: V3, distPlayer: number, hurtPlayer?: boolean, approaching?: boolean }
+
+/**
+ * Pull aggro off the player: with two or more ground melee mobs within 4 blocks of the player,
+ * the nearest one the bot hasn't hit in the last few seconds (`tagged`) is hit once so it turns
+ * on the bot, then the bot steps to `spot`, 6 blocks from the player on its own side (away from
+ * the mobs when it stands in the player), so the mobs follow it off the player. Null when there
+ * is nothing to pull (one mob is simply fought by the player).
+ */
+export function pullPlan (mobs: readonly PullCandidate[], player: V3, bot: V3, tagged: ReadonlySet<number>): { id: number, spot: V3 } | null {
+  const RANGED_OR_SPECIAL = (n: string) => RANGED.has(n) || FLYERS.has(n) || n === 'creeper'
+  const on = mobs.filter(m => !RANGED_OR_SPECIAL(m.name) && m.distPlayer <= 4 && (m.hurtPlayer || m.approaching))
+  if (on.length < 2) return null
+  const next = on.filter(m => !tagged.has(m.id)).sort((a, b) => a.distPlayer - b.distPlayer)[0]
+  if (!next) return null
+  let dx = bot.x - player.x
+  let dz = bot.z - player.z
+  if (Math.hypot(dx, dz) < 1) {
+    const cx = on.reduce((n, m) => n + m.pos.x, 0) / on.length
+    const cz = on.reduce((n, m) => n + m.pos.z, 0) / on.length
+    dx = player.x - cx
+    dz = player.z - cz
+  }
+  const l = Math.hypot(dx, dz) || 1
+  return { id: next.id, spot: { x: player.x + dx / l * 6, y: player.y, z: player.z + dz / l * 6 } }
 }

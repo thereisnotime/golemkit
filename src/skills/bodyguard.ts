@@ -10,7 +10,8 @@ import { defineSkill, defineAction, z, ok, fail, goals, isHostile, FLYING, sleep
 import { fightTarget, creeperFuseLit, eatNow } from './fight.ts'
 import { combatRefusal, recentAttacker } from './combat.ts'
 import { weaponFlags, hasRanged, readyShield, isRangedMob } from './weapons.ts'
-import { rankGuardThreats, guardSpot, blockSpot, feedDecision, motion, facingTowards, shouldRetarget, inLineOfFire, type GuardThreat, type Sample, type FoodItem, type V3 } from './guard-plan.ts'
+import { rankGuardThreats, guardSpot, blockSpot, feedDecision, motion, facingTowards, shouldRetarget, inLineOfFire, velocityOf, etaToPlayer, interceptPoint, pullPlan, type GuardThreat, type Sample, type FoodItem, type V3 } from './guard-plan.ts'
+import { gearPlan, hasGearUpgrade, equipGear } from './gear.ts'
 
 const EYE = 1.62
 const HURT_MS = 8000
@@ -91,6 +92,12 @@ export function playerHealth (bot: Bot, e: Entity): number | null {
 // ---- reading threats ----
 
 const samples = new WeakMap<Bot, Map<number, Sample>>()
+const velocities = new WeakMap<Bot, Map<number, { x: number, z: number }>>()
+
+/** A mob's horizontal velocity (blocks per second) from playerThreats' samples, or null. */
+export function mobVelocity (bot: Bot, id: number): { x: number, z: number } | null {
+  return velocities.get(bot)?.get(id) ?? null
+}
 
 /** Raycast between two points (blocks only). */
 function clearLine (bot: Bot, from: any, to: any): boolean {
@@ -111,6 +118,8 @@ export type ThreatEntry = GuardThreat & { e: Entity, reason: string, score: numb
 export function playerThreats (bot: Bot, player: Entity, range: number): ThreatEntry[] {
   let seen = samples.get(bot)
   if (!seen) samples.set(bot, seen = new Map())
+  let vels = velocities.get(bot)
+  if (!vels) velocities.set(bot, vels = new Map())
   const now = Date.now()
   const pp = player.position
   const eye = pp.offset(0, EYE, 0)
@@ -126,9 +135,11 @@ export function playerThreats (bot: Bot, player: Entity, range: number): ThreatE
     if (typeof hp === 'number' && hp <= 0) continue
     alive.add(e.id)
     const flat = Math.hypot(e.position.x - pp.x, e.position.z - pp.z)
-    const cur: Sample = { dist: distPlayer, y: e.position.y, flat, at: now }
+    const cur: Sample = { dist: distPlayer, y: e.position.y, flat, at: now, x: e.position.x, z: e.position.z }
     const prev = seen.get(e.id)
     const m = motion(prev, cur)
+    const v = velocityOf(prev, cur)
+    if (v) vels.set(e.id, v)
     if (!prev || now - prev.at >= 500) seen.set(e.id, cur)
     const ranged = isRangedMob(e.name)
     list.push({
@@ -144,10 +155,11 @@ export function playerThreats (bot: Bot, player: Entity, range: number): ThreatE
       approaching: m.approaching,
       facing: !FLYING.has(e.name ?? '') && facingTowards((e as any).headYaw ?? e.yaw, e.position, pp),
       diving: FLYING.has(e.name ?? '') && m.descending,
+      eta: etaToPlayer(prev, cur),
       e
     })
   }
-  for (const id of seen.keys()) if (!alive.has(id)) seen.delete(id)
+  for (const id of seen.keys()) if (!alive.has(id)) { seen.delete(id); vels.delete(id) }
   return rankGuardThreats(list, range)
 }
 
@@ -238,6 +250,17 @@ const protect = defineAction({
     let kills = 0
     let fed = 0
     let mode = ''
+    const tagged = new Map<number, number>() // mobs the bot hit (they turn on it): id -> when
+    let gearAt = 0
+    // wear the best armour, shield and weapon it has before escorting, and again after a respawn
+    // (the loop checks every few seconds, so gear handed over later goes on too)
+    const gearUpNow = async () => {
+      gearAt = Date.now()
+      try {
+        if (hasGearUpgrade(gearPlan(bot))) { const done = await equipGear(bot); if (done.length) log.info(`protect: put on ${done.join(', ')}`) }
+      } catch {}
+    }
+    await gearUpNow()
     const player = () => bot.players[who]?.entity
     const setMode = (m: string) => { if (m !== mode) { mode = m; (m.startsWith('fighting') || m.startsWith('blocking') ? log.info : log.debug)(`protect: ${m}`) } }
 
@@ -275,6 +298,38 @@ const protect = defineAction({
             await sleep(250, signal)
             continue
           }
+          // pull aggro: two or more mobs on the player, hit each once so they turn on the bot, then step
+          // away from the player so they follow
+          const now = Date.now()
+          for (const [id, at] of tagged) if (now - at > 6000) tagged.delete(id)
+          const pull = pullPlan(ranked.map(x => ({ id: x.id, name: x.name, pos: x.e.position, distPlayer: x.distPlayer, hurtPlayer: x.hurtPlayer, approaching: x.approaching })), pl.position, bot.entity.position, new Set(tagged.keys()))
+          if (pull) {
+            const m = ranked.find(x => x.id === pull.id)!.e
+            setMode(`pulling ${m.name} off ${who}`)
+            let r
+            try {
+              r = await fightTarget(bot, m, signal, { maxMs: 4000, flags: { ...flags, maxChase: p.range }, stopAfterHits: 1 })
+            } catch (e) { if (signal.aborted || !(e instanceof ActionAbortedError)) throw e }
+            if (r?.hits) tagged.set(m.id, Date.now())
+            if (r?.killed) kills++
+            // all of them tagged: walk off the player so they follow
+            const rest = pullPlan(ranked.map(x => ({ id: x.id, name: x.name, pos: x.e.position, distPlayer: x.distPlayer, hurtPlayer: x.hurtPlayer, approaching: x.approaching })), pl.position, bot.entity.position, new Set(tagged.keys()))
+            if (!rest) {
+              bot.pathfinder.setGoal(new goals.GoalNear(pull.spot.x, pull.spot.y, pull.spot.z, 1), true)
+              await sleep(1200, signal)
+              bot.pathfinder.setGoal(null)
+            }
+            continue
+          }
+          // intercept: a mob 6-12 out walking at the player is met on its path, not at the player
+          if (top.reason === 'intercept' && t.position.distanceTo(bot.entity.position) > 4) {
+            const at = interceptPoint(pl.position, t.position, mobVelocity(bot, t.id), bot.entity.position)
+            setMode(`intercepting ${t.name}`)
+            bot.pathfinder.setGoal(new goals.GoalNear(at.x, at.y, at.z, 1), true)
+            const until = Date.now() + 1500
+            while (Date.now() < until && t.position.distanceTo(bot.entity.position) > 4 && (t as any).isValid !== false) await sleep(100, signal)
+            bot.pathfinder.setGoal(null)
+          }
           setMode(`fighting ${t.name} (${top.reason})`)
           bot.pathfinder.setGoal(null)
           let reranked = Date.now()
@@ -310,6 +365,7 @@ const protect = defineAction({
             sub.stop()
           }
           if (!r) continue
+          if (r.hits) tagged.set(t.id, Date.now())
           if (r.killed) { kills++; continue }
           if (r.end === 'outnumbered') return fail(`outnumbered (${r.reason}); letting the escape rules take over`)
           if (r.end === 'heal') {
@@ -328,7 +384,8 @@ const protect = defineAction({
           continue
         }
 
-        // quiet: feed, then stand between the player and the nearest hostile, or just follow
+        // quiet: gear (after a respawn), feed, then stand between the player and the nearest hostile, or just follow
+        if (Date.now() - gearAt > 5000) await gearUpNow()
         if (p.feed) {
           const done = await maybeFeed(agent, bot, who, pl, { keepFood: p.keepFood, chat: p.chat }, false, signal)
           if (done) { fed++; log.info(done) }

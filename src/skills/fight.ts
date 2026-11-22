@@ -9,7 +9,7 @@ import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
 import { goals, FLYING, isHostile, sleep, checkAborted } from '../core/index.ts'
 import { equipForTarget, hasRanged, shootAt, readyShield, isRangedMob, DEFAULT_MAX_CHASE, type WeaponFlags } from './weapons.ts'
-import { attackCooldownMs, swingDecision, spacing, chaseRefusal, outnumbered, shouldDisengageToHeal, shouldEatInLull, MELEE_REACH } from './tactics.ts'
+import { attackCooldownMs, swingDecision, spacing, chaseRefusal, outnumbered, shouldDisengageToHeal, shouldEatInLull, creeperMove, MELEE_REACH } from './tactics.ts'
 import { bestFood } from './survival.ts'
 
 export type FightEnd = 'killed' | 'escaped' | 'timeout' | 'gave_up' | 'heal' | 'outnumbered' | 'retarget'
@@ -139,6 +139,8 @@ export interface FightOptions {
   tactical?: boolean
   /** Checked before every shot: true holds fire (a bodyguard's player in the line of fire) and the loop closes in instead. */
   holdFire?: (target: Entity) => boolean
+  /** Stop (end 'retarget', reason 'tagged') after this many hits: a bodyguard pulling a mob off its player. */
+  stopAfterHits?: number
 }
 
 /**
@@ -236,7 +238,8 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
       }
 
       // A creeper whose fuse is lit (~1.5 s): get away now, finish it after the fizzle.
-      if (target.name === 'creeper' && creeperFuseLit(target) && dist < 5) {
+      const creeper = target.name === 'creeper' ? creeperMove({ dist, fuseLit: creeperFuseLit(target), bow: !!(flags.ranged && hasRanged(bot)), holdFire: opts.holdFire?.(target) }) : null
+      if (creeper === 'back_off') {
         lowerShield()
         clearMoves(bot)
         if (mode === 'path') bot.pathfinder.setGoal(null)
@@ -325,7 +328,7 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
           await sleep(100, signal)
           continue
         }
-        if (archer && flags.ranged && hasRanged(bot) && dist > 6 && dist < 32 && !opts.holdFire?.(target)) {
+        if ((creeper === 'shoot' || (archer && flags.ranged && hasRanged(bot) && dist > 6 && dist < 32 && !opts.holdFire?.(target)))) {
           lowerShield()
           if (mode === 'path') { bot.pathfinder.setGoal(null); mode = 'still' }
           clearMoves(bot)
@@ -387,6 +390,7 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
         if (crit) res.crits++
         firstHit = false
         bot.setControlState('sprint', false)
+        if (opts.stopAfterHits && res.hits >= opts.stopAfterHits) return finish('retarget', 'tagged')
         if (target.name === 'creeper') {
           // hit and step back: knockback plus distance keeps us out of the blast
           press('back')
