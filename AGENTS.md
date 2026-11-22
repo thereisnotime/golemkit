@@ -12,7 +12,7 @@ Framework for Minecraft bots on NeoForge servers, built on Mineflayer. TypeScrip
 
 The [game-adapters proposal](openspec/changes/game-adapters/proposal.md) splits the code into a game-agnostic core and game adapters (Minecraft Java first). [docs/concepts/scope.md](docs/concepts/scope.md) has the per-directory table with counts; `node scripts/scope-check.ts` prints them.
 
-- Game-agnostic: `src/llm/`, `src/context/`, `src/cli.ts`, and in `src/core/` the events, fleets, log, profile, retry, storage and toggles modules.
+- Game-agnostic: `src/llm/`, `src/context/`, `src/cli.ts`, and in `src/core/` the danger, events, fleets, log, profile, retry, storage and toggles modules.
 - Mixed (generic framework, Minecraft parts): `src/core/agent.ts`, `helpers.ts`, `humanize.ts`, `protection.ts`, `modded.ts`, `action.ts`, `brain.ts`, `skill.ts`, `definition.ts` (Mineflayer types only), `src/core/journal/capture.ts`, `src/brains/*` (the frameworks are generic; reflexes, the behaviour library and stock NPC behaviours are Minecraft), `profiles/`, `scripts/`.
 - Minecraft-specific: `src/skills/` (except `config`, and the journal actions), `variants/`, `blueprints/`.
 - NeoForge-specific: `src/core/neoforge/`.

@@ -249,7 +249,7 @@ find_target, chop_wood_loop; they resume afterwards) answers with `rangedRespons
 flowchart TB
   A(["shot at, arrow on course,<br/>or a shooter aiming"]) --> L{"health ≤ 8?"}
   L -- yes --> H["hide"]
-  L -- no --> O{"3+ shooters or a patrol of 3+,<br/>no iron armour + shield?"}
+  L -- no --> O{"3+ shooters or a patrol of 3+,<br/>gear score below<br/>what that many need?"}
   O -- yes --> H
   O -- no --> B{"bow or crossbow<br/>and arrows?"}
   B -- yes --> S["shoot back"]
@@ -260,33 +260,71 @@ flowchart TB
   CH -- no --> H
   H --> CV{"cover within 8?"}
   CV -- yes --> CO["walk behind the block,<br/>eat there, fight what walks up"]
-  CV -- no --> R["back out of range,<br/>straight away from them"]
+  CV -- no --> BL{"blocks to place<br/>and a wall that fits?"}
+  BL -- yes --> W["build a 1x2 wall<br/>(or pillar + wall),<br/>hide behind it"]
+  BL -- no --> CF{"cover within 14?"}
+  CF -- yes --> CO
+  CF -- no --> R["back off, straight away,<br/>at most 24 blocks from<br/>where it started"]
   classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
   classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
   classDef r fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
   class A a
-  class L,O,B,SH,CH,CV d
+  class L,O,B,SH,CH,CV,BL,CF d
   class S,C,Z g
-  class H,CO,R r
+  class H,CO,W,R r
 ```
 
+- **Gear score** (`gearScore`, 0-100): armour points (35 for a full 20), a shield (20), the best
+  melee weapon's damage (15 at 8+, slow weapons count a little less), a bow or crossbow with arrows
+  (15 at 16+ arrows, nothing without arrows) and health (15 at 20). Against 3 shooters (or a patrol
+  of 3) it needs 65, and 5 more for each one beyond (`gearNeeded`). Iron armour, a shield and an
+  iron sword at full health score 72.5, so they take on 4 but not 5; with a bow and arrows (87.5)
+  up to 7. The same gear at 14 health (68) takes on only 3. With 1 or 2 shooters the gear isn't
+  scored; the rest of the chart decides.
 - **Cover** (`findCover`): a standable spot within 8 blocks (2 up or down) where a solid block
   is on the line from the bot's head and chest to every shooter's eyes, cheapest first by walking
   distance, with a penalty for walking towards them or ending within 4 blocks of one. If a
   shooter comes round and sees it again it looks for new cover; one walking up within 4 blocks
   is fought there.
+- **Building cover** (`planWall`): with no cover within 8, a filler block in the inventory (dirt,
+  cobblestone, planks, logs, stone...) and block placing allowed (`settings.canPlace`), it places a
+  wall where it stands: the cells around it that block the head and chest lines to every shooter,
+  picked greedily (the cell that blocks most open lines first), each with something solid to place
+  against (the block below goes in first). Against one shooter on flat ground that is 2 blocks, a
+  1x2 wall towards it; against two on opposite sides 4. When the ground around won't take blocks it
+  pillars up 1-2 blocks and walls from there, if that's cheaper (a pillar block counts double).
+  Cells its body overlaps and cells in protected areas are never used, and the plan is capped at 6
+  blocks (or what it carries). It logs `ranged: building cover at x y z: 2 cobblestone against the
+  skeleton`. A wall that turns out not to cover it (seen right away) or that couldn't be placed
+  isn't tried again for 10 s. The blocks stay where they are afterwards.
+- **Hiding time**: behind cover it leaves as soon as every shooter is gone, or at 16+ health with
+  nothing shooting at it, and at the latest after 4 s (health 16+), 8 s (12+) or 15 s (below).
+  After a fight that went badly (it stopped to heal, got outnumbered or gave up) it hides for 3 s
+  at 16+ health, 6 s at 12+, 10 s above 8 and 15 s below (`hideMs`), and stops hiding early when
+  healthy and no shooter has a line to it.
+- **Retreat cap**: backing off goes straight away from the shooters, but never more than 24 blocks
+  (`RETREAT_CAP`) from where the shooting started (a run that ended less than a minute ago counts
+  as the same spell). At the cap it stands its ground with a bow, shield or weapon; with none of
+  those it may go 16 blocks further. Before backing off at all it looks for cover up to 14 blocks
+  out, so cover wins over distance.
+- **Danger zones** (`core/danger.ts`): every shooter it deals with is remembered where it was seen,
+  with a radius of its range + 8 (24 for a skeleton), for 5 minutes after the last sighting; a
+  patrol of 3+ is remembered at its middle with a radius of 32 for 10 minutes. Killing the only
+  shooter there clears its zone. `find_target` skips scouting waypoints inside a zone or whose
+  straight path crosses one, and `chop_tree` (and so `chop_wood_loop` and `gather_materials`)
+  skips trees in or past one. `dangerMemory(agent).isInDanger(pos)`, `avoid(points)` and
+  `crosses(a, b)` are there for any job (find_food is the next to use them); the pure `isInDanger`,
+  `avoidZones` and `crossesDanger` take a zone list and a time.
 - **Eating**: only out of every shooter's sight with nothing in flight at it (`canEatUnderFire`),
   never standing in the open.
 - **Ghasts** without a bow, and **blazes** without a bow or shield: cover.
 - A melee mob within 3 blocks is fought first; a `defend` already running is only taken over to
   hide, and a bodyguard's `protect` only at 6 health or less.
 - `stay_safe` adds a `ranged` danger (score 91, above a starving keep_fed's 90) when a shooter
-  has a line to the bot and it is at 12 health or less, or outnumbered without good gear: it runs
+  has a line to the bot and it is at 12 health or less, or outnumbered for its gear score: it runs
   `ranged_defense` in cover mode. Option `ranged` (default on); reflexes have `rangedDefense`.
-
-Flat open ground has no cover, so there the answer is backing off; the bot doesn't build cover
-(placing a block wall) yet.
+  `ranged_defense` takes `build: false` to never place blocks.
 
 ## Reflexes
 

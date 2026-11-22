@@ -39,7 +39,7 @@ ships through `defineAction`).
 
 | directory | files | import | bot use | scope | why | after the split |
 |---|---|---|---|---|---|---|
-| `src/core/` (top level) | 18 | 9 | 4 | mixed | `events`, `fleet`, `fleetFile`, `log`, `profile`, `retry`, `storage`, `toggles` and `index` are clean. `agent.ts` wraps the Mineflayer bot and pathfinder; `action`, `brain`, `skill`, `definition` only import its types; `helpers` (goto, holdGoal), `humanize` and `protection` drive the bot; `modded` patches prismarine-block for modded blocks. | core, with `agent`, `helpers`, `protection`, `modded` and the Mineflayer half of `humanize` moving to the adapter; the type imports become adapter interfaces |
+| `src/core/` (top level) | 19 | 9 | 4 | mixed | `danger`, `events`, `fleet`, `fleetFile`, `log`, `profile`, `retry`, `storage`, `toggles` and `index` are clean. `agent.ts` wraps the Mineflayer bot and pathfinder; `action`, `brain`, `skill`, `definition` only import its types; `helpers` (goto, holdGoal), `humanize` and `protection` drive the bot; `modded` patches prismarine-block for modded blocks. | core, with `agent`, `helpers`, `protection`, `modded` and the Mineflayer half of `humanize` moving to the adapter; the type imports become adapter interfaces |
 | `src/core/journal/` | 13 | 1 | 2 | mixed | Storage, aggregation, rollups and queries are plain data. `capture.ts` subscribes to Mineflayer events (death, health, inventory, dig, place). The second bot-use hit, `journal.ts`, only stores the bot's name. | core, with capture split: agent events in core, game events from the adapter's `on()` |
 | `src/core/neoforge/` | 5 | 2 | 0 | neoforge | The NeoForge configuration-phase handshake, registry sync and channel store; `codec.ts` uses prismarine-nbt, `handshake.ts` hooks minecraft-protocol. | adapter (minecraft-java) |
 | `src/llm/` (with `providers/`, `eval/`) | 25 | 0 | 2 | core | Providers, prompts, goals, budgets, quota pause, pricing, usage, MCP bridge. Only `runtime.ts` (online player check, danger check before resuming) and `tools.ts` (observe, safety check on health, food, time, hostiles) peek at the bot through `as any`. | core; those two reads go through the adapter's `self()` and `observe()` |
@@ -57,7 +57,7 @@ ships through `defineAction`).
 | `scripts/` | 25 | 0 | 13 | mixed | Live tests and benchmarks (`guard-bench`, `fight-test`, `build-test`, ...) drive a real bot on a Minecraft server; `gen-docs`, `docs-interlink`, `llm-*` and `scope-check` are generic. | live tests per adapter; the rest stays |
 | `blueprints/` | YAML | | | minecraft | Block palettes and schematics imported from Minecraft formats. | adapter data |
 
-Totals: in `src/core/` as a whole, 13 of 36 files import Mineflayer or touch the bot; in
+Totals: in `src/core/` as a whole, 13 of 37 files import Mineflayer or touch the bot; in
 `src/llm/`, 2 of 25; in `src/context/`, none; in `src/skills/`, 34 of 45. The proposal quotes
 17 of 36 core files and 38 of 45 skill files, which counts more patterns (anything that uses a
 Minecraft type or name); either way the shape is the same.

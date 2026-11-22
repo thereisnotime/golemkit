@@ -219,12 +219,29 @@ pillagers, witches, blazes, ghasts, drowned with tridents); the details are unde
   range with a line to the bot looks at it. That preempts `find_food`, `find_target`,
   `chop_wood_loop` or whatever job runs, so the bot no longer walks on through crossbow fire.
 - It answers by health and gear: shoot back with a bow or crossbow and arrows, raise a shield
-  and close in, charge a lone shooter when healthy with a weapon, or take cover behind a block
-  and back out of range when there is none. At 8 health or less, or against 3+ shooters or a
-  pillager patrol of 3+ without iron armour and a shield, it hides instead of fighting.
-- Behind cover it eats; it never stands in the open eating while something shoots at it.
+  and close in, charge a lone shooter when healthy with a weapon, or hide. At 8 health or less, or
+  against 3+ shooters or a pillager patrol of 3+ when its gear score is too low for that many, it
+  hides instead of fighting.
+- **Gear** is a score from 0 to 100: armour points, a shield, the best weapon's damage, a bow with
+  arrows, and health. 3 shooters need 65 and each one more 5 more, so iron armour, a shield and an
+  iron sword at full health (72.5) take on 4 pillagers but hide from 5, and hide from 4 once down to
+  14 health; with a bow and arrows they take on more.
+- **Hiding** means walking behind a block within 8 blocks; with none there, **building cover**: a
+  1x2 wall of dirt, cobblestone, planks or whatever filler block it carries between itself and the
+  shooters (or a 1-2 block pillar with a wall on it, when that is quicker), if it may place blocks
+  and the cells aren't protected. It says so in the log (`ranged: building cover at ...`). Only
+  then cover up to 14 blocks out, and only then backing off, at most 24 blocks from where the
+  shooting started. At that cap it stands its ground with a bow, shield or weapon.
+- Behind cover it eats; it never stands in the open eating while something shoots at it. It leaves
+  cover as soon as the shooters are gone or, at 16+ health, nothing shoots at it, and stays at most
+  4 s when healthy, 8 s at 12+ and 15 s below. After a fight that went badly it hides 3 s at full
+  health and up to 15 s at 8 or less, and gets back to work early when healthy and out of sight.
+- **Danger zones**: each shooter (range + 8 around it, 5 minutes) and patrol (32 blocks, 10
+  minutes) it dealt with is remembered, and `find_target` scouting and `chop_wood_loop`'s
+  `chop_tree` keep out of those zones, so the bot doesn't walk back into the patrol once it's quiet.
+  `dangerMemory(agent).isInDanger(pos)` (from `core`) is there for other jobs.
 - `stay_safe` takes cover itself (score 91, above a starving `keep_fed`) when a shooter has a
-  line to the bot and it is at 12 health or less, or outnumbered without good gear. Turn it off
+  line to the bot and it is at 12 health or less, or outnumbered for its gear score. Turn it off
   with `ranged: false` (stay_safe) or `rangedDefense: false` (reflexes).
 
 Going home at night has some slack so it doesn't flap at the edge of `homeRange`:
@@ -290,13 +307,14 @@ flowchart TB
   zombie reaching the player while the bot chases an archer. With a bow (skeletons drop them)
   it never shoots while the player is near the line of fire, up to 4 blocks past the target; it
   closes in instead.
-- **Intercept**: a ground mob walking at the player 6 to 12 blocks out is met on its predicted
-  path (velocity from position samples) instead of at the player, and of similar mobs the one
-  that reaches the player first goes first.
-- **Pulling aggro**: with two or more melee mobs on the player (within 4 blocks, hitting or
-  closing in), it hits each one it hasn't hit in the last 6 s once, so they turn on it, then
-  steps 6 blocks off the player on its own side so they follow. One mob on the player is just
-  fought.
+- **Intercept** (`intercept`, default on): a ground mob walking at the player 6 to 12 blocks out
+  is met on its predicted path (velocity from position samples) instead of at the player, and of
+  similar mobs the one that reaches the player first goes first. Off, it fights them where they
+  are, ranked without the time-to-player.
+- **Pulling aggro** (`pullAggro`, default on): with two or more melee mobs on the player (within
+  4 blocks, hitting or closing in), it hits each one it hasn't hit in the last 6 s once, so they
+  turn on it, then steps 6 blocks off the player on its own side so they follow. One mob on the
+  player is just fought.
 - **Creepers**: shot from 5+ blocks with a bow and arrows when the player isn't in the line,
   otherwise hit once and stepped back from; a lit fuse within 5 blocks sends the bot 7 away
   (never within 3 of it).
@@ -346,7 +364,9 @@ they don't burn, the skeleton with a bow), a spider, and a creeper every other w
 The order flips on every repeat. A tester death is counted, the mobs alive are killed and the
 tester is reset on the spot. `--waves ranged` summons archers only (2 skeletons and 2 pillagers
 with crossbows, a third pillager every other wave) to measure how the bot keeps itself alive
-under fire; `--bow` also gives the bot a bow and 32 arrows. The bot's own hits taken and deaths
+under fire; `--bow` also gives the bot a bow and 32 arrows, `--blocks 16` 16 cobblestone (to
+build cover with). `--no-intercept` and `--no-pull` arm the bodyguard with that tactic off, so
+each can be compared with the default (results carry `variant`). The bot's own hits taken and deaths
 are counted in every phase. In the guard phase the bodyguard whispers its warnings to the
 tester, so nobody else on the server sees them.
 
@@ -355,6 +375,7 @@ just guard-bench --scout                      # check the spot (flat, dry) and R
 just guard-bench                              # 1250 445, 2 repeats x 3 phases x 4 min
 just guard-bench 1250 445 --minutes 4 --repeats 3 --armour --tag mytest
 just guard-bench --phases follow --waves ranged --minutes 3   # the bot's own survival under fire
+just guard-bench --phases guard --no-pull --minutes 3         # the bodyguard without pulling aggro
 just guard-bench --cleanup                    # kill tagged mobs, clear both players
 ```
 

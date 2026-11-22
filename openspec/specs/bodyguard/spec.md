@@ -57,6 +57,17 @@ With two or more ground melee mobs within 4 blocks of the player that are hittin
 - **WHEN** only one zombie is on the player
 - **THEN** there is no pull; the bot fights it
 
+### Requirement: Intercept and pull aggro can be turned off
+The bodyguard behaviour and the protect action SHALL take `intercept` and `pullAggro` options (both default on). With `intercept: false` the bot SHALL not walk to a mob's predicted path and SHALL rank threats without the time-to-player bonus; with `pullAggro: false` it SHALL not tag mobs and step off the player. The guard benchmark SHALL arm the bodyguard with them off for `--no-intercept` and `--no-pull` and record the variant with each result.
+
+#### Scenario: Intercept off
+- **WHEN** the bodyguard is armed with intercept false and a zombie 10 blocks from the player walks at them
+- **THEN** the bot fights the zombie without first walking to a point on its path
+
+#### Scenario: Benchmark variant
+- **WHEN** guard-bench runs with --no-pull
+- **THEN** the bodyguard is armed with pullAggro false and each result has variant "no-pull"
+
 ### Requirement: Creeper safety
 The bot SHALL back away from a creeper whose fuse is lit within 5 blocks (never staying within 3 of a lit fuse), SHALL shoot a creeper from 5 or more blocks when it has a bow or crossbow and arrows and the player is not in the line of fire, and otherwise SHALL hit it once and step back.
 
