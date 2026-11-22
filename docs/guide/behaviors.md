@@ -12,8 +12,8 @@ them per [profile](/guide/profiles), from chat, from an LLM tool call, from `hoo
 
 The motivating case: an LLM bot sat at 6/20 health with no food and died twice, because
 nothing made it go and get food, and nothing ran between its turns. With `keep_fed` armed
-it hunts, cooks and eats by itself, scouts further out when there is nothing near, and with
-`farm_setup` it grows its own food ([details](#food-keep-fed-scouting-and-farm-setup)).
+it hunts, cooks and eats by itself, searches wider and wider when there is nothing near, and
+with no food source around it starts a farm ([details](#food-keep-fed-the-food-ladder-and-farm-setup)).
 
 ## Actions, brains and behaviours
 
@@ -432,38 +432,37 @@ How to read it:
   before it and had no freeze.
 
 
-## Food: keep_fed, scouting and farm_setup
+## Food: keep_fed, the food ladder and farm_setup
 
-`keep_fed` used to look only within its `radius`; near a busy spawn there is often nothing,
-so it backed off and the bot starved. It now goes further, step by step, and as a last
-resort grows its own food. The choice is the pure `nextFoodStep(world, options, tried)`;
-a step that fails is added to `tried` and the next one is picked.
+`keep_fed` climbs a ladder when the bot is hungry: what it carries, then sources it knows,
+then searches that widen ring by ring, then a farm of its own. The choice is the pure
+`planFood(world, options, tried)` in `src/skills/foodPlan.ts`, which returns the rung, the
+step and the reason; a step that fails goes into `tried` and the next one is picked. Every
+decision is logged at debug level, so the climb is visible in the bot's log:
+
+```
+keep_fed ladder: rung=search step=scout (nothing within 48 blocks, widening to 120)
+keep_fed ladder: rung=farm step=seeds (no proper food source (every ring out to 250 came up empty in the last 20 min); 2 seeds, breaking grass for more)
+keep_fed ladder: still hungry, next try in 180s (nothing to do, 14 crops growing)
+```
 
 ```mermaid
 flowchart TB
-  H(["hungry: food below `below`,<br/>or hurt and food below 18"]) --> E{"ready food<br/>in the bag?"}
-  E -- yes --> EAT["1 · eat"]
-  E -- no --> C{"raw meat/potato,<br/>furnace + fuel?"}
-  C -- no --> B{"3+ wheat?"}
-  C -- yes --> COOK["2 · cook (smelt)"]
-  B -- yes --> BREAD["3 · bake bread"]
-  B -- no --> CH{"food in a<br/>known chest?"}
-  CH -- no --> F{"own farm ripe<br/>(or due a visit)?<br/>village crops in range?"}
-  CH -- yes --> WD["withdraw"]
-  F -- yes --> FARM["4 · harvest farm:n<br/>(replants)"]
-  F -- no --> SP{"remembered spot<br/>food:animals ·<br/>food:village_farm?"}
-  SP -- no --> HU{"animals above<br/>keepAtLeast?<br/>(any, if starving)"}
-  SP -- "yes (in range,<br/>or nothing<br/>to hunt here)" --> SPOT["5 · go there, look"]
-  HU -- yes --> HUNT["6 · hunt<br/>(safety filter)"]
-  HU -- no --> N{"day, or<br/>scoutAtNight?"}
-  N -- no --> BACK(["fail truthfully, back off<br/>stay_safe takes it home"])
-  N -- yes --> SC["7 · scout: find_food<br/>spiral out to scoutRadius"]
-  SC -- "found animals<br/>/ crops" --> HU
-  SC -- "nothing" --> SF{"no farm yet,<br/>seeds or grass?"}
-  SF -- yes --> START["8 · start_farm by water<br/>(food in a few days)"]
-  SF -- no --> BACK
-  START --> BACK
-  LOOP(["after 1–6 and withdraw:<br/>re-sense, loop"]) -.-> E
+  H(["hungry: food below `below`,<br/>or hurt and food below 18"]) --> R1
+  R1{"1 · in the bag?<br/>food · raw meat + fuel ·<br/>3 wheat"}
+  R1 -- yes --> EAT["eat · cook · bake"]
+  R1 -- no --> R2{"2 · known source?<br/>chest · ripe crops ·<br/>own farm · food spot ·<br/>animals beyond breeders"}
+  R2 -- yes --> KNOWN["withdraw · harvest ·<br/>go there · hunt"]
+  R2 -- no --> R3{"3 · a ring not<br/>searched empty<br/>in the last 20 min?<br/>(by day, no mobs)"}
+  R3 -- "48 → 120 → 250" --> SC["find_food on that ring<br/>4 · on the way: seeds from<br/>grass, note animals + water"]
+  SC -- "found animals<br/>or crops" --> R2
+  SC -- "empty: remember<br/>the ring" --> R3
+  R3 -- "all empty, night,<br/>or mobs near" --> R5{"5 · farm fallback"}
+  R5 --> FARM["plant bare farmland ·<br/>gather seeds · start_farm<br/>near home · breed ·<br/>berries as a stopgap"]
+  FARM --> W(["wait by rung:<br/>20 s next ring ·<br/>3 min crops growing ·<br/>2 min at night · 5 min idle"])
+  R5 -- "nothing to do<br/>and food ≤ 6" --> REP(["6 · tell the owner once<br/>(every 10 min at most),<br/>stay safe"])
+  EAT -.-> H
+  KNOWN -.-> H
 
   classDef trig fill:#f1f5f9,stroke:#475569,color:#0f172a
   classDef ask fill:#fef3c7,stroke:#d97706,color:#78350f
@@ -471,44 +470,68 @@ flowchart TB
   classDef far fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef grow fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
   classDef stop fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-  class H,LOOP trig
-  class E,C,B,CH,F,SP,HU,N,SF ask
-  class EAT,COOK,BREAD,WD,HUNT near
-  class FARM,SPOT,SC far
-  class START grow
-  class BACK stop
+  class H,W trig
+  class R1,R2,R3,R5 ask
+  class EAT,KNOWN near
+  class SC far
+  class FARM grow
+  class REP stop
 ```
 
-- **Order:** eat, cook, bake, (eat safe raw meat), chest, crops in range, own farm, known
-  food spot, hunt, scout, start a farm. A known spot further than `radius` only wins over
-  hunting when there is nothing to hunt where the bot stands.
-- **Scouting** (`find_food`): known spots first, then an expanding spiral around home (rings
-  every 64 blocks, waypoints every ~96, starting on the side away from the world spawn) out to
-  `scoutRadius`. It skips waypoints over open water or lava and in protected areas, gives up on
-  a direction once a leg gets stuck there, and stops at night, at health 6 or less, with three
-  mobs around, after 4 stuck legs in a row, or after `maxMinutes`. It stops walking as soon as
-  animals or a village farm come into view.
-- **Memory:** sightings are stored with a timestamp (`agent.storage` key `foodSpots`) and as
-  places `food:animals`, `food:village_farm` and `food:water`, plus a `food_spot` [journal](/guide/journal)
-  event. Animal spots go stale after 6 hours, an empty visit pauses a spot for 30 minutes, and
-  two empty visits in a row forget it.
+- **1 · inventory:** eat ready food, cook raw meat or potatoes when it has fuel and a furnace
+  (nearby, carried or craftable from 8 cobblestone), bake bread from 3 wheat, and eat safe raw
+  meat when cooking isn't possible (never raw chicken).
+- **2 · known sources:** a chest it has looked into, ripe crops in `radius` (its own farm or a
+  village's), its own farm further out when ripe or due a visit, a remembered `food:animals` /
+  `food:village_farm` spot, and animals in range. A known spot further than `radius` only wins
+  over hunting when there is nothing to hunt where the bot stands.
+- **3 · search:** `find_food` on the smallest ring in `rings` (default 48, 120, 250 blocks around
+  home) that no recent empty search covered. An empty 120 search also covers the 48 ring, a
+  wider search skips the rings a smaller one walked (`minRadius`), and an empty ring is
+  remembered for `ringMemoryMinutes` (default 20) in `agent.storage` key `foodLadder`, so a
+  restart doesn't rescan it. A search cut short by night or mobs is not remembered as empty.
+  Within one run it moves on to the next ring right away.
+- **4 · while searching:** it stops walking as soon as animals or a village farm come into
+  view (keep_fed then goes there and hunts), notes water for a farm, and when the farm fallback
+  is on and it carries fewer than `minSeeds` seeds, breaks grass right next to its path for
+  wheat seeds (no detours, 20 s per stop). A waypoint over water or lava is moved to dry ground
+  closer in or a little round the ring; only when everything near it is wet is it skipped.
+- **5 · farm fallback** (`startFarm`, on by default), once every ring came up empty, or the
+  search is off or too dangerous: plant bare farmland on its farm with the seeds it has, get
+  more seeds by breaking grass (`gather_seeds`), start a farm near home once it has `minSeeds`
+  (`start_farm`), breed animals it has food for (`breed`), and pick sweet berries as a stopgap
+  (`forage`). When the wheat is ripe, rung 2 harvests it and rung 1 bakes the bread.
+- **6 · critical:** at food 6 or less with nothing left to try it tells its owner once (a
+  whisper, at most every 10 minutes) and does nothing risky; `stay_safe` keeps it out of
+  trouble.
+- **Waits:** after a run that leaves it hungry, the wait depends on what is left: 20 s when
+  another ring or step is open, 3 minutes while its crops grow, 2 minutes at night or when
+  critical, 5 minutes when nothing at all is possible. A change in the food-related inventory
+  (meat, wheat, seeds, fuel) cuts the wait short. Steps that failed are paused on their own
+  (a farm it couldn't reach for 10 minutes, start_farm for 15).
+- **Breeders:** with `keepBreeders` (default on) `keepAtLeast` (default 2) adults of each kind
+  are spared, by hunting and when counting what a search found; they are only hunted when
+  starving (health or food 6 or less). Only adults are hunted.
 - **Never from other players:** crops count only on the bot's own farms (`farm:<n>`) or on a
   village farm (villagers within 24 blocks); `anyCrops: true` lifts that (e.g. for its owner's
   field). Animals go through the hunt filter (no pets, named, tamed, leashed or baby animals,
   never villagers, never in protected areas, nothing inside fences except on its own farm).
-- **Herd:** `keepAtLeast` (default 2) adults of each kind are spared; they are only hunted
-  when starving (health or food 6 or less).
-- **Night and reflexes:** far trips (scouting, known spots, its farm out of range, building a
-  farm) only happen by day unless `scoutAtNight`; at night keep_fed fails and backs off, and
-  `stay_safe` (night score 48, below keep_fed's 55+) takes the bot home. Eating what it carries
-  stays with the reflexes, which always outrank behaviours.
-- **Reports** say what happened: `still hungry (food 6/20): scouted 192 blocks east and
-  north-east of home, no animals or village crops; stopped: walked 24 legs; started a 9x9 wheat
-  farm at 812 63 -40 (farm:1): tilled 64, planted 9`.
+- **Night and reflexes:** far trips (searching, known spots, its farm out of range, starting a
+  farm, seed walks) only happen by day unless `scoutAtNight`; planting and picking in range is
+  fine at night. `stay_safe` (night score 48, below keep_fed's 55+) takes the bot home. Eating
+  what it carries stays with the reflexes, which always outrank behaviours.
+- **Memory of spots:** sightings are stored with a timestamp (`agent.storage` key `foodSpots`)
+  and as places `food:animals`, `food:village_farm` and `food:water`, plus a `food_spot`
+  [journal](/guide/journal) event. Animal spots go stale after 6 hours, an empty visit pauses a
+  spot for 30 minutes, and two empty visits in a row forget it.
+- **Reports** say what happened: `still hungry (food 6/20): did seeds, no more food to get;
+  scouted 120 blocks east and north-east of home, no animals or village crops; stopped: covered
+  every direction out to 120 blocks; picked up 3 seeds; started a 9x9 wheat farm at 812 63 -40
+  (farm:1): tilled 64, planted 9`.
 
 ```
-!behavior_configure keep_fed scout=true scoutRadius=200
-!behavior_configure keep_fed scoutAtNight=false keepAtLeast=3 startFarm=false
+!behavior_configure keep_fed rings=40,100,200 ringMemoryMinutes=30
+!behavior_configure keep_fed startFarm=false keepBreeders=false
 ```
 
 ### farm_setup
@@ -587,9 +610,9 @@ Keeps its distance from dangerous mobs (creepers, wardens by default) instead of
 
 ### `keep_fed`
 
-*survival · priority behavior (35) · needs `eat` · uses `withdraw`, `harvest`, `hunt`, `smelt`, `craft`, `goto`, `goto_place`, `list_container`, `find_food`, `start_farm` when present*
+*survival · priority behavior (35) · needs `eat` · uses `withdraw`, `harvest`, `hunt`, `smelt`, `craft`, `goto`, `goto_place`, `list_container`, `find_food`, `start_farm`, `plant`, `gather_seeds`, `forage`, `breed` when present*
 
-Looks after food on its own: when hungry (or hurt and too hungry to heal) it eats, and when it has nothing to eat it cooks or bakes, takes food from known chests, harvests its own or a village farm, goes back to remembered food spots, hunts passive animals (sparing a small herd), scouts further out when nothing is near, and as a last resort starts a farm. Arm it so you never starve between turns.
+Looks after food on its own, climbing a ladder when hungry (or hurt and too hungry to heal): eat, cook or bake what it carries; take food from known chests, its own or a village farm, remembered spots, animals in range (sparing breeders); search close, then wider, then wide (picking up seeds on the way); with no proper source start a farm near home, plant it and use it, picking berries meanwhile; when starving and nothing works, tell the owner and stay safe. Arm it so you never starve between turns.
 
 | option | type | default | description |
 |---|---|---|---|
@@ -600,17 +623,22 @@ Looks after food on its own: when hungry (or hurt and too hungry to heal) it eat
 | `chestPlace` | string |  | a remembered place with a food chest to check first |
 | `harvest` | boolean | `true` | harvest ripe crops on its own farms and village farms |
 | `anyCrops` | boolean | `false` | also harvest crops that are not its own or a village's (e.g. its owner's field); off = never touch other players' farms |
-| `hunt` | boolean | `true` | hunt passive animals (never pets, named, tamed or leashed animals) |
-| `keepAtLeast` | integer (0..32) | `2` | leave at least this many adults of each kind (only hunted when starving: health or food 6 or less) |
+| `hunt` | boolean | `true` | hunt passive animals (adults only; never pets, named, tamed or leashed animals) |
+| `keepBreeders` | boolean | `true` | spare keepAtLeast adults of each kind for breeding (only hunted when starving); off = hunt them all |
+| `keepAtLeast` | integer (0..32) | `2` | breeders to spare per kind when keepBreeders is on |
 | `animals` | list of cow, pig, sheep, chicken, rabbit, mooshroom | `["cow","pig","sheep","chicken","rabbit","mooshroom"]` | animals it may hunt |
 | `cook` | boolean | `true` | cook raw meat/potatoes when a furnace and fuel are available or craftable |
 | `eatRaw` | boolean | `true` | eat raw meat when cooking is not possible (never raw chicken) |
 | `radius` | number (4..64) | `32` | how far to look for crops and animals |
 | `places` | boolean | `true` | go back to remembered food spots (food:animals, food:village_farm) |
-| `scout` | boolean | `true` | when nothing is in range, scout further out (find_food) for animals and village farms |
-| `scoutRadius` | number (32..512) | `200` | how far from home to scout |
-| `scoutAtNight` | boolean | `false` | also make far trips (scouting, known spots, its farm) at night |
-| `startFarm` | boolean | `true` | as a last resort, start a farm (start_farm) when it has none and has or can get seeds |
+| `scout` | boolean | `true` | when nothing is in range, search further out (find_food), one ring wider each time a ring comes up empty |
+| `rings` | list | `[48,120,250]` | search rings around home, smallest first: close, wider, wide |
+| `ringMemoryMinutes` | number (1..240) | `20` | remember an empty ring this long before searching it again |
+| `scoutRadius` | number (32..512) |  | old single search radius; when set it caps the rings |
+| `scoutAtNight` | boolean | `false` | also make far trips (searching, known spots, its farm) at night |
+| `startFarm` | boolean | `true` | farm fallback: with no proper food source (all rings empty), gather seeds, start a farm near home, plant and use it |
+| `minSeeds` | integer (1..64) | `8` | seeds to have before starting a farm (picked up while searching, or by breaking grass) |
+| `report` | boolean | `true` | when food is critical (6 or less) and nothing works, tell the owner (at most every 10 minutes) |
 
 ### `bodyguard`
 

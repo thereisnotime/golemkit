@@ -100,6 +100,12 @@ away junk like rotten flesh, extra saplings and seeds, never the recipe's items)
 anything that fell out. Felling and mining stop with "inventory full" instead of leaving drops
 behind, and the strip mine sweeps its tunnel before it stops.
 
+**Seeds and food.** Wheat seeds come from breaking grass (about 1 in 8 drops). The crafting
+junk cleaner keeps 16 wheat seeds and 8 beetroot seeds, so seeds picked up while `keep_fed`
+searches for food survive until the bot starts a farm. `gather_seeds` breaks grass on purpose,
+`forage` picks sweet berries, and the whole food ladder (search 48, 120, 250 blocks, then a farm
+near home) is in [behaviours](/guide/behaviors#food-keep-fed-the-food-ladder-and-farm-setup).
+
 ## Speed
 
 - Results carry their time (`... in 95s`), mining its blocks per minute.

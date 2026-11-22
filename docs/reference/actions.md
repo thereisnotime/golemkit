@@ -10,7 +10,7 @@ scopeNote: "Generated from the skills: most are Minecraft; the journal and confi
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-25 skills, 103 actions.
+25 skills, 105 actions.
 
 ## blueprint-library
 
@@ -480,7 +480,7 @@ Turn dirt or grass into farmland with a hoe, either at x y z or the nearest spot
 
 ## food
 
-Food self-sufficiency: scouting for animals and village farms, starting a farm of its own, breeding animals.
+Food self-sufficiency: scouting for animals and village farms, starting a farm of its own, gathering seeds, picking berries, breeding animals.
 
 ### `find_food`
 
@@ -497,6 +497,8 @@ Scout for food beyond what is in sight: first known food spots, then an expandin
 | `maxMinutes` | number (1..30) |  | `8` | give up after this long |
 | `keepAtLeast` | integer (0..32) |  | `0` | only count animals above this many adults of a kind (a herd to spare) |
 | `from` | `home` \| `here` |  | `"home"` | centre of the search: home (when set) or where the bot stands |
+| `minRadius` | number (0..512) |  | `0` | skip rings at or inside this radius (an earlier, smaller search covered them) |
+| `seeds` | integer (0..64) |  | `0` | pick up this many seeds on the way by breaking grass next to the path (for a farm later) |
 
 ### `start_farm`
 
@@ -515,6 +517,30 @@ Start a small farm of its own: picks grass or dirt by water near home (or a plac
 | `fence` | boolean |  | `true` | fence the plot when it has (or can craft) enough fences |
 | `light` | boolean |  | `true` | put torches on the corners when it has torches or coal |
 | `spawnClearance` | number (0..256) |  | `48` | never farm within this distance of the world spawn |
+
+### `gather_seeds`
+
+Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. Skips protected areas and the world spawn. Needs digging enabled.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `count` | integer (1..64) |  | `10` | seeds to get |
+| `radius` | number (4..64) |  | `32` | how far to look for grass |
+| `maxMinutes` | number (0.5..10) |  | `3` | give up after this long |
+| `spawnClearance` | number (0..256) |  | `48` | never break grass this close to the world spawn |
+
+### `forage`
+
+Pick sweet berries from ripe bushes nearby (right-click, the bush stays and regrows). A stopgap food while a farm grows; never on protected land.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `radius` | number (4..64) |  | `32` | how far to look for berry bushes |
+| `max` | integer (1..32) |  | `8` | bushes to pick at most |
 
 ### `breed`
 
