@@ -25,4 +25,5 @@ A measured split: 23 of 25 LLM files and all 6 context files don't touch the gam
 
 ## Status
 
-Proposed, not started.
+Phases 0 to 3 done (safety net, interfaces, Minecraft Java behind the interface, capability
+gating); results in [baseline.md](baseline.md). Phase 4 (a second game) is open.

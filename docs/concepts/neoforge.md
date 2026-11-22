@@ -6,7 +6,8 @@ scope: neoforge
 
 Mineflayer only speaks the vanilla protocol. A NeoForge server rejects vanilla clients when
 its mods register network channels (any content mod does), so golemkit adds a NeoForge layer
-in `src/core/neoforge/`. Skills and brains never see it.
+in `src/adapters/minecraft-java/platforms/neoforge/`, the default server platform of the
+[Minecraft Java adapter](./adapters.md). Skills and brains never see it.
 
 Everything here is written against NeoForge's 1.21.1 source
 (`neoforged/NeoForge`, branch `1.21.1`, `network/payload/` and `network/registration/`).

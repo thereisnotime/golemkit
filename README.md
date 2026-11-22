@@ -197,7 +197,7 @@ definition or the fleet file override them.
 
 ## How it gets into a NeoForge server
 
-Mineflayer only speaks vanilla. `src/core/neoforge/` adds:
+Mineflayer only speaks vanilla. `src/adapters/minecraft-java/platforms/neoforge/` adds:
 
 1. **Channel negotiation.** NeoForge rejects clients that don't list every payload channel its
    mods require, with the right version and direction. The bot learns them from the server's

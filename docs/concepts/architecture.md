@@ -1,6 +1,6 @@
 ---
 scope: mixed
-scopeNote: "The action lock, brains, chat queue and fleets are game-agnostic; Agent wraps a Mineflayer bot and the NeoForge layer hooks its client."
+scopeNote: "The action lock, brains, chat queue and fleets are game-agnostic; the Minecraft Java adapter wraps a Mineflayer bot and its NeoForge platform hooks the client."
 ---
 
 # Architecture
@@ -10,8 +10,9 @@ variants/<name>.ts      what kind of bot: skills + brains + default persona/sett
 profiles/<name>.yaml    a saved instance: variant + username, owners, server, LLM, settings
 fleets/<name>.yaml      profiles/variants run together, possibly on several servers
 src/brains/             who decides: command (chat), reflexes, npc, llm, ...
-src/skills/             what it can do: actions grouped by topic
-src/core/               agent lifecycle, action lock, chat, storage, NeoForge layer
+src/skills/             what it can do: actions grouped by topic (Minecraft)
+src/core/               agent lifecycle, action lock, chat, storage, the GameAdapter interface
+src/adapters/           games: minecraft-java (Mineflayer, NeoForge/vanilla/Paper platforms)
 ```
 
 ## The big picture
@@ -24,9 +25,9 @@ flowchart TB
   BUS["Fleet bus +<br/>blackboard<br/>(per server)"]
   PROF & FLEET --> AG
   AG <-.->|"brains"| BUS
-  AG -->|"skills,<br/>chat queue"| MF["Mineflayer + pathfinder"]
+  AG -->|"skills,<br/>chat queue"| MF["Minecraft Java adapter<br/>Mineflayer + pathfinder"]
   AG -.->|"llm / self brains<br/>(proxy optional)"| LLM["LLM providers<br/>Claude · Codex<br/>OpenCode · API"]
-  MF --> NF["NeoForge layer<br/>handshake · registries<br/>tolerant parser"]
+  MF --> NF["NeoForge platform<br/>handshake · registries<br/>tolerant parser"]
   NF --> SRV[("Minecraft server<br/>NeoForge 1.21.1")]
   classDef run fill:#f1f5f9,stroke:#475569,color:#0f172a
   classDef brain fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
@@ -53,7 +54,7 @@ flowchart TB
   SK -.-> PA[("Protected areas<br/>per server")]
   ST[("Storage + journal<br/>data/bots/…")]
   CHAT ~~~ ST
-  SK --> MF["Mineflayer + pathfinder"]
+  SK --> MF["Game adapter<br/>Mineflayer + pathfinder"]
   CHAT --> MF
   classDef run fill:#f1f5f9,stroke:#475569,color:#0f172a
   classDef brain fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
@@ -67,15 +68,18 @@ flowchart TB
   class MF lib
 ```
 
-Brains decide, skills provide actions, the action lock arbitrates the body, and the NeoForge
-layer gets everything into a modded server. [Variants](/concepts/variants-profiles) pick skills and brains; [profiles](/guide/profiles) and
+Brains decide, skills provide actions, the action lock arbitrates the body, the
+[game adapter](./adapters.md) is the game, and its NeoForge platform gets everything into a
+modded server. [Variants](/concepts/variants-profiles) pick skills and brains; [profiles](/guide/profiles) and
 fleets pick who, where and how many.
 
 ## Agent
 
 `Agent` (src/core/agent.ts) is one bot identity. It survives disconnects: every reconnect is
-a new *session* with a fresh mineflayer `Bot`, and skills/brains get their `setup()` /
-`session()` hooks called again. The agent owns:
+a new *session* (with Minecraft Java, a fresh mineflayer `Bot` from the adapter), and
+skills/brains get their `setup()` / `session()` hooks called again. The game is behind
+`agent.adapter` (see [Game adapters](./adapters.md)); brains read it there, Minecraft skills
+get the bot as `ctx.bot`. The agent owns:
 
 - the action registry and the **action lock** (`act()`), with [retries](../guide/profiles#retries)
 - rate-limited chat (`say`, `whisper`, `reply`), since vanilla kicks for spam, optionally
@@ -124,6 +128,8 @@ const follow = defineAction({
   queries/chat that can run alongside.
 - `longRunning`: runs until aborted (follow, guard).
 - `internal`: hidden from `!help` and LLM tool lists.
+- `capabilities`: what the game must support (`dig`, `place`, `move`, ...; a skill can set a
+  default). Agents on a game without one don't get the action at all.
 - `run()` returns `ok(msg, data?)`, `fail(msg)`, a string, or nothing.
 - Use `goto(bot, goal, signal)`, `holdGoal`, `sleep(ms, signal)`, `checkAborted(signal)` from
   core so actions stop promptly.
@@ -252,5 +258,6 @@ board.set('scene', 'act2'); board.watch('scene', v => ...)
 
 ## NeoForge layer
 
-See README "How it gets in". It lives in `src/core/neoforge/` and is transparent to skills.
+See README "How it gets in". It lives in `src/adapters/minecraft-java/platforms/neoforge/`, the
+default server platform of the Minecraft Java adapter, and is transparent to skills.
 Modded blocks are `modded_block` (solid), modded items are `modded#<id>`.
