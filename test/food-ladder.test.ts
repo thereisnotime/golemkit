@@ -150,6 +150,7 @@ test('the wait after a failed run depends on the rung', () => {
   const all = { ...bare, canStartFarm: false, searches: [empty(250, 1)] }
   assert.equal(planFood(all, opts).retryMs, 5 * MIN, 'nothing at all: 5 min')
   assert.equal(planFood({ ...all, food: 5, lastReportAt: NOW }, opts).retryMs, 2 * MIN, 'critical: sooner')
+  assert.equal(planFood({ ...bare, danger: true, canStartFarm: false }, opts).retryMs, 45_000, 'mobs near: they usually pass soon')
 })
 
 test('paused steps (failed in an earlier run) are skipped until their pause ends', () => {

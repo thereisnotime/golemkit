@@ -553,7 +553,7 @@ export const STEP_PAUSE_MS: Record<FoodStep, number> = {
 }
 
 /** How long to wait before the next keep_fed run, by what is left to do. */
-const RETRY = { soon: 20_000, night: 2 * 60_000, growing: 3 * 60_000, critical: 2 * 60_000, idle: 5 * 60_000 }
+const RETRY = { soon: 20_000, danger: 45_000, night: 2 * 60_000, growing: 3 * 60_000, critical: 2 * 60_000, idle: 5 * 60_000 }
 
 /**
  * The next rung and step towards being fed. `tried` holds steps that already failed this run;
@@ -632,6 +632,7 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   let why = searchBlocked ? `nothing to do (${searchBlocked})` : 'nothing to do'
   if (ring && dayOrBold && !w.danger && o.scout && w.canScout) retryMs = RETRY.soon // a wider ring is still open
   else if (w.night && !o.scoutAtNight) { retryMs = RETRY.night; why += ', waiting for day' }
+  else if (w.danger) { retryMs = RETRY.danger; why += ', waiting for the mobs to go' }
   else if (w.hasFarm && (w.farmGrowing ?? 0) > 0) { retryMs = RETRY.growing; why += `, ${w.farmGrowing} crops growing` }
   else if (critical) retryMs = RETRY.critical
   return { step: null, rung: null, reason: why, retryMs }

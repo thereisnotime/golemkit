@@ -76,7 +76,7 @@ When food is at or below 6 and no step is left, keep_fed SHALL tell its owner on
 - **THEN** the owner gets one message, and none again for 10 minutes
 
 ### Requirement: Rung-dependent wait
-After a run that leaves the bot hungry, keep_fed SHALL wait 20 s when another ring or step is open, 3 minutes while its crops grow, 2 minutes at night or when critical, and 5 minutes when nothing is possible; a change in its food-related inventory SHALL end the wait early. Failed steps SHALL be paused on their own schedule.
+After a run that leaves the bot hungry, keep_fed SHALL wait 20 s when another ring or step is open, 45 s while hostiles are near, 3 minutes while its crops grow, 2 minutes at night or when critical, and 5 minutes when nothing is possible; a change in its food-related inventory SHALL end the wait early. Failed steps SHALL be paused on their own schedule.
 
 #### Scenario: Farm growing
 - **WHEN** nothing is ripe and its farm has crops growing

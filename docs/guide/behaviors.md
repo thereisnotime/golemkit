@@ -459,7 +459,7 @@ flowchart TB
   SC -- "empty: remember<br/>the ring" --> R3
   R3 -- "all empty, night,<br/>or mobs near" --> R5{"5 · farm fallback"}
   R5 --> FARM["plant bare farmland ·<br/>gather seeds · start_farm<br/>near home · breed ·<br/>berries as a stopgap"]
-  FARM --> W(["wait by rung:<br/>20 s next ring ·<br/>3 min crops growing ·<br/>2 min at night · 5 min idle"])
+  FARM --> W(["wait by rung:<br/>20 s next ring · 45 s mobs ·<br/>3 min crops growing ·<br/>2 min at night · 5 min idle"])
   R5 -- "nothing to do<br/>and food ≤ 6" --> REP(["6 · tell the owner once<br/>(every 10 min at most),<br/>stay safe"])
   EAT -.-> H
   KNOWN -.-> H
@@ -505,8 +505,8 @@ flowchart TB
   whisper, at most every 10 minutes) and does nothing risky; `stay_safe` keeps it out of
   trouble.
 - **Waits:** after a run that leaves it hungry, the wait depends on what is left: 20 s when
-  another ring or step is open, 3 minutes while its crops grow, 2 minutes at night or when
-  critical, 5 minutes when nothing at all is possible. A change in the food-related inventory
+  another ring or step is open, 45 s while mobs are near, 3 minutes while its crops grow,
+  2 minutes at night (or in a storm) or when critical, 5 minutes when nothing at all is possible. A change in the food-related inventory
   (meat, wheat, seeds, fuel) cuts the wait short. Steps that failed are paused on their own
   (a farm it couldn't reach for 10 minutes, start_farm for 15).
 - **Breeders:** with `keepBreeders` (default on) `keepAtLeast` (default 2) adults of each kind
