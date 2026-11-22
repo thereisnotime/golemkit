@@ -299,22 +299,41 @@ Results append to `data/guard-bench/results.jsonl` and a table prints at the end
 natural spawns out, but spiders don't pick targets in daylight, so in practice the waves are
 zombies, skeletons and creepers.
 
-**Numbers so far (partial, the run was paused).** mc02, spot 1250 70 445, seed 1, iron sword,
-no armour, 4 minutes per phase, 36 mobs summoned in each phase, from two runs (the first one
-stopped after 4 phases). With the bodyguard code before
-the fixes below:
+**Results** (mc02, 22 Nov 2026, spot 1250 70 445, seed 1, iron sword and shield, no armour,
+4 minutes per phase, 2 repeats, order flipped). "Before" is the bodyguard as first shipped,
+"after" is with the three fixes described under Threats and Night above. Each phase summons
+36 mobs (8 waves) unless the cap held waves back.
 
-| phase | runs | tester hits | damage (mean) | tester deaths | bot deaths | bot kills (mean) |
-|---|---|---|---|---|---|---|
-| guard | 2 | 36, 55 | 146 | 3, 5 | 1, 2 | 12.5 |
-| follow | 3 | 40, 67, 54 | 181 | 4, 5, 5 | 1, 2, 2 | 11.3 |
-| none | 4 | 77, 81, 69, 58 | 225 | 7, 8, 6, 6 | - | - |
+| set | phase | tester hits (each run) | mean hits | mean damage | tester deaths | bot deaths | bot kills (mean) | creeper blasts within 6 | warnings (mean) |
+|---|---|---|---|---|---|---|---|---|---|
+| before | guard | 55, 60 | 57.5 | 189 | 5, 6 | 2, 3 | 12.5 | 0, 2 | 22 |
+| before | follow | 67, 54 | 60.5 | 200 | 5, 5 | 2, 2 | 11 | 1, 2 | 0 |
+| before | none | 69, 58 | 63.5 | 202 | 6, 6 | - | - | 1, 2 | 0 |
+| after | guard | 43, 34 | 38.5 | 138 | 4, 3 | 4, 2 | 16 | 2, 2 | 22 |
+| after | follow | 67, 53 | 60 | 181 | 6, 4 | 2, 1 | 10 | 2, 1 | 0 |
+| after | none | 60, 61 | 60.5 | 213 | 6, 6 | - | - | 3, 1 | 0 |
 
-Either bot roughly halves what the player takes against no bot; the bodyguard was only a little
-ahead of `follow_owner`, and the spread between runs is as large as the gap. The logs showed
-why: it chased skeletons while a zombie hit the player, backed off whenever three mobs reached
-the player (stay_safe's surrounded rule), and once shot the player with a bow it had picked up.
-Those three are fixed (see Threats and Night above); the re-run with the fixes is not done yet.
+The median time from a wave's spawn to its first hit on the tester was 4 to 5 s in every phase:
+the bot doesn't stop the first hit, it shortens the fight after it. Feeding happened 3 times in
+all (the tester ate its own bread too).
+
+How to read it:
+
+- Before the fixes the bodyguard was no better than `follow_owner`, and neither was much better
+  than no bot (57 / 60 / 63 hits). The logs showed why: it chased skeletons while a zombie hit
+  the player, stay_safe pulled it out every time three mobs reached the player, and once it shot
+  the player with a bow it had picked up (2 hits). After the fixes the guard phases took about a
+  third fewer hits and deaths than follow or none in the same session, with no friendly fire.
+- Two runs per cell is little. An earlier session with the "before" code (4 phases before it
+  was stopped) had guard 36, follow 40 and none 77 and 81 hits, so whole sessions shift by 15 to
+  20 hits; compare phases within a set, not across sets.
+- The bot dies more after the fixes (6 deaths in 8 minutes against 5), because it no longer runs
+  from crowds. Most bot deaths are creepers it fights point blank without armour: a creeper by
+  the player still goes first, and a sword at melee range lets it go off. `--armour` would
+  change that picture; it hasn't been measured yet.
+- Fairness: in the first "after" follow phase the 8-alive cap held back 2 waves (27 mobs instead
+  of 36), so that phase is if anything easier than the others. Spiders don't attack in daylight,
+  so the waves are effectively zombies, skeletons and creepers. Zombies did 75-90% of all hits.
 
 ## Food: keep_fed, scouting and farm_setup
 

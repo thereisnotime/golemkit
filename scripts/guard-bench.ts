@@ -339,7 +339,11 @@ async function main (): Promise<void> {
   const placeBot = () => cmd(`/tp ${BOT} ${spot.x + 3} ${spot.y} ${spot.z} 90 0`)
   // next to the director while the floor is repaired (filling a crater with the tester in it buries it)
   const parkPlayers = async () => {
-    for (const [p, dz] of [[TESTER, 2], [BOT, -2]] as const) if (p === TESTER ? live(tester) : live(bot)) await cmd(`/tp ${p} ${X + 24.5} ${(park?.y ?? G) + 1} ${Z + 0.5 + dz}`)
+    for (const [p, dz] of [[TESTER, 2], [BOT, -2]] as const) {
+      if (!(p === TESTER ? live(tester) : live(bot))) continue
+      const ground = surface(X + 24, Z + dz) ?? park // its own column: one block off can be a block higher and suffocate it
+      await cmd(`/tp ${p} ${X + 24.5} ${(ground?.y ?? G) + 1} ${Z + 0.5 + dz}`)
+    }
   }
   const repairFloor = async () => {
     // creeper holes: fill air under the floor level with dirt, and remove pillars the bot left
