@@ -1,12 +1,34 @@
 # mc-buddy
 
-A TypeScript framework for Minecraft bots on **NeoForge** servers: player assistants,
-self-sufficient NPCs, LLM-driven agents. Bots are real protocol clients built on
+A TypeScript framework for building Minecraft bots on **NeoForge** servers: companions,
+bodyguards, self-sufficient NPCs and LLM-driven agents, all from the same pieces (actions,
+skills, brains, behaviours, profiles). Bots are real protocol clients built on
 [Mineflayer](https://github.com/PrismarineJS/mineflayer), not headless Minecraft, so they
 start in a second and use ~100 MB each.
 
-Built for the **mc02** NeoForge 1.21.1 modpack (Create, Ars Nouveau, Curios, ...), but the
-NeoForge layer learns any server's mod channels on its own.
+Built and tested on the **mc02** NeoForge 1.21.1 modpack (Create, Ars Nouveau, Curios, ...),
+but the NeoForge layer learns any server's mod channels on its own.
+
+## What the bots can do
+
+- **Talk to them in plain chat.** "pax follow me", "guard me", "find iron", "bring me 16
+  planks", "chop some wood". A layered intent pipeline (patterns, a local MiniLM embedding
+  model, an optional local LLM, then the cloud LLM) handles it, and each layer can be switched,
+  reordered, tuned live and benchmarked. Works with no LLM at all.
+- **Run on an LLM when you want one.** Claude or Codex on your subscription, or an API. Goals
+  they work through on their own, budgets, quota pauses, and an NPC fallback mode when the
+  quota runs out.
+- **Look after themselves and you.** Reflexes (fight back, eat, escape), adaptive weapons,
+  shields, crits, a bodyguard behaviour that protects its owner, tool upgrades, food scouting,
+  farming, climbing out of caves, swimming up when low on air.
+- **Find and fetch.** Search for ores, mobs, water, villages or biomes, then bring items from
+  their own chests, crafting, smelting or gathering, and recover an owner's drops after a death.
+- **Build.** YAML blueprints, imports from `.schem`/`.litematic`/`.nbt`, a blueprint library,
+  creative builds by hand or by command, road and stair planning, optional WorldEdit.
+- **Stay configurable.** Variants, saved profiles, armable behaviours, live toggles
+  (`!config_set`) that change behaviour without a restart, fleets of bots in one process.
+- **Keep a record.** A journal of deaths, items, actions and LLM token usage, with daily
+  rollups and analysis scripts.
 
 ## Quick start
 
@@ -68,19 +90,20 @@ Details in [docs/concepts/architecture.md](docs/concepts/architecture.md) and
 The full docs live in [docs/](docs/) (guides, concepts, generated action reference). Browse
 them as a local site with `just docs` (dev server) or `just docs-build` (static HTML).
 
-Change settings in game without a restart (`!config_set`): [docs/guide/live-config.md](docs/guide/live-config.md).
-Profiles (instances, LLM listen modes, immersive mode, humanize, retries, proxy): [docs/guide/profiles.md](docs/guide/profiles.md).
-Movement, protected areas, combat and reflexes: [docs/concepts/world.md](docs/concepts/world.md).
-Self-sufficient NPCs (utility-AI brain, behaviours, `variants/villager.ts`): [docs/guide/npc-brain.md](docs/guide/npc-brain.md).
-LLM-driven bots on your Claude / Codex subscription or an API (`variants/companion.ts`): [docs/guide/llm-brain.md](docs/guide/llm-brain.md).
-Armable behaviours (keep_fed, stay_safe, follow_owner, guard_area...) that owners and LLMs switch on and that run between turns: [docs/guide/behaviors.md](docs/guide/behaviors.md).
-Goals that LLM bots work through on their own, and building structures from YAML blueprints: [docs/guide/goals-and-building.md](docs/guide/goals-and-building.md).
-NPCs that run their own program and rewrite it with one LLM call when an owner teaches them (`variants/apprentice.ts`): [docs/guide/self-improver.md](docs/guide/self-improver.md).
-Per-profile rules, skills, memory and hooks, with an A/B eval: [docs/guide/context-pack.md](docs/guide/context-pack.md).
-What happened to each bot (deaths, items, actions, daily rollups, `!last_death`): [docs/guide/journal.md](docs/guide/journal.md).
+Guides worth starting with:
 
-What each skill and action does, including `extendedSkills()` (crafting, chests, farming, woodcutting, building): [docs/skills.md](docs/skills.md).
-Scenes with several bots acting together (`variants/actor.ts`, `scenes/*.yaml`): [docs/guide/scenes.md](docs/guide/scenes.md).
+- [Getting started](docs/guide/getting-started.md) and [writing a bot](docs/guide/writing-a-bot.md)
+- [Plain-language commands and the intent layers](docs/guide/intents.md)
+- [Behaviours](docs/guide/behaviors.md): keep_fed, stay_safe, follow_owner, bodyguard, NPC mode, the guard benchmark
+- [Search and fetch](docs/guide/search.md): `find_target`, `bring_item`, `fetch_drops`
+- [LLM brain](docs/guide/llm-brain.md): providers, listen modes, budgets, quota pause
+- [Goals and building](docs/guide/goals-and-building.md), [blueprints](docs/guide/blueprints.md), [roads](docs/guide/roads.md), [WorldEdit](docs/guide/worldedit.md)
+- [Tool progression](docs/guide/progression.md): tools, mining, what to do when digging gives nothing
+- [Live config](docs/guide/live-config.md) and [profiles](docs/guide/profiles.md)
+- [NPC brain](docs/guide/npc-brain.md), [self-improving NPCs](docs/guide/self-improver.md), [scenes](docs/guide/scenes.md)
+- [Context packs](docs/guide/context-pack.md) and the [journal](docs/guide/journal.md)
+- Concepts: [architecture](docs/concepts/architecture.md), [world, movement and combat](docs/concepts/world.md)
+- Reference: [skills](docs/skills.md) and the generated [action reference](docs/reference/actions.md)
 
 ## buddy's commands
 
@@ -91,7 +114,9 @@ Positional args follow the parameter order, `key=value` works too (`!follow dist
 `!guard [player]` `!attack` `!eat` `!sleep` `!wake` `!inventory` `!drop [item|all] [count]`
 `!equip <item>` `!collect <block> [count]` `!pos` `!hp` `!say <text>` `!look_at` `!jump`
 
-It also fights back when hit, eats when hungry, respawns and reconnects.
+It also fights back when hit, eats when hungry, respawns and reconnects. Bots with the
+intents brain understand the same requests in plain chat ("follow me", "come here"); say
+"help" to the bot for the list.
 
 ## Config
 
