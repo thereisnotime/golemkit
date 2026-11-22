@@ -7,7 +7,7 @@ import {
 } from '../../core/index.ts'
 import { getHome, setHome } from '../../skills/navigation.ts'
 import { Blackboard, type BlackboardOptions } from './blackboard.ts'
-import { decide, failureCooldown, type Scored, type SelectOptions } from './select.ts'
+import { decide, failureCooldown, flipCooldown, isFlip, type Scored, type SelectOptions } from './select.ts'
 import { NpcYield, type Behavior, type BehaviorContext, type NpcContext, type NpcHook } from './types.ts'
 
 /** Internal no-op action the brain runs to cut its own in-flight action short. */
@@ -42,6 +42,10 @@ interface Stats {
   runs: number
   failures: number
   cooldownUntil: number
+  /** Runs in a row that dropped out ("no longer applies") within flipRunMs of starting. */
+  flips: number
+  /** Until then it may only start with an urgent score (flip back-off). */
+  flipUntil: number
   last?: string
   lastAt?: number
 }
@@ -124,7 +128,7 @@ export class NpcController {
   /** The current behaviour set (static, or re-read from the options function). */
   behaviors (): Behavior[] {
     const list = typeof this.opts.behaviors === 'function' ? this.opts.behaviors() : this.opts.behaviors
-    for (const b of list) if (!this.stats.has(b.name)) this.stats.set(b.name, { runs: 0, failures: 0, cooldownUntil: 0 })
+    for (const b of list) if (!this.stats.has(b.name)) this.stats.set(b.name, { runs: 0, failures: 0, cooldownUntil: 0, flips: 0, flipUntil: 0 })
     return list
   }
 
@@ -241,8 +245,24 @@ export class NpcController {
       } catch (e) {
         this.log.debug(`score ${b.name}: ${(e as Error).message}`)
       }
+      // flickering at the edge of its condition: only an urgent score may start it again for now
+      if (ctx.now < st.flipUntil && score < (this.opts.urgentScore ?? 80) && this.current !== b.name) score = 0
       return { name: b.name, score }
     })
+  }
+
+  /** Counts a run that dropped out on its own condition; repeated quick drop-outs get a pause. */
+  private noteDropOut (now: number): void {
+    const r = this.running
+    if (!r) return
+    const st = this.stats.get(r.behavior.name)!
+    if (!isFlip(now - r.startedAt, this.opts)) { st.flips = 0; return }
+    st.flips++
+    const cd = flipCooldown(st.flips, this.opts.flipCooldownMs, this.opts.maxFlipCooldownMs)
+    if (cd > 0) {
+      st.flipUntil = now + cd
+      this.log.debug(`${r.behavior.name} keeps flipping on and off (${st.flips}x), holding it back ${Math.round(cd / 1000)}s unless urgent`)
+    }
   }
 
   /** One decision step. Safe to call often; re-entrant calls are ignored. */
@@ -279,11 +299,13 @@ export class NpcController {
           break
         case 'switch':
           this.log.debug(`switch ${d.from} -> ${d.name}: ${d.reason}`)
+          if (!((this.lastScores.find(s => s.name === d.from)?.score ?? 0) > 0)) this.noteDropOut(now)
           this.abortRunning('switch', true)
           this.start(d.name, d.score, now)
           break
         case 'stop':
           this.log.debug(`stop ${d.name}: ${d.reason}`)
+          this.noteDropOut(now)
           this.abortRunning('stop', true)
           break
       }
@@ -353,6 +375,7 @@ export class NpcController {
       const end = this.now()
       if (outcome === 'ok') {
         st.failures = 0
+        if (!signal.aborted) st.flips = 0 // a run that finished by itself, not one cut short
         st.cooldownUntil = end + (behavior.cooldownMs ?? 0)
       } else if (outcome === 'fail') {
         st.failures++

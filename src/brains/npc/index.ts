@@ -7,7 +7,7 @@ import { NpcController, INTERRUPT_ACTION, type NpcOptions } from './controller.t
 
 export { NpcController, INTERRUPT_ACTION, type NpcOptions, type BehaviorStats } from './controller.ts'
 export { Blackboard, type Needs, type Facts, type BlackboardOptions } from './blackboard.ts'
-export { decide, best, failureCooldown, type Decision, type Scored, type SelectOptions } from './select.ts'
+export { decide, best, failureCooldown, flipCooldown, isFlip, type Decision, type Scored, type SelectOptions } from './select.ts'
 export { NpcYield, type Behavior, type BehaviorContext, type NpcContext, type NpcHook } from './types.ts'
 export * from './behaviors/index.ts'
 

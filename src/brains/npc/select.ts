@@ -17,6 +17,12 @@ export interface SelectOptions {
   minRunMs?: number
   /** Scores at or above this interrupt regardless of minRunMs (danger). Default 80. */
   urgentScore?: number
+  /** A run that drops out ("no longer applies") sooner than this counts as a flip. Default 10000. */
+  flipRunMs?: number
+  /** First pause after repeated flips; doubles per further flip. Default 5000. */
+  flipCooldownMs?: number
+  /** Ceiling for the flip pause. Default 60000. */
+  maxFlipCooldownMs?: number
 }
 
 export type Decision =
@@ -74,4 +80,19 @@ export function decide (scores: Scored[], running: Running | null, now: number, 
 export function failureCooldown (failures: number, baseMs: number, maxMs: number): number {
   if (failures <= 0) return 0
   return Math.min(maxMs, baseMs * 2 ** (failures - 1))
+}
+
+/**
+ * Flip back-off: a behaviour that keeps starting and then dropping out within a few seconds
+ * (its condition flickers at the edge of a threshold) waits before it may start again. The
+ * first flip is free, then base * 2^(flips-2), capped. Urgent scores ignore it (see controller).
+ */
+export function flipCooldown (flips: number, baseMs = 5000, maxMs = 60_000): number {
+  if (flips <= 1) return 0
+  return Math.min(maxMs, baseMs * 2 ** (flips - 2))
+}
+
+/** Whether a run that ended "no longer applies" after `ranMs` counts as a flip. */
+export function isFlip (ranMs: number, opts: SelectOptions = {}): boolean {
+  return ranMs < (opts.flipRunMs ?? 10_000)
 }

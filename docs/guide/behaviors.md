@@ -198,6 +198,22 @@ the same `retreat`/`flee` actions and the reflex always outranks the behaviour, 
 never pull the body two ways. `keep_fed` likewise leaves "eat what you carry" to the reflex
 (food < 15) and steps in below 14, or when health is low and food is under 18 (no regen).
 
+Going home at night has some slack so it doesn't flap at the edge of `homeRange`:
+
+- "Home" is measured horizontally from the home block, and a height difference only counts
+  beyond 3 blocks, so a floor up, a cellar or the inside of the walls is home. `go_home`
+  returns at once ("already home") when the bot is within its range by that measure.
+- It starts when the bot is farther than `homeRange` and, once on its way, keeps going until
+  it is within go_home's range (4) instead of stopping at `homeRange`. For 3 minutes after
+  getting home it allows `homeRange + 4` before heading back, so a chore at the edge of the
+  base doesn't send it home every few seconds.
+- When `go_home` fails, stay_safe doesn't try again for 60 s (doubling per failure in a row,
+  up to 5 min). Meanwhile an unprepared bot (no armour, weapon or food) stays put: it digs in
+  with `bunker` when it may, otherwise stands guard where it is. A more urgent danger
+  (surrounded, low health, water) still takes over.
+- A path stopped right at the start (the previous action's stop landing on the new path) is
+  retried once; if it is stopped again, go_home says so instead of the pathfinder's text.
+
 ## Bodyguard
 
 `bodyguard` protects a player (default: the first owner online) without any LLM turns. Pax has

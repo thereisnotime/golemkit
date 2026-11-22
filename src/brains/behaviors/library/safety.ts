@@ -7,11 +7,13 @@ import { needsSurvival } from '../../../core/index.ts'
 import type { Bot } from 'mineflayer'
 import { z } from '../../../core/index.ts'
 import { defineBehavior } from '../types.ts'
-import type { NpcContext } from '../../npc/index.ts'
+import type { NpcContext, BehaviorContext } from '../../npc/index.ts'
+import type { ActionResult } from '../../../core/index.ts'
 import { fillerBlock, bestFood, roofAbove } from '../../../skills/survival.ts'
 import { wornArmorPoints } from '../../../skills/gear.ts'
 import { unpreparedForNight } from '../../../skills/tactics.ts'
-import { findStandable, getHome } from '../../../skills/navigation.ts'
+import { findStandable, getHome, homeOffset, sameDimension } from '../../../skills/navigation.ts'
+import { failureCooldown } from '../../npc/index.ts'
 import { canPlace } from '../runtime.ts'
 import { hostilesNear } from './util.ts'
 import { escorting } from '../../../skills/bodyguard.ts'
@@ -19,7 +21,50 @@ import { escorting } from '../../../skills/bodyguard.ts'
 /** Health at or below which an escorting bodyguard treats a crowd around it as surrounded. */
 const ESCORT_SURROUNDED_HEALTH = 12
 
-type Danger = 'surrounded' | 'low_health' | 'water' | 'night' | 'shelter' | null
+type Danger = 'surrounded' | 'low_health' | 'water' | 'night' | 'hold' | 'shelter' | null
+
+/** After a failed go_home, how long before stay_safe tries it again (doubles per failure, capped). */
+export const HOME_BACKOFF_MS = 60_000
+export const MAX_HOME_BACKOFF_MS = 5 * 60_000
+/** After getting home, wandering this much past homeRange is allowed before it heads back again... */
+export const HOME_SETTLE_SLACK = 4
+/** ...for this long, so a chore at the edge of homeRange doesn't send it home every few seconds. */
+export const HOME_SETTLE_MS = 3 * 60_000
+
+/** go_home back-off for the n-th failure in a row. Pure, exported for tests. */
+export function homeBackoffMs (failures: number): number {
+  return failureCooldown(failures, HOME_BACKOFF_MS, MAX_HOME_BACKOFF_MS)
+}
+
+/** What stay_safe remembers about its trips home (one per armed instance). */
+export interface HomeTrips {
+  /** No go_home attempts before this (ms); the bot holds position instead. */
+  backoffUntil: number
+  /** go_home failures in a row. */
+  failures: number
+  /** When it last got (or already was) home, ms. */
+  arrivedAt: number
+}
+
+export function newHomeTrips (): HomeTrips {
+  return { backoffUntil: 0, failures: 0, arrivedAt: -Infinity }
+}
+
+/**
+ * Whether the bot should (still) head home at night, with hysteresis: it starts when farther
+ * than homeRange (plus HOME_SETTLE_SLACK shortly after arriving), and once on its way keeps
+ * going until within arriveRange. Pure, exported for tests.
+ */
+export function needsHome (offset: number, o: { homeRange: number, arriveRange: number, running: boolean, sinceArrivedMs: number }): boolean {
+  if (o.running) return offset > o.arriveRange
+  const leave = o.sinceArrivedMs < HOME_SETTLE_MS ? o.homeRange + HOME_SETTLE_SLACK : o.homeRange
+  return offset > leave
+}
+
+/** The range stay_safe passes to go_home. */
+function arriveRange (o: { homeRange: number }): number {
+  return Math.min(o.homeRange, 4)
+}
 
 function inWater (bot: Bot): boolean {
   const p = bot.entity?.position
@@ -51,7 +96,7 @@ export function nightUnready (bot: Bot): string | null {
 type StayO = z.infer<typeof stayOptions>
 
 /** Which danger stay_safe should handle right now, most urgent first. Exported for tests. */
-export function assessDanger (ctx: Pick<NpcContext, 'agent' | 'bot' | 'bb'> & { current?: string | null }, o: StayO): Danger {
+export function assessDanger (ctx: Pick<NpcContext, 'agent' | 'bot' | 'bb'> & { current?: string | null, now?: number }, o: StayO, trips: HomeTrips = newHomeTrips()): Danger {
   const { bot, bb, agent } = ctx
   // once backing off, keep at it until the mob is well behind us (no stop/start at the edge)
   const running = ctx.current === 'stay_safe'
@@ -67,7 +112,15 @@ export function assessDanger (ctx: Pick<NpcContext, 'agent' | 'bot' | 'bb'> & { 
   if (o.avoidWater && near.length && health < 16 && inWater(bot)) return 'water'
   // an armed bodyguard with its player online stays with them at night (the dangers above still apply)
   if (escorting(agent)) return null
-  if (o.homeAtNight && bb.facts.isNight && !bb.facts.sleeping && getHome(agent) && bb.facts.homeDistance !== null && bb.facts.homeDistance > o.homeRange) return 'night'
+  const home = getHome(agent)
+  if (o.homeAtNight && bb.facts.isNight && !bb.facts.sleeping && home && sameDimension(bot, home)) {
+    const now = ctx.now ?? Date.now()
+    if (needsHome(homeOffset(pos, home), { homeRange: o.homeRange, arriveRange: arriveRange(o), running, sinceArrivedMs: now - trips.arrivedAt })) {
+      // go_home just failed: don't try again every few seconds, stand guard where it is meanwhile
+      return now < trips.backoffUntil ? 'hold' : 'night'
+    }
+    return null
+  }
   // no home to go to and not fit for a night outside: dig in, unless already under a roof
   if (o.shelterUnprepared && bb.facts.isNight && !bb.facts.sleeping && !getHome(agent) && agent.canDig && agent.getAction?.('bunker') &&
       !agent.protectedAreas?.isProtected(pos) && nightUnready(bot) && roofAbove(bot, 12) === null) return 'shelter'
@@ -84,22 +137,39 @@ export const staySafe = defineBehavior({
   uses: ['retreat', 'flee', 'pillar', 'goto', 'go_home', 'bunker'],
   priority: 'behavior',
   create (o, { agent }) {
+    const trips = newHomeTrips()
+    // Shelter in place after a failed go_home: dig in when unprepared and allowed to, else stand
+    // guard until the back-off ends or a more urgent danger shows up (which this run then yields to).
+    const holdPosition = async (ctx: BehaviorContext): Promise<ActionResult | string> => {
+      const pos = ctx.bot.entity.position
+      if (agent.canDig && agent.getAction('bunker') && !agent.protectedAreas?.isProtected(pos) &&
+          nightUnready(ctx.bot) && roofAbove(ctx.bot, 12) === null) {
+        return ctx.act('bunker', { untilDay: true })
+      }
+      while (Date.now() < trips.backoffUntil) {
+        await ctx.wait(1000)
+        const d = assessDanger({ ...ctx, current: 'stay_safe', now: Date.now() }, o, trips)
+        if (d !== 'hold') break
+      }
+      return `stood guard at ${Math.floor(pos.x)} ${Math.floor(pos.y)} ${Math.floor(pos.z)}`
+    }
     return {
       failureCooldownMs: 4000,
       maxFailureCooldownMs: 30_000,
       score (ctx) {
         if (!needsSurvival(ctx.bot)) return 0 // creative/spectator: mobs can't hurt us
-        switch (assessDanger(ctx, o)) {
+        switch (assessDanger(ctx, o, trips)) {
           case 'surrounded': return 92
           case 'low_health': return 88
           case 'water': return 78
           case 'night': return nightUnready(ctx.bot) ? 70 : ctx.current === 'stay_safe' ? 50 : 48 // unprepared: home beats other jobs
+          case 'hold': return nightUnready(ctx.bot) ? 40 : 0 // stay put rather than wander off after a failed trip
           case 'shelter': return 66
           default: return 0
         }
       },
       async run (ctx) {
-        const danger = assessDanger(ctx, o)
+        const danger = assessDanger(ctx, o, trips)
         const back = agent.getAction('retreat') ? 'retreat' : agent.getAction('flee') ? 'flee' : null
         switch (danger) {
           case 'surrounded':
@@ -129,8 +199,22 @@ export const staySafe = defineBehavior({
           }
           case 'shelter':
             return ctx.act('bunker', { untilDay: true })
-          case 'night':
-            return agent.getAction('go_home') ? ctx.act('go_home', { range: Math.min(o.homeRange, 4) }) : 'no go_home action'
+          case 'night': {
+            if (!agent.getAction('go_home')) return 'no go_home action'
+            const r = await ctx.act('go_home', { range: arriveRange(o) })
+            if (r.ok) {
+              trips.failures = 0
+              trips.arrivedAt = Date.now()
+              return r
+            }
+            trips.failures++
+            const wait = homeBackoffMs(trips.failures)
+            trips.backoffUntil = Date.now() + wait
+            ctx.log.debug(`stay_safe: go_home failed (${r.message}), not trying again for ${Math.round(wait / 1000)}s, holding position`)
+            return holdPosition(ctx)
+          }
+          case 'hold':
+            return holdPosition(ctx)
           default:
             return 'safe'
         }
