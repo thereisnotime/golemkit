@@ -12,7 +12,7 @@
 import { join } from 'node:path'
 import YAML from 'yaml'
 import { z } from 'zod'
-import { serverFromEnv, type InstanceOptions, type ServerConfig } from './definition.ts'
+import { serverFromEnv, expandEnv, type InstanceOptions, type ServerConfig } from './definition.ts'
 
 const ServerSchema = z.object({
   host: z.string().optional(),
@@ -97,7 +97,7 @@ export function resolveUsername (p: PlannedAgent, defUsername: string, multiServ
 }
 
 export function parseFleetFile (text: string, base: ServerConfig = serverFromEnv()): FleetPlan {
-  const file = FleetFileSchema.parse(YAML.parse(text))
+  const file = FleetFileSchema.parse(YAML.parse(expandEnv(text)))
   const servers: FleetPlan['servers'] = {}
   const rawServers = file.servers ?? { default: file.server ?? {} }
   for (const [name, s] of Object.entries(rawServers)) {

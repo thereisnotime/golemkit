@@ -13,8 +13,10 @@ just run pax -v      # same, with debug logging
 
 ## Personal values from the environment
 
-Profiles and their context packs (AGENTS.md, USER.md, skills) expand `${NAME}` and
-`${NAME:-default}` from the environment, after loading `.env`. Keep owner names and token
+Profiles, their context packs (AGENTS.md, USER.md, skills, hooks.yaml), fleet files and scene
+files expand `${NAME}` and `${NAME:-default}` from the environment, after loading `.env`.
+Variants and scripts read the environment directly (`envOr('NAME', 'default')` from core);
+`.env` is loaded as soon as core is imported, also without `--env-file`. Keep owner names and token
 locations in `.env` instead of the repo:
 
 ```yaml

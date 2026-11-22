@@ -1,4 +1,8 @@
 // Public API for writing skills, brains and bots.
+import { loadDotEnvOnce } from './definition.ts'
+// Load .env before any variant or script reads process.env, also when Node wasn't started with
+// --env-file. Variables already set in the environment win.
+loadDotEnvOnce()
 export { Agent, type AgentEvents, type ChatMessage, type ActionInfo, type ActOptions, type ActionCatalogEntry } from './agent.ts'
 export {
   defineAction, noParams, ok, fail, sleep, checkAborted, ActionAbortedError, PRIORITY,
@@ -6,7 +10,7 @@ export {
 } from './action.ts'
 export { defineSkill, type SkillDef } from './skill.ts'
 export { defineBrain, type BrainDef } from './brain.ts'
-export { defineBot, defineVariant, serverFromEnv, expandEnv, type BotDefinition, type VariantDefinition, type ServerConfig, type InstanceOptions } from './definition.ts'
+export { defineBot, defineVariant, serverFromEnv, expandEnv, envOr, loadDotEnvOnce, type BotDefinition, type VariantDefinition, type ServerConfig, type InstanceOptions } from './definition.ts'
 export {
   createLogger, setLogLevel, configureLogging, loggingFromEnv, getLoggingConfig, recentLogs, subscribeLogs, installCrashHandlers, LEVELS,
   type Logger, type Level, type LogEntry, type LogConfig, type LogFields

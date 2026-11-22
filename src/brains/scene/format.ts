@@ -5,6 +5,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, extname } from 'node:path'
 import YAML from 'yaml'
 import { z } from 'zod'
+import { expandEnv } from '../../core/definition.ts'
 import {
   BEAT_KINDS, DEFAULT_SCENE_OPTIONS,
   type Beat, type BeatKind, type Scene, type SceneInput, type InteractionSpec
@@ -267,7 +268,7 @@ export function defineScene (input: SceneInput): Scene {
 export function parseSceneYaml (text: string, source = 'scene.yaml'): Scene {
   let data: unknown
   try {
-    data = YAML.parse(text)
+    data = YAML.parse(expandEnv(text))
   } catch (e) {
     throw new SceneValidationError(source, [`YAML: ${(e as Error).message}`])
   }

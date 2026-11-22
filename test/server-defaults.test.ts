@@ -19,3 +19,10 @@ test('expandEnv fills variables and defaults', async () => {
   assert.equal(expandEnv('${NOPE:-Robin} and ${NOPE}!', env), 'Robin and !')
   assert.equal(expandEnv('file: ${F:-~/.config/x.env}', env), 'file: ~/.config/x.env')
 })
+
+test('fleet files expand ${VAR} from the environment', async () => {
+  const { parseFleetFile } = await import('../src/core/fleetFile.ts')
+  process.env.MCB_TEST_HOST = 'fleet.example.com'
+  const plan = parseFleetFile('servers:\n  a: { host: "${MCB_TEST_HOST}" }\nbots:\n  - { variant: buddy, username: X, server: a }\n')
+  assert.ok(JSON.stringify(plan).includes('fleet.example.com'))
+})

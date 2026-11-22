@@ -51,6 +51,12 @@ export function expandEnv (text: string, env: NodeJS.ProcessEnv = process.env): 
   return text.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}/g, (_m, name: string, def?: string) => env[name] || def || '')
 }
 
+/** An environment variable (after loading `.env`), or the default: for variants and scripts. */
+export function envOr (name: string, def = ''): string {
+  loadDotEnvOnce()
+  return process.env[name] || def
+}
+
 /** Defaults for a server running on this machine; set MC_HOST etc. in `.env` for anything else. */
 export const DEFAULT_SERVER: ServerConfig = { host: 'localhost', port: 25565, auth: 'offline', version: '1.21.1' }
 
