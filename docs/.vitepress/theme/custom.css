@@ -55,8 +55,19 @@
 /* Mermaid: natural size with horizontal scroll instead of shrinking wide charts to unreadable text;
    labels may overflow their measured box rather than being clipped */
 .vp-doc .mermaid { overflow-x: auto; padding: 8px 0 4px; text-align: center; }
-.vp-doc .mermaid svg { max-width: none; height: auto; }
+.vp-doc .mermaid svg { max-width: none; height: auto; display: block; margin: 0 auto; }
 .vp-doc .mermaid foreignObject { overflow: visible; }
 .vp-doc .mermaid .nodeLabel, .vp-doc .mermaid .edgeLabel, .vp-doc .mermaid .label { overflow: visible; }
 /* the expand button sits above the chart instead of on top of a node */
 .vp-doc .zoomable-diagram { padding-top: 38px; }
+
+/* Home page */
+:root {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #22c55e 10%, #14b8a6 50%, #0ea5e9 90%);
+  --vp-home-hero-image-background-image: radial-gradient(circle, #14b8a666 0%, #22c55e33 45%, transparent 70%);
+  --vp-home-hero-image-filter: blur(56px);
+}
+.VPHero .image-src { image-rendering: pixelated; width: 240px; height: 240px; max-width: 60vw; max-height: 60vw; }
+.VPFeature .icon { font-size: 26px; background: var(--vp-c-default-soft); }
+.vp-doc .home-footnote { color: var(--vp-c-text-2); font-size: 0.9em; margin-top: 2.5em; }

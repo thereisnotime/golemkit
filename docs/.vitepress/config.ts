@@ -40,6 +40,9 @@ export default withMermaid(defineConfig({
     }
   },
   themeConfig: {
+    logo: '/golem.svg',
+    socialLinks: [{ icon: 'github', link: 'https://github.com/thereisnotime/golemkit' }],
+    footer: { message: 'Released under the LGPL-3.0 License.', copyright: 'golemkit contributors' },
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Concepts', link: '/concepts/architecture' },
