@@ -1,7 +1,7 @@
 # A straight wall, 7 long and 3 high (runs east-west as drawn). 21 blocks.
 name: wall_segment
 description: Straight wall 7 long and 3 high
-meta: { tags: [defence, wall], author: mc-buddy }
+meta: { tags: [defence, wall], author: golemkit }
 facing: south
 site: near
 roles:

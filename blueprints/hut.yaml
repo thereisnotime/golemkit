@@ -3,7 +3,7 @@
 # 2 glass panes; without glass the windows stay open).
 name: hut
 description: Small 5x5 one-room house with a door, a flat roof and a torch inside
-meta: { tags: [house, starter, quick], author: mc-buddy }
+meta: { tags: [house, starter, quick], author: golemkit }
 facing: south            # the door side, as drawn below
 site: near
 roles:

@@ -24,7 +24,7 @@ llm:
   effort: low
   login: .auth/pax
   oauthTokenVar: ${MC_OAUTH_TOKEN_VAR:-CLAUDE_CODE_OAUTH_TOKEN}
-  oauthTokenFile: ${MC_OAUTH_TOKEN_FILE:-~/.config/mc-buddy/secrets.env}
+  oauthTokenFile: ${MC_OAUTH_TOKEN_FILE:-~/.config/golemkit/secrets.env}
   listen: conversation        # mention | conversation | all
   immersive: false            # true = stay in character (reports stay truthful)
   aliases: [pax]

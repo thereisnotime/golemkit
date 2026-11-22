@@ -1,4 +1,4 @@
-// Logs a subscription CLI into an isolated mc-buddy profile, or shows profile status.
+// Logs a subscription CLI into an isolated golemkit profile, or shows profile status.
 //   node scripts/llm-login.ts <claude|codex|opencode> [token|device] [--profile DIR]
 //   node scripts/llm-login.ts status
 // The CLI runs with the same isolated environment the bots use (HOME = profile), so the

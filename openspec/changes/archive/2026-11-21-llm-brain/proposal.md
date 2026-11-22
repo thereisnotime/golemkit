@@ -1,6 +1,6 @@
 ## Why
 
-mc-buddy's action catalog was built so a language model could use it, but nothing drives a bot
+golemkit's action catalog was built so a language model could use it, but nothing drives a bot
 with a model yet. The owner wants LLM bots on the subscriptions they already pay for (Claude
 through Claude Code, ChatGPT through Codex, OpenCode), with API keys as an option, and without
 those agent CLIs getting shell or file access on the host.

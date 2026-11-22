@@ -7,7 +7,7 @@ name: small_house
 description: Cozy 5x5 wooden house with log corners, a pitched stair roof, windows, a door with a step, torches, crafting table, chest and bed
 facing: south            # the door side, as drawn
 site: near
-meta: { tags: [house, starter, wood], style: rustic, author: mc-buddy }
+meta: { tags: [house, starter, wood], style: rustic, author: golemkit }
 stairs: roof             # ^ v < > are roof stairs climbing north, south, west, east
 roles:
   wall: { default: oak_planks, accept: "_planks$", material: true, wood: true }

@@ -1,5 +1,5 @@
-# podman build -t mc-buddy .
-# podman run -d --name mc-buddy --env-file .env -v ./data:/app/data:Z mc-buddy fleet fleet.yaml
+# podman build -t golemkit .
+# podman run -d --name golemkit --env-file .env -v ./data:/app/data:Z golemkit fleet fleet.yaml
 FROM docker.io/library/node:26-slim
 WORKDIR /app
 ENV NODE_ENV=production

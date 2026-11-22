@@ -296,7 +296,7 @@ name: small_house          # lowercase, digits, _
 description: Cozy 5x5 wooden house ...
 facing: south              # the side the entrance is on, as drawn
 site: near                 # near: find a spot near the player; here: around the bot
-meta: { tags: [house, starter], style: rustic, author: mc-buddy }   # free-form, optional
+meta: { tags: [house, starter], style: rustic, author: golemkit }   # free-form, optional
 stairs: roof               # role for the ^ v < > shorthand (default: a role named roof)
 roles:                     # what each kind of block is made of
   wall: { default: oak_planks, accept: "_planks$", material: true, wood: true }

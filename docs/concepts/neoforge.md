@@ -1,7 +1,7 @@
 # NeoForge support
 
 Mineflayer only speaks the vanilla protocol. A NeoForge server rejects vanilla clients when
-its mods register network channels (any content mod does), so mc-buddy adds a NeoForge layer
+its mods register network channels (any content mod does), so golemkit adds a NeoForge layer
 in `src/core/neoforge/`. Skills and brains never see it.
 
 Everything here is written against NeoForge's 1.21.1 source
@@ -10,7 +10,7 @@ Everything here is written against NeoForge's 1.21.1 source
 ```mermaid
 sequenceDiagram
   autonumber
-  participant B as Bot (mc-buddy)
+  participant B as Bot (golemkit)
   participant S as NeoForge server
   Note over B: first ever connection, no cache
   B->>S: login (offline / microsoft)

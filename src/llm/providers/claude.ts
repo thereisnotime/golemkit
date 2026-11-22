@@ -86,7 +86,7 @@ export class ClaudeSubscriptionProvider implements LlmProvider {
   }
 
   private env (): NodeJS.ProcessEnv {
-    const set: Record<string, string> = { CLAUDE_AGENT_SDK_CLIENT_APP: 'mc-buddy/0.1' }
+    const set: Record<string, string> = { CLAUDE_AGENT_SDK_CLIENT_APP: 'golemkit/0.1' }
     if (this.proxyUrl) set.ANTHROPIC_BASE_URL = this.proxyUrl
     const token = this.token()
     if (token) set.CLAUDE_CODE_OAUTH_TOKEN = token

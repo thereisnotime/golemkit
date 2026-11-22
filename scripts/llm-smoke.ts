@@ -11,7 +11,7 @@ import { FakeAgent } from '../src/llm/testing.ts'
 
 const name = process.argv[2] || process.env.MC_LLM_PROVIDER || 'claude-subscription'
 const message = process.argv[3] || 'please come over here, and tell me when you are on the way'
-const dir = mkdtempSync(join(tmpdir(), 'mc-buddy-smoke-'))
+const dir = mkdtempSync(join(tmpdir(), 'golemkit-smoke-'))
 const agent = new FakeAgent({ dataDir: dir, username: 'Buddy', persona: 'A cheerful helper. Very short answers.' })
 const provider = createProvider(name)
 const rt = new LlmRuntime(agent, {

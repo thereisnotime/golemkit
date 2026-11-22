@@ -130,7 +130,7 @@ export async function runEval (opts: EvalOptions): Promise<EvalReport> {
 }
 
 async function runOne (opts: EvalOptions, arm: Arm, sc: Scenario, rep: number, _log: unknown): Promise<RunRecord> {
-  const dir = mkdtempSync(join(tmpdir(), 'mc-buddy-eval-'))
+  const dir = mkdtempSync(join(tmpdir(), 'golemkit-eval-'))
   const world = new EvalWorld(sc.world)
   const username = opts.username ?? 'Pax'
   const agent = new FakeAgent({ dataDir: dir, username, actions: world.actions(), persona: opts.persona, observation: () => world.observe(username) })

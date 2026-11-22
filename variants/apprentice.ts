@@ -62,7 +62,7 @@ export default defineVariant({
         effort: 'low',
         login: '.auth/apprentice',
         oauthTokenVar: envOr('MC_OAUTH_TOKEN_VAR', 'CLAUDE_CODE_OAUTH_TOKEN'),
-        oauthTokenFile: envOr('MC_OAUTH_TOKEN_FILE', '~/.config/mc-buddy/secrets.env')
+        oauthTokenFile: envOr('MC_OAUTH_TOKEN_FILE', '~/.config/golemkit/secrets.env')
       },
       budget: { turnsPerHour: 10, tokensPerHour: 300_000, tokensPerDay: 1_000_000, callsPerInstruction: 3 },
       npc: { extraBehaviors: [fleeOrFight()] }

@@ -196,7 +196,7 @@ export class LlmRuntime {
     if (this.unavailable) this.log.warn(`provider ${this.provider.name} unavailable: ${this.unavailable}`, { provider: this.provider.name })
     if (this.provider.needsMcp || this.opts.mcp?.expose) {
       const port = this.opts.mcp?.port ?? 0
-      this.bridge = await startMcpHttp(this.tools, { port, token: this.opts.mcp?.token, name: `mc-buddy-${this.agent.username}` })
+      this.bridge = await startMcpHttp(this.tools, { port, token: this.opts.mcp?.token, name: `golemkit-${this.agent.username}` })
       // The token is a local secret; print it only when the user asked to expose the bridge.
       if (this.opts.mcp?.expose) this.log.info(`MCP bridge on ${this.bridge.url} (Authorization: Bearer ${this.bridge.token})`, { url: this.bridge.url })
       else this.log.debug('MCP bridge started', { url: this.bridge.url })

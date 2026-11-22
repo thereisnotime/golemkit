@@ -1,7 +1,7 @@
 ---
 layout: home
 hero:
-  name: mc-buddy
+  name: golemkit
   text: Minecraft bots for NeoForge servers
   tagline: Player assistants, self-sufficient NPCs, LLM agents and staged scenes, on real protocol clients that start in a second.
   actions:

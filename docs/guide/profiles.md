@@ -23,7 +23,7 @@ locations in `.env` instead of the repo:
 owners: ["${MC_OWNER:-Robin}"]
 llm:
   oauthTokenVar: ${MC_OAUTH_TOKEN_VAR:-CLAUDE_CODE_OAUTH_TOKEN}
-  oauthTokenFile: ${MC_OAUTH_TOKEN_FILE:-~/.config/mc-buddy/secrets.env}
+  oauthTokenFile: ${MC_OAUTH_TOKEN_FILE:-~/.config/golemkit/secrets.env}
 ```
 
 ## Format
@@ -47,7 +47,7 @@ llm:                          # only for variants with an LLM brain
   effort: low
   login: .auth/pax            # isolated LLM login dir
   oauthTokenVar: CLAUDE_CODE_OAUTH_TOKEN
-  oauthTokenFile: ~/.config/mc-buddy/secrets.env
+  oauthTokenFile: ~/.config/golemkit/secrets.env
   listen: conversation        # mention | conversation | all
   immersive: false            # true = stay in character
   aliases: [pax]

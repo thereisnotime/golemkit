@@ -10,8 +10,8 @@
 ## Install
 
 ```bash
-git clone git@github.com:thereisnotime/mc-buddy.git
-cd mc-buddy
+git clone git@github.com:thereisnotime/golemkit.git
+cd golemkit
 asdf install      # node + just
 just setup        # npm ci, creates .env from .env.example
 ```

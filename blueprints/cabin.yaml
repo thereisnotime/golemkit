@@ -6,7 +6,7 @@ name: cabin
 description: 7x5 log cabin with horizontal log walls, log gables, stair roof, shuttered windows, torch, bed, chest and crafting table
 facing: south
 site: near
-meta: { tags: [house, cabin, wood], style: log cabin, author: mc-buddy }
+meta: { tags: [house, cabin, wood], style: log cabin, author: golemkit }
 stairs: roof
 roles:
   floor: { default: spruce_planks, accept: "_planks$", wood: true }

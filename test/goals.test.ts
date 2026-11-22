@@ -14,7 +14,7 @@ import { Storage } from '../src/core/index.ts'
 
 const dirs: string[] = []
 function tmp (): string {
-  const d = mkdtempSync(join(tmpdir(), 'mc-buddy-goals-'))
+  const d = mkdtempSync(join(tmpdir(), 'golemkit-goals-'))
   dirs.push(d)
   return d
 }

@@ -1,7 +1,7 @@
 # A flat 5x5 pad on the ground: a base for crafting stations, a landing, a floor. 25 blocks.
 name: platform
 description: Flat 5x5 floor pad
-meta: { tags: [decoration, utility], author: mc-buddy }
+meta: { tags: [decoration, utility], author: golemkit }
 facing: south
 site: near
 roles:

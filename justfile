@@ -94,7 +94,7 @@ docs-build: docs-gen
     npx vitepress build docs
     @echo "{{GREEN}}✔ open docs/.vitepress/dist/index.html (or: npx vitepress preview docs){{NORMAL}}"
 
-# Log a subscription CLI into its isolated mc-buddy profile (claude [token] | codex [device] | opencode)
+# Log a subscription CLI into its isolated golemkit profile (claude [token] | codex [device] | opencode)
 [group('llm')]
 llm-login provider mode="" *args:
     @node scripts/llm-login.ts {{provider}} {{mode}} {{args}}
@@ -133,7 +133,7 @@ blueprint-fetch *args:
 
 # Build the container image (podman)
 [group('deploy')]
-image tag="mc-buddy":
+image tag="golemkit":
     podman build -t {{tag}} .
 
 # Typecheck + unit tests

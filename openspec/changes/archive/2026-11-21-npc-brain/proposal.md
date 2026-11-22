@@ -1,6 +1,6 @@
 ## Why
 
-mc-buddy bots only act when a player commands them (command brain) or when something hits them (reflexes). An NPC should live on its own: wander near home, go back at night, sleep, eat, deal with mobs, notice players, and pick up chores when the bot has the skills for them. That decision loop should be a reusable framework piece that bots configure, not one hard-coded bot.
+golemkit bots only act when a player commands them (command brain) or when something hits them (reflexes). An NPC should live on its own: wander near home, go back at night, sleep, eat, deal with mobs, notice players, and pick up chores when the bot has the skills for them. That decision loop should be a reusable framework piece that bots configure, not one hard-coded bot.
 
 ## What Changes
 

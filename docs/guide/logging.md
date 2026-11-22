@@ -37,7 +37,7 @@ Loggers are hierarchical, `<username>/<component>/...`:
 | `McBuddy/neoforge` | handshake, channel learning (debug), skipped packets (trace) |
 | `McBuddy/<brain>` | brains log under their own name (e.g. `McBuddy/npc`) |
 | `fleet` | fleet messages between bots (debug) |
-| `mc-buddy` | CLI and process-level messages |
+| `golemkit` | CLI and process-level messages |
 
 ## Levels
 
@@ -79,7 +79,7 @@ Shortcuts on the CLI: `-v` (debug), `-q` (warn), `-l <spec>`.
 ## Files
 
 ```bash
-MC_LOG_FILE=logs/mc-buddy.log     # everything in one file
+MC_LOG_FILE=logs/golemkit.log     # everything in one file
 MC_LOG_DIR=logs                   # one file per bot: logs/McBuddy.log, logs/_system.log
 MC_LOG_FILE_FORMAT=json           # files in JSON (console stays pretty)
 MC_LOG_MAX_SIZE_MB=20             # rotate at this size (0 = never)

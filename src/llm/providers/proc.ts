@@ -99,7 +99,7 @@ export function childEnv (opts: EnvOptions = {}): NodeJS.ProcessEnv {
 
 /** An empty scratch directory used as the CLI's working dir, so it has no project files to read. */
 export function scratchDir (prefix: string): { path: string, remove (): void } {
-  const path = mkdtempSync(join(tmpdir(), `mc-buddy-${prefix}-`))
+  const path = mkdtempSync(join(tmpdir(), `golemkit-${prefix}-`))
   return { path, remove: () => { try { rmSync(path, { recursive: true, force: true }) } catch {} } }
 }
 

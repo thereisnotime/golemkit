@@ -2,7 +2,7 @@
 # corner posts and a torch. 51 blocks + torch.
 name: tower
 description: Small 3x3 lookout tower, 7 high, with a doorway and corner posts
-meta: { tags: [defence, tower, stone], author: mc-buddy }
+meta: { tags: [defence, tower, stone], author: golemkit }
 facing: south
 site: near
 roles:

@@ -21,7 +21,7 @@ import type { LlmProvider, TurnInput, TurnResult } from '../src/llm/types.ts'
 
 const dirs: string[] = []
 function tmp (): string {
-  const d = mkdtempSync(join(tmpdir(), 'mc-buddy-test-'))
+  const d = mkdtempSync(join(tmpdir(), 'golemkit-test-'))
   dirs.push(d)
   return d
 }

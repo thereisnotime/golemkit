@@ -1,4 +1,4 @@
-# mc-buddy
+# golemkit
 
 A TypeScript framework for building Minecraft Java bots, with first-class **NeoForge** support: companions,
 bodyguards, self-sufficient NPCs and LLM-driven agents, all from the same pieces (actions,
@@ -49,6 +49,7 @@ Paper servers. See [what's supported](#support-status) for what has been tested.
 | Modded items and mobs | ✅ | real names from NeoForge's registry sync |
 | Modded blocks | 🧪 | treated as full cubes, since their states aren't synced |
 | Mod GUIs, Create contraptions, Ars spells, Curios slots | ❌ | |
+| Games other than Minecraft Java | 🚧 | the LLM brain, intents, behaviours and context packs are game-agnostic; a game-adapter split is proposed in [game-adapters](openspec/changes/game-adapters/proposal.md) |
 
 ### Bot features
 

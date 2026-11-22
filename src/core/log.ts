@@ -1,7 +1,7 @@
 // Logging for agents, brains, skills and the fleet.
 //
 // - Hierarchical logger names: "<username>/<component>/...", e.g. "McBuddy/action/follow",
-//   "McBuddy/chat", "McBuddy/neoforge", "fleet", "mc-buddy".
+//   "McBuddy/chat", "McBuddy/neoforge", "fleet", "golemkit".
 // - Level rules like RUST_LOG: "info,McBuddy=debug,*/neoforge=trace,*/chat=warn".
 //   The most specific (longest) matching pattern wins; `*` matches anything, including "/".
 // - Formats: pretty (coloured), plain, json (one object per line).
@@ -281,7 +281,7 @@ function safeStringify (obj: unknown): string {
 
 interface FileSink { path: string, fd: number, size: number }
 const files = new Map<string, FileSink>()
-const SYSTEM_LOGGERS = new Set(['mc-buddy', 'fleet'])
+const SYSTEM_LOGGERS = new Set(['golemkit', 'fleet'])
 
 function fileFor (path: string): FileSink {
   let f = files.get(path)
@@ -378,7 +378,7 @@ export function createLogger (name: string, bound?: LogFields): Logger {
 }
 
 /** Logs uncaught exceptions and unhandled rejections instead of dying silently. */
-export function installCrashHandlers (log: Logger = createLogger('mc-buddy')): void {
+export function installCrashHandlers (log: Logger = createLogger('golemkit')): void {
   process.on('uncaughtException', (e) => {
     log.error(`uncaught exception: ${e.stack ?? e}`)
     closeFiles()

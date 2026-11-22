@@ -8,7 +8,7 @@ name: cottage
 description: 7x7 cottage on a cobblestone foundation, log frame, glass windows, porch, gabled stair roof with overhang, torches, bed, chest, crafting table and furnace
 facing: south
 site: near
-meta: { tags: [house, cottage, wood, stone], style: rustic, author: mc-buddy }
+meta: { tags: [house, cottage, wood, stone], style: rustic, author: golemkit }
 stairs: roof
 roles:
   foundation: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone_bricks|mossy_stone_bricks|stone|andesite|polished_andesite)$" }

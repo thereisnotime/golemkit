@@ -1,4 +1,4 @@
-// mc-buddy CLI.
+// golemkit CLI.
 //   node src/cli.ts run <profile|variant> [--username NAME] [--owners a,b] [--dig]
 //   node src/cli.ts fleet <name|file.yaml>        (fleets/<name>.yaml)
 //   node src/cli.ts list
@@ -15,7 +15,7 @@ import { validateBehaviorConfig, defaultBehaviorRegistry } from './brains/behavi
 const ROOT = resolve(import.meta.dirname, '..')
 const VARIANTS_DIR = join(ROOT, 'variants')
 const FLEETS_DIR = join(ROOT, 'fleets')
-const log = createLogger('mc-buddy')
+const log = createLogger('golemkit')
 
 async function loadVariant (name: string): Promise<BotDefinition> {
   const candidates = [join(VARIANTS_DIR, `${name}.ts`), join(VARIANTS_DIR, name, 'index.ts'), resolve(name)]

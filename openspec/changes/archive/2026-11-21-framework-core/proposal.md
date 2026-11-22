@@ -1,6 +1,6 @@
 ## Why
 
-mc-buddy should be a base for many kinds of bots: player assistants, self-sufficient NPCs, NPCs with LLM loops. The first version hard-wired one bot's commands and behaviours.
+golemkit should be a base for many kinds of bots: player assistants, self-sufficient NPCs, NPCs with LLM loops. The first version hard-wired one bot's commands and behaviours.
 
 ## What Changes
 

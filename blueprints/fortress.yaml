@@ -10,7 +10,7 @@ name: fortress
 description: Walled fort 17x17 with stone corner towers, battlements, a walkway with a ladder, a stone floor and a gate with torches
 facing: south            # the gate side, as drawn
 site: near
-meta: { tags: [defence, fort, walls, stone], style: medieval, author: mc-buddy, version: 2 }
+meta: { tags: [defence, fort, walls, stone], style: medieval, author: golemkit, version: 2 }
 roles:
   stone: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_stone_bricks|andesite|polished_andesite)$" }
   foundation: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_stone_bricks|andesite|polished_andesite)$" }

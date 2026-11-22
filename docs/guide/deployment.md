@@ -7,12 +7,12 @@ Bots are long-running Node processes. Any process supervisor works; two tested s
 The repo ships a `Containerfile`.
 
 ```bash
-podman build -t mc-buddy .
-podman run -d --name mc-buddy \
+podman build -t golemkit .
+podman run -d --name golemkit \
   --env-file .env \
   -v ./data:/app/data:Z \
   -v ./fleet.yaml:/app/fleet.yaml:ro,Z \
-  mc-buddy fleet fleet.yaml
+  golemkit fleet fleet.yaml
 ```
 
 - `data/` holds learned channels and bot storage; mount it so restarts keep them.
@@ -23,16 +23,16 @@ podman run -d --name mc-buddy \
 Stop and clean up:
 
 ```bash
-podman rm -f -v mc-buddy
-podman rmi mc-buddy
+podman rm -f -v golemkit
+podman rmi golemkit
 ```
 
 ## systemd (user service)
 
 ```ini
-# ~/.config/systemd/user/mc-buddy.service
+# ~/.config/systemd/user/golemkit.service
 [Unit]
-Description=mc-buddy fleet
+Description=golemkit fleet
 After=network-online.target
 
 [Service]
@@ -47,8 +47,8 @@ WantedBy=default.target
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now mc-buddy
-journalctl --user -u mc-buddy -f
+systemctl --user enable --now golemkit
+journalctl --user -u golemkit -f
 ```
 
 The agent already reconnects after disconnects; `Restart=on-failure` only covers crashes.

@@ -1,5 +1,5 @@
 {
-  "name": "mc-buddy",
+  "name": "golemkit",
   "version": "0.1.0",
   "private": true,
   "description": "Framework for Minecraft bots (assistants, NPCs, LLM agents) on NeoForge servers, built on Mineflayer",

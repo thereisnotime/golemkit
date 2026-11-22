@@ -2,7 +2,7 @@
 # or planks, whatever the bot has most of. 25 blocks.
 name: shelter
 description: Emergency 3x3 box of dirt, cobblestone or planks around the bot
-meta: { tags: [house, emergency], author: mc-buddy }
+meta: { tags: [house, emergency], author: golemkit }
 facing: south
 site: here               # centred on where the bot stands
 roles:

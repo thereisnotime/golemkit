@@ -1,6 +1,6 @@
 # Skills
 
-Every skill and action that ships with mc-buddy. Parameters, defaults and flags for each
+Every skill and action that ships with golemkit. Parameters, defaults and flags for each
 action are in the generated [action reference](./reference/actions.md); this page says what
 each one is for and how it behaves.
 

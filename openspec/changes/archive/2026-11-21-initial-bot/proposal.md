@@ -12,5 +12,5 @@ We want a bot that can join the mc02 NeoForge 1.21.1 modpack server and play alo
 
 ## Impact
 
-- New repo `thereisnotime/mc-buddy` (private).
+- New repo `thereisnotime/golemkit` (private).
 - Depends on mineflayer 4.39, mineflayer-pathfinder, prismarine-nbt.
