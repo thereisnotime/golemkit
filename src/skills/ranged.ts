@@ -212,12 +212,13 @@ const LIQUID = /^(water|lava|bubble_column)$/
 const BAD_FLOOR = /^(lava|fire|soul_fire|magma_block|campfire|soul_campfire|cactus|sweet_berry_bush|powder_snow)$/
 
 /** The nearest spot with a block between it and every active shooter, read from the world. */
-export function coverFor (bot: Bot, shooters: readonly Entity[], radius = 8): (V3 & { cost: number }) | null {
+export function coverFor (bot: Bot, shooters: readonly Entity[], radius = 8, skip: ReadonlySet<string> = new Set()): (V3 & { cost: number }) | null {
   const me = bot.entity.position
   const at = (x: number, y: number, z: number) => bot.blockAt(me.clone().set(x, y, z))
   const solid = (x: number, y: number, z: number) => at(x, y, z)?.boundingBox === 'block'
   const free = (x: number, y: number, z: number) => { const b = at(x, y, z); return !!b && b.boundingBox === 'empty' && !LIQUID.test(b.name) }
   const standable = (x: number, y: number, z: number) => {
+    if (skip.has(`${x},${y},${z}`)) return false
     const floor = at(x, y - 1, z)
     return !!floor && floor.boundingBox === 'block' && !BAD_FLOOR.test(floor.name) && free(x, y, z) && free(x, y + 1, z)
   }
@@ -265,6 +266,7 @@ export const rangedDefense = defineAction({
     let ate = 0
     let quietSince = 0
     let hideUntil = 0 // after a failed charge or a heal stop, hide for a while
+    const badCover = new Set<string>() // spots that turned out to be in sight after all
     let last = ''
     const note = (d: RangedDecision) => {
       const k = `${d.act}:${d.why}`
@@ -273,6 +275,9 @@ export const rangedDefense = defineAction({
     try {
       while (Date.now() < until) {
         checkAborted(signal)
+        // every pass yields to the event loop: a fight or walk that ends at once (a spot it already
+        // stands on, a target already gone) must not spin here and starve the connection
+        await sleep(50, signal)
         if (bot.health <= 0) return fail('died under fire')
         const s = rangedSituation(bot)
         if (!s.active.length && !s.incoming) {
@@ -291,10 +296,11 @@ export const rangedDefense = defineAction({
         if (face) { await fightTarget(bot, face, signal, { maxMs: 6000, flags: { ...flags, maxChase: 4 } }); continue }
         const shield = !!bot.inventory.items().find(i => i.name === 'shield') || bot.inventory.slots[45]?.name === 'shield'
         const melee = bot.inventory.items().some(i => /_(sword|axe)$/.test(i.name))
-        const hide = p.cover || Date.now() < hideUntil
-        const cover = coverFor(bot, s.active.map(x => x.e))
+        const hide = p.cover ? 'asked to take cover' : Date.now() < hideUntil ? 'the last fight went badly' : undefined
+        const cover = coverFor(bot, s.active.map(x => x.e), 8, badCover)
         const d = rangedResponse({
-          health: hide ? Math.min(bot.health, 1) : bot.health,
+          health: bot.health,
+          hide,
           armor: wornArmorPoints(bot),
           bow: !!hasRanged(bot),
           shield,
@@ -323,13 +329,20 @@ export const rangedDefense = defineAction({
           if (!got) { hideUntil = Date.now() + 5000; continue }
           // behind cover: eat, raise the shield if one of them comes round, fight what walks up
           const hold = Date.now() + 15_000
+          const spotKey = `${Math.floor(cover.x)},${cover.y},${Math.floor(cover.z)}`
+          let held = 0
           while (Date.now() < hold) {
             checkAborted(signal)
             const h = rangedSituation(bot)
             const close = h.shooters.find(x => x.dist <= 4)
             if (close) { await fightTarget(bot, close.e, signal, { maxMs: 6000, flags: { ...flags, maxChase: 4 } }); break }
             const exposed = h.active.some(x => x.los)
-            if (exposed) break // they moved: find new cover
+            if (exposed) {
+              // seen at once: the block doesn't cover us after all (the sight lines differ a little); never this spot again
+              if (held === 0) badCover.add(spotKey)
+              break
+            }
+            held++
             if (canEatUnderFire({ health: bot.health, food: bot.food, hasFood: !!fightFood(bot), exposed, incoming: h.incoming })) {
               if (await eatNow(bot, signal)) { ate++; continue }
             }

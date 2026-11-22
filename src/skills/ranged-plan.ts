@@ -116,6 +116,8 @@ export interface RangedState {
   /** Combat flags: combat.ranged and combat.shield (default on). */
   useBow?: boolean
   useShield?: boolean
+  /** Hide whatever the gear, with this reason (asked for cover, or a charge that just failed). */
+  hide?: string
 }
 
 export type RangedAct = 'shoot' | 'shield_close' | 'charge' | 'cover' | 'retreat'
@@ -150,6 +152,7 @@ export function rangedResponse (s: RangedState): RangedDecision | null {
   const hide = (why: string): RangedDecision => s.coverNear ? { act: 'cover', target: nearest.id, why } : { act: 'retreat', target: nearest.id, why }
   const bow = s.bow && s.useBow !== false
   const shield = s.shield && s.useShield !== false
+  if (s.hide) return hide(s.hide)
   if (s.health <= RANGED_LOW_HEALTH) return hide(`health ${Math.ceil(s.health)}`)
   const many = Math.max(active.length, s.patrol)
   const goodGear = s.armor >= GOOD_ARMOR && shield

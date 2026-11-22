@@ -70,6 +70,7 @@ test('response: by health and gear', () => {
   // low health hides whatever the gear
   assert.equal(rangedResponse(st({ shooters: one, health: 6, bow: true, shield: true, armor: 20 }))!.act, 'cover')
   assert.equal(rangedResponse(st({ shooters: one, useBow: false, bow: true, shield: true }))!.act, 'shield_close', 'combat.ranged off')
+  assert.deepEqual(rangedResponse(st({ shooters: one, bow: true, hide: 'asked to take cover' }))!.why, 'asked to take cover')
 })
 
 test('response: a pillager patrol outnumbers a bot without good gear', () => {
