@@ -429,7 +429,8 @@ export const keepFed = defineBehavior({
             done.push(d.step)
             // eating succeeded: the next pass may eat again; anything else changes the world, so retry all
             // (a farm was just planted: nothing to harvest yet, so don't plant or scout again this run)
-            if (d.step !== 'eat') { tried.clear(); if (d.step === 'start_farm') { tried.add('start_farm'); tried.add('scout') } }
+            // (a report changes nothing in the world: keep what was tried)
+            if (d.step !== 'eat' && d.step !== 'report') { tried.clear(); if (d.step === 'start_farm') { tried.add('start_farm'); tried.add('scout') } }
             // scouted: don't scout again this run, but do walk to what it found (spot); been at a spot: don't go again
             if (d.step === 'scout') { tried.add('scout'); if (m.paused.spot) { delete m.paused.spot; saveMemory(agent, m) } }
             if (d.step === 'spot') { tried.add('scout'); tried.add('spot') }

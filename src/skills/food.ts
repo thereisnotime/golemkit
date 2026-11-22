@@ -8,7 +8,7 @@ import type { Entity } from 'prismarine-entity'
 import type { Vec3 } from 'vec3'
 import type { Agent, ActionContext, ActionResult } from '../core/index.ts'
 import { defineSkill, defineAction, z, ok, fail, goals, travel, sleep, checkAborted, fmtPos, needsSurvival, itemName, TravelUnderwaterError } from '../core/index.ts'
-import { huntRefusal, inPen, herdSurplus, HUNTABLE, type HuntCandidate } from './combat.ts'
+import { huntRefusal, inPen, herdSurplus, unreachableAnimals, HUNTABLE, type HuntCandidate } from './combat.ts'
 import { CROPS, isMature, plantOn, TILLABLE } from './farming.ts'
 import { getHome, getPlaces, setPlace, sameDimension, reachDryLand, type Place } from './navigation.ts'
 import { digBlock, DigRefusedError, findItem, countItem, placeAt, reachBlock, vec, within, gotoWithin } from './world.ts'
@@ -123,8 +123,11 @@ export function animalsAround (agent: Agent, bot: Bot, center: { x: number, y: n
   animals: readonly string[] = HUNTABLE, opts: { pens?: boolean } = {}): AnimalCount {
   const adults: Record<string, number> = {}
   const entities: Entity[] = []
+  // ones hunt just gave up on (out of reach) are not food for the next few minutes
+  const gaveUp = unreachableAnimals(bot)
   for (const e of Object.values(bot.entities ?? {})) {
     if (!e?.position || Math.hypot(e.position.x - center.x, e.position.y - center.y, e.position.z - center.z) > radius) continue
+    if (gaveUp.has(e.id)) continue
     const keys = (bot.registry as any).entitiesByName?.[e.name ?? '']?.metadataKeys as string[] | undefined
     if (huntRefusal(e as HuntCandidate, { animals, metadataKeys: keys })) continue
     if (agent.protectedAreas?.isProtected(e.position)) continue

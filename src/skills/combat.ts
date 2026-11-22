@@ -96,7 +96,8 @@ export function threats (bot: Bot, radius = 24): Entity[] {
 
 /** Animals a hunt couldn't get to (up a cliff, behind water...): skipped by later hunts for 5 minutes. */
 const unreachable = new WeakMap<Bot, Map<number, number>>()
-function unreachableAnimals (bot: Bot): { has: (id: number) => boolean, add: (id: number) => void } {
+/** Animals hunt gave up on (couldn't reach or kill) in the last 5 minutes, per bot. */
+export function unreachableAnimals (bot: Bot): { has: (id: number) => boolean, add: (id: number) => void } {
   let m = unreachable.get(bot)
   if (!m) unreachable.set(bot, m = new Map())
   const map = m
