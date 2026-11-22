@@ -174,7 +174,7 @@ test('bodyguard is registered, at behaviour level, with the documented options',
   assert.equal(def.priority, 'behavior')
   const v = reg.validate('bodyguard', { player: 'Robin' })
   assert.ok(v.ok)
-  if (v.ok) assert.deepEqual({ ...v.options }, { player: 'Robin', distance: 3, range: 16, feed: true, keepFood: 4, warn: true, chat: true, whisper: false, whenGone: 'stay', catchUp: 48 })
+  if (v.ok) assert.deepEqual({ ...v.options }, { player: 'Robin', distance: 3, range: 16, feed: true, keepFood: 4, warn: true, chat: true, whisper: false, intercept: true, pullAggro: true, whenGone: 'stay', catchUp: 48 })
 })
 
 test('protect drops its target for a clearly more urgent one, not for a close call', () => {

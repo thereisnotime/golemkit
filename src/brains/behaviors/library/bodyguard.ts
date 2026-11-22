@@ -21,6 +21,8 @@ const options = z.object({
   warn: z.boolean().default(true).describe('warn the player in chat: "creeper behind you", "skeleton on the ridge east", "phantoms incoming"'),
   chat: z.boolean().default(true).describe('short callouts (fed you, ...)'),
   whisper: z.boolean().default(false).describe('send warnings as whispers instead of public chat'),
+  intercept: z.boolean().default(true).describe('meet a mob walking at the player 6-12 blocks out on its path instead of at the player'),
+  pullAggro: z.boolean().default(true).describe('with two or more mobs on the player, hit each once and step off so they follow the bot'),
   whenGone: z.enum(['stay', 'home']).default('stay').describe('player offline: wait where they were last seen (stay) or go home'),
   catchUp: z.number().min(16).max(256).default(48).describe('player online but out of sight: walk to where they were last seen, up to this far')
 })
@@ -95,7 +97,7 @@ export const bodyguard = defineBehavior({
       async run (ctx) {
         const t = target(agent, ctx.bot, o)
         if (t?.entity) {
-          return ctx.act('protect', { player: t.name, distance: o.distance, range: o.range, feed: o.feed, keepFood: o.keepFood, chat: o.chat })
+          return ctx.act('protect', { player: t.name, distance: o.distance, range: o.range, feed: o.feed, keepFood: o.keepFood, chat: o.chat, intercept: o.intercept, pullAggro: o.pullAggro })
         }
         if (!t && o.whenGone === 'home') return ctx.act('go_home', { range: 3 })
         const seen = lastSeen(agent, t?.name ?? o.player)

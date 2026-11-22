@@ -2,7 +2,8 @@
 // gets hit with the bodyguard armed, with follow_owner only, and with no bot at all.
 //   node scripts/guard-bench.ts [x z] [--minutes 4] [--repeats 2] [--phases guard,follow,none]
 //        [--seed 1] [--sword stone|iron] [--armour] [--tester-food 8] [--interval 30] [--cap 8]
-//        [--time day|night] [--phantoms] [--waves mixed|ranged] [--bow] [--tag run] [--scout] [--cleanup] [--force]
+//        [--time day|night] [--phantoms] [--waves mixed|ranged] [--bow] [--blocks 0] [--no-intercept] [--no-pull]
+//        [--tag run] [--scout] [--cleanup] [--force]
 // DIRECTOR (default ClaudeTest, an op) runs everything with commands: before every phase it sets
 // the time, kills leftover tagged mobs, fills explosion holes in the arena floor, resets both
 // players to full health and hunger, gives the same gear (GUARD_BOT: a sword, a shield, 16 bread,
@@ -12,7 +13,9 @@
 // phantom every third with --phantoms), one every --interval seconds while fewer than --cap mobs
 // are alive. --waves ranged summons archers only: 2 skeletons and 2 pillagers (crossbows), 3
 // pillagers on every other wave, to see how the bot keeps itself alive under fire. --bow also gives
-// the bot a bow and 32 arrows. The tester stands still (no self-defence, eats). Phases: guard (bodyguard armed for
+// the bot a bow and 32 arrows; --blocks N gives it N cobblestone (to build cover against archers).
+// --no-intercept and --no-pull arm the bodyguard with intercept or pulling aggro off, so each can be
+// measured on its own (the results carry `variant`). The tester stands still (no self-defence, eats). Phases: guard (bodyguard armed for
 // the tester), follow (follow_owner only), none (the bot is offline: the baseline). The phase
 // order flips on every repeat. A tester death is counted, the mobs alive are killed and the
 // tester is reset on the spot. --time day (default) keeps natural spawns out; zombies and
@@ -32,7 +35,7 @@ const AVOID = process.env.MC_OWNER || 'Robin'
 const argv = process.argv.slice(2)
 const flag = (name: string) => argv.includes(`--${name}`)
 const opt = (name: string, def: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : def }
-const BOOL_FLAGS = ['--armour', '--phantoms', '--scout', '--force', '--cleanup', '--bow']
+const BOOL_FLAGS = ['--armour', '--phantoms', '--scout', '--force', '--cleanup', '--bow', '--no-intercept', '--no-pull']
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i > 0 && argv[i - 1].startsWith('--') && !BOOL_FLAGS.includes(argv[i - 1])))
 const X = Number(positional[0] ?? 1250)
 const Z = Number(positional[1] ?? 445)
@@ -49,6 +52,11 @@ const TIME = opt('time', 'day')
 const PHANTOMS = flag('phantoms')
 const WAVES = opt('waves', 'mixed') as 'mixed' | 'ranged'
 const BOW = flag('bow')
+const BLOCKS = Number(opt('blocks', '0'))
+const INTERCEPT = !flag('no-intercept')
+const PULL = !flag('no-pull')
+/** Which bodyguard tactics are on: all, no-intercept, no-pull, neither. */
+const VARIANT = INTERCEPT && PULL ? 'all' : !INTERCEPT && !PULL ? 'neither' : !INTERCEPT ? 'no-intercept' : 'no-pull'
 const RUN_TAG = opt('tag', 'run')
 
 type Phase = 'guard' | 'follow' | 'none'
@@ -340,6 +348,7 @@ async function main (): Promise<void> {
     await cmd(`/give ${BOT} minecraft:shield 1`)
     await cmd(`/give ${BOT} minecraft:bread 16`)
     if (BOW) { await cmd(`/give ${BOT} minecraft:bow 1`); await cmd(`/give ${BOT} minecraft:arrow 32`) }
+    if (BLOCKS > 0) await cmd(`/give ${BOT} minecraft:cobblestone ${BLOCKS}`)
     if (ARMOUR) for (const p of ['helmet', 'chestplate', 'leggings', 'boots']) await cmd(`/give ${BOT} minecraft:iron_${p} 1`)
     await heal(BOT)
   }
@@ -437,7 +446,7 @@ async function main (): Promise<void> {
         await heal(TESTER)
         if (phase !== 'none') {
           await heal(BOT)
-          const r = await step(bot, 'behavior_arm', { name: phase === 'guard' ? 'bodyguard' : 'follow_owner', options: phase === 'guard' ? { player: TESTER, whisper: true } : { player: TESTER } })
+          const r = await step(bot, 'behavior_arm', { name: phase === 'guard' ? 'bodyguard' : 'follow_owner', options: phase === 'guard' ? { player: TESTER, whisper: true, intercept: INTERCEPT, pullAggro: PULL } : { player: TESTER } })
           if (!r.ok) throw new Error(`couldn't arm ${phase}: ${r.message}`)
         }
         await pause(2000)
@@ -455,7 +464,7 @@ async function main (): Promise<void> {
         const until = start + MINUTES * 60_000
         let next = 0
         let lastLog = 0
-        log(`measuring ${phase} for ${MINUTES} min`)
+        log(`measuring ${phase}${phase === 'guard' ? ` (${VARIANT})` : ''} for ${MINUTES} min`)
         while (Date.now() < until) {
           try {
             await pause(1000)
@@ -517,6 +526,8 @@ async function main (): Promise<void> {
           armour: ARMOUR,
           waveKind: WAVES,
           bow: BOW,
+          blocks: BLOCKS,
+          variant: VARIANT,
           waves: st.waves.length,
           summoned: st.summoned,
           testerHits: st.hits,

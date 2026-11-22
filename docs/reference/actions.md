@@ -173,6 +173,8 @@ Stay with a player as a bodyguard until stopped: keep close (between them and th
 | `feed` | boolean |  | `true` | toss food when their health is low (needs the server to send player health) |
 | `keepFood` | integer (0..64) |  | `4` | food items to keep for itself |
 | `chat` | boolean |  | `true` | short callouts in chat (fed you, ...) |
+| `intercept` | boolean |  | `true` | meet a mob walking at the player 6-12 blocks out on its path instead of at the player |
+| `pullAggro` | boolean |  | `true` | with two or more mobs on the player, hit each once and step off so they follow the bot |
 
 ### `feed_player`
 
@@ -282,6 +284,7 @@ Deal with mobs shooting at the bot (skeletons, strays, bogged, pillagers, witche
 | param | type | required | default | description |
 |---|---|---|---|---|
 | `cover` | boolean |  | `false` | hide or back off instead of fighting, whatever the gear |
+| `build` | boolean |  | `true` | on open ground, place a few blocks (dirt, cobblestone, planks) for cover when there is none to walk to |
 | `maxSeconds` | number (5..120) |  | `45` | give up after this long |
 
 ## config

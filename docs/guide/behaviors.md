@@ -703,6 +703,8 @@ A real bodyguard for its owner (or a given player), no LLM needed: stays close a
 | `warn` | boolean | `true` | warn the player in chat: "creeper behind you", "skeleton on the ridge east", "phantoms incoming" |
 | `chat` | boolean | `true` | short callouts (fed you, ...) |
 | `whisper` | boolean | `false` | send warnings as whispers instead of public chat |
+| `intercept` | boolean | `true` | meet a mob walking at the player 6-12 blocks out on its path instead of at the player |
+| `pullAggro` | boolean | `true` | with two or more mobs on the player, hit each once and step off so they follow the bot |
 | `whenGone` | `stay` \| `home` | `"stay"` | player offline: wait where they were last seen (stay) or go home |
 | `catchUp` | number (16..256) | `48` | player online but out of sight: walk to where they were last seen, up to this far |
 

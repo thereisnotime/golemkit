@@ -114,8 +114,9 @@ export type ThreatEntry = GuardThreat & { e: Entity, reason: string, score: numb
 /**
  * Mobs threatening `player` (or the bot) within range + 8 of them, ranked by guard-plan. Never
  * includes players, villagers, golems, pets or named mobs; neutral mobs only when they attack.
+ * `eta: false` leaves out the reaches-the-player-first ordering (protect with intercept off).
  */
-export function playerThreats (bot: Bot, player: Entity, range: number): ThreatEntry[] {
+export function playerThreats (bot: Bot, player: Entity, range: number, opts: { eta?: boolean } = {}): ThreatEntry[] {
   let seen = samples.get(bot)
   if (!seen) samples.set(bot, seen = new Map())
   let vels = velocities.get(bot)
@@ -155,7 +156,7 @@ export function playerThreats (bot: Bot, player: Entity, range: number): ThreatE
       approaching: m.approaching,
       facing: !FLYING.has(e.name ?? '') && facingTowards((e as any).headYaw ?? e.yaw, e.position, pp),
       diving: FLYING.has(e.name ?? '') && m.descending,
-      eta: etaToPlayer(prev, cur),
+      eta: opts.eta === false ? undefined : etaToPlayer(prev, cur),
       e
     })
   }
@@ -239,7 +240,9 @@ const protect = defineAction({
     range: z.number().min(6).max(32).default(16).describe('protect this far around them'),
     feed: z.boolean().default(true).describe('toss food when their health is low (needs the server to send player health)'),
     keepFood: z.number().int().min(0).max(64).default(4).describe('food items to keep for itself'),
-    chat: z.boolean().default(true).describe('short callouts in chat (fed you, ...)')
+    chat: z.boolean().default(true).describe('short callouts in chat (fed you, ...)'),
+    intercept: z.boolean().default(true).describe('meet a mob walking at the player 6-12 blocks out on its path instead of at the player'),
+    pullAggro: z.boolean().default(true).describe('with two or more mobs on the player, hit each once and step off so they follow the bot')
   }),
   longRunning: true,
   async run ({ bot, agent, signal, player: caller, log }, p) {
@@ -269,7 +272,7 @@ const protect = defineAction({
         checkAborted(signal)
         const pl = player()
         if (!pl) return ok(`lost sight of ${who}${kills ? ` (killed ${kills})` : ''}${fed ? `, fed ${fed}x` : ''}`)
-        const ranked = playerThreats(bot, pl, p.range)
+        const ranked = playerThreats(bot, pl, p.range, { eta: p.intercept })
         const top = ranked[0]
 
         if (top) {
@@ -302,7 +305,7 @@ const protect = defineAction({
           // away from the player so they follow
           const now = Date.now()
           for (const [id, at] of tagged) if (now - at > 6000) tagged.delete(id)
-          const pull = pullPlan(ranked.map(x => ({ id: x.id, name: x.name, pos: x.e.position, distPlayer: x.distPlayer, hurtPlayer: x.hurtPlayer, approaching: x.approaching })), pl.position, bot.entity.position, new Set(tagged.keys()))
+          const pull = p.pullAggro ? pullPlan(ranked.map(x => ({ id: x.id, name: x.name, pos: x.e.position, distPlayer: x.distPlayer, hurtPlayer: x.hurtPlayer, approaching: x.approaching })), pl.position, bot.entity.position, new Set(tagged.keys())) : null
           if (pull) {
             const m = ranked.find(x => x.id === pull.id)!.e
             setMode(`pulling ${m.name} off ${who}`)
@@ -322,7 +325,7 @@ const protect = defineAction({
             continue
           }
           // intercept: a mob 6-12 out walking at the player is met on its path, not at the player
-          if (top.reason === 'intercept' && t.position.distanceTo(bot.entity.position) > 4) {
+          if (p.intercept && top.reason === 'intercept' && t.position.distanceTo(bot.entity.position) > 4) {
             const at = interceptPoint(pl.position, t.position, mobVelocity(bot, t.id), bot.entity.position)
             setMode(`intercepting ${t.name}`)
             bot.pathfinder.setGoal(new goals.GoalNear(at.x, at.y, at.z, 1), true)
@@ -345,7 +348,7 @@ const protect = defineAction({
             // something more urgent came up (a zombie hitting the player while we chase an archer)
             if (Date.now() - reranked >= 600) {
               reranked = Date.now()
-              const next = shouldRetarget(t.id, playerThreats(bot, q, p.range))
+              const next = shouldRetarget(t.id, playerThreats(bot, q, p.range, { eta: p.intercept }))
               if (next) return 'a more urgent threat'
             }
             return null
