@@ -811,6 +811,7 @@ const removeRoad = defineAction({
 
 const roadList = defineAction({
   name: 'road_list',
+  capabilities: [],
   description: 'The roads this bot built: id, from where to where, length, stairs, and whether it was removed.',
   params: z.object({}),
   exclusive: false,
@@ -827,6 +828,7 @@ const roadList = defineAction({
 
 export const roads = () => defineSkill({
   name: 'roads',
+  capabilities: ['move', 'dig', 'place'],
   description: 'Roads and staircases between buildings: planning, building, removing.',
   actions: [buildRoadAction, connectBuildings, removeRoad, roadList]
 })

@@ -97,6 +97,7 @@ const modItems = defineAction({
 
 export const creativeGet = defineAction({
   name: 'creative_get',
+  capabilities: ['mods', 'creative'],
   description: 'Creative mode only: put any item (vanilla or modded, exact name) into your inventory, e.g. to show or hand ' +
     'it to a player with drop, or to build without gathering.',
   params: z.object({
@@ -121,6 +122,7 @@ export const creativeGet = defineAction({
 
 export const modsSkill = () => defineSkill({
   name: 'mods',
+  capabilities: ['mods'],
   description: 'Installed mods, their items, and creative-mode item access.',
   actions: [mods, modItems, creativeGet],
   observe: (agent) => {

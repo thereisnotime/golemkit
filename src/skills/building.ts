@@ -4,6 +4,7 @@ import { ensureTool, equipFor, minTierFor, needsTool, toolKindFor } from './tool
 
 const placeBlock = defineAction({
   name: 'place_block',
+  capabilities: ['place'],
   description: 'Place a block from the inventory at x y z. Needs a solid block next to that spot to build against.',
   params: z.object({
     item: z.string().describe('block item to place, e.g. cobblestone'),
@@ -27,6 +28,7 @@ const placeBlock = defineAction({
 
 const breakBlock = defineAction({
   name: 'break_block',
+  capabilities: ['dig'],
   description: 'Break (mine) the block at x y z with the best tool in the inventory (crafts a pickaxe first for stone and ores when it can). Needs digging enabled. ' +
     'Refuses chests and other containers unless force=true.',
   params: z.object({

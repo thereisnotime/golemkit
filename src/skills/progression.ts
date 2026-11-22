@@ -351,6 +351,7 @@ const upgradeAction = defineAction({
 
 export const progressionSkill = () => defineSkill({
   name: 'progression',
+  capabilities: ['move', 'dig', 'craft'],
   description: 'Tool progression: stone, iron and diamond tools.',
   actions: [upgradeAction],
   observe: (_agent, bot) => ({ tools: toolSummary(inventoryCounts(bot)) })

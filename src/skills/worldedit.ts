@@ -754,6 +754,7 @@ const weBuild = defineAction({
  */
 export const worldedit = () => defineSkill({
   name: 'worldedit',
+  capabilities: ['commands'],
   description: 'WorldEdit commands (mod or plugin, or FAWE) on servers that have it and give me permission; owners only, with a block limit.',
   actions: [weStatus, weSelect, weSet, weReplace, weWalls, weOutline, weHollow, weCopy, weCut, wePaste, weRotate, weFlip, historyAction('we_undo', 'undo'), historyAction('we_redo', 'redo'),
     weSchemList, weSchemLoad, weSchemSave, weRaw, weBuild],

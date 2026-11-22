@@ -28,6 +28,7 @@ export function wornTools (bot: Bot, min: number): string[] {
 
 export const keepToolsUpgraded = defineBehavior({
   name: 'keep_tools_upgraded',
+  capabilities: ['craft'],
   category: 'work',
   description: 'Keeps tools usable and moving up the tiers when the bot is idle: re-crafts a worn or broken pickaxe/axe/shovel/sword, ' +
     'makes stone tools as soon as it can mine 3 cobblestone, then a furnace, iron (smelted with coal or charcoal) and diamond tools, up to `upTo`. ' +

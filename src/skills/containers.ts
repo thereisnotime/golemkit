@@ -246,6 +246,7 @@ const listContainer = defineAction({
 
 export const containers = () => defineSkill({
   name: 'containers',
+  capabilities: ['move', 'containers'],
   description: 'Storing items in and taking them out of chests and barrels.',
   actions: [deposit, withdraw, listContainer],
   observe: (_agent, bot) => {

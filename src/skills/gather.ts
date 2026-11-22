@@ -134,6 +134,7 @@ const collect = defineAction({
 
 export const gather = () => defineSkill({
   name: 'gather',
+  capabilities: ['move', 'dig'],
   description: 'Mining and collecting blocks.',
   actions: [collect]
 })

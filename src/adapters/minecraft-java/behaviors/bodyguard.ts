@@ -35,6 +35,7 @@ function target (agent: Agent, bot: Bot, o: O) {
 
 export const bodyguard = defineBehavior({
   name: 'bodyguard',
+  capabilities: ['move', 'combat'],
   category: 'combat',
   description: 'A real bodyguard for its owner (or a given player), no LLM needed: stays close and between them and danger, ' +
     'kills mobs that threaten them (creepers near them first, archers with a shot at them, diving phantoms, mobs coming ' +

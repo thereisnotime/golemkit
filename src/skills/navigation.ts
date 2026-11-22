@@ -275,6 +275,7 @@ const flee = defineAction({
 
 export const navigation = () => defineSkill({
   name: 'navigation',
+  capabilities: ['move'],
   description: 'Home, wandering and named places.',
   actions: [wander, setHomeAction, goHome, rememberPlace, forgetPlace, places, gotoPlace, flee],
   observe: (agent, bot) => {

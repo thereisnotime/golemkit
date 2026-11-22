@@ -28,6 +28,7 @@ const stop = defineAction({
 
 const say = defineAction({
   name: 'say',
+  capabilities: ['chat'],
   description: 'Say something in public chat.',
   params: z.object({ text: z.string().min(1) }),
   exclusive: false,

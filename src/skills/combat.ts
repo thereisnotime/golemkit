@@ -439,6 +439,7 @@ const hunt = defineAction({
 
 export const combat = () => defineSkill({
   name: 'combat',
+  capabilities: ['move', 'combat'],
   description: 'Fighting hostile mobs, guarding players and hunting animals for food.',
   actions: [attack, guard, defend, retreat, hunt, gearUp, rangedDefense],
   setup: (_agent, bot) => {

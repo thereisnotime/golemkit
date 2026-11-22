@@ -3,7 +3,7 @@
 // schemas, so the same definition gives runtime validation, TypeScript types, chat-command
 // parsing and the JSON schema an LLM sees as a tool.
 import { z } from 'zod'
-import type { GameClient } from './adapter.ts'
+import type { GameClient, Capability } from './adapter.ts'
 import type { Agent } from './agent.ts'
 import type { Logger } from './log.ts'
 
@@ -67,6 +67,12 @@ export interface ActionDef<S extends z.ZodObject = z.ZodObject> {
   aliases?: string[]
   /** Hide from LLM tool lists. */
   internal?: boolean
+  /**
+   * What the game must support for this action (see Capability in core/adapter.ts). An agent
+   * whose adapter lacks one doesn't register it: no command, no LLM tool, not in help.
+   * Default: the skill's `capabilities`, else none.
+   */
+  capabilities?: Capability[]
   run (ctx: ActionContext, params: z.infer<S>): Promise<ActionResult | string | void> | ActionResult | string | void
 }
 

@@ -912,6 +912,7 @@ const buildPlan = defineAction({
 
 export const construction = () => defineSkill({
   name: 'construction',
+  capabilities: ['move', 'place'],
   description: 'Building structures from blueprints.',
   actions: [build, buildPlan],
   observe (agent) {

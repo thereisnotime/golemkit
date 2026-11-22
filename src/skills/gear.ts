@@ -68,6 +68,7 @@ export function wornArmorPoints (bot: Bot): number {
 
 export const gearUp = defineAction({
   name: 'gear_up',
+  capabilities: ['inventory'],
   description: 'Put on the best armour in the inventory and put a totem of undying or a shield in the offhand.',
   params: noParams,
   // Moves items between inventory slots only; runs beside the current action, but never while a

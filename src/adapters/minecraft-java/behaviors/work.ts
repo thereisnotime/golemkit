@@ -12,6 +12,7 @@ import { resolveCenter, isDay, countWhere, dist, flatDist } from './util.ts'
 
 export const collectDrops = defineBehavior({
   name: 'collect_drops',
+  capabilities: ['move', 'inventory'],
   category: 'work',
   description: 'Picks up dropped items lying nearby every so often (all items, or only the listed ones). Arm it while working so loot and drops don\'t despawn.',
   options: z.object({
@@ -45,6 +46,7 @@ export const collectDrops = defineBehavior({
 
 export const depositWhenFull = defineBehavior({
   name: 'deposit_when_full',
+  capabilities: ['move', 'containers'],
   category: 'work',
   description: 'When the inventory is nearly full, walks to a chest (a remembered place, coordinates, or the nearest one), ' +
     'stores everything except tools, armour, food and kept items, then walks back. Arm it for long gathering jobs.',
@@ -98,6 +100,7 @@ export function woodStock (bot: Bot): number {
 
 export const chopWoodLoop = defineBehavior({
   name: 'chop_wood_loop',
+  capabilities: ['move', 'dig'],
   category: 'work',
   description: 'Keeps a stock of wood: by day, while it has fewer than `keep` logs (4 planks count as one), it fells trees nearby, ' +
     'away from spawn and protected areas, and replants. Needs digging enabled.',
@@ -141,6 +144,7 @@ export function ripeCount (bot: Bot, center: { x: number, y: number, z: number }
 
 export const farmLoop = defineBehavior({
   name: 'farm_loop',
+  capabilities: ['move', 'dig', 'place'],
   category: 'work',
   description: 'Tends fields: every few minutes, when enough crops are ripe within the radius, harvests them, picks up the drops ' +
     'and replants. Arm it near a farm, or give it a remembered place (e.g. farm:1 from start_farm) to walk to.',
@@ -215,6 +219,7 @@ function torchSpot (bot: Bot): { x: number, y: number, z: number } | null {
 
 export const lightArea = defineBehavior({
   name: 'light_area',
+  capabilities: ['place'],
   category: 'work',
   description: 'Places torches on dark ground around home (or a remembered place) so mobs do not spawn there, crafting torches ' +
     'from coal and sticks if needed. Only inside the given radius; never in protected areas.',

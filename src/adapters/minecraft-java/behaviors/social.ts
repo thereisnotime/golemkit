@@ -6,6 +6,7 @@ import { ownerTarget, dist } from './util.ts'
 
 export const followOwner = defineBehavior({
   name: 'follow_owner',
+  capabilities: ['move'],
   category: 'social',
   description: 'Follows its owner (or a given player) at a distance whenever they are online and in sight, and walks to catch up ' +
     '(no teleporting) when they are far. Arm it when your owner wants you to come along.',
@@ -47,6 +48,7 @@ export const followOwner = defineBehavior({
 
 export const guardOwner = defineBehavior({
   name: 'guard_owner',
+  capabilities: ['move', 'combat'],
   category: 'combat',
   description: 'Stays near its owner (or a given player) and kills hostile mobs that come close to them, like the guard action ' +
     'but persistent: it picks up again after interruptions and restarts. Arm it as a bodyguard.',
@@ -72,6 +74,7 @@ export const guardOwner = defineBehavior({
 
 export const greetPlayersBehavior = defineBehavior({
   name: 'greet_players',
+  capabilities: ['chat'],
   category: 'social',
   description: 'Says hello in chat, now and then, to players who come close (rate limited per player and overall). Flavour for NPCs.',
   options: z.object({
@@ -93,6 +96,7 @@ export const greetPlayersBehavior = defineBehavior({
 
 export const idleLook = defineBehavior({
   name: 'idle_look',
+  capabilities: ['look'],
   category: 'idle',
   description: 'Fidgets when there is nothing else to do: glances at nearby players or looks around, so it looks alive.',
   options: z.object({

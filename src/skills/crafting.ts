@@ -283,6 +283,7 @@ const smelt = defineAction({
 
 export const crafting = () => defineSkill({
   name: 'crafting',
+  capabilities: ['craft'],
   description: 'Crafting and smelting.',
   actions: [craft, smelt]
 })

@@ -114,6 +114,7 @@ const history = defineAction({
 
 const gotoDeath = defineAction({
   name: 'goto_death',
+  capabilities: ['move'],
   description: 'Walk back to where the bot last died to pick up its dropped items (they despawn 5 minutes after death).',
   params: z.object({ pickup: z.boolean().default(true).describe('pick up dropped items there') }),
   longRunning: true,

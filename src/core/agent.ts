@@ -21,7 +21,7 @@ import { TOGGLES, findToggle, parseToggleValue, getPath, expandPaths, deepMerge,
 import { resolveHumanize, typingDelayMs, styleLine, between, type HumanizeOptions } from './humanize.ts'
 import type { UsageSnapshot } from '../llm/usage.ts'
 import { Journal } from './journal/journal.ts'
-import type { GameAdapter, GameClient, AdapterEvents } from './adapter.ts'
+import { supports, type GameAdapter, type GameClient, type AdapterEvents, type Capability } from './adapter.ts'
 // The default game until profiles pick one (game-adapters phase 4).
 import { minecraftJava } from '../adapters/minecraft-java/adapter.ts'
 
@@ -123,6 +123,8 @@ export class Agent extends TypedEmitter<AgentEvents> {
   readonly journal: Journal
   /** The game behind this agent (Minecraft Java unless InstanceOptions.adapter says otherwise). */
   readonly adapter: GameAdapter
+  /** Actions left out because the adapter lacks a capability they need. */
+  readonly unsupported: { name: string, missing: Capability[] }[] = []
 
   /** Bumped on every session, so delayed work can tell its session is gone. */
   private sessionId = 0
@@ -167,8 +169,9 @@ export class Agent extends TypedEmitter<AgentEvents> {
     this.adapter.attach(this)
 
     for (const skill of this.skills) {
-      for (const action of skill.actions ?? []) this.registerAction(action)
+      for (const action of skill.actions ?? []) this.registerAction(action, skill.capabilities)
     }
+    if (this.unsupported.length) this.log.debug(`left out (the game lacks what they need): ${this.unsupported.map(u => `${u.name} (${u.missing.join(', ')})`).join(', ')}`)
   }
 
   // ---------------------------------------------------------------- settings / toggles
@@ -288,8 +291,18 @@ export class Agent extends TypedEmitter<AgentEvents> {
 
   // ---------------------------------------------------------------- actions
 
-  registerAction (action: ActionDef<any>): void {
+  /**
+   * Adds an action. One that needs a capability the adapter lacks (its `capabilities`, else
+   * `inherited` from its skill) is left out and listed in `unsupported`: no command, no LLM
+   * tool, not in help.
+   */
+  registerAction (action: ActionDef<any>, inherited?: Capability[]): void {
     if (this.actions.has(action.name)) throw new Error(`duplicate action "${action.name}"`)
+    const need = action.capabilities ?? inherited
+    if (!supports(this.adapter.capabilities, need)) {
+      this.unsupported.push({ name: action.name, missing: need!.filter(c => !this.adapter.capabilities.has(c)) })
+      return
+    }
     this.actions.set(action.name, action)
     for (const a of action.aliases ?? []) this.aliases.set(a, action.name)
   }

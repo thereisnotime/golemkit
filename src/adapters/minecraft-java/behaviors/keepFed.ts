@@ -489,6 +489,7 @@ const CUT_SHORT = /night fell|mobs|health is low|it is night/
 
 export const keepFed = defineBehavior({
   name: 'keep_fed',
+  capabilities: ['eat'],
   category: 'survival',
   description: 'Looks after food on its own, climbing a ladder when hungry (or hurt and too hungry to heal): eat, cook or bake what it carries; ' +
     'take food from known chests, its own or a village farm, remembered spots, animals in range (sparing breeders); search close, ' +

@@ -53,6 +53,7 @@ const equip = defineAction({
 
 export const inventorySkill = () => defineSkill({
   name: 'inventory',
+  capabilities: ['inventory'],
   description: 'Inventory management.',
   actions: [inventory, drop, equip]
 })

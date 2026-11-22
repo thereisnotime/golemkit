@@ -90,6 +90,7 @@ const sceneList = defineAction({
 
 const sceneWalk = defineAction({
   name: 'scene_walk',
+  capabilities: ['move'],
   description: 'Walk near a position (scene stage direction). Omit y to walk to the surface at x/z.',
   params: z.object({ x: z.number(), y: z.number().optional(), z: z.number(), range: z.number().min(0).max(16).default(1.5) }),
   internal: true,
@@ -102,6 +103,7 @@ const sceneWalk = defineAction({
 
 const sceneLook = defineAction({
   name: 'scene_look',
+  capabilities: ['look'],
   description: 'Look at a player/bot by name or at a position (scene stage direction).',
   params: z.object({ player: z.string().optional(), x: z.number().optional(), y: z.number().optional(), z: z.number().optional() }),
   exclusive: false,
@@ -122,6 +124,7 @@ const sceneLook = defineAction({
 
 const sceneGesture = defineAction({
   name: 'scene_gesture',
+  capabilities: ['look'],
   description: 'A harmless gesture: swing (arm), crouch, nod, shake (head), spin, jump.',
   params: z.object({ gesture: z.enum(['swing', 'crouch', 'nod', 'shake', 'spin', 'jump']), times: z.number().int().min(1).max(10).default(1) }),
   exclusive: false,

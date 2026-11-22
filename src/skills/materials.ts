@@ -779,6 +779,7 @@ const gatherAction = defineAction({
 
 export const materialsSkill = () => defineSkill({
   name: 'materials',
+  capabilities: ['move', 'dig', 'craft'],
   description: 'Gathering and crafting everything a job needs.',
   actions: [gatherAction]
 })

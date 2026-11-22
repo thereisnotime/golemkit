@@ -2,7 +2,7 @@
 // factory for an NPC-brain Behavior. The behaviours brain keeps a set of them armed and
 // runs the armed ones through the NPC controller. See docs/guide/behaviors.md.
 import type { z } from 'zod'
-import { PRIORITY, type Agent } from '../../core/index.ts'
+import { PRIORITY, type Agent, type Capability } from '../../core/index.ts'
 import type { Behavior, NpcHook } from '../npc/index.ts'
 
 /** Priority levels a behaviour can run at (mapped to PRIORITY.idle / npc / behavior). */
@@ -35,6 +35,11 @@ export interface BehaviorDefinition<S extends z.ZodObject = z.ZodObject> {
   requires?: string[]
   /** Actions it uses when present (documentation only). */
   uses?: string[]
+  /**
+   * What the game must support (see Capability in core/adapter.ts). On an adapter without one
+   * the behaviour doesn't exist for that agent: it can't be armed, listed or configured.
+   */
+  capabilities?: Capability[]
   /** Terrain capabilities: dig = agent.canDig, place = settings.canPlace !== false. */
   needs?: { dig?: boolean, place?: boolean }
   /** Default priority level. Default 'npc'. Every behaviour also takes a `priority` option. */

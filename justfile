@@ -145,10 +145,10 @@ image tag="golemkit":
 [group('check')]
 check: typecheck test lint-adapters
 
-# No Minecraft imports or agent.bot outside src/adapters and src/skills (warnings until the split is done)
+# No Minecraft imports or agent.bot outside src/adapters and src/skills (an error)
 [group('check')]
 lint-adapters:
-    @node scripts/adapter-lint.ts --warn | tail -1
+    @node scripts/adapter-lint.ts | tail -1
 
 # Offline parity checks for the adapter split: tsc, tests, golden snapshots, replay, intents bench
 [group('check')]

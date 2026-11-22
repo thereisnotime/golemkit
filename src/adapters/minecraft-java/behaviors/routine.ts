@@ -12,6 +12,7 @@ const strip = <T extends { name: string, priority?: number }>(b: T) => {
 
 export const sleepAtNightBehavior = defineBehavior({
   name: 'sleep_at_night',
+  capabilities: ['sleep'],
   category: 'routine',
   description: 'At night walks home (if a home is set) and sleeps in a bed there until morning. Needs a bed within 16 blocks of home.',
   options: z.object({
@@ -25,6 +26,7 @@ export const sleepAtNightBehavior = defineBehavior({
 
 export const returnHome = defineBehavior({
   name: 'return_home',
+  capabilities: ['move'],
   category: 'routine',
   description: 'Walks back home when it strays too far by day, and stays close to home at night. Needs a home (set_home).',
   options: z.object({
@@ -38,6 +40,7 @@ export const returnHome = defineBehavior({
 
 export const wanderBehavior = defineBehavior({
   name: 'wander',
+  capabilities: ['move'],
   category: 'idle',
   description: 'Takes short walks near home (or where it is) with pauses in between, when nothing else is going on.',
   options: z.object({
@@ -60,6 +63,7 @@ const areaOptions = z.object({
 
 export const guardArea = defineBehavior({
   name: 'guard_area',
+  capabilities: ['move', 'combat'],
   category: 'combat',
   description: 'Defends an area (a remembered place, coordinates, or where it stands when armed): kills hostile mobs that enter ' +
     'it and patrols when quiet. Never attacks players or animals. Arm it to protect a base or farm.',

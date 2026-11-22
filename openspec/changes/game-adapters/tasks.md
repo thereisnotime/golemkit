@@ -25,8 +25,8 @@ Every phase ends with the parity checks below; a phase is done only when they al
 
 ## Phase 3: capabilities
 
-- [ ] Actions and behaviours declare the capabilities they need; agents only offer what the adapter supports (LLM tools and "help" follow)
-- [ ] Lint rule becomes an error
+- [x] Actions and behaviours declare the capabilities they need; agents only offer what the adapter supports (LLM tools and "help" follow)
+- [x] Lint rule becomes an error
 
 ## Phase 4: a second game
 

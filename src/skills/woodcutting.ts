@@ -336,6 +336,7 @@ const chopTree = defineAction({
 
 export const woodcutting = () => defineSkill({
   name: 'woodcutting',
+  capabilities: ['move', 'dig'],
   description: 'Felling trees.',
   actions: [chopTree]
 })

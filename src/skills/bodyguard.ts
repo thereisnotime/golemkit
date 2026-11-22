@@ -413,6 +413,7 @@ const protect = defineAction({
 
 const feedPlayer = defineAction({
   name: 'feed_player',
+  capabilities: ['move', 'inventory'],
   description: 'Walk up to a player and toss them food from the inventory (the best food, 1-2 items), keeping some for itself.',
   params: z.object({
     player: z.string().optional().describe('who to feed; defaults to the requesting player'),
@@ -438,6 +439,7 @@ const feedPlayer = defineAction({
 
 export const guardSkill = () => defineSkill({
   name: 'bodyguard',
+  capabilities: ['move', 'combat'],
   description: 'Protecting a player: stay with them, fight what threatens them, block arrows, feed them.',
   actions: [protect, feedPlayer],
   setup: (_agent, bot) => {

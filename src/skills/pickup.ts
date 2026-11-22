@@ -65,6 +65,7 @@ const pickupItems = defineAction({
 
 export const pickup = () => defineSkill({
   name: 'pickup',
+  capabilities: ['move', 'inventory'],
   description: 'Picking up dropped items.',
   actions: [pickupItems],
   observe: (_agent, bot) => ({

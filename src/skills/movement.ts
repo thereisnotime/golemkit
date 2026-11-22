@@ -102,6 +102,7 @@ const gotoPlayer = defineAction({
 
 const lookAt = defineAction({
   name: 'look_at',
+  capabilities: ['look'],
   description: 'Turn to look at a player.',
   params: z.object({ player: z.string().optional() }),
   exclusive: false,
@@ -128,6 +129,7 @@ const jump = defineAction({
 
 const lookAround = defineAction({
   name: 'look_around',
+  capabilities: ['look'],
   description: 'Glance around: at a nearby player now and then, otherwise a random direction (idle fidget).',
   params: z.object({ radius: z.number().min(1).max(32).default(10).describe('look at players within this distance') }),
   exclusive: false,
@@ -145,6 +147,7 @@ const lookAround = defineAction({
 
 export const movement = () => defineSkill({
   name: 'movement',
+  capabilities: ['move'],
   description: 'Walking around: come, follow, goto.',
   actions: [come, follow, gotoAction, gotoPlayer, lookAt, jump, lookAround]
 })

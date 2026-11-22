@@ -2,6 +2,7 @@
 // chat-style option strings ("radius=8 animals=cow,pig").
 import { z } from 'zod'
 import type { BehaviorDefinition, BehaviorLevel } from './types.ts'
+import { supports, type Capability } from '../../core/index.ts'
 
 export type Options = Record<string, unknown>
 export type ValidateResult = { ok: true, options: Options } | { ok: false, error: string }
@@ -27,6 +28,16 @@ export class BehaviorRegistry {
     this.defs.set(def.name, def)
     this.schemas.set(def.name, def.options.extend(COMMON).strict())
     return this
+  }
+
+  /**
+   * The behaviours a game supports (their `capabilities` against the adapter's). Returns this
+   * registry when every behaviour is supported.
+   */
+  forCapabilities (have: ReadonlySet<Capability>): BehaviorRegistry {
+    const all = this.list()
+    const ok = all.filter(d => supports(have, d.capabilities))
+    return ok.length === all.length ? this : new BehaviorRegistry(ok)
   }
 
   get (name: string): BehaviorDefinition<any> | undefined {

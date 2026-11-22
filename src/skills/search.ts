@@ -1043,6 +1043,7 @@ const fetchDrops = defineAction({
 
 export const search = () => defineSkill({
   name: 'search',
+  capabilities: ['move'],
   description: 'Finding things (find_target) and fetching them for players (bring_item, fetch_drops) without an LLM.',
   actions: [findTarget, bringItem, fetchDrops],
   setup,

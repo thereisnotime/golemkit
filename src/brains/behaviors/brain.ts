@@ -102,11 +102,16 @@ export const behaviorsBrain = (opts: BehaviorsBrainOptions = {}) => {
   return defineBrain({
     name,
     start (agent: Agent) {
-      const registry = opts.registry ?? defaultBehaviorRegistry()
+      const library = opts.registry ?? defaultBehaviorRegistry()
       // both blocks are checked on their own first, so errors say where they come from
-      validateBehaviorConfig(opts.defaults, registry, `variant ${agent.definition.name} behaviors`)
-      validateBehaviorConfig(agent.settings.behaviors, registry, 'profile behaviors')
-      const config = validateBehaviorConfig(mergeConfigs(opts.defaults, agent.settings.behaviors as BehaviorConfig | undefined), registry)
+      validateBehaviorConfig(opts.defaults, library, `variant ${agent.definition.name} behaviors`)
+      validateBehaviorConfig(agent.settings.behaviors, library, 'profile behaviors')
+      const merged = validateBehaviorConfig(mergeConfigs(opts.defaults, agent.settings.behaviors as BehaviorConfig | undefined), library)
+      // behaviours the game can't do (capabilities) are left out, config entries for them too
+      const caps = (agent as Partial<Agent>).adapter?.capabilities
+      const registry = caps ? library.forCapabilities(caps) : library
+      const config = registry === library ? merged : Object.fromEntries(Object.entries(merged).filter(([n]) => registry.has(n)))
+      if (registry !== library) agent.log.child(name).info(`left out (the game lacks what they need): ${library.names().filter(n => !registry.has(n)).join(', ')}`)
       const rt = new BehaviorRuntime(agent, registry, config, name)
       attachRuntime(agent, rt)
       for (const a of [...behaviorActions, interrupt]) if (!agent.getAction(a.name)) agent.registerAction(a)

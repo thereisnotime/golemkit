@@ -109,6 +109,7 @@ export function senseFarm (agent: Agent, bot: Bot, o: O): FarmState {
 
 export const farmSetup = defineBehavior({
   name: 'farm_setup',
+  capabilities: ['move', 'dig', 'place'],
   category: 'work',
   description: 'Makes the bot self-sufficient for food: when it has no farm it starts one (seeds from grass, a hoe, flat grass by water ' +
     'near home, outside protected areas and away from builds), then harvests and replants it when ripe, bakes bread from the ' +

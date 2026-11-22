@@ -1218,6 +1218,7 @@ const breed = defineAction({
 
 export const food = () => defineSkill({
   name: 'food',
+  capabilities: ['move', 'eat'],
   description: 'Food self-sufficiency: scouting for animals and village farms, starting, tending and growing a farm of its own, gathering seeds, foraging berries, kelp and apples, breeding animals.',
   actions: [findFood, startFarmAction, tendFarm, gatherSeeds, forage, breed],
   observe: (agent) => {

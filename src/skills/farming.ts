@@ -208,6 +208,7 @@ const till = defineAction({
 
 export const farming = () => defineSkill({
   name: 'farming',
+  capabilities: ['move', 'dig', 'place'],
   description: 'Harvesting, planting and tilling crops.',
   actions: [harvest, plant, till],
   observe: (_agent, bot) => {

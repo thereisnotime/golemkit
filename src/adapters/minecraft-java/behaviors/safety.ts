@@ -174,6 +174,7 @@ export function assessDanger (ctx: Pick<NpcContext, 'agent' | 'bot' | 'bb'> & { 
 
 export const staySafe = defineBehavior({
   name: 'stay_safe',
+  capabilities: ['move', 'combat'],
   category: 'safety',
   description: 'Keeps the bot alive: backs away from mobs at low health, pillars up when surrounded (if it can place blocks), ' +
     'takes cover from skeletons, pillagers and other shooters when hurt or outnumbered (and eats behind cover), ' +
@@ -279,6 +280,7 @@ const avoidOptions = z.object({
 
 export const avoidMobs = defineBehavior({
   name: 'avoid_mobs',
+  capabilities: ['move'],
   category: 'safety',
   description: 'Keeps its distance from dangerous mobs (creepers, wardens by default) instead of fighting them. Arm it on bots that work outdoors.',
   options: avoidOptions,

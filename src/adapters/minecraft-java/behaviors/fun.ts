@@ -65,6 +65,7 @@ async function perform (bot: Bot, antic: Antic): Promise<void> {
 
 export const idleAntics = defineBehavior({
   name: 'idle_antics',
+  capabilities: ['look'],
   category: 'idle',
   description: 'When idle (standing around, nothing to do), now and then does something funny or strange: spins, crouch-dances, ' +
     'stares at the sky, hops, moonwalks, or mutters a line. Pure flavour; runs even while follow_owner is armed.',
@@ -107,6 +108,7 @@ const AFK_MOVES = ['look', 'swing', 'sneak', 'hop'] as const
 
 export const antiAfk = defineBehavior({
   name: 'anti_afk',
+  capabilities: ['move'],
   category: 'idle',
   description: 'Avoids idle (AFK) kicks: after some seconds without moving, looks around, swings an arm, sneaks or hops in place. Never walks.',
   options: z.object({

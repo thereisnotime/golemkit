@@ -23,6 +23,7 @@ export function bestFood (bot: Bot) {
 
 const eat = defineAction({
   name: 'eat',
+  capabilities: ['eat'],
   description: 'Eat the best food in the inventory.',
   params: noParams,
   async run ({ bot }) {
@@ -37,6 +38,7 @@ const eat = defineAction({
 
 const sleepInBed = defineAction({
   name: 'sleep',
+  capabilities: ['sleep'],
   description: 'Sleep in a bed within 16 blocks (only works at night or during storms).',
   params: noParams,
   async run ({ bot, signal }) {
@@ -50,6 +52,7 @@ const sleepInBed = defineAction({
 
 const wake = defineAction({
   name: 'wake',
+  capabilities: ['sleep'],
   description: 'Get out of bed.',
   params: noParams,
   async run ({ bot }) {
@@ -61,6 +64,7 @@ const wake = defineAction({
 
 const pillar = defineAction({
   name: 'pillar',
+  capabilities: ['place'],
   description: 'Emergency escape: jump and place blocks underneath to stand on a pillar out of reach of mobs. ' +
     'Uses dirt/cobblestone/planks from the inventory.',
   params: z.object({
@@ -208,6 +212,7 @@ export function keepClimbing (t: ClimbThreat): boolean {
 
 export const climbOut = defineAction({
   name: 'climb_out',
+  capabilities: ['move', 'dig'],
   description: 'Get out of a pit, shaft or cave straight up to open sky: dig the block above if needed, jump and place ' +
     'a block underneath, repeat. Without blocks it carves stair steps up into the wall instead.',
   params: z.object({ maxBlocks: z.number().int().min(1).max(64).default(32).describe('give up after rising this many blocks') }),
@@ -259,6 +264,7 @@ const isNight = (bot: Bot) => { const t = bot.time.timeOfDay; return t >= 12_500
 
 const bunker = defineAction({
   name: 'bunker',
+  capabilities: ['dig', 'place'],
   description: 'Hide from phantoms and other mobs: dig straight down 3 blocks, seal the hole above with a dug ' +
     'block, wait until morning (or until no hostiles are near), then climb out. Needs digging; not in protected areas.',
   params: z.object({
