@@ -238,8 +238,13 @@ flowchart TB
   them inside `range`, a phantom diving at them, a mob inside `range` walking towards them or
   looking at them, anything within 5 of them, and whatever attacks the bot. Neutral mobs
   (endermen, piglins, wolves) only when they attack; players, pets, villagers, golems and named
-  mobs never. The fight itself is the [fight loop](/concepts/world#fighting) with `maxChase` set to
-  `range`, stopped early when a creeper comes up to the player or the target leads the bot away.
+  mobs never. A melee mob hitting the player from within 3 blocks goes before archers (a creeper
+  by them still goes first). The fight itself is the [fight loop](/concepts/world#fighting) with
+  `maxChase` set to `range`, stopped early when a creeper comes up to the player, the target leads
+  the bot away, or a re-rank (every 0.6 s) finds a threat that scores clearly higher, such as a
+  zombie reaching the player while the bot chases an archer. With a bow (skeletons drop them)
+  it never shoots while the player is near the line of fire, up to 4 blocks past the target; it
+  closes in instead.
 - **Position**: with a mob around but nothing to fight, the bot stands on the line between the
   player and the mob at the follow distance (at most halfway). Flyers are fought from next to
   the player.
@@ -255,8 +260,9 @@ flowchart TB
   every 30 s, 1-2 of its best food, never below `keepFood` items for itself. It whispers what it
   tossed. Where the server hides player health it doesn't feed at all.
 - **Night**: while it is armed and the player is online, `stay_safe` doesn't go home or dig in;
-  the reflexes don't [bunker](/concepts/world#phantoms-bunker) away from phantoms unless health is 6 or less. Surrounded (pillar),
-  low health (retreat) and the back-off to eat at 4 health still apply.
+  the reflexes don't [bunker](/concepts/world#phantoms-bunker) away from phantoms unless health is 6 or less. Low health
+  (retreat) and the back-off to eat at 4 health still apply; surrounded (pillar, or back off)
+  only at 12 health or less, because every wave that reaches the player surrounds the bot too.
 - **Reflexes**: while `protect` holds the body the reflexes don't start `defend` over it (it fights
   what attacks the bot too, ranked after threats to the player); when it isn't running they defend
   the bot as usual. Priority level `behavior` (35) beats `follow_owner`/`guard_owner` and the LLM's
@@ -266,11 +272,49 @@ flowchart TB
   Offline: wait there (`whenGone: stay`) or go home (`whenGone: home`).
 
 The actions behind it are usable on their own: `protect` (the loop) and `feed_player`.
-`scripts/guard-test.ts` measures how often a player standing still at night gets hit with the
-bodyguard armed and with `follow_owner` only. First runs on mc02 (two nights, 4 minutes per phase,
-natural spawns, a stone sword and no armour): 0 hits with the bodyguard in 8 minutes, against 1
-hit (which killed the tester, already at 1 health) with `follow_owner` in 8 minutes. Too few mobs
-reached the player for that to mean much; it is a smoke test, not a benchmark.
+`scripts/guard-test.ts` is the older smoke test (natural night spawns, too few mobs to mean much).
+
+### Benchmark: `just guard-bench`
+
+`scripts/guard-bench.ts` is the controlled version. ClaudeTest (an op) directs; GuardTest is
+the bot and GuardTester the owner, who stands still (no self-defence, eats bread). Before every
+phase the director sets the time to morning, kills leftover tagged mobs, fills creeper holes in
+the arena floor, resets both players to full health and hunger, gives the same gear (bot: iron
+sword, shield, 16 bread, iron armour with `--armour`; tester: 8 bread) and teleports both to the
+spot, the bot 3 blocks east. Then it summons a seeded wave schedule 8 to 14 blocks around the
+tester every 30 s while fewer than 8 are alive: 2 zombies and a skeleton (leather helmets so
+they don't burn, the skeleton with a bow), a spider, and a creeper every other wave. Phases:
+`guard` (bodyguard armed for the tester), `follow` (`follow_owner` only), `none` (bot offline).
+The order flips on every repeat. A tester death is counted, the mobs alive are killed and the
+tester is reset on the spot.
+
+```sh
+just guard-bench --scout                      # check the spot (flat, dry) and robin's distance
+just guard-bench                              # 1250 445, 2 repeats x 3 phases x 4 min
+just guard-bench 1250 445 --minutes 4 --repeats 3 --armour --tag mytest
+just guard-bench --cleanup                    # kill tagged mobs, clear both players
+```
+
+Results append to `data/guard-bench/results.jsonl` and a table prints at the end. Daytime keeps
+natural spawns out, but spiders don't pick targets in daylight, so in practice the waves are
+zombies, skeletons and creepers.
+
+**Numbers so far (partial, the run was paused).** mc02, spot 1250 70 445, seed 1, iron sword,
+no armour, 4 minutes per phase, 36 mobs summoned in each phase, from two runs (the first one
+stopped after 4 phases). With the bodyguard code before
+the fixes below:
+
+| phase | runs | tester hits | damage (mean) | tester deaths | bot deaths | bot kills (mean) |
+|---|---|---|---|---|---|---|
+| guard | 2 | 36, 55 | 146 | 3, 5 | 1, 2 | 12.5 |
+| follow | 3 | 40, 67, 54 | 181 | 4, 5, 5 | 1, 2, 2 | 11.3 |
+| none | 4 | 77, 81, 69, 58 | 225 | 7, 8, 6, 6 | - | - |
+
+Either bot roughly halves what the player takes against no bot; the bodyguard was only a little
+ahead of `follow_owner`, and the spread between runs is as large as the gap. The logs showed
+why: it chased skeletons while a zombie hit the player, backed off whenever three mobs reached
+the player (stay_safe's surrounded rule), and once shot the player with a bow it had picked up.
+Those three are fixed (see Threats and Night above); the re-run with the fixes is not done yet.
 
 ## Food: keep_fed, scouting and farm_setup
 
