@@ -14,12 +14,19 @@ import { bestFood } from '../../../skills/survival.ts'
 import { HUNTABLE, herdSurplus } from '../../../skills/combat.ts'
 import { CROPS, isMature } from '../../../skills/farming.ts'
 import {
-  animalsAround, ownFarmRipe, villageCrops, getFarms, nearestFarm, saveFarm, getFoodSpots, forgetEmptySpot, farmStatus, ripeBerries, type Farm
+  animalsAround, ownFarmRipe, villageCrops, getFarms, nearestFarm, saveFarm, getFoodSpots, forgetEmptySpot, farmStatus, ripeBerries,
+  shoreKelp, appleLeaves, canSmeltKelp, farmWorkFor, type Farm
 } from '../../../skills/food.ts'
 import {
-  rankSpots, seedCount, planFood, nextRing, recordSearch, breedPlan, BREED_FOOD, STEP_PAUSE_MS,
-  type FoodStep, type FoodWorld, type FoodDecision, type SearchRecord
+  rankSpots, seedCount, planFood, nextRing, recordSearch, breedPlan, foodDanger, farmChore, BREED_FOOD, STEP_PAUSE_MS, CHORE_PAUSE_MS,
+  type FoodStep, type FoodWorld, type FoodDecision, type SearchRecord, type FoodChore, type ChoreWorld
 } from '../../../skills/foodPlan.ts'
+import { farmWorkCount, type FarmWork } from '../../../skills/farmPlan.ts'
+import { inDangerZone } from '../../../skills/food-danger.ts'
+import { rangedSituation } from '../../../skills/ranged.ts'
+import { wornArmorPoints } from '../../../skills/gear.ts'
+import { escorting } from '../../../skills/bodyguard.ts'
+import { rangedDanger } from './safety.ts'
 import { pickFuel } from '../../../skills/crafting.ts'
 import { knownContainers } from '../../../skills/containers.ts'
 import { getPlaces } from '../../../skills/navigation.ts'
@@ -34,7 +41,8 @@ export const COOKED: Record<string, string> = {
   rabbit: 'cooked_rabbit',
   cod: 'cooked_cod',
   salmon: 'cooked_salmon',
-  potato: 'baked_potato'
+  potato: 'baked_potato',
+  kelp: 'dried_kelp'
 }
 
 /** Raw foods that are fine to eat uncooked in a pinch (raw chicken can poison). */
@@ -98,6 +106,11 @@ const options = z.object({
   scoutAtNight: z.boolean().default(false).describe('also make far trips (searching, known spots, its farm) at night'),
   startFarm: z.boolean().default(true).describe('farm fallback: with no proper food source (all rings empty), gather seeds, start a farm near home, plant and use it'),
   minSeeds: z.number().int().min(1).max(64).default(8).describe('seeds to have before starting a farm (picked up while searching, or by breaking grass)'),
+  growFarm: z.boolean().default(true).describe('between meals (and when food is not urgent) start, tend and grow its farm alongside the other sources: replant, re-till, add cells, breed near home'),
+  farmSize: z.number().int().min(3).max(9).default(9).describe('side of the square its farm grows towards around the water block'),
+  seedReserve: z.number().int().min(0).max(32).default(4).describe('seeds kept for replanting: the farm only grows with seeds beyond these'),
+  farmAbove: z.number().min(1).max(20).default(14).describe('food at or above this is not urgent: farm work may come before a long search'),
+  breed: z.boolean().default(true).describe('breed animals near home between meals when it has their food (wheat: cows, sheep; seeds: chickens; carrots: pigs)'),
   report: z.boolean().default(true).describe('when food is critical (6 or less) and nothing works, tell the owner (at most every 10 minutes)')
 })
 
@@ -113,6 +126,8 @@ export function ringsFor (o: { rings: number[], scoutRadius?: number }): number[
 
 const stepOptions = (o: O) => ({
   ...o,
+  growFarm: o.growFarm,
+  farmAbove: o.farmAbove,
   rings: ringsFor(o),
   ringMemoryMs: o.ringMemoryMinutes * 60_000,
   keepAtLeast: o.keepBreeders ? o.keepAtLeast : 0
@@ -122,7 +137,7 @@ const stepOptions = (o: O) => ({
 const isNightTime = (bot: Bot) => { const t = bot.time?.timeOfDay ?? 0; return (bot as { thunderState?: number }).thunderState! > 0 || (t >= 12_542 && t <= 23_459) }
 
 /** What keep_fed remembers between runs (agent.storage, so a restart doesn't rescan empty rings). */
-interface LadderMemory { searches: SearchRecord[], paused: Partial<Record<FoodStep, number>>, lastReportAt: number }
+interface LadderMemory { searches: SearchRecord[], paused: Partial<Record<FoodStep, number>>, lastReportAt: number, chores?: Partial<Record<FoodChore, number>> }
 const MEMORY_KEY = 'foodLadder'
 const memories = new WeakMap<Agent, LadderMemory>()
 function memory (agent: Agent): LadderMemory {
@@ -130,7 +145,7 @@ function memory (agent: Agent): LadderMemory {
   if (!m) {
     const st = (agent as { storage?: Agent['storage'] }).storage
     const saved = st?.get<Partial<LadderMemory>>(MEMORY_KEY, {}) ?? {}
-    m = { searches: saved.searches ?? [], paused: saved.paused ?? {}, lastReportAt: saved.lastReportAt ?? 0 }
+    m = { searches: saved.searches ?? [], paused: saved.paused ?? {}, lastReportAt: saved.lastReportAt ?? 0, chores: saved.chores ?? {} }
     memories.set(agent, m)
   }
   return m
@@ -138,6 +153,38 @@ function memory (agent: Agent): LadderMemory {
 function saveMemory (agent: Agent, m: LadderMemory): void {
   const st = (agent as { storage?: Agent['storage'] }).storage
   try { st?.set(MEMORY_KEY, m) } catch {}
+}
+
+/** The shared danger signals (stay_safe's ranged danger, surrounded, hurt with mobs near, a remembered danger zone), or null. */
+export function senseDanger (agent: Agent, bot: Bot): string | null {
+  const pos = bot.entity.position
+  const health = typeof bot.health === 'number' ? bot.health : 20
+  let ranged = false
+  try {
+    const r = rangedSituation(bot)
+    const shield = bot.inventory?.slots?.[45]?.name === 'shield' || !!bot.inventory?.items?.().some(i => i.name === 'shield')
+    ranged = rangedDanger({ active: r.active.length, patrol: r.patrol, health, armor: bot.inventory?.slots ? wornArmorPoints(bot) : 0, shield, escorting: !!escorting(agent) })
+  } catch {}
+  return foodDanger({ ranged, close: hostilesNear(bot, pos, 6).length, near: hostilesNear(bot, pos, 10).length, health, inZone: inDangerZone(agent, pos) })
+}
+
+/** Its nearest farm's work when the farm is loaded and within `range`. */
+function nearFarmWork (agent: Agent, bot: Bot, o: O, range: number): { farm: Farm, work: FarmWork } | null {
+  const farm = nearestFarm(agent, bot)
+  if (!farm) return null
+  const pos = bot.entity.position
+  if (Math.hypot(farm.x - pos.x, farm.z - pos.z) > range) return null
+  const work = farmWorkFor(agent, bot, farm, { targetSize: o.farmSize, seedReserve: o.seedReserve })
+  return work ? { farm, work } : null
+}
+
+/** Breeding is worth it here: near home (or no home), a pair, and their food (seeds kept back). */
+function breedHere (agent: Agent, bot: Bot, inv: Record<string, number>, keepSeeds: number): boolean {
+  if (!agent.getAction('breed')) return false
+  const home = getHome(agent)
+  const pos = bot.entity.position
+  if (home && Math.hypot(home.x - pos.x, home.z - pos.z) > 64) return false
+  return !!breedPlan(animalsAround(agent, bot, pos, 24, Object.keys(BREED_FOOD)).adults, inv, { keepSeeds })
 }
 
 /** Reads the world into a FoodWorld. */
@@ -161,10 +208,18 @@ export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
   let farmDistance: number | null = null
   let farmEmpty = 0
   let farmGrowing = 0
+  let farmWork: number | undefined
+  let farmSeedsWanted = 0
   const farm = nearestFarm(agent, bot)
   if (farm) {
     const status = farmStatus(bot, farm)
     if (status && Math.hypot(farm.x - pos.x, farm.z - pos.z) <= Math.max(o.radius, 48)) { farmEmpty = status.empty; farmGrowing = status.growing }
+    const near = (agent.getAction('tend_farm') || agent.getAction('plant')) ? nearFarmWork(agent, bot, o, Math.max(o.radius, 48)) : null
+    if (near) {
+      // without tend_farm only bare farmland can be planted
+      farmWork = agent.getAction('tend_farm') ? farmWorkCount(near.work) : near.work.plant.length
+      farmSeedsWanted = near.work.seedsWanted
+    }
   }
   if (o.harvest && agent.getAction('harvest')) {
     const own = ownFarmRipe(agent, bot, o.radius)
@@ -189,7 +244,7 @@ export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
   }
   const spot = o.places && agent.getAction('goto')
     ? rankSpots(getFoodSpots(agent), ['animals', 'village_farm'], Date.now(), pos, bot.game?.dimension)
-      .find(s => Math.hypot(s.x - pos.x, s.z - pos.z) <= farRange * 1.5)
+      .find(s => Math.hypot(s.x - pos.x, s.z - pos.z) <= farRange * 1.5 && !inDangerZone(agent, s))
     : undefined
   const grass = () => {
     const ids = ['short_grass', 'grass', 'tall_grass', 'fern'].map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
@@ -198,9 +253,11 @@ export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
   const inv: Record<string, number> = {}
   for (const i of items) inv[i.name] = (inv[i.name] ?? 0) + i.count
   const seeds = seedCount(inv)
-  const canBreed = !!agent.getAction('breed') && !!breedPlan(animalsAround(agent, bot, pos, 24, Object.keys(BREED_FOOD)).adults, inv)
-  const hostiles = hostilesNear(bot, pos, 16)
+  const canBreed = breedHere(agent, bot, inv, o.minSeeds)
   const m = memory(agent)
+  const forageable = agent.getAction('forage')
+    ? ripeBerries(bot, pos, o.radius).length + (agent.canDig && canSmeltKelp(bot) ? shoreKelp(bot, pos, Math.min(o.radius, 24)).length : 0)
+    : 0
   return {
     hasReadyFood: ready && !!best,
     raw,
@@ -224,13 +281,63 @@ export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
     grass: !!agent.canDig && !!agent.getAction('gather_seeds') && grass(),
     farmEmpty: agent.getAction('plant') ? farmEmpty : 0,
     farmGrowing,
-    forage: agent.getAction('forage') ? ripeBerries(bot, pos, o.radius).length : 0,
+    ...(farmWork !== undefined ? { farmWork, farmSeedsWanted } : {}),
+    forage: forageable,
+    apples: agent.getAction('forage') && agent.canDig ? appleLeaves(bot, pos, 16, 8).length : 0,
     canBreed,
-    danger: hostiles.length >= 2 || (hostiles.length >= 1 && health <= 8),
+    danger: !!senseDanger(agent, bot),
     searches: m.searches,
     paused: m.paused,
     lastReportAt: m.lastReportAt,
     now: Date.now()
+  }
+}
+
+/** Reads what the between-meals chores need into a ChoreWorld. */
+export function senseChores (agent: Agent, bot: Bot, o: O): ChoreWorld {
+  const pos = bot.entity.position
+  const inv = invOf(bot)
+  const farm = nearestFarm(agent, bot)
+  const near = farm && agent.getAction('tend_farm') ? nearFarmWork(agent, bot, o, 128) : null
+  const grassIds = ['short_grass', 'grass', 'tall_grass', 'fern'].map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
+  const grass = !!agent.canDig && !!agent.getAction('gather_seeds') && !!bot.findBlock?.({ matching: grassIds, maxDistance: 32 })
+  return {
+    food: typeof bot.food === 'number' ? bot.food : 20,
+    night: isNightTime(bot),
+    danger: !!senseDanger(agent, bot),
+    hasFarm: getFarms(agent).some(f => !f.dim || f.dim === bot.game?.dimension),
+    canStartFarm: !!agent.getAction('start_farm') && !!agent.canDig,
+    seeds: seedCount(inv),
+    grass,
+    farmDistance: farm ? Math.round(Math.hypot(farm.x - pos.x, farm.z - pos.z)) : null,
+    farmWork: near ? farmWorkCount(near.work) : 0,
+    farmSeedsWanted: near?.work.seedsWanted ?? 0,
+    farmSize: near?.work.size ?? farm?.size ?? 0,
+    farmTarget: o.farmSize,
+    canBreed: o.breed && breedHere(agent, bot, inv, o.minSeeds),
+    paused: memory(agent).chores ?? {},
+    now: Date.now()
+  }
+}
+
+async function doChore (ctx: BehaviorContext, chore: FoodChore, o: O): Promise<ActionResult> {
+  const { bot, agent } = ctx
+  switch (chore) {
+    case 'tend_farm': {
+      const farm = nearestFarm(agent, bot)
+      if (!farm) return { ok: false, message: 'no farm of my own' }
+      return ctx.act('tend_farm', { farm: farm.name, size: o.farmSize, seedReserve: o.seedReserve })
+    }
+    case 'start_farm':
+      return ctx.act('start_farm', { seeds: o.minSeeds })
+    case 'seeds': {
+      const farm = nearestFarm(agent, bot)
+      const work = farm ? nearFarmWork(agent, bot, o, 128)?.work : undefined
+      const want = work ? work.seedsWanted : o.minSeeds - seedCount(invOf(bot))
+      return ctx.act('gather_seeds', { count: Math.max(2, Math.min(32, want)), radius: 32, maxMinutes: 2 })
+    }
+    case 'breed':
+      return ctx.act('breed', { keepSeeds: o.minSeeds })
   }
 }
 
@@ -254,7 +361,8 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
       return ctx.act('eat')
     }
     case 'cook': {
-      const raw = Object.keys(COOKED).filter(n => has(n) > 0).sort((a, b) => has(b) - has(a))[0]
+      // meat and potatoes first; kelp (one bar a piece) only when nothing better is raw
+      const raw = Object.keys(COOKED).filter(n => has(n) > 0).sort((a, b) => (Number(a === 'kelp') - Number(b === 'kelp')) || has(b) - has(a))[0]
       if (!raw) return { ok: false, message: 'nothing to cook' }
       const furnaceNear = !!bot.findBlock({ matching: bot.registry.blocksByName.furnace.id, maxDistance: 32 })
       if (!furnaceNear && !has('furnace')) {
@@ -329,7 +437,8 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
     }
     case 'seeds': {
       const farm = nearestFarm(agent, bot)
-      const want = Math.max(o.minSeeds, farm ? (farmStatus(bot, farm)?.empty ?? 0) : 0) - seedCount(invOf(bot))
+      const work = farm ? nearFarmWork(agent, bot, o, 256)?.work : undefined
+      const want = Math.max(o.minSeeds - seedCount(invOf(bot)), work?.seedsWanted ?? (farm ? (farmStatus(bot, farm)?.empty ?? 0) - seedCount(invOf(bot)) : 0))
       return ctx.act('gather_seeds', { count: Math.max(2, Math.min(32, want)), radius: 32 })
     }
     case 'start_farm':
@@ -337,6 +446,7 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
     case 'plant': {
       const farm = nearestFarm(agent, bot)
       if (!farm) return { ok: false, message: 'no farm of my own' }
+      if (agent.getAction('tend_farm')) return ctx.act('tend_farm', { farm: farm.name, size: o.farmSize, seedReserve: o.seedReserve })
       return atFarm(ctx, farm, async () => {
         const r = await ctx.act('plant', { radius: farmRadius(farm), x: farm.x, y: farm.y, z: farm.z })
         if (r.ok) saveFarm(agent, { ...farm, tended: Date.now() })
@@ -346,7 +456,7 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
     case 'breed':
       return ctx.act('breed', { keepSeeds: o.minSeeds })
     case 'forage':
-      return ctx.act('forage', { radius: o.radius })
+      return ctx.act('forage', { radius: o.radius, kinds: canSmeltKelp(bot) ? ['berries', 'kelp'] : ['berries'], ...(d.apples ? { apples: true } : {}) })
     case 'report': {
       let owner: { name: string } | null = null
       try { owner = ownerTarget(agent, bot) } catch {}
@@ -381,16 +491,28 @@ export const keepFed = defineBehavior({
   description: 'Looks after food on its own, climbing a ladder when hungry (or hurt and too hungry to heal): eat, cook or bake what it carries; ' +
     'take food from known chests, its own or a village farm, remembered spots, animals in range (sparing breeders); search close, ' +
     'then wider, then wide (picking up seeds on the way); with no proper source start a farm near home, plant it and use it, ' +
-    'picking berries meanwhile; when starving and nothing works, tell the owner and stay safe. Arm it so you never starve between turns.',
+    'foraging berries, kelp (dried in a furnace) and, when desperate, apples meanwhile; when starving and nothing works, tell the owner and stay safe. ' +
+    'Between meals it starts, replants, re-tills and grows its farm and breeds animals near home. Arm it so you never starve between turns.',
   options,
   requires: ['eat'],
-  uses: ['withdraw', 'harvest', 'hunt', 'smelt', 'craft', 'goto', 'goto_place', 'list_container', 'find_food', 'start_farm', 'plant', 'gather_seeds', 'forage', 'breed'],
+  uses: ['withdraw', 'harvest', 'hunt', 'smelt', 'craft', 'goto', 'goto_place', 'list_container', 'find_food', 'start_farm', 'tend_farm', 'plant', 'gather_seeds', 'forage', 'breed'],
   priority: 'behavior',
   create (o, { agent }) {
     const so = stepOptions(o)
+    const choreOpts = { growFarm: o.growFarm, startFarm: o.startFarm, breed: o.breed, minSeeds: o.minSeeds, farmAbove: o.farmAbove, tendRange: 128 }
     // the ladder sets its own wait after a failed run; the controller's back-off stays short
     let retryAt = 0
     let stockAtFail = ''
+    // between meals: the chore found by the last check (sensing a farm is not free, so at most every 30 s)
+    let chore: { chore: FoodChore, reason: string } | null = null
+    let choreCheckedAt = 0
+    let choreRunning = false
+    const checkChore = (bot: Bot) => {
+      if (Date.now() - choreCheckedAt < 30_000) return chore
+      choreCheckedAt = Date.now()
+      try { chore = (o.growFarm || o.breed) ? farmChore(senseChores(agent, bot, o), choreOpts) : null } catch { chore = null }
+      return chore
+    }
     return {
       failureCooldownMs: 10_000,
       maxFailureCooldownMs: 10_000,
@@ -398,13 +520,35 @@ export const keepFed = defineBehavior({
         if (!needsSurvival(bot)) return 0 // creative/spectator: no hunger
         const food = typeof bot.food === 'number' ? bot.food : 20
         const health = typeof bot.health === 'number' ? bot.health : 20
-        if (current === 'keep_fed' && food < o.until) return 60 + bb.needs.hunger * 30
-        if (!isHungry(food, health, o)) return 0
+        const hungry = isHungry(food, health, o)
+        if (current === 'keep_fed' && choreRunning && !hungry) return 22 // a chore keeps its low score; hunger takes over below
+        if (current === 'keep_fed' && food < o.until && !choreRunning) return 60 + bb.needs.hunger * 30
+        if (!hungry) {
+          // between meals: farm work and breeding at the level of farm_setup, below following the owner's orders
+          const c = checkChore(bot)
+          return c ? (c.chore === 'tend_farm' || c.chore === 'start_farm' ? 22 : 21) : 0
+        }
         if (Date.now() < retryAt && foodStock(bot) === stockAtFail) return 0
         return 55 + bb.needs.hunger * 35
       },
       async run (ctx) {
         const m = memory(agent)
+        if (!isHungry(ctx.bot.food, ctx.bot.health, o)) {
+          choreCheckedAt = 0
+          const c = checkChore(ctx.bot)
+          chore = null
+          if (!c) return { ok: true, message: 'fed, nothing to do on the farm' }
+          ctx.log.debug(`keep_fed chore: ${c.chore} (${c.reason})`, { chore: c.chore, food: ctx.bot.food })
+          choreRunning = true
+          let r: ActionResult
+          try { r = await doChore(ctx, c.chore, o) } finally { choreRunning = false }
+          const pause = CHORE_PAUSE_MS[c.chore]
+          m.chores = { ...(m.chores ?? {}), [c.chore]: Date.now() + (r.ok ? pause.ok : pause.fail) }
+          saveMemory(agent, m)
+          ctx.log.debug(`keep_fed chore ${c.chore}: ${r.message}`, { chore: c.chore, ok: r.ok })
+          // a chore that didn't work is paused on its own; it is not a keep_fed failure
+          return { ok: true, message: `${c.chore}: ${r.message}` }
+        }
         const tried = new Set<FoodStep>()
         const done: string[] = []
         // what the far-reaching steps said, for a truthful report ("searched 120 blocks east, no animals; started a farm at ...")

@@ -51,7 +51,9 @@ reflexes:
 behaviors:
   keep_fed:                   # food ladder: eat/cook what it has, known sources, search 48 -> 120 -> 250 blocks,
                               # then a farm near home (seeds picked up on the way); tells ${MC_OWNER:-Robin} when starving
-    { below: 14, healBelow: 14, radius: 64, scout: true, rings: [48, 120, 250], keepBreeders: true, keepAtLeast: 2, startFarm: true, minSeeds: 8 }
+                              # between meals: replant, re-till and grow farm:1 towards 9x9, breed near home
+    { below: 14, healBelow: 14, radius: 64, scout: true, rings: [48, 120, 250], keepBreeders: true, keepAtLeast: 2, startFarm: true, minSeeds: 8,
+      growFarm: true, farmSize: 9, seedReserve: 4 }
   farm_setup: { tendRange: 128 }   # starts its own wheat farm near home (or where it is), tends it, bakes bread, breeds animals
   stay_safe: { retreatBelow: 0, avoidWater: false }   # stands its ground like the reflexes above;
                                                       # still pillars up when surrounded, goes home at night
