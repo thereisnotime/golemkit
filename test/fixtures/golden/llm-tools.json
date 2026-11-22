@@ -1267,7 +1267,7 @@
             "description": "how far to look for grass",
             "type": "number",
             "minimum": 4,
-            "maximum": 64
+            "maximum": 128
           },
           "maxMinutes": {
             "default": 3,
@@ -4239,7 +4239,7 @@
             "description": "how far to look for grass",
             "type": "number",
             "minimum": 4,
-            "maximum": 64
+            "maximum": 128
           },
           "maxMinutes": {
             "default": 3,
