@@ -103,6 +103,9 @@ async function surfaceLeg (bot: Bot, x: number, z: number, range: number, signal
 /** A travel leg went deep underground (caves, ravines): the caller should climb out or give up. */
 export class TravelUndergroundError extends Error {}
 
+/** travel kept sinking (lake beds) and had to surface three times: the caller should get to dry land, not try again from here. */
+export class TravelUnderwaterError extends Error {}
+
 export interface TravelOptions {
   /** Length of each leg in blocks (the pathfinder only plans through loaded chunks). Default 64. */
   stepBlocks?: number
@@ -136,7 +139,7 @@ export async function travel (bot: Bot, target: { x: number, y?: number, z: numb
       clearInterval(watch)
     }
     await swimUp(bot, signal)
-    if (surfaced >= 2) throw new Error(`kept running out of air under water near ${fmtPos(bot.entity.position)}`)
+    if (surfaced >= 2) throw new TravelUnderwaterError(`kept running out of air under water near ${fmtPos(bot.entity.position)}`)
   }
 }
 

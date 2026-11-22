@@ -7,10 +7,10 @@ import type { Block } from 'prismarine-block'
 import type { Entity } from 'prismarine-entity'
 import type { Vec3 } from 'vec3'
 import type { Agent, ActionContext, ActionResult } from '../core/index.ts'
-import { defineSkill, defineAction, z, ok, fail, goals, travel, sleep, checkAborted, fmtPos, needsSurvival, itemName } from '../core/index.ts'
+import { defineSkill, defineAction, z, ok, fail, goals, travel, sleep, checkAborted, fmtPos, needsSurvival, itemName, TravelUnderwaterError } from '../core/index.ts'
 import { huntRefusal, inPen, herdSurplus, HUNTABLE, type HuntCandidate } from './combat.ts'
 import { CROPS, isMature, plantOn, TILLABLE } from './farming.ts'
-import { getHome, getPlaces, setPlace, sameDimension, type Place } from './navigation.ts'
+import { getHome, getPlaces, setPlace, sameDimension, reachDryLand, type Place } from './navigation.ts'
 import { digBlock, DigRefusedError, findItem, countItem, placeAt, reachBlock, vec, within, gotoWithin } from './world.ts'
 import { pickupNearby } from './pickup.ts'
 import { climbOut, roofAbove } from './survival.ts'
@@ -354,6 +354,13 @@ const findFood = defineAction({
           consecutiveFailures++
           blocked.set(w.sector, w.ring + 1)
           log.debug('find_food: leg failed', { to: `${w.x} ${w.z}`, error: (e as Error).message })
+          // Sank on a lake bed: the next leg from this spot dives into the same water (it did, twice,
+          // and Pax drowned there once the action ended). Get to dry land and stop scouting.
+          if (e instanceof TravelUnderwaterError) {
+            const dry = await reachDryLand(bot, signal)
+            reason = `${(e as Error).message}${dry ? '' : ' (and found no dry land close by)'}`
+            break
+          }
         }
       }
       if (wentUnder) {
