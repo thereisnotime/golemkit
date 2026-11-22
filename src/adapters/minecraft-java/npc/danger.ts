@@ -1,4 +1,4 @@
-import type { Behavior } from '../types.ts'
+import type { Behavior } from '../../../brains/npc/types.ts'
 
 export interface DangerOptions {
   /** Fight mobs that come this close. Default 5. */

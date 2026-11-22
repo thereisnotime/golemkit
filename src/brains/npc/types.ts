@@ -1,12 +1,12 @@
 // Types shared by the NPC brain and its behaviours.
-import type { Bot } from 'mineflayer'
-import type { Agent, ActionResult, Logger } from '../../core/index.ts'
+import type { Agent, ActionResult, Logger, GameClient } from '../../core/index.ts'
 import type { Blackboard } from './blackboard.ts'
 
 /** What every scoring function sees. Cheap to build, rebuilt each tick. */
 export interface NpcContext {
   agent: Agent
-  bot: Bot
+  /** The game client (Minecraft Java: the Mineflayer bot), for game-specific behaviours. */
+  bot: GameClient
   bb: Blackboard
   log: Logger
   /** Milliseconds, from the brain's clock (injectable for tests). */

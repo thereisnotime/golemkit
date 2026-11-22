@@ -5,10 +5,9 @@
 //   rules    -> one Behavior each: score while `when` holds, run = the routine
 //   triggers -> fired triggers go into a TriggerQueue; one extra Behavior ("triggers")
 //               scores the best pending priority and runs the queued routine
-import type { Bot } from 'mineflayer'
-import { fail, PRIORITY, type Agent } from '../../core/index.ts'
-import { getPlaces, sameDimension } from '../../skills/navigation.ts'
-import { itemName } from '../../core/index.ts'
+import { fail, PRIORITY, distance, type Agent, type GameAdapter, type SeenEntity } from '../../core/index.ts'
+import { getPlaces } from '../../skills/navigation.ts'
+import type { NpcWorldView } from '../npc/blackboard.ts'
 import type { Behavior, BehaviorContext, NpcContext, Blackboard } from '../npc/index.ts'
 import { NpcYield } from '../npc/index.ts'
 import type { Program, Scalar, Trigger } from './format.ts'
@@ -139,25 +138,26 @@ export function compile (deps: CompileDeps): Behavior[] {
   return behaviors
 }
 
-/** Live fact view over the blackboard, the bot and the agent's stored places. */
-export function liveWorld (agent: Agent, bot: Bot, bb: Blackboard, memory: ProgramMemory): World {
+/** Live fact view over the blackboard, the game (the agent's adapter) and the agent's stored places. */
+export function liveWorld (agent: Agent, view: NpcWorldView & Pick<GameAdapter, 'playerPosition'>, bb: Blackboard, memory: ProgramMemory): World {
   const f = bb.facts
-  const pos = bot.entity?.position
-  const count = (pred: (e: any) => boolean) => pos
-    ? Object.values(bot.entities ?? {}).filter(e => e !== bot.entity && e.position && pred(e) && e.position.distanceTo(pos) <= 16).length
+  const self = view.self()
+  const pos = self?.position
+  const count = (pred: (e: SeenEntity) => boolean) => pos
+    ? (view.entities?.() ?? []).filter(e => pred(e) && e.distance <= 16).length
     : 0
   return {
     fact (name): Scalar | undefined {
       switch (name) {
-        case 'health': return typeof bot.health === 'number' ? Math.round(bot.health) : 20
-        case 'food': return typeof bot.food === 'number' ? bot.food : 20
+        case 'health': return typeof self?.health === 'number' ? Math.round(self.health) : 20
+        case 'food': return typeof self?.food === 'number' ? self.food : 20
         case 'timeOfDay': return f.timeOfDay
         case 'isNight': return f.isNight
         case 'isDay': return !f.isNight
         case 'sleeping': return f.sleeping
         case 'busy': return (agent.currentAction?.priority ?? 0) > PRIORITY.npc
         case 'homeDistance': return f.homeDistance === null ? -1 : Math.round(f.homeDistance)
-        case 'playersNearby': return count(e => e.type === 'player' && e.username !== bot.username)
+        case 'playersNearby': return count(e => e.type === 'player' && e.username !== self?.username)
         case 'hostilesNearby': return count(e => e.type === 'hostile')
         case 'nearestPlayer.name': return f.nearestPlayer?.name ?? ''
         case 'nearestPlayer.distance': return f.nearestPlayer ? Math.round(f.nearestPlayer.distance) : -1
@@ -169,18 +169,18 @@ export function liveWorld (agent: Agent, bot: Bot, bb: Blackboard, memory: Progr
       if (ns === 'need') return bb.need(key)
       if (ns === 'var') return memory.get(key)
       if (ns === 'inventory') {
-        try { return bot.inventory.items().filter(i => itemName(i) === key).reduce((n, i) => n + i.count, 0) } catch { return 0 }
+        try { return (view.inventory?.().items ?? []).filter(i => i.label === key).reduce((n, i) => n + i.count, 0) } catch { return 0 }
       }
       if (ns === 'place') {
         const pl = getPlaces(agent)[key.toLowerCase()]
-        if (!pl || !pos || !sameDimension(bot, pl)) return -1
+        if (!pl || !pos || (pl.dimension && pl.dimension !== self?.game.dimension)) return -1
         return Math.round(Math.hypot(pos.x - pl.x, pos.y - pl.y, pos.z - pl.z))
       }
       return undefined
     },
     playerDistance (name) {
-      const e = bot.players?.[name]?.entity
-      return e && pos ? e.position.distanceTo(pos) : undefined
+      const p = view.playerPosition?.(name)
+      return p && pos ? distance(pos, p) : undefined
     }
   }
 }

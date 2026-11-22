@@ -1,5 +1,5 @@
 export { sceneBrain, type SceneBrainOptions } from './brain.ts'
-export { sceneSkill, sceneActions } from './actions.ts'
+export { sceneSkill, sceneActions } from '../../adapters/minecraft-java/skills/scene.ts'
 export { scene, b, SceneBuilder } from './builder.ts'
 export { defineScene, parseScene, parseSceneYaml, loadSceneDir, SceneValidationError } from './format.ts'
 export { SceneRuntime, runtimeOf, agentWorld, agentPerformer, type SceneRuntimeOptions, type Performer } from './runtime.ts'

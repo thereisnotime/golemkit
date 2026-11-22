@@ -180,31 +180,30 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
       agent.on('actionEnd', (info, result) => rt.onActionEnd(info, result))
     },
 
-    session (agent, bot) {
+    session (agent) {
       const rt = runtimes.get(agent)
       if (!rt) return
       const spawnedAt = Date.now()
       let lastHurt = 0
       rt.onSession()
 
-      const onHurt = (entity: any) => {
-        if (entity !== bot.entity || Date.now() - lastHurt < 60_000) return
+      const game = agent.adapter
+      const onHurt = (health: number) => {
+        if (Date.now() - lastHurt < 60_000) return
         lastHurt = Date.now()
-        rt.onEvent('hurt', `you got hurt, health now ${Math.round(bot.health)}/20`)
+        rt.onEvent('hurt', `you got hurt, health now ${Math.round(health)}/20`)
       }
       const onDeath = () => rt.onEvent('death', 'you died and respawned')
-      const onJoin = (p: { username: string }) => {
+      const onJoin = (player: string) => {
         // The player list is replayed on spawn; only count real joins.
-        if (p.username === bot.username || Date.now() - spawnedAt < 10_000) return
-        rt.onEvent('playerJoined', `${p.username} joined the game`, p.username)
+        if (Date.now() - spawnedAt < 10_000) return
+        rt.onEvent('playerJoined', `${player} joined the game`, player)
       }
-      const onLeave = (p: { username: string }) => {
-        if (p.username !== bot.username) rt.onEvent('playerLeft', `${p.username} left the game`, p.username)
-      }
-      bot.on('entityHurt', onHurt)
-      bot.on('death', onDeath)
-      bot.on('playerJoined', onJoin)
-      bot.on('playerLeft', onLeave)
+      const onLeave = (player: string) => { rt.onEvent('playerLeft', `${player} left the game`, player) }
+      game.on('hurt', onHurt)
+      game.on('death', onDeath)
+      game.on('playerJoined', onJoin)
+      game.on('playerLeft', onLeave)
 
       const tickMs = opts.tickMs ?? opts.triggers?.tickMs ?? 0
       const timer = tickMs > 0
@@ -212,10 +211,10 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
         : null
 
       return () => {
-        bot.off('entityHurt', onHurt)
-        bot.off('death', onDeath)
-        bot.off('playerJoined', onJoin)
-        bot.off('playerLeft', onLeave)
+        game.off('hurt', onHurt)
+        game.off('death', onDeath)
+        game.off('playerJoined', onJoin)
+        game.off('playerLeft', onLeave)
         if (timer) clearInterval(timer)
       }
     },

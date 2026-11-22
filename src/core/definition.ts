@@ -1,6 +1,6 @@
 // Variants (variants/<name>.ts: what kind of bot), instance options (from profiles, fleet
 // entries or CLI flags) and server connection settings.
-import type { Bot } from 'mineflayer'
+import type { AdapterFactory, GameClient } from './adapter.ts'
 import type { SkillDef } from './skill.ts'
 import type { BrainDef } from './brain.ts'
 import type { Agent } from './agent.ts'
@@ -22,7 +22,9 @@ export interface BotDefinition {
   /** Arbitrary per-bot settings, readable via agent.settings. */
   settings?: Record<string, unknown>
   /** Runs after every spawn, after skills and brains are set up. */
-  onSpawn? (agent: Agent, bot: Bot): void
+  onSpawn? (agent: Agent, bot: GameClient): void
+  /** The game this variant plays; Minecraft Java by default. */
+  adapter?: AdapterFactory
 }
 
 /** A variant: a kind of bot (skills + brains + defaults). `defineBot` is the older name. */
@@ -40,6 +42,11 @@ export interface ServerConfig {
   /** 'offline' for offline-mode servers, 'microsoft' for a real account. */
   auth: 'offline' | 'microsoft'
   version: string
+  /**
+   * Server software, for adapters that care (Minecraft Java: 'neoforge' (default), 'vanilla',
+   * 'paper'). MC_PLATFORM in the environment.
+   */
+  platform?: string
 }
 
 /**
@@ -74,7 +81,8 @@ export function serverFromEnv (env: NodeJS.ProcessEnv = process.env): ServerConf
     host: env.MC_HOST || DEFAULT_SERVER.host,
     port: Number(env.MC_PORT || DEFAULT_SERVER.port),
     auth: (env.MC_AUTH as ServerConfig['auth']) || DEFAULT_SERVER.auth,
-    version: env.MC_VERSION || DEFAULT_SERVER.version
+    version: env.MC_VERSION || DEFAULT_SERVER.version,
+    ...(env.MC_PLATFORM ? { platform: env.MC_PLATFORM } : {})
   }
 }
 
@@ -89,6 +97,8 @@ export interface InstanceOptions {
   /** Data directory; defaults to data/bots/<username>. */
   dataDir?: string
   reconnectDelayMs?: number
+  /** The game adapter for this instance (overrides the variant's); Minecraft Java by default. */
+  adapter?: AdapterFactory
 }
 
 export function listFromEnv (v: string | undefined): string[] {

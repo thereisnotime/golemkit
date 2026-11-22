@@ -5,10 +5,9 @@
 //   brains: [commandBrain(), reflexes(), selfImprover({ base: myProgram, provider: 'claude-subscription' })]
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Bot } from 'mineflayer'
 import {
-  defineBrain, defineAction, noParams, ok, fail, z,
-  type Agent, type ActionContext, type ChatMessage, type Logger
+  defineBrain, defineAction, noParams, ok, fail, z, distance,
+  type Agent, type ActionContext, type ChatMessage, type Logger, type GameClient
 } from '../../core/index.ts'
 import { createProvider } from '../../llm/providers/index.ts'
 import type { LlmProvider } from '../../llm/types.ts'
@@ -91,7 +90,8 @@ export class SelfImprover {
   /** Pending "want me to rework it?" question. */
   proposal: { key: string, instruction: string, at: number, owner: string } | null = null
   private readonly opts: SelfImproverOptions
-  private bot: Bot | null = null
+  /** The session's game client (null between sessions); game facts come from the agent's adapter. */
+  private client: GameClient | null = null
   private lastProposal = 0
   private lastFired = new Map<string, number>()
   private inWindowState = new Map<string, boolean>()
@@ -154,49 +154,50 @@ export class SelfImprover {
     this.queue.clear()
     this.lastFired.clear()
     this.inWindowState.clear()
-    if (this.bot) this.startController(this.bot)
+    if (this.client) this.startController(this.client)
   }
 
   // ---------------------------------------------------------------- session
 
-  session (bot: Bot): () => void {
-    this.bot = bot
+  session (bot: GameClient): () => void {
+    this.client = bot
     this.startController(bot)
+    const game = (this.agent as Agent).adapter
     const spawnedAt = Date.now()
     let lastHurt = 0
-    const onHurt = (e: any) => {
-      if (e !== bot.entity || Date.now() - lastHurt < 10_000) return
+    const onHurt = () => {
+      if (Date.now() - lastHurt < 10_000) return
       lastHurt = Date.now()
       this.fireEvent('hurt')
     }
     const onDeath = () => this.fireEvent('death')
-    const onJoin = (p: { username: string }) => {
-      if (p.username === bot.username || Date.now() - spawnedAt < 10_000) return
-      this.fireEvent('playerJoined', p.username)
+    const onJoin = (player: string) => {
+      if (Date.now() - spawnedAt < 10_000) return
+      this.fireEvent('playerJoined', player)
     }
-    bot.on('entityHurt', onHurt)
-    bot.on('death', onDeath)
-    bot.on('playerJoined', onJoin)
+    game.on('hurt', onHurt)
+    game.on('death', onDeath)
+    game.on('playerJoined', onJoin)
     const spawnTimer = setTimeout(() => this.fireEvent('spawn'), 4000)
     const clock = setInterval(() => this.clockTick(), this.opts.triggerTickMs ?? 1000)
     const npcTick = setInterval(() => this.tickController(), this.opts.npc?.tickMs ?? 1500)
     const inboxOn = this.opts.intake?.inbox ?? true
     const inbox = inboxOn ? setInterval(() => this.pollInbox(), this.opts.intake?.inboxPollMs ?? 10_000) : null
     return () => {
-      bot.off('entityHurt', onHurt)
-      bot.off('death', onDeath)
-      bot.off('playerJoined', onJoin)
+      game.off('hurt', onHurt)
+      game.off('death', onDeath)
+      game.off('playerJoined', onJoin)
       clearTimeout(spawnTimer)
       clearInterval(clock)
       clearInterval(npcTick)
       if (inbox) clearInterval(inbox)
       this.controller?.stop('session ended')
       this.controller = null
-      this.bot = null
+      this.client = null
     }
   }
 
-  private startController (bot: Bot): void {
+  private startController (bot: GameClient): void {
     this.controller?.stop('program changed')
     const agent = this.agent as Agent
     const behaviors = compile({
@@ -204,7 +205,7 @@ export class SelfImprover {
       memory: this.memory,
       chat: this.chat,
       queue: this.queue,
-      world: (ctx) => liveWorld(agent, bot, ctx.bb, this.memory),
+      world: (ctx) => liveWorld(agent, agent.adapter, ctx.bb, this.memory),
       onOutcome: (kind, name, outcome, detail) => this.onOutcome(kind, name, outcome, detail)
     })
     const { extraBehaviors = [], ...npc } = this.opts.npc ?? {}
@@ -223,11 +224,11 @@ export class SelfImprover {
 
   private conditionHolds (t: Trigger): boolean {
     if (!t.when) return true
-    const bot = this.bot
     const c = this.controller
-    if (!bot || !c) return false
-    c.bb.update(bot)
-    return evalCond(t.when, { world: liveWorld(this.agent as Agent, bot, c.bb, this.memory), memory: this.memory, host: this.host() })
+    if (!this.client || !c) return false
+    const game = (this.agent as Agent).adapter
+    c.bb.update(game)
+    return evalCond(t.when, { world: liveWorld(this.agent as Agent, game, c.bb, this.memory), memory: this.memory, host: this.host() })
   }
 
   /** Queues a trigger's routine if its cooldown and condition allow. */
@@ -250,7 +251,7 @@ export class SelfImprover {
 
   private clockTick (): void {
     const now = Date.now()
-    const time = this.bot?.time?.timeOfDay
+    const time = this.client ? (this.agent as Agent).adapter.time?.()?.timeOfDay : undefined
     for (const t of this.program.triggers) {
       if (t.on === 'interval' && t.everyMs) {
         if (!this.lastFired.has(t.name)) this.lastFired.set(t.name, now)
@@ -287,9 +288,10 @@ export class SelfImprover {
       if (t.on !== 'chat' || !t.match || !chatMatches(msg.message, t.match)) continue
       if (t.ownersOnly && !owner) continue
       if (t.near !== undefined) {
-        const e = this.bot?.players?.[msg.from]?.entity
-        const me = this.bot?.entity
-        const d = e && me ? e.position.distanceTo(me.position) : undefined
+        const game = this.client ? (this.agent as Agent).adapter : null
+        const e = game?.playerPosition?.(msg.from)
+        const me = game?.self()?.position
+        const d = e && me ? distance(e, me) : undefined
         if (d === undefined || d > t.near) {
           this.log.debug(`chat trigger ${t.name}: ${msg.from} is ${d === undefined ? 'not visible' : `${Math.round(d)} blocks away`} (near ${t.near})`)
           continue
@@ -389,7 +391,7 @@ export class SelfImprover {
   }
 
   private onlineOwner (): string | null {
-    const players = Object.keys(this.bot?.players ?? {})
+    const players = this.client ? (this.agent as Agent).adapter.players?.() ?? [] : []
     return players.find(p => p !== this.agent.username && isTeacher(this.agent, p)) ?? null
   }
 

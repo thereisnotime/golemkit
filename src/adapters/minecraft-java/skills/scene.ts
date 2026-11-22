@@ -1,8 +1,8 @@
 // Scene actions. Control actions (scene_start/stop/status/list) are chat commands; stage
 // actions (scene_walk/look/gesture) are what directors use for goto/look/gesture beats.
-import { defineAction, defineSkill, z, noParams, ok, fail, goals, goto, sleep, playerEntity, type ActionContext, type Agent } from '../../core/index.ts'
-import { runtimeOf } from './runtime.ts'
-import { BOARD, type RunInfo, type RunSummary } from './protocol.ts'
+import { defineAction, defineSkill, z, noParams, ok, fail, goals, goto, sleep, playerEntity, type ActionContext, type Agent } from '../../../core/index.ts'
+import { runtimeOf } from '../../../brains/scene/runtime.ts'
+import { BOARD, type RunInfo, type RunSummary } from '../../../brains/scene/protocol.ts'
 
 const CLAIM_MS = 3000
 

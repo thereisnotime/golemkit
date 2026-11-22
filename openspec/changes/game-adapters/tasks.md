@@ -18,10 +18,10 @@ Every phase ends with the parity checks below; a phase is done only when they al
 
 ## Phase 2: Minecraft behind the interface
 
-- [ ] Move the Mineflayer agent into `src/adapters/minecraft-java`
-- [ ] Move the NeoForge layer into `src/adapters/minecraft-java/platforms/neoforge`; vanilla and Paper as thin platforms
-- [ ] `src/core/index.ts` keeps re-exporting so variants, profiles and scripts don't change
-- [ ] Replace direct `agent.bot` use in brains (behaviour library, npc, self) with adapter calls
+- [x] Move the Mineflayer agent into `src/adapters/minecraft-java`
+- [x] Move the NeoForge layer into `src/adapters/minecraft-java/platforms/neoforge`; vanilla and Paper as thin platforms
+- [x] `src/core/index.ts` keeps re-exporting so variants, profiles and scripts don't change
+- [x] Replace direct `agent.bot` use in brains (behaviour library, npc, self) with adapter calls
 
 ## Phase 3: capabilities
 

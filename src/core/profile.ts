@@ -80,7 +80,8 @@ export const ProfileSchema = z.object({
     host: z.string().optional(),
     port: z.number().int().optional(),
     auth: z.enum(['offline', 'microsoft']).optional(),
-    version: z.string().optional()
+    version: z.string().optional(),
+    platform: z.enum(['neoforge', 'vanilla', 'paper']).optional()
   }).optional(),
   llm: LlmProfileSchema.optional(),
   /** Plain-language commands without the LLM (intents brain). Lands in settings.intents. See docs/guide/intents.md. */

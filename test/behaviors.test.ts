@@ -1,4 +1,5 @@
 import { test } from 'node:test'
+import { minecraftView } from './fake-attach.ts'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { PRIORITY, ok, fail, createLogger, type ActionInfo, type ActionResult } from '../src/core/index.ts'
@@ -302,6 +303,7 @@ function fakeAgent (actions: string[], extra: Record<string, unknown> = {}) {
     food: 20, health: 20, time: { timeOfDay: 1000 }, entities: {}, players: {}, game: { dimension: 'overworld' },
     inventory: { items: () => [], inventoryStart: 9, inventoryEnd: 45, emptySlotCount: () => 36 }
   }
+  agent.adapter = minecraftView(bot)
   return { agent, bot, calls, store, setForeign: (i: ActionInfo | null) => { current = i } }
 }
 

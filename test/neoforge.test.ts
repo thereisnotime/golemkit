@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import nbt from 'prismarine-nbt'
-import { encodeQuery, decodeNetworkSetup, decodeSetupFailed, failureReason, Reader, Writer, PROTOCOL, FLOW } from '../src/core/neoforge/codec.ts'
-import { ChannelStore } from '../src/core/neoforge/channelStore.ts'
+import { encodeQuery, decodeNetworkSetup, decodeSetupFailed, failureReason, Reader, Writer, PROTOCOL, FLOW } from '../src/adapters/minecraft-java/platforms/neoforge/codec.ts'
+import { ChannelStore } from '../src/adapters/minecraft-java/platforms/neoforge/channelStore.ts'
 
 const comp = (translate: string, ...args: any[]): any => nbt.comp({
   translate: nbt.string(translate),

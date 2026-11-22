@@ -2,7 +2,8 @@
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
 import pf from 'mineflayer-pathfinder'
-import { ActionAbortedError, checkAborted } from './action.ts'
+import { ActionAbortedError, checkAborted } from '../../core/action.ts'
+import { fmtPos } from '../../core/format.ts'
 
 export const { goals, Movements } = pf
 export type Goal = InstanceType<typeof pf.goals.GoalBlock> | any
@@ -247,9 +248,7 @@ export function itemName (item: { name?: string, type: number }): string {
   return item.name && item.name !== 'unknown' ? item.name : `modded#${item.type}`
 }
 
-export function fmtPos (p: { x: number, y: number, z: number }): string {
-  return `${Math.floor(p.x)} ${Math.floor(p.y)} ${Math.floor(p.z)}`
-}
+export { fmtPos }
 
 /** True in survival/adventure, where hunger, damage and gathering matter. */
 export function needsSurvival (bot: Bot): boolean {

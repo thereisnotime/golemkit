@@ -58,29 +58,31 @@ export const hooksBrain = (opts: HooksBrainOptions = {}) => {
       onLlmBudgetExhausted(agent, reason => run(engine.emit({ type: 'llmBudgetExhausted', reason })))
     },
 
-    session (agent, bot) {
+    session (agent) {
       const engine = engines.get(agent)
       if (!engine) return
       const log = agent.log.child('hooks')
       const run = (p: Promise<unknown>) => { p.catch(e => log.warn(`hook error: ${(e as Error).message}`)) }
+      const game = agent.adapter
       states.set(agent, () => {
         const inventory: Record<string, number> = {}
         let foodItems = 0
-        const foods = (bot.registry as any).foodsByName ?? {}
-        for (const i of bot.inventory?.items() ?? []) {
+        for (const i of game.inventory?.().items ?? []) {
           inventory[i.name] = (inventory[i.name] ?? 0) + i.count
-          if (foods[i.name]) foodItems += i.count
+          if (i.food) foodItems += i.count
         }
-        const t = bot.time?.timeOfDay ?? 0
+        const t = game.time?.()?.timeOfDay ?? 0
+        const self = game.self()
+        const me = self?.username ?? agent.username
         return {
-          health: bot.health,
-          food: bot.food,
+          health: self?.health ?? undefined,
+          food: self?.food ?? undefined,
           inventory,
           foodItems,
-          position: bot.entity ? fmtPos(bot.entity.position) : undefined,
+          position: self ? fmtPos(self.position) : undefined,
           isDay: t < 13000 || t > 23000,
           idle: !agent.currentAction,
-          players: Object.keys(bot.players ?? {}).filter(p => p !== bot.username)
+          players: (game.players?.() ?? []).filter(p => p !== me)
         }
       })
       engine.resetSession()
@@ -90,49 +92,50 @@ export const hooksBrain = (opts: HooksBrainOptions = {}) => {
 
       // The first health readings after login/respawn aren't news (we may log in hurt): skip 5 s.
       let healthQuietUntil = Date.now() + 5000
-      bot.on('spawn', () => { healthQuietUntil = Date.now() + 5000 })
-      const onHealth = () => { if (Date.now() >= healthQuietUntil && bot.health > 0) run(engine.health(bot.health)) }
-      const onHurt = (entity: any) => {
-        if (entity !== bot.entity || Date.now() - lastHurt < hurtMs) return
+      const onRespawn = () => { healthQuietUntil = Date.now() + 5000 }
+      const onHealth = (health: number) => { if (Date.now() >= healthQuietUntil && health > 0) run(engine.health(health)) }
+      const onHurt = (health: number) => {
+        if (Date.now() - lastHurt < hurtMs) return
         lastHurt = Date.now()
-        run(engine.emit({ type: 'hurt', health: bot.health }))
+        run(engine.emit({ type: 'hurt', health }))
       }
       // What we carried just before dying (the inventory is already empty by the death event).
       let carried = 0
       let carriedAt = 0
       const countItems = () => {
         try {
-          const n = bot.inventory.items().reduce((a, i) => a + i.count, 0)
+          const n = (game.inventory?.().items ?? []).reduce((a, i) => a + i.count, 0)
           if (n > 0 || Date.now() - carriedAt > 5000) { carried = n; carriedAt = Date.now() } // keep a recent non-empty count: the server empties the inventory just before the death event
         } catch {}
       }
       const carryTimer = setInterval(countItems, 2000)
       const onDeath = () => {
-        const pos = bot.entity ? fmtPos(bot.entity.position) : 'unknown position'
+        const p = game.self()?.position
+        const pos = p ? fmtPos(p) : 'unknown position'
         const drops = carried > 0 ? `My stuff (${carried} items) should still be there for 5 minutes.` : 'I had nothing on me.'
         run(engine.emit({ type: 'death', vars: { pos, deathPos: pos, drops } }))
       }
-      const onJoin = (p: { username: string }) => {
-        if (p.username === bot.username || Date.now() - spawnedAt < 10_000) return // the list is replayed on spawn
-        run(engine.emit({ type: 'playerJoined', player: p.username }))
+      const onJoin = (player: string) => {
+        if (Date.now() - spawnedAt < 10_000) return // the list is replayed on spawn
+        run(engine.emit({ type: 'playerJoined', player }))
       }
-      const onLeave = (p: { username: string }) => {
-        if (p.username !== bot.username) run(engine.emit({ type: 'playerLeft', player: p.username }))
-      }
-      bot.on('health', onHealth)
-      bot.on('entityHurt', onHurt)
-      bot.on('death', onDeath)
-      bot.on('playerJoined', onJoin)
-      bot.on('playerLeft', onLeave)
+      const onLeave = (player: string) => { run(engine.emit({ type: 'playerLeft', player })) }
+      game.on('respawn', onRespawn)
+      game.on('health', onHealth)
+      game.on('hurt', onHurt)
+      game.on('death', onDeath)
+      game.on('playerJoined', onJoin)
+      game.on('playerLeft', onLeave)
       const timers = engine.list.filter(h => h.on === 'timer').map(h => setInterval(() => run(engine.emit({ type: 'timer', hookId: h.id })), parseDuration(h.every)))
       run(engine.emit({ type: 'spawn' }))
 
       return () => {
-        bot.off('health', onHealth)
-        bot.off('entityHurt', onHurt)
-        bot.off('death', onDeath)
-        bot.off('playerJoined', onJoin)
-        bot.off('playerLeft', onLeave)
+        game.off('respawn', onRespawn)
+        game.off('health', onHealth)
+        game.off('hurt', onHurt)
+        game.off('death', onDeath)
+        game.off('playerJoined', onJoin)
+        game.off('playerLeft', onLeave)
         for (const t of timers) clearInterval(t)
         clearInterval(carryTimer)
         states.delete(agent)

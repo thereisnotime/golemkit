@@ -19,6 +19,7 @@ const ServerSchema = z.object({
   port: z.number().int().optional(),
   auth: z.enum(['offline', 'microsoft']).optional(),
   version: z.string().optional(),
+  platform: z.enum(['neoforge', 'vanilla', 'paper']).optional(),
   /** Delay between logins on this server. */
   staggerMs: z.number().optional()
 })

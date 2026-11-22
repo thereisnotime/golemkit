@@ -1,4 +1,5 @@
 import { test } from 'node:test'
+import { minecraftView } from './fake-attach.ts'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -266,7 +267,9 @@ test('experience: repeated failures make it ask the owner, and it only reworks a
   const p = new ScriptedProvider([submit({ patch: { set: { rules: [{ name: 'stroll', score: 10, do: [{ act: 'wander', params: { radius: 4 } }] }] } } })])
   const { s, said, done } = await make(p)
   try {
-    ;(s as any).bot = { players: { Boss: {}, Apprentice: {} } }
+    const bot = { players: { Boss: {}, Apprentice: {} } }
+    ;(s as any).client = bot
+    ;(s.agent as any).adapter = minecraftView(bot)
     for (let i = 0; i < 4; i++) s.onOutcome('rule', 'stroll', 'fail', 'wander failed: no path')
     assert.equal(s.proposal, null)
     s.onOutcome('rule', 'stroll', 'fail', 'wander failed: no path')

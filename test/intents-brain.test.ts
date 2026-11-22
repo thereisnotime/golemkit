@@ -51,6 +51,18 @@ class IntentAgent extends FakeAgent {
   get bot () {
     return { players: this.players, entity: { position: { x: 0, y: 64, z: 0 } }, inventory: { items: () => [{ name: 'bread', count: 3 }] }, registry: {} } as any
   }
+
+  /** The same world through the adapter view the brain reads. */
+  readonly inSession = true
+  get adapter () {
+    const players = this.players as Record<string, { entity?: { position: { x: number, y: number, z: number } } }>
+    return {
+      players: () => Object.keys(players),
+      playerPosition: (name: string) => players[name]?.entity?.position ?? null,
+      self: () => ({ username: 'Pax', position: { x: 0, y: 64, z: 0 }, health: 20, food: 20, heldItem: null, game: {} }),
+      inventory: () => ({ items: [{ name: 'bread', label: 'bread', count: 3, food: false }], slots: 36 })
+    } as any
+  }
 }
 
 const actions = () => [

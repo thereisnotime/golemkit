@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 import { defineBrain, type Agent } from '../../core/index.ts'
 import { loadSceneDir, parseScene } from './format.ts'
 import { SceneRuntime, runtimeOf, type SceneRuntimeOptions } from './runtime.ts'
-import { sceneActions } from './actions.ts'
+import { sceneActions } from '../../adapters/minecraft-java/skills/scene.ts'
 import type { LineProvider, Scene, SceneInput } from './types.ts'
 
 export interface SceneBrainOptions {

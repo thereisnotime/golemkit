@@ -3,7 +3,7 @@
 // nextToolUpgrade (src/skills/progression.ts); the work goes through ctx.act().
 import type { Bot } from 'mineflayer'
 import { z, needsSurvival, itemName } from '../../../core/index.ts'
-import { defineBehavior } from '../types.ts'
+import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import { nextToolUpgrade, senseNearby, type Nearby } from '../../../skills/progression.ts'
 import { inventoryCounts, toolTier, type ToolKind } from '../../../skills/toolkit.ts'
 

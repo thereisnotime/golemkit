@@ -1,5 +1,5 @@
 export { commandBrain, parseArgs, type CommandBrainOptions } from './command.ts'
-export { reflexes, type ReflexOptions } from './reflexes.ts'
+export { reflexes, type ReflexOptions } from '../adapters/minecraft-java/brains/reflexes.ts'
 export { npcBrain, actionBehavior, type Behavior, type NpcOptions } from './npc/index.ts'
 export { sceneBrain, sceneSkill, scene, b, defineScene, type SceneBrainOptions } from './scene/index.ts'
 export { llmBrain, llmRuntime, llmFleetUsage, llmUsageAction, type LlmBrainOptions } from './llm.ts'

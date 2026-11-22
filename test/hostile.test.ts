@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isHostile, FLYING } from '../src/core/helpers.ts'
+import { isHostile, FLYING } from '../src/adapters/minecraft-java/helpers.ts'
 
 const e = (name: string, type: string) => ({ name, type, isValid: true }) as any
 

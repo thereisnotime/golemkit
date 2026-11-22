@@ -47,7 +47,9 @@ for (const file of ROOTS.flatMap(walk).sort()) {
   if (file === 'scripts/scope-check.ts') continue
   const text = readFileSync(file, 'utf8')
   const pkgs = [...new Set([...text.matchAll(GAME_IMPORT)].map(m => m[1]!))]
-  const touches = BOT_TOUCH.test(text)
+  // comment lines don't count (doc comments may say "ctx.bot")
+  const code = text.split('\n').filter(l => !/^\s*(\*|\/\*|\/\/)/.test(l)).map(l => l.replace(/\s\/\/.*$/, '')).join('\n')
+  const touches = BOT_TOUCH.test(code)
   const g = group(file)
   const r = rows.get(g) ?? { files: 0, imports: 0, touches: 0, either: 0 }
   r.files++

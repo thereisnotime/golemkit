@@ -168,8 +168,7 @@ export class BotTools implements ToolHost {
     const isOwner = (p?: string) => !!p && !!(this.agent as { isOwner?: (p: string) => boolean }).isOwner?.(p)
     if (isOwner(scope.speaker)) return Math.max(this.opts.priority, PRIORITY.behavior + 5)
     if (isOwner(scope.player)) {
-      const bot = (() => { try { return (this.agent as any).bot } catch { return null } })()
-      if (bot && !inDanger(bot)) return Math.max(this.opts.priority, PRIORITY.behavior + 5)
+      if (inSessionAndSafe(this.agent)) return Math.max(this.opts.priority, PRIORITY.behavior + 5)
     }
     return this.opts.priority
   }
@@ -267,11 +266,17 @@ export function cleanSchema (schema: Record<string, unknown>): Record<string, un
   return rest
 }
 
-/** Low health or food, night (or a thunderstorm), or a hostile mob within 12 blocks. */
-export function inDanger (bot: any): boolean {
-  if (!bot?.entity) return false
-  if (bot.health <= 6 || bot.food <= 6) return true
-  const t = bot.time?.timeOfDay ?? 0
-  if ((bot.thunderState ?? 0) > 0 || (t >= 12_542 && t <= 23_459)) return true
-  return Object.values(bot.entities ?? {}).some((e: any) => e?.type === 'hostile' && e.position?.distanceTo(bot.entity.position) < 12)
+/** The parts of an agent the danger checks read (a fake ToolAgent has neither: never safe, never in danger). */
+type SessionView = { inSession?: boolean, adapter?: { inDanger? (): boolean } }
+
+/** In a session and not in danger (low health or food, night, hostiles close: the adapter's judgement). */
+export function inSessionAndSafe (agent: object): boolean {
+  const a = agent as SessionView
+  return !!a.inSession && !a.adapter?.inDanger?.()
+}
+
+/** In a session and in danger. */
+export function inSessionAndDanger (agent: object): boolean {
+  const a = agent as SessionView
+  return !!a.inSession && !!a.adapter?.inDanger?.()
 }

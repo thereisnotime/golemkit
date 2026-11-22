@@ -1,8 +1,7 @@
 // The Agent is one bot identity. It outlives connections: it reconnects, re-runs skill and
 // brain setup on every session, owns the action lock, chat queue and persistent storage.
+// The game itself is behind a GameAdapter (core/adapter.ts); Minecraft Java is the default.
 import { join } from 'node:path'
-import mineflayer, { type Bot } from 'mineflayer'
-import pf from 'mineflayer-pathfinder'
 import { z } from 'zod'
 import {
   PRIORITY, normalizeResult, fail, ActionAbortedError,
@@ -14,20 +13,17 @@ import { listFromEnv, type BotDefinition, type InstanceOptions, type ServerConfi
 import { TypedEmitter } from './events.ts'
 import { createLogger, type Logger } from './log.ts'
 import { Storage } from './storage.ts'
-import { ChannelStore } from './neoforge/channelStore.ts'
-import { attachNeoForge } from './neoforge/handshake.ts'
-import { installTolerantParser } from './neoforge/tolerantParser.ts'
-import { solidifyUnknownBlocks } from './modded.ts'
-import { RegistryCache, applyModdedRegistries, type RegistrySnapshot } from './neoforge/registries.ts'
-import { fmtPos, itemName, gameModeNote } from './helpers.ts'
+import { fmtPos } from './format.ts'
 import type { Fleet } from './fleet.ts'
-import { ProtectedAreas, watchRefusedDigs } from './protection.ts'
+import { ProtectedAreas } from './protection.ts'
 import { resolveRetry, actionAttempts, backoffMs, isRetryableResult, type RetryConfig } from './retry.ts'
 import { TOGGLES, findToggle, parseToggleValue, getPath, expandPaths, deepMerge, type ToggleDef } from './toggles.ts'
-import { resolveHumanize, typingDelayMs, styleLine, holdStill, between, type HumanizeOptions } from './humanize.ts'
+import { resolveHumanize, typingDelayMs, styleLine, between, type HumanizeOptions } from './humanize.ts'
 import type { UsageSnapshot } from '../llm/usage.ts'
 import { Journal } from './journal/journal.ts'
-import { JournalCapture } from './journal/capture.ts'
+import type { GameAdapter, GameClient, AdapterEvents } from './adapter.ts'
+// The default game until profiles pick one (game-adapters phase 4).
+import { minecraftJava } from '../adapters/minecraft-java/adapter.ts'
 
 export interface ChatMessage {
   from: string
@@ -51,7 +47,7 @@ export interface ActionInfo {
 
 export type AgentEvents = {
   /** New session, bot spawned and skills/brains set up. */
-  session: (bot: Bot) => void
+  session: (bot: GameClient) => void
   sessionEnd: (reason: string) => void
   chat: (msg: ChatMessage) => void
   /** Any server/system message that isn't player chat. */
@@ -121,15 +117,15 @@ export class Agent extends TypedEmitter<AgentEvents> {
   private readonly brains: BrainDef[]
   /** Retry policies (actions, LLM, reconnect) from env + settings.retry. */
   retry!: RetryConfig
-  private readonly channels: ChannelStore
-  private readonly registryCache: RegistryCache
   /** Areas where the server refuses block breaking (learned); the pathfinder won't dig there. */
   readonly protectedAreas: ProtectedAreas
   /** Event journal (data/bots/<username>/journal/), see docs/guide/journal.md. */
   readonly journal: Journal
-  private readonly journalCapture: JournalCapture
+  /** The game behind this agent (Minecraft Java unless InstanceOptions.adapter says otherwise). */
+  readonly adapter: GameAdapter
 
-  private _bot: Bot | null = null
+  /** Bumped on every session, so delayed work can tell its session is gone. */
+  private sessionId = 0
   private _fleet: Fleet | null = null
   private _serverName = 'default'
   private sessionController: AbortController | null = null
@@ -163,13 +159,12 @@ export class Agent extends TypedEmitter<AgentEvents> {
     this.baseCanDig = opts.canDig ?? definition.canDig ?? process.env.MC_CAN_DIG === 'true'
     this.reconnectBaseOverride = opts.reconnectDelayMs
     this.recomputeSettings()
-    this.channels = new ChannelStore(join('data', `channels-${server.host}-${server.port}.json`))
-    this.registryCache = new RegistryCache(join('data', `registries-${server.host}-${server.port}.json`))
     this.protectedAreas = new ProtectedAreas(join('data', `protected-${server.host}-${server.port}.json`))
     this.skills = definition.skills
     this.brains = definition.brains
     this.journal = new Journal({ dir: join(this.dataDir, 'journal'), settings: this.settings, log: this.log.child('journal'), bot: this.username })
-    this.journalCapture = new JournalCapture(this, this.journal)
+    this.adapter = (opts.adapter ?? definition.adapter ?? minecraftJava)()
+    this.adapter.attach(this)
 
     for (const skill of this.skills) {
       for (const action of skill.actions ?? []) this.registerAction(action)
@@ -266,21 +261,9 @@ export class Agent extends TypedEmitter<AgentEvents> {
     return keys.length
   }
 
-  /**
-   * Pathfinder planning budget. The library default (5 s) fails with "Took to long to decide
-   * path" on a loaded machine, where each 40 ms think slice gets fewer ticks; 10 s by default,
-   * `pathfinder.thinkTimeoutMs` in settings or live via config_set.
-   */
-  private applyPathfinderSettings (bot: any): void {
-    const ms = Number(getPath(this.settings, 'pathfinder.thinkTimeoutMs'))
-    bot.pathfinder.thinkTimeout = Number.isFinite(ms) && ms >= 1000 ? ms : 10_000
-  }
-
   private applyToggles (key: string): void {
     this.recomputeSettings()
-    const bot = this._bot as any
-    if (bot?.pathfinder?.movements && (key === 'canDig' || key === '*')) bot.pathfinder.movements.canDig = this.canDig
-    if (bot?.pathfinder && (key.startsWith('pathfinder') || key === '*')) this.applyPathfinderSettings(bot)
+    this.adapter.settingsChanged?.(key)
     this.log.info(`setting changed: ${key}`, { overrides: this.overrides() })
     this.emit('settingsChanged', key)
   }
@@ -346,7 +329,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
     if (!def) return fail(`unknown action "${name}"`)
     const parsed = def.params.safeParse(params ?? {})
     if (!parsed.success) return fail(`bad parameters for ${def.name}: ${z.prettifyError(parsed.error).replace(/\n/g, '; ')}`)
-    if (!this._bot || !this.sessionController) return fail('not connected')
+    if (!this.adapter.client || !this.sessionController) return fail('not connected')
 
     const caller = opts.caller ?? { kind: 'system', name: 'system' }
     const priority = opts.priority ?? defaultPriority(caller)
@@ -385,7 +368,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
     this.suspended = []
     this.current?.controller.abort(reason)
     this.current = null
-    this._bot?.pathfinder?.setGoal(null)
+    this.adapter.stopMotion?.()
   }
 
   /**
@@ -403,7 +386,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
       n++
       cur.controller.abort(reason)
       this.current = null
-      this._bot?.pathfinder?.setGoal(null)
+      this.adapter.stopMotion?.()
       this.resumeSuspended()
     }
     return n
@@ -422,14 +405,14 @@ export class Agent extends TypedEmitter<AgentEvents> {
       this.logs.action.info(`retrying ${run.def.name} in ${Math.round(wait / 100) / 10}s`, { attempt: attempt + 1, of: extra, after: result.message })
       await delay(wait)
       const exclusive = run.def.exclusive !== false
-      if (run.controller.signal.aborted || (exclusive && this.current !== run) || !this._bot) break
+      if (run.controller.signal.aborted || (exclusive && this.current !== run) || !this.sessionController) break
       result = await this.execute(run)
     }
     return result
   }
 
   private async execute (run: Running): Promise<ActionResult> {
-    const bot = this._bot!
+    const bot = this.adapter.client as GameClient
     const session = this.sessionController!
     const onSessionEnd = () => run.controller.abort('session ended')
     session.signal.addEventListener('abort', onSessionEnd, { once: true })
@@ -465,7 +448,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
 
   private resumeSuspended (): void {
     const next = this.suspended.pop()
-    if (!next || !this._bot) return
+    if (!next || !this.sessionController) return
     this.logs.action.debug(`resuming ${next.def.name}`, { caller: `${next.caller.kind}:${next.caller.name}` })
     void this.act(next.def.name, next.params, { caller: next.caller, priority: next.priority, player: next.player })
   }
@@ -499,8 +482,8 @@ export class Agent extends TypedEmitter<AgentEvents> {
       this.logs.chat.warn('refused command', { command: line.slice(0, 80) })
       return Promise.resolve(false)
     }
-    if (!this._bot || this.chatQueue.length >= CHAT_QUEUE_MAX) {
-      this.logs.chat.warn(this._bot ? 'chat queue full, dropping command' : 'not connected, dropping command', { command: line })
+    if (!this.sessionController || this.chatQueue.length >= CHAT_QUEUE_MAX) {
+      this.logs.chat.warn(this.sessionController ? 'chat queue full, dropping command' : 'not connected, dropping command', { command: line })
       return Promise.resolve(false)
     }
     return new Promise(resolve => this.chatQueue.push({ msg: line, command: resolve }))
@@ -514,14 +497,13 @@ export class Agent extends TypedEmitter<AgentEvents> {
   }
 
   private pumpChat (): void {
-    const bot = this._bot
-    if (!bot || this.chatSending || !this.chatQueue.length || Date.now() - this.lastChat < CHAT_INTERVAL_MS) return
+    if (!this.sessionController || this.chatSending || !this.chatQueue.length || Date.now() - this.lastChat < CHAT_INTERVAL_MS) return
     const item = this.chatQueue.shift()!
     if (item.command) {
       this.lastChat = Date.now()
       let sent = true
       try {
-        bot.chat(item.msg)
+        void this.adapter.command(item.msg)
         this.logs.chat.info(`command ${item.msg}`)
       } catch (e) {
         sent = false
@@ -530,27 +512,27 @@ export class Agent extends TypedEmitter<AgentEvents> {
       item.command(sent)
       return
     }
-    if (!this.humanize) return this.sendChat(bot, item.to, item.msg)
+    if (!this.humanize) return this.sendChat(item.to, item.msg)
     // Humanize: react, maybe turn to the person and stand still, "type", then send.
     const h = this.humanize
+    const session = this.sessionId
     this.chatSending = true
     const styled = styleLine(item.msg, h)
     const delay = typingDelayMs(styled.text, h, { reaction: Date.now() - this.lastChat > 4000 })
-    const target = h.lookAtSpeaker && item.face ? bot.players[item.face]?.entity : undefined
-    const face = target ? target.position.offset(0, target.height ?? 1.6, 0) : undefined
-    const wait = h.pauseWhileTyping ? holdStill(bot, delay, face) : new Promise(r => setTimeout(r, delay))
+    const wait = h.pauseWhileTyping && this.adapter.holdStill
+      ? this.adapter.holdStill(delay, h.lookAtSpeaker && item.face ? item.face : undefined)
+      : new Promise(r => setTimeout(r, delay))
     void wait.then(() => {
-      if (this._bot !== bot) return
-      this.sendChat(bot, item.to, styled.text)
+      if (this.sessionId !== session || !this.sessionController) return
+      this.sendChat(item.to, styled.text)
       if (styled.correction) this.chatQueue.unshift({ to: item.to, msg: styled.correction })
     }).finally(() => { this.chatSending = false })
   }
 
-  private sendChat (bot: Bot, to: string | undefined, msg: string): void {
+  private sendChat (to: string | undefined, msg: string): void {
     this.lastChat = Date.now()
     try {
-      if (to) bot.whisper(to, msg)
-      else bot.chat(msg)
+      void this.adapter.chat(msg, to)
       this.logs.chat.info(to ? `-> ${to}: ${msg}` : `> ${msg}`)
       this.emit('chatOut', { ...(to ? { to } : {}), message: msg })
     } catch (e) {
@@ -569,9 +551,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
     }
     this.emit('protectedArea', pos)
     this.log.info('server refuses block breaking here, not digging in this area anymore', { at: fmtPos(pos) })
-    const bot = this._bot
-    const goal = bot?.pathfinder?.goal
-    if (bot && goal) bot.pathfinder.setMovements(bot.pathfinder.movements) // forces a re-plan with the new exclusion
+    this.adapter.replan?.()
   }
 
   isOwner (player: string): boolean {
@@ -580,51 +560,42 @@ export class Agent extends TypedEmitter<AgentEvents> {
 
   // ---------------------------------------------------------------- world
 
-  get bot (): Bot {
-    if (!this._bot) throw new Error('not connected')
-    return this._bot
+  /** The game client for game-specific code (Minecraft Java: the Mineflayer bot). Throws when not in the world. */
+  get bot (): GameClient {
+    const client = this.adapter.client
+    if (!client || !this.sessionController) throw new Error('not connected')
+    return client as GameClient
+  }
+
+  /** Between spawn and the end of the session (the game client exists; `connected` also wants the bot's entity). */
+  get inSession (): boolean {
+    return !!this.sessionController && !!this.adapter.client
   }
 
   get connected (): boolean {
-    return !!this._bot?.entity
+    return !!this.sessionController && this.adapter.connected
   }
 
   /** JSON-friendly snapshot of the bot and its surroundings. */
   observe (): Record<string, unknown> {
-    const bot = this._bot
-    if (!bot?.entity) return { connected: false }
-    const pos = bot.entity.position
-    const near = Object.values(bot.entities)
-      .filter(e => e !== bot.entity && e.position.distanceTo(pos) < 24)
-      .sort((a, b) => a.position.distanceTo(pos) - b.position.distanceTo(pos))
-      .slice(0, 12)
-      .map(e => ({
-        name: e.type === 'player' ? e.username : (e.name ?? 'unknown'),
-        type: e.type,
-        distance: Math.round(e.position.distanceTo(pos)),
-        position: fmtPos(e.position)
-      }))
-    const inventory: Record<string, number> = {}
-    for (const i of bot.inventory.items()) inventory[itemName(i)] = (inventory[itemName(i)] ?? 0) + i.count
+    const o = this.sessionController ? this.adapter.observe() : null
+    if (!o) return { connected: false }
     const snapshot: Record<string, unknown> = {
-      username: bot.username,
+      username: o.self.username,
       ...(this.settings.selfAware === false ? {} : { self: this.selfSummary() }),
-      position: fmtPos(pos),
-      dimension: bot.game.dimension,
-      // World spawn (compass target); context packs use it for "don't dig near spawn" rules.
-      spawnPoint: bot.spawnPoint ? fmtPos(bot.spawnPoint) : null,
-      gameMode: bot.game.gameMode,
-      gameModeNote: gameModeNote(bot.game.gameMode),
-      health: Math.round(bot.health),
-      food: bot.food,
-      timeOfDay: bot.time.timeOfDay,
-      isDay: bot.time.timeOfDay < 13000 || bot.time.timeOfDay > 23000,
-      heldItem: bot.heldItem ? itemName(bot.heldItem) : null,
+      position: fmtPos(o.self.position),
+      ...o.self.game,
+      health: o.self.health === null ? null : Math.round(o.self.health),
+      food: o.self.food,
+      timeOfDay: o.time.timeOfDay,
+      isDay: o.time.isDay,
+      heldItem: o.self.heldItem,
       currentAction: this.currentAction ? { name: this.currentAction.name, params: this.currentAction.params } : null,
-      players: Object.keys(bot.players).filter(p => p !== bot.username),
-      nearby: near,
-      inventory
+      players: o.players,
+      nearby: o.nearby.map(e => ({ name: e.name, type: e.type, distance: Math.round(e.distance), position: fmtPos(e.position) })),
+      inventory: o.inventory
     }
+    const bot = this.adapter.client as GameClient
     for (const part of [...this.skills, ...this.brains]) {
       if (!part.observe) continue
       try {
@@ -640,7 +611,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
 
   /** Connects and keeps reconnecting until stop(). Resolves when stopped. */
   async start (): Promise<void> {
-    installTolerantParser((id, e) => this.logs.neoforge.trace(`skipped unparseable packet ${id}`, { error: e.message.slice(0, 160) }))
+    this.adapter.start?.()
     for (const brain of this.brains) await brain.start?.(this)
     this.log.info(`starting: ${this.skills.length} skills, ${this.actions.size} actions, brains: ${this.brains.map(b => b.name).join(', ') || 'none'}`)
     let learnRounds = 0
@@ -669,7 +640,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
     for (const brain of this.brains) {
       try { await brain.stop?.(this) } catch (e) { this.log.warn(`brain ${brain.name} stop: ${(e as Error).message}`) }
     }
-    this._bot?.quit()
+    void this.adapter.disconnect('stopped').catch(() => {})
     this.storage.flush()
     this.journal.stop()
     this.emit('stopped')
@@ -679,19 +650,13 @@ export class Agent extends TypedEmitter<AgentEvents> {
     return new Promise(resolve => {
       const session = new AbortController()
       const cleanups: (() => void)[] = []
+      const subs: [keyof AdapterEvents, (...a: any[]) => void][] = []
+      const on = <E extends keyof AdapterEvents>(event: E, fn: AdapterEvents[E]) => {
+        this.adapter.on(event, fn)
+        subs.push([event, fn as (...a: any[]) => void])
+      }
       let finished = false
-
-      this.log.info(`connecting to ${this.server.host}:${this.server.port} (${this.server.auth}), ${this.channels.size} known NeoForge channels`)
-      const bot = mineflayer.createBot({
-        host: this.server.host,
-        port: this.server.port,
-        username: this.username,
-        auth: this.server.auth,
-        version: this.server.version,
-        profilesFolder: '.auth',
-        checkTimeoutInterval: 60_000,
-        hideErrors: true
-      })
+      const adapter = this.adapter
 
       const finish = (reason: 'learned' | 'ended', detail?: string) => {
         if (finished) return
@@ -702,81 +667,28 @@ export class Agent extends TypedEmitter<AgentEvents> {
         for (const q of this.chatQueue) q.command?.(false)
         this.chatQueue = []
         for (const c of cleanups.reverse()) { try { c() } catch {} }
-        try { bot.quit() } catch {}
-        this._bot = null
+        for (const [event, fn] of subs) adapter.off(event, fn as any)
+        adapter.endSession()
         this.sessionController = null
         this.emit('sessionEnd', detail ?? reason)
         resolve({ reason, detail })
       }
 
-      attachNeoForge(bot._client, this.channels, m => this.logs.neoforge.debug(m))
-      bot._client.on('neoforge_failed' as any, (failures: Record<string, unknown>) => {
-        const { changed, unknown } = this.channels.learn(failures)
-        this.channels.save()
-        for (const u of unknown.slice(0, 10)) this.logs.neoforge.warn(`unhandled negotiation failure: ${u}`)
-        this.logs.neoforge.info(`server rejected our channel list, ${changed ? 'learned from it' : 'nothing new learned'}`, { issues: Object.keys(failures).length, known: this.channels.size })
-        finish(changed ? 'learned' : 'ended', changed ? undefined : 'negotiation failed and nothing new to learn')
-      })
-
-      bot.loadPlugin(pf.pathfinder)
-      const loaded = new Set<unknown>()
-      for (const skill of this.skills) {
-        for (const plugin of skill.plugins ?? []) {
-          if (!loaded.has(plugin)) { loaded.add(plugin); bot.loadPlugin(plugin) }
-        }
-      }
-
-      bot._client.on('neoforge_registry' as any, (snap: RegistrySnapshot) => this.registryCache.add(snap))
-      bot._client.on('neoforge_registries_done' as any, () => this.registryCache.save())
-
-      bot.once('login', () => {
-        solidifyUnknownBlocks(bot.registry)
-        // Modded item and entity names from the server's registry sync (or the cached copy).
-        const hostile = [
-          ...((this.settings.moddedHostile as string[] | undefined) ?? []),
-          ...listFromEnv(process.env.MC_MODDED_HOSTILE)
-        ]
-        const r = applyModdedRegistries(bot.registry, this.registryCache, { hostile })
-        if (r.items || r.entities) this.logs.neoforge.debug('modded registries applied', { items: r.items, entities: r.entities })
-        if (r.mismatches.length) this.logs.neoforge.warn(`server ids differ from vanilla data for ${r.mismatches.length} entries, names may be wrong`, { first: r.mismatches.slice(0, 3) })
-      })
-
-      bot.once('spawn', () => {
-        this._bot = bot
+      on('spawn', () => {
+        this.sessionId++
         this.sessionController = session
-        this.log.info(`spawned at ${fmtPos(bot.entity.position)} (${bot.game.dimension}, ${bot.game.gameMode})`)
-        const moves = new pf.Movements(bot)
-        moves.canDig = this.canDig
-        moves.allow1by1towers = false
-        moves.allowSprinting = true // explicit: travel sprints
-        moves.allowParkour = true
-        // Never plan long drops into water (the default allows any height): Pax died falling 32 blocks
-        // into a ravine pool. Normal max drop (4) still applies.
-        ;(moves as { infiniteLiquidDropdownDistance?: boolean }).infiniteLiquidDropdownDistance = false
-        moves.exclusionAreasBreak.push(this.protectedAreas.breakCost)
-        bot.pathfinder.setMovements(moves)
-        this.applyPathfinderSettings(bot)
-        cleanups.push(watchRefusedDigs(bot, (pos) => this.markProtected(pos)))
-        try { cleanups.push(this.journalCapture.session(bot)) } catch (e) { this.log.warn(`journal: ${(e as Error).message}`) }
-
-        let lastMode = bot.game.gameMode
-        const onGame = () => {
-          if (bot.game.gameMode === lastMode) return
-          const previous = lastMode
-          lastMode = bot.game.gameMode
-          this.log.info(`game mode changed: ${previous} -> ${lastMode}`)
-          this.emit('gameModeChanged', lastMode, previous)
+        const bot = adapter.client as GameClient
+        const onGame = (mode: string, previous: string) => {
+          this.log.info(`game mode changed: ${previous} -> ${mode}`)
+          this.emit('gameModeChanged', mode, previous)
         }
-        bot.on('game', onGame)
-        cleanups.push(() => bot.off('game', onGame))
+        on('gameMode', onGame)
         const chatTimer = setInterval(() => this.pumpChat(), 100)
         cleanups.push(() => clearInterval(chatTimer))
-        if (this.humanize?.idleFidget) {
+        if (this.humanize?.idleFidget && adapter.fidget) {
           const fidget = setInterval(() => {
-            if (this.current || this.chatSending || bot.pathfinder?.isMoving?.() || Math.random() > 0.35) return
-            const near = bot.nearestEntity(e => e.type === 'player' && e.position.distanceTo(bot.entity.position) < 10)
-            if (near && Math.random() < 0.6) void bot.lookAt(near.position.offset(0, near.height ?? 1.6, 0)).catch(() => {})
-            else void bot.look(bot.entity.yaw + (Math.random() - 0.5) * 1.6, bot.nearestEntity(e => e.name === 'enderman' && e.position.distanceTo(bot.entity.position) < 48) ? -0.7 : (Math.random() - 0.5) * 0.6) // never a random glance at an enderman.catch(() => {})
+            if (this.current || this.chatSending || adapter.isMoving?.() || Math.random() > 0.35) return
+            adapter.fidget?.()
           }, 6000)
           cleanups.push(() => clearInterval(fidget))
         }
@@ -801,29 +713,26 @@ export class Agent extends TypedEmitter<AgentEvents> {
         this.emit('session', bot)
       })
 
-      bot.on('chat', (username, message) => {
-        if (username === bot.username) return
-        this.logs.chat.info(`<${username}> ${message}`)
-        this.emit('chat', { from: username, message, whisper: false })
+      on('chat', (from, message, whisper) => {
+        this.logs.chat.info(whisper ? `<${from} whispers> ${message}` : `<${from}> ${message}`)
+        this.emit('chat', { from, message, whisper })
       })
-      bot.on('whisper', (username, message) => {
-        if (username === bot.username) return
-        this.logs.chat.info(`<${username} whispers> ${message}`)
-        this.emit('chat', { from: username, message, whisper: true })
-      })
-      bot.on('messagestr', (msg, position) => {
-        if (position === 'chat') return
+      on('serverMessage', (msg, position) => {
         this.logs.server.debug(msg, { position })
         this.emit('serverMessage', msg)
       })
-      bot.on('death', () => {
-        const p = bot.entity?.position
+      on('death', () => {
+        const p = adapter.self()?.position
         this.log.info('died', p ? { at: fmtPos(p) } : undefined)
         this.stopActions('died')
       })
-      bot.on('kicked', (reason) => this.log.warn(`kicked: ${typeof reason === 'string' ? reason : JSON.stringify(reason)}`))
-      bot.on('error', (e) => this.log.warn(`error: ${e.message}`))
-      bot.on('end', (why) => finish('ended', why))
+      on('kicked', (reason) => this.log.warn(`kicked: ${reason}`))
+      on('error', (e) => this.log.warn(`error: ${e.message}`))
+      on('end', (reason, detail) => finish(reason, detail))
+      void adapter.connect({ username: this.username }).catch(e => {
+        this.log.warn(`connect failed: ${(e as Error).message}`)
+        finish('ended', (e as Error).message)
+      })
     })
   }
 }

@@ -7,7 +7,7 @@
 // crafting an axe or replanting, so nothing is placed), find iron (find_target), bring planks
 // (bring_item spruce_planks to the tester) and go home. Each step's ok/fail and message is
 // printed and appended to data/smoke/results.jsonl; "same results" means the same ok/fail per
-// step. Both players get Resistance V for the run (a dark forest spawns mobs and the bot has no
+// step (bring_planks: the tester ends up with the 4 planks). Both players get Resistance V for the run (a dark forest spawns mobs and the bot has no
 // reflexes here) and respawn at the spot; natural hostiles within 48 are removed before and after.
 // At the end both inventories and effects are cleared, the spawn points go back to the world
 // spawn and dropped items near the spot are removed.
@@ -188,11 +188,12 @@ async function main (): Promise<void> {
     let bringing = true
     const pick = (async () => { while (bringing) { await act(tester, 'pickup_items', { radius: 6 }, sys); await pause(1000) } })()
     const bring = await act(bot, 'bring_item', { item: 'spruce_planks', count: 4, player: TESTER })
+    // the bot reports as soon as it tossed them; give the tester up to 10 s to pick them up
+    for (let i = 0; i < 10 && count(tester, /_planks$/) - before < 4; i++) await pause(1000)
     bringing = false
     await pick
-    await pause(5000)
     const got = count(tester, /_planks$/) - before
-    record({ step: 'bring_planks', ok: bring.r.ok, message: bring.r.message, seconds: bring.s, extra: { testerGot: got } })
+    record({ step: 'bring_planks', ok: got >= 4, message: bring.r.message, seconds: bring.s, extra: { testerGot: got } })
 
     // go home, from 12 blocks off
     await act(bot, 'goto', { x: spot.x - 10, y: spot.y, z: spot.z - 6 }, sys)

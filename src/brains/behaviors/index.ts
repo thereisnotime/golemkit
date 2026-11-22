@@ -7,4 +7,4 @@ export { ArmedStore, STORAGE_KEY, type ArmedEntry, type ArmedRecord } from './ar
 export { BehaviorRuntime, canPlace, missingCapability } from './runtime.ts'
 export { validateBehaviorConfig, mergeConfigs, normalizeEntry, BehaviorConfigError, type BehaviorConfig, type BehaviorConfigEntry } from './config.ts'
 export { behaviorActions, runtimeFor, changeDenied, describeOptions, fmtOptions } from './actions.ts'
-export * from './library/index.ts'
+export * from '../../adapters/minecraft-java/behaviors/index.ts'

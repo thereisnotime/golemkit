@@ -5,7 +5,7 @@ import {
   gearScore, gearNeeded, hideMs, stillHiding, leaveCover, coverHoldMs, cappedRetreat, planWall,
   type RangedState, type ShooterView
 } from '../src/skills/ranged-plan.ts'
-import { rangedDanger } from '../src/brains/behaviors/library/safety.ts'
+import { rangedDanger } from '../src/adapters/minecraft-java/behaviors/safety.ts'
 import { creeperMove } from '../src/skills/tactics.ts'
 import { threatReason, rankGuardThreats, etaToPlayer, interceptPoint, pullPlan, type GuardThreat } from '../src/skills/guard-plan.ts'
 

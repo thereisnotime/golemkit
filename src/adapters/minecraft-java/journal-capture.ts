@@ -1,38 +1,17 @@
 // Feeds the journal from agent events (actions, chat, LLM usage, protected areas) and from
 // each session's mineflayer bot (deaths, damage, inventory, blocks, players, places). Created
-// by the Agent, so every bot records regardless of its brains.
+// by the adapter when it attaches to an agent, so every bot records regardless of its brains.
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
-import type { Agent, ActionInfo } from '../agent.ts'
-import type { ActionResult } from '../action.ts'
-import { itemName } from '../helpers.ts'
-import type { Journal } from './journal.ts'
-import type { Pos } from './types.ts'
-import { InventoryTracker, DamageAggregator, BlockAggregator, type Counts } from './aggregate.ts'
-import { parseDeathMessage, parseAdvancement, type DeathInfo } from './deathMessages.ts'
+import type { Agent, ActionInfo } from '../../core/agent.ts'
+import type { ActionResult } from '../../core/action.ts'
+import { itemName } from './helpers.ts'
+import type { Journal } from '../../core/journal/journal.ts'
+import type { Pos } from '../../core/journal/types.ts'
+import { InventoryTracker, DamageAggregator, BlockAggregator, type Counts } from '../../core/journal/aggregate.ts'
+import { parseDeathMessage, parseAdvancement, type DeathInfo } from '../../core/journal/deathMessages.ts'
 
-const SECRET_CMD = /^\/(login|log|l|register|reg|changepassword|changepass|cp)\b.*/i
-const cut = (s: unknown, n: number) => { const t = String(s ?? ''); return t.length > n ? t.slice(0, n - 1) + '…' : t }
-
-/** Slash commands that carry passwords keep only the command name. */
-export function maskChat (msg: string): string {
-  return SECRET_CMD.test(msg) ? msg.replace(SECRET_CMD, (_m, c) => `/${c} ***`) : msg
-}
-
-/** Text of a kick/disconnect reason (string or chat component JSON). */
-export function reasonText (r: unknown): string {
-  if (typeof r === 'string') {
-    try { return reasonText(JSON.parse(r)) } catch { return r }
-  }
-  if (r && typeof r === 'object') {
-    const o = r as Record<string, any>
-    const own = typeof o.text === 'string' ? o.text : typeof o.translate === 'string' ? o.translate : ''
-    const extra = Array.isArray(o.extra) ? o.extra.map(reasonText).join('') : ''
-    const value = o.value !== undefined && typeof o.value !== 'object' ? String(o.value) : ''
-    return (own + extra || value || JSON.stringify(r)).trim()
-  }
-  return String(r ?? '')
-}
+import { maskChat, reasonText, cut } from '../../core/journal/text.ts'
 
 export function inventoryCounts (bot: Bot): Counts {
   const c: Counts = {}

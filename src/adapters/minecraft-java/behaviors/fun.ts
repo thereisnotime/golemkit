@@ -7,7 +7,7 @@
 // each antic lasts a few seconds at most.
 import type { Bot } from 'mineflayer'
 import { z } from '../../../core/index.ts'
-import { defineBehavior } from '../types.ts'
+import { defineBehavior } from '../../../brains/behaviors/types.ts'
 
 const ANTICS = ['spin', 'crouch_dance', 'sky_stare', 'bob', 'victory_hop', 'head_shake', 'moonwalk', 'stare_contest'] as const
 type Antic = typeof ANTICS[number]

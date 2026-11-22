@@ -1,10 +1,11 @@
 // The blackboard: needs and facts the NPC brain refreshes every tick, plus a small memory
 // (in-process scratch and persisted keys in agent.storage). Behaviours score from it
 // instead of each poking the bot.
-import type { Bot } from 'mineflayer'
-import type { Agent } from '../../core/index.ts'
-import { isHostile } from '../../core/index.ts'
-import { getHome, sameDimension, type Place } from '../../skills/navigation.ts'
+import type { Agent, GameAdapter } from '../../core/index.ts'
+import { getHome, type Place } from '../../skills/navigation.ts'
+
+/** What the blackboard reads from the game (an agent's adapter). */
+export type NpcWorldView = Pick<GameAdapter, 'self' | 'entities' | 'inventory' | 'time'>
 
 export interface Needs {
   /** 0 full .. 1 starving (from bot.food). */
@@ -87,29 +88,29 @@ export class Blackboard {
     this.agent.storage.set(`npc.${key}`, value)
   }
 
-  /** Refreshes needs and facts from the bot. Tolerates a partially loaded bot. */
-  update (bot: Bot): void {
-    const pos = bot.entity?.position
-    const food = typeof bot.food === 'number' ? bot.food : 20
-    const health = typeof bot.health === 'number' ? bot.health : 20
-    const timeOfDay = bot.time?.timeOfDay ?? 0
-    const storm = (bot as any).thunderState > 0
-    const isNight = storm || (timeOfDay >= 12542 && timeOfDay <= 23459)
+  /** Refreshes needs and facts from the game. Tolerates a partially loaded bot. */
+  update (view: NpcWorldView): void {
+    const self = view.self()
+    const pos = self?.position
+    const food = typeof self?.food === 'number' ? self.food : 20
+    const health = typeof self?.health === 'number' ? self.health : 20
+    const time = view.time?.()
+    const timeOfDay = time?.timeOfDay ?? 0
+    const isNight = time ? time.isNight : false
 
     const home = getHome(this.agent) ?? null
-    const homeDistance = home && pos && sameDimension(bot, home)
+    const homeDistance = home && pos && (!home.dimension || home.dimension === self?.game.dimension)
       ? Math.hypot(pos.x - home.x, pos.y - home.y, pos.z - home.z)
       : null
 
     let nearestHostile: Facts['nearestHostile'] = null
     let nearestPlayer: Facts['nearestPlayer'] = null
     if (pos) {
-      for (const e of Object.values(bot.entities ?? {})) {
-        if (e === bot.entity || !e.position) continue
-        const d = e.position.distanceTo(pos)
-        if (isHostile(e) && !this.opts.ignoreMobs.includes(e.name ?? '') && d <= this.opts.dangerRadius) {
-          if (!nearestHostile || d < nearestHostile.distance) nearestHostile = { id: e.id, name: e.name ?? 'mob', distance: d }
-        } else if (e.type === 'player' && e.username && e.username !== bot.username && d <= this.opts.playerRadius) {
+      for (const e of view.entities?.() ?? []) {
+        const d = e.distance
+        if (e.hostile && !this.opts.ignoreMobs.includes(e.name) && d <= this.opts.dangerRadius) {
+          if (!nearestHostile || d < nearestHostile.distance) nearestHostile = { id: e.id, name: e.name || 'mob', distance: d }
+        } else if (e.type === 'player' && e.username && e.username !== self?.username && d <= this.opts.playerRadius) {
           if (!nearestPlayer || d < nearestPlayer.distance) nearestPlayer = { name: e.username, distance: d }
         }
       }
@@ -118,10 +119,10 @@ export class Blackboard {
     let used = 0
     let slots = 36
     try {
-      const inv = bot.inventory
+      const inv = view.inventory?.()
       if (inv) {
-        slots = inv.inventoryEnd - inv.inventoryStart || 36
-        used = inv.items().length
+        slots = inv.slots
+        used = inv.items.length
       }
     } catch {}
 
@@ -138,7 +139,7 @@ export class Blackboard {
     this.facts = {
       timeOfDay,
       isNight,
-      sleeping: !!bot.isSleeping,
+      sleeping: !!self?.sleeping,
       home,
       homeDistance,
       nearestHostile,

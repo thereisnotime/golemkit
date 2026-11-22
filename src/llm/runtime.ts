@@ -9,7 +9,7 @@ import { backoffMs, isTransientLlmError } from '../core/retry.ts'
 import { buildSystemPrompt, buildUserMessage, chatTrigger, type ChatTriggerOptions, type PromptContext, type Trigger } from './prompt.ts'
 import { PRIORITY } from '../core/index.ts'
 import type { ProxyMetrics } from './proxyMetrics.ts'
-import { BotTools, LLM_CALLER, inDanger, type BotToolsOptions, type ToolAgent } from './tools.ts'
+import { BotTools, LLM_CALLER, inSessionAndDanger, type BotToolsOptions, type ToolAgent } from './tools.ts'
 import type { LlmProvider, ToolCallRecord, TurnResult } from './types.ts'
 import { PriceTable, type Price } from './pricing.ts'
 import { UsageTracker, fmtTurn, fmtCost, fmtSummary, turnUsage, type TurnUsage, type UsageSnapshot } from './usage.ts'
@@ -145,9 +145,11 @@ export class LlmRuntime {
     this.prices = new PriceTable(opts.prices)
     this.budget = new Budget(opts.limits, { today: () => this.usage.today })
     this.goals = new GoalStore(agent.storage, opts.goals)
-    // Unknown while disconnected (agent.bot throws then): assume online so nothing auto-resumes.
+    // Unknown while disconnected: assume online so nothing auto-resumes.
     this.goals.isOnline = name => {
-      try { const ps = (agent as any).bot?.players; return !ps || name in ps } catch { return true }
+      const a = agent as { inSession?: boolean, adapter?: { players? (): string[] } }
+      const ps = a.inSession ? a.adapter?.players?.() : undefined
+      return !ps || ps.includes(name)
     }
     registerGoalTools(this.tools, this.goals, what => this.log.info(`goal ${what}`, { goal: this.goals.active?.text }))
     const l = opts.limits ?? {}
@@ -451,8 +453,7 @@ export class LlmRuntime {
     if (!cur) return false
     if (cur.caller.kind !== 'brain' || cur.caller.name === LLM_CALLER.name) return true
     if (cur.priority > PRIORITY.behavior) return true
-    const bot = (() => { try { return (this.agent as any).bot } catch { return null } })()
-    return !!bot && inDanger(bot)
+    return inSessionAndDanger(this.agent)
   }
 
   private quotaTimer: NodeJS.Timeout | null = null

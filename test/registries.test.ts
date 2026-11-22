@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
-import { Writer } from '../src/core/neoforge/codec.ts'
-import { decodeFrozenRegistry, RegistryCache, applyModdedRegistries } from '../src/core/neoforge/registries.ts'
+import { Writer } from '../src/adapters/minecraft-java/platforms/neoforge/codec.ts'
+import { decodeFrozenRegistry, RegistryCache, applyModdedRegistries } from '../src/adapters/minecraft-java/platforms/neoforge/registries.ts'
 
 const require = createRequire(import.meta.url)
 const Registry = require('prismarine-registry')

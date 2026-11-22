@@ -5,7 +5,7 @@ import {
   motion, facingTowards, shouldRetarget, inLineOfFire, type GuardThreat, type FeedState
 } from '../src/skills/guard-plan.ts'
 import { attackRefusal, type AttackCandidate } from '../src/skills/tactics.ts'
-import { assessDanger } from '../src/brains/behaviors/library/safety.ts'
+import { assessDanger } from '../src/adapters/minecraft-java/behaviors/safety.ts'
 import { setEscort, escorting } from '../src/skills/bodyguard.ts'
 import { defaultBehaviorRegistry } from '../src/brains/behaviors/index.ts'
 

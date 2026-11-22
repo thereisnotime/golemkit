@@ -16,17 +16,27 @@ export {
   type Logger, type Level, type LogEntry, type LogConfig, type LogFields
 } from './log.ts'
 export { Storage } from './storage.ts'
+export { distance } from './format.ts'
 export { Fleet, Blackboard, type FleetMessage, type FleetEvents } from './fleet.ts'
-export { goals, Movements, goto, gotoTimed, travel, surfaceY, roofed, TravelUndergroundError, TravelUnderwaterError, holdGoal, playerEntity, isHostile, FLYING, nearestHostile, itemName, fmtPos, needsSurvival, gameModeNote } from './helpers.ts'
-export { isModdedBlock, MODDED_BLOCK } from './modded.ts'
+export { goals, Movements, goto, gotoTimed, travel, surfaceY, roofed, TravelUndergroundError, TravelUnderwaterError, holdGoal, playerEntity, isHostile, FLYING, nearestHostile, itemName, fmtPos, needsSurvival, gameModeNote } from '../adapters/minecraft-java/helpers.ts'
+export { isModdedBlock, MODDED_BLOCK } from '../adapters/minecraft-java/modded.ts'
 export {
   DangerMemory, dangerMemory, rememberDanger, activeZones, isInDanger, avoidZones, crossesDanger, clearDanger, describeZone,
   DANGER_TTL_MS, PATROL_TTL_MS, DANGER_RADIUS, type DangerZone, type DangerSighting, type DangerPos
 } from './danger.ts'
 export {
-  Journal, JournalCapture, resolveJournalConfig, fleetQuery, parseDeathMessage, parseAdvancement, parseRange,
+  Journal, resolveJournalConfig, fleetQuery, parseDeathMessage, parseAdvancement, parseRange,
   fmtEvent, fmtSection, fmtRollup, fmtCounts, ago, buildDayRollup, buildSection, ITEM_DESPAWN_MS, JOURNAL_TYPES,
   type JournalEvent, type JournalQuery, type JournalConfig, type JournalType, type DeathView, type DayRollup,
   type RollupSection, type PeriodSummary, type DeathInfo
 } from './journal/index.ts'
+export {
+  KNOWN_CAPABILITIES, supports,
+  type GameAdapter, type GameClient, type GameClients, type AdapterFactory, type AdapterEvents, type AdapterConnectOptions,
+  type Capability, type KnownCapability, type Observation, type SelfState, type ObservedEntity, type SeenEntity,
+  type InventoryStack, type WorldTime, type Pos
+} from './adapter.ts'
+// Minecraft Java (the default adapter): re-exported so variants, profiles and scripts keep their imports.
+export { MinecraftJavaAdapter, minecraftJava } from '../adapters/minecraft-java/adapter.ts'
+export { JournalCapture } from '../adapters/minecraft-java/journal-capture.ts'
 export { z } from 'zod'

@@ -61,7 +61,10 @@ export class Journal {
   readonly dir: string
   readonly rollupDir: string
   readonly config: JournalConfig
-  readonly bot?: string
+  /** The bot's name, for rollups. */
+  readonly botName?: string
+  /** Same as botName (older name). */
+  get bot (): string | undefined { return this.botName }
   private readonly log?: Logger
   private readonly now: () => number
   private readonly limiter: RateLimiter
@@ -80,7 +83,7 @@ export class Journal {
     this.rollupDir = join(opts.dir, 'rollups')
     this.config = opts.config ?? resolveJournalConfig(opts.settings ?? {})
     this.log = opts.log
-    this.bot = opts.bot
+    this.botName = opts.bot
     this.now = opts.now ?? Date.now
     this.limiter = new RateLimiter(this.config.caps)
   }
@@ -218,7 +221,7 @@ export class Journal {
     const events = this.readDay(date)
     const prev = this.readRollup(date)
     if (!events.length && prev) return prev
-    const r = buildDayRollup(events, date, { now: this.now(), bot: this.bot })
+    const r = buildDayRollup(events, date, { now: this.now(), bot: this.botName })
     if (prev?.summary) { r.summary = prev.summary; if (prev.summaryBy) r.summaryBy = prev.summaryBy }
     if (opts.write !== false && events.length) this.writeRollup(r)
     return r

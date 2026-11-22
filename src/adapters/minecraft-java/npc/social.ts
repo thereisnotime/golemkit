@@ -1,4 +1,4 @@
-import type { Behavior, NpcHook } from '../types.ts'
+import type { Behavior, NpcHook } from '../../../brains/npc/types.ts'
 
 export interface FollowPlayerOptions {
   /** Notice players within this distance. Default 10. */

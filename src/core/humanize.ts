@@ -6,7 +6,6 @@
 //   humanize: { typoRate: 0.03, lowercase: true }
 //   humanize: false                      # off even when llm.immersive is on
 // Default: on when settings.llm.immersive is true, off otherwise.
-import type { Bot } from 'mineflayer'
 
 export interface HumanizeOptions {
   /** Random wait before starting to "type" a reply, ms [min, max]. */
@@ -92,30 +91,4 @@ export function styleLine (text: string, h: HumanizeOptions, rnd: Rng = Math.ran
     }
   }
   return { text: out }
-}
-
-const MOVE_KEYS = ['forward', 'back', 'left', 'right', 'jump', 'sprint'] as const
-
-/**
- * Holds the bot still (and optionally facing a point) for `ms`, without touching the
- * pathfinder's goal, so a running goto/follow just carries on afterwards.
- */
-export async function holdStill (bot: Bot, ms: number, face?: { x: number, y: number, z: number }): Promise<void> {
-  const origSet = bot.setControlState.bind(bot)
-  const origLook = bot.look.bind(bot)
-  for (const k of MOVE_KEYS) origSet(k, false)
-  ;(bot as any).setControlState = (control: string, state: boolean) => {
-    if ((MOVE_KEYS as readonly string[]).includes(control)) return origSet(control as any, false)
-    return origSet(control as any, state)
-  }
-  if (face) {
-    try { await bot.lookAt(face as any, false) } catch {}
-    ;(bot as any).look = async () => {}
-  }
-  try {
-    await new Promise(r => setTimeout(r, ms))
-  } finally {
-    ;(bot as any).setControlState = origSet
-    ;(bot as any).look = origLook
-  }
 }

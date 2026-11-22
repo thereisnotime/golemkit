@@ -27,6 +27,8 @@ export interface ServerPlatform {
   describe? (): string
   /** Hooks a fresh client before it logs in (handshakes, registry sync). */
   attach? (bot: Bot, ctx: PlatformContext): void
+  /** After the pathfinder and skill plugins are loaded (listeners that must come after them). */
+  afterPlugins? (bot: Bot, ctx: PlatformContext): void
   /** Right after the play-state login packet: registry fixes for modded content. */
   onLogin? (bot: Bot, ctx: PlatformContext): void
 }

@@ -224,17 +224,16 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
       return r
     }
 
-    const players = (): Record<string, { entity?: { position: Pos } }> => {
-      try { return (agent.bot as unknown as { players: Record<string, { entity?: { position: Pos } }> }).players ?? {} } catch { return {} }
-    }
+    const players = (): string[] => agent.inSession ? agent.adapter.players?.() ?? [] : []
     /** The real player name for a lower-case one from the parser. */
-    const playerName = (name: string): string => Object.keys(players()).find(p => p.toLowerCase() === name.toLowerCase()) ?? name
+    const playerName = (name: string): string => players().find(p => p.toLowerCase() === name.toLowerCase()) ?? name
     const positionOf = (name: string): Pos | null => {
-      const e = players()[playerName(name)]?.entity
-      return e ? { x: Math.floor(e.position.x), y: Math.floor(e.position.y), z: Math.floor(e.position.z) } : null
+      const p = agent.inSession ? agent.adapter.playerPosition?.(playerName(name)) : null
+      return p ? { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z) } : null
     }
     const botPos = (): Pos | null => {
-      try { const p = agent.bot.entity.position; return { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z) } } catch { return null }
+      const p = agent.inSession ? agent.adapter.self()?.position : undefined
+      return p ? { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z) } : null
     }
     /** "here"/"there": where the speaker stands (null and a reply when they're out of sight). */
     const speakerPos = (): Pos | null => {
@@ -313,7 +312,7 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
           return
         }
         const place = String(a.place ?? '')
-        const asPlayer = Object.keys(players()).find(p => p.toLowerCase() === place.toLowerCase())
+        const asPlayer = players().find(p => p.toLowerCase() === place.toLowerCase())
         if (asPlayer && asPlayer !== agent.username) { await run('come', { player: asPlayer }, `going to ${asPlayer}`); return }
         await run('goto_place', { name: place }, `heading to ${place}`)
         return
@@ -480,17 +479,13 @@ function fmt (r: ActionResult, doneText?: (r: ActionResult) => string): string {
 
 /** An inventory item for a spoken name: exact, then generic (log -> oak_log, food -> bread), then partial. */
 export function inventoryMatch (agent: Agent, name: string): string | null {
-  let items: { name: string }[] = []
-  try { items = agent.bot.inventory.items() } catch { return null }
+  if (!agent.inSession) return null
+  const items = agent.adapter.inventory?.().items ?? []
   const names = [...new Set(items.map(i => i.name))]
   if (names.includes(name)) return name
   const alts: Record<string, string[]> = { iron_ingot: ['raw_iron', 'iron_ore'], gold_ingot: ['raw_gold', 'gold_ore'], copper_ingot: ['raw_copper'], diamond: ['diamond_ore'] }
   for (const alt of alts[name] ?? []) if (names.includes(alt)) return alt
-  if (name === 'food') {
-    let foods: Record<string, unknown> = {}
-    try { foods = (agent.bot.registry as unknown as { foodsByName?: Record<string, unknown> }).foodsByName ?? {} } catch {}
-    return names.find(n => n in foods) ?? null
-  }
+  if (name === 'food') return names.find(n => items.some(i => i.name === n && i.food)) ?? null
   return names.find(n => n.endsWith(`_${name}`)) ?? names.find(n => n.startsWith(`${name}_`)) ?? names.find(n => n.includes(name)) ?? null
 }
 

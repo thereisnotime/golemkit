@@ -2,7 +2,7 @@
 import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
 import { z } from '../../../core/index.ts'
-import { defineBehavior } from '../types.ts'
+import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import { droppedItemName } from '../../../skills/pickup.ts'
 import { CROPS, isMature } from '../../../skills/farming.ts'
 import { isPlaceFace, vec } from '../../../skills/world.ts'

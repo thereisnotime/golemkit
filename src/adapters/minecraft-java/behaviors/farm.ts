@@ -4,7 +4,7 @@
 // (nextFarmTask) so it is unit-tested without a server.
 import type { Bot } from 'mineflayer'
 import { z, needsSurvival, type Agent } from '../../../core/index.ts'
-import { defineBehavior } from '../types.ts'
+import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import { getHome } from '../../../skills/navigation.ts'
 import { getFarms, nearestFarm, ownFarmRipe, saveFarm, animalsAround, type Farm } from '../../../skills/food.ts'
 import { breadToBake, breedPlan, seedCount, BREED_FOOD } from '../../../skills/foodPlan.ts'

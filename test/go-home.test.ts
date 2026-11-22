@@ -1,6 +1,7 @@
 // go_home / stay_safe loop: an at-home check that measures in 3D with some vertical slack,
 // stay_safe's night hysteresis and go_home back-off, and the controller's flip back-off.
 import { test } from 'node:test'
+import { minecraftView } from './fake-attach.ts'
 import assert from 'node:assert/strict'
 import { flipCooldown, isFlip } from '../src/brains/npc/select.ts'
 import { NpcController } from '../src/brains/npc/controller.ts'
@@ -9,7 +10,7 @@ import { ok, createLogger, type ActionResult } from '../src/core/index.ts'
 import { atHome, homeOffset, navigation } from '../src/skills/navigation.ts'
 import {
   assessDanger, needsHome, homeBackoffMs, newHomeTrips, HOME_BACKOFF_MS, MAX_HOME_BACKOFF_MS, HOME_SETTLE_MS
-} from '../src/brains/behaviors/library/safety.ts'
+} from '../src/adapters/minecraft-java/behaviors/safety.ts'
 
 // Pax's home and spots from the log of the loop
 const HOME = { x: 560, y: 68, z: -46 }
@@ -159,7 +160,7 @@ test('controller: a behaviour that keeps flipping on and off is held back unless
   const bot: any = { entity: { position: { x: 0, y: 64, z: 0, distanceTo: () => 0 } }, food: 20, health: 20, time: { timeOfDay: 1000 }, entities: {}, players: {}, game: { dimension: 'overworld' }, inventory: { items: () => [] } }
   const safe = { v: 0 }
   const chore = { v: 28 }
-  const c = new NpcController(fakeAgent() as any, bot, { behaviors: [waiting('stay_safe', safe), waiting('chore', chore)], now: () => clock.t, autoHome: false })
+  const c = new NpcController({ ...fakeAgent(), adapter: minecraftView(bot) } as any, bot, { behaviors: [waiting('stay_safe', safe), waiting('chore', chore)], now: () => clock.t, autoHome: false })
   const step = async (ms: number) => { clock.t += ms; await c.tick(); await new Promise(r => setImmediate(r)) }
   await step(0)
   assert.equal(c.current, 'chore')

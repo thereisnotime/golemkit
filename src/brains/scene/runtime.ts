@@ -3,7 +3,7 @@
 // - coordinator (when elected): handles start/stop requests, casts, runs the scheduler;
 // - director host: runs Director instances for the runs it was given.
 import { randomUUID } from 'node:crypto'
-import { PRIORITY, sleep, type Agent, type Blackboard, type FleetMessage, type Logger } from '../../core/index.ts'
+import { PRIORITY, sleep, distance, type Agent, type Blackboard, type FleetMessage, type Logger } from '../../core/index.ts'
 import { Director, type StageWorld } from './director.ts'
 import {
   BOARD, TOPIC, callerName, castRoles, electCoordinator, electDirector,
@@ -246,18 +246,17 @@ export class SceneRuntime {
     })
 
     let offHurt = () => {}
-    try {
-      const bot = this.agent.bot
-      const onHurt = (entity: unknown) => {
-        if (entity !== bot.entity) return
+    const game = (this.agent as Partial<Agent>).adapter
+    if (game) {
+      const onHurt = () => {
         const run = myRun()
         if (!run?.listens.hit) return
         const p = this.world.playersNear(this.self, 5).sort((a, b) => a.distance - b.distance)[0]
         if (p) report(run, { trigger: 'hit', player: p.name, distance: p.distance })
       }
-      bot.on('entityHurt', onHurt)
-      offHurt = () => bot.off('entityHurt', onHurt)
-    } catch { /* not connected (tests) */ }
+      game.on('hurt', onHurt)
+      offHurt = () => game.off('hurt', onHurt)
+    }
 
     return () => { clearInterval(timer); offChat(); offHurt() }
   }
@@ -453,22 +452,24 @@ export function agentWorld (agent: Agent): StageWorld {
   return {
     position (username) {
       const a = agent.fleet.get(username, agent.serverName)
-      if (a?.connected) return a.bot.entity.position
+      if (a?.connected) return a.adapter.self()?.position
       for (const b of bots()) {
-        const e = b.bot.players[username]?.entity
-        if (e) return e.position
+        const p = b.adapter.playerPosition?.(username)
+        if (p) return p
       }
       return undefined
     },
     playersNear (username, radius) {
       const a = agent.fleet.get(username, agent.serverName)
       if (!a?.connected) return []
-      const bot = a.bot
-      const me = bot.entity.position
+      const self = a.adapter.self()
+      if (!self) return []
       const out: { name: string, distance: number }[] = []
-      for (const [name, p] of Object.entries(bot.players)) {
-        if (name === bot.username || !p.entity || isFleet(name)) continue
-        const d = p.entity.position.distanceTo(me)
+      for (const name of a.adapter.players?.() ?? []) {
+        if (name === self.username || isFleet(name)) continue
+        const p = a.adapter.playerPosition?.(name)
+        if (!p) continue
+        const d = distance(p, self.position)
         if (d <= radius) out.push({ name, distance: d })
       }
       return out
@@ -476,8 +477,8 @@ export function agentWorld (agent: Agent): StageWorld {
     time () {
       const b = bots()[0]
       if (!b) return undefined
-      const t = b.bot.time
-      return { timeOfDay: t.timeOfDay, day: t.day }
+      const t = b.adapter.time?.()
+      return t ? { timeOfDay: t.timeOfDay, day: t.day } : undefined
     }
   }
 }

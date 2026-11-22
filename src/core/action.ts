@@ -3,7 +3,7 @@
 // schemas, so the same definition gives runtime validation, TypeScript types, chat-command
 // parsing and the JSON schema an LLM sees as a tool.
 import { z } from 'zod'
-import type { Bot } from 'mineflayer'
+import type { GameClient } from './adapter.ts'
 import type { Agent } from './agent.ts'
 import type { Logger } from './log.ts'
 
@@ -43,7 +43,7 @@ export interface ActionResult {
 
 export interface ActionContext {
   agent: Agent
-  bot: Bot
+  bot: GameClient
   /** Aborted when the action is preempted, stopped, or the session ends. Long-running actions must honour it. */
   signal: AbortSignal
   caller: Caller

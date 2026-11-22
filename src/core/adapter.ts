@@ -45,6 +45,8 @@ export interface SelfState {
   health: number | null
   food: number | null
   heldItem: string | null
+  /** In bed (games that have sleeping). */
+  sleeping?: boolean
   /** Game-specific facts about the bot, in the order they appear in observe(). */
   game: Record<string, unknown>
 }
@@ -73,6 +75,37 @@ export interface Observation {
   nearby: ObservedEntity[]
   /** Item name -> count. */
   inventory: Record<string, number>
+}
+
+export interface SeenEntity {
+  id: number
+  name: string
+  type: string
+  /** Players only. */
+  username?: string
+  position: Pos
+  distance: number
+  /** Attacks on sight (the game's own judgement, neutral mobs excluded). */
+  hostile: boolean
+}
+
+export interface InventoryStack {
+  /** The game's item name (Minecraft: 'unknown' for an unmapped modded item). */
+  name: string
+  /** The name observe() uses (Minecraft: modded#<id> for an unmapped modded item). */
+  label: string
+  count: number
+  /** Edible. */
+  food: boolean
+}
+
+export interface WorldTime {
+  timeOfDay: number
+  day: number
+  /** Day as observe() reports it. */
+  isDay: boolean
+  /** Night for sleeping and danger (Minecraft: beds work, or a thunderstorm). */
+  isNight: boolean
 }
 
 /** Events an adapter emits. The Agent turns them into its own events (session, chat, ...). */
@@ -131,7 +164,12 @@ export interface GameAdapter {
   on<E extends keyof AdapterEvents> (event: E, fn: AdapterEvents[E]): void
   off<E extends keyof AdapterEvents> (event: E, fn: AdapterEvents[E]): void
 
-  // Primitives the core uses for its own mechanics (all optional: a game without them skips them).
+  /** Called by the agent when a session is over (after skills and brains cleaned up): drop per-session state and close the client. */
+  endSession (): void
+
+  // Primitives the core and the brain frameworks use (all optional: a game without them skips them).
+  /** Once per Agent.start(), before the first connect (process-wide setup). */
+  start? (): void
   /** Stops any movement in progress (the action lock calls it when it stops an action). */
   stopMotion? (): void
   /** Settings changed (config_set): re-read what the adapter takes from settings. */
@@ -142,16 +180,20 @@ export interface GameAdapter {
   holdStill? (ms: number, speaker?: string): Promise<void>
   /** Humanize: an idle glance around. */
   fidget? (): void
-  /** Turns to look at a point or a player. */
-  lookAt? (target: Pos | { player: string }): Promise<boolean>
-  /** Holds a movement control (jump, sneak, ...) on or off. */
-  setControl? (control: string, on: boolean): void
   /** Is the body moving (path finding, following)? */
   isMoving? (): boolean
-  /** Position of another player, when the bot can see them. */
+  /** Every entity the client tracks except the bot, with its distance from the bot. */
+  entities? (): SeenEntity[]
+  /** Inventory stacks with the game's own item names, and how many slots there are. */
+  inventory? (): { items: InventoryStack[], slots: number }
+  /** World time and the game's notions of day and night. */
+  time? (): WorldTime | null
+  /** Everyone online, the bot included. */
+  players? (): string[]
+  /** Where another player is, when the bot can see them. */
   playerPosition? (name: string): Pos | null
-  /** Food items in the inventory, best first: name and count. */
-  foods? (): { name: string, count: number, points: number }[]
+  /** Low health or food, night, or hostiles close (the LLM brain lets safety behaviours win then). */
+  inDanger? (): boolean
 }
 
 /**

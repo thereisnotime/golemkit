@@ -1,5 +1,5 @@
 // The built-in behaviour library. Order matters only for ties and listings.
-import type { BehaviorDefinition } from '../types.ts'
+import type { BehaviorDefinition } from '../../../brains/behaviors/types.ts'
 import { keepFed } from './keepFed.ts'
 import { staySafe, avoidMobs } from './safety.ts'
 import { bodyguard } from './bodyguard.ts'

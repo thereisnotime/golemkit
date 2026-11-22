@@ -1,4 +1,5 @@
 import { test } from 'node:test'
+import { minecraftView } from './fake-attach.ts'
 import assert from 'node:assert/strict'
 import { PRIORITY, ok, fail, createLogger, type ActionInfo, type ActionResult } from '../src/core/index.ts'
 import { NpcController } from '../src/brains/npc/controller.ts'
@@ -121,6 +122,7 @@ function fakeBody () {
     food: 20, health: 20, time: { timeOfDay: 1000 }, entities: {}, players: {}, game: { dimension: 'overworld' },
     inventory: { items: () => [], inventoryStart: 9, inventoryEnd: 45 }
   }
+  agent.adapter = minecraftView(bot)
   return { agent, bot, calls, said, clock, hold (info: ActionInfo | null) { current = info } }
 }
 

@@ -5,16 +5,16 @@
 // an arrow or bolt on course for the bot, a hit from range, or a shooter in range looking at it,
 // and picks shoot back / shield up / cover / back off by health and gear. It preempts whatever
 // job runs (scouting for food, chopping), which resumes afterwards.
-import { defineBrain, PRIORITY, nearestHostile, isHostile, FLYING, needsSurvival } from '../core/index.ts'
-import { bestFood, isClimbingOut, keepClimbing } from '../skills/survival.ts'
-import { isRangedMob } from '../skills/weapons.ts'
-import { threats } from '../skills/combat.ts'
-import { fightFood } from '../skills/fight.ts'
-import { gearPlan, hasGearUpgrade } from '../skills/gear.ts'
-import { escorting } from '../skills/bodyguard.ts'
-import { rangedSituation, onRangedAlarm, noteUnexplainedHit } from '../skills/ranged.ts'
-import { isShooter, rangedResponse } from '../skills/ranged-plan.ts'
-import { wornArmorPoints } from '../skills/gear.ts'
+import { defineBrain, PRIORITY, nearestHostile, isHostile, FLYING, needsSurvival } from '../../../core/index.ts'
+import { bestFood, isClimbingOut, keepClimbing } from '../../../skills/survival.ts'
+import { isRangedMob } from '../../../skills/weapons.ts'
+import { threats } from '../../../skills/combat.ts'
+import { fightFood } from '../../../skills/fight.ts'
+import { gearPlan, hasGearUpgrade } from '../../../skills/gear.ts'
+import { escorting } from '../../../skills/bodyguard.ts'
+import { rangedSituation, onRangedAlarm, noteUnexplainedHit } from '../../../skills/ranged.ts'
+import { isShooter, rangedResponse } from '../../../skills/ranged-plan.ts'
+import { wornArmorPoints } from '../../../skills/gear.ts'
 
 export interface ReflexOptions {
   selfDefense?: boolean

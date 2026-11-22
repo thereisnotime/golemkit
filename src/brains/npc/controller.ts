@@ -1,9 +1,8 @@
 // The NPC decision loop for one session: refresh the blackboard, run hooks, back off while
 // somebody else owns the body, score behaviours, and start/keep/switch the winner.
-import type { Bot } from 'mineflayer'
 import {
   PRIORITY, ActionAbortedError, checkAborted, sleep,
-  type Agent, type ActionResult, type Caller, type Logger
+  type Agent, type ActionResult, type Caller, type Logger, type GameClient
 } from '../../core/index.ts'
 import { getHome, setHome } from '../../skills/navigation.ts'
 import { Blackboard, type BlackboardOptions } from './blackboard.ts'
@@ -80,7 +79,8 @@ export class NpcController {
   readonly bb: Blackboard
   readonly name: string
   private readonly agent: Agent
-  private readonly bot: Bot
+  /** The game client, handed to behaviours as ctx.bot. */
+  private readonly client: GameClient
   private readonly opts: NpcOptions
   private readonly log: Logger
   private readonly now: () => number
@@ -97,9 +97,9 @@ export class NpcController {
   private ticking = false
   private stopped = false
 
-  constructor (agent: Agent, bot: Bot, opts: NpcOptions) {
+  constructor (agent: Agent, client: GameClient, opts: NpcOptions) {
     this.agent = agent
-    this.bot = bot
+    this.client = client
     this.opts = opts
     this.name = opts.name ?? 'npc'
     this.log = agent.log.child(this.name)
@@ -110,9 +110,10 @@ export class NpcController {
     this.bb = new Blackboard(agent, opts)
     if (Array.isArray(opts.behaviors)) this.checkNames(opts.behaviors)
     this.behaviors()
-    if ((opts.autoHome ?? true) && bot.entity && !getHome(agent)) {
-      const p = bot.entity.position
-      setHome(agent, { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z), dimension: bot.game?.dimension })
+    const self = agent.adapter.self()
+    if ((opts.autoHome ?? true) && self && !getHome(agent)) {
+      const p = self.position
+      setHome(agent, { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z), dimension: self.game.dimension as string | undefined })
       this.log.info(`home set to spawn ${Math.floor(p.x)} ${Math.floor(p.y)} ${Math.floor(p.z)}`)
     }
   }
@@ -173,7 +174,7 @@ export class NpcController {
   }
 
   private context (now: number): NpcContext {
-    return { agent: this.agent, bot: this.bot, bb: this.bb, log: this.log, now, current: this.current }
+    return { agent: this.agent, bot: this.client, bb: this.bb, log: this.log, now, current: this.current }
   }
 
   /** Who other than us holds the body, at any priority. */
@@ -267,11 +268,11 @@ export class NpcController {
 
   /** One decision step. Safe to call often; re-entrant calls are ignored. */
   async tick (): Promise<void> {
-    if (this.ticking || this.stopped || !this.bot.entity) return
+    if (this.ticking || this.stopped || !this.agent.adapter.self()) return
     this.ticking = true
     try {
       const now = this.now()
-      this.bb.update(this.bot)
+      this.bb.update(this.agent.adapter)
       const ctx = this.context(now)
       for (const hook of this.hooks()) {
         try { hook(ctx) } catch (e) { this.log.debug(`hook: ${(e as Error).message}`) }

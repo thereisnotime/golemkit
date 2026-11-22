@@ -1,7 +1,7 @@
 // Social behaviours: follow_owner, guard_owner, greet_players, idle_look.
 import { z } from '../../../core/index.ts'
-import { defineBehavior } from '../types.ts'
-import { greetPlayers } from '../../npc/index.ts'
+import { defineBehavior } from '../../../brains/behaviors/types.ts'
+import { greetPlayers } from '../../../brains/npc/index.ts'
 import { ownerTarget, dist } from './util.ts'
 
 export const followOwner = defineBehavior({

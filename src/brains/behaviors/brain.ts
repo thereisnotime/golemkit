@@ -15,7 +15,7 @@ import { BehaviorRegistry } from './registry.ts'
 import { BehaviorRuntime } from './runtime.ts'
 import { mergeConfigs, validateBehaviorConfig, type BehaviorConfig } from './config.ts'
 import { attachRuntime, behaviorActions, fmtOptions, runtimeFor } from './actions.ts'
-import { defaultBehaviors } from './library/index.ts'
+import { defaultBehaviors } from '../../adapters/minecraft-java/behaviors/index.ts'
 
 export interface BehaviorsBrainOptions extends SelectOptions, BlackboardOptions {
   /** Caller name for act() and logs. Default 'behaviors'. */

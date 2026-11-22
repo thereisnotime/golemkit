@@ -21,7 +21,11 @@ function walk (p: string): string[] {
 const warnOnly = process.argv.includes('--warn')
 const hits: string[] = []
 for (const file of CHECKED.flatMap(walk).sort()) {
-  readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+  readFileSync(file, 'utf8').split('\n').forEach((raw, i) => {
+    // comments don't count: doc comments may name the bot ("ctx.bot in actions")
+    const t = raw.trim()
+    if (t.startsWith('*') || t.startsWith('/*') || t.startsWith('//')) return
+    const line = raw.replace(/\s\/\/.*$/, '')
     const imp = GAME_IMPORT.exec(line)
     if (imp) hits.push(`${file}:${i + 1}: imports ${imp[1]}`)
     else if (BOT_TOUCH.test(line)) hits.push(`${file}:${i + 1}: touches the Mineflayer bot: ${line.trim().slice(0, 100)}`)

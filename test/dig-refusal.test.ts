@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import { Vec3 } from 'vec3'
 import { digBlock, DigRefusedError } from '../src/skills/world.ts'
-import { watchRefusedDigs } from '../src/core/protection.ts'
+import { watchRefusedDigs } from '../src/adapters/minecraft-java/refusals.ts'
 
 const NAMES: Record<number, string> = { 0: 'air', 9: 'grass_block', 14: 'cobblestone' }
 

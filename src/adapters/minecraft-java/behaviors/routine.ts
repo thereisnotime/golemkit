@@ -1,8 +1,8 @@
 // Routine behaviours wrapping the NPC brain's existing ones (sleep_at_night, return_home,
 // wander), plus guard_area.
 import { z, fmtPos } from '../../../core/index.ts'
-import { defineBehavior } from '../types.ts'
-import { sleepAtNight as npcSleep, goHome as npcHome, wander as npcWander } from '../../npc/index.ts'
+import { defineBehavior } from '../../../brains/behaviors/types.ts'
+import { sleepAtNight as npcSleep, goHome as npcHome, wander as npcWander } from '../../../brains/npc/index.ts'
 import { resolveCenter, hostilesNear, flatDist } from './util.ts'
 
 const strip = <T extends { name: string, priority?: number }>(b: T) => {

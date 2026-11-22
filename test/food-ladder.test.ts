@@ -5,7 +5,7 @@ import {
   planFood, nextRing, recordSearch, dryWaypoint, scoutWaypoints, RING_MEMORY_MS, STEP_PAUSE_MS,
   type FoodWorld, type FoodStepOptions, type SearchRecord
 } from '../src/skills/foodPlan.ts'
-import { ringsFor } from '../src/brains/behaviors/library/keepFed.ts'
+import { ringsFor } from '../src/adapters/minecraft-java/behaviors/keepFed.ts'
 
 const NOW = 1_000_000_000
 const MIN = 60_000

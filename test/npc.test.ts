@@ -1,4 +1,5 @@
 import { test } from 'node:test'
+import { minecraftView } from './fake-attach.ts'
 import assert from 'node:assert/strict'
 import { decide, best, failureCooldown } from '../src/brains/npc/select.ts'
 import { NpcController } from '../src/brains/npc/controller.ts'
@@ -95,6 +96,7 @@ function fake (actions: string[] = ['wander', 'go_home', 'npc_interrupt']): Fake
       }
     }
   }
+  f.agent.adapter = minecraftView(f.bot)
   return f
 }
 

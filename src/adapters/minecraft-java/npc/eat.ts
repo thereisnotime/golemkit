@@ -1,4 +1,4 @@
-import type { Behavior } from '../types.ts'
+import type { Behavior } from '../../../brains/npc/types.ts'
 import { bestFood } from '../../../skills/survival.ts'
 
 export interface EatOptions {

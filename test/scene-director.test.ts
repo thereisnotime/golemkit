@@ -1,4 +1,5 @@
 import { test } from 'node:test'
+import { attachFakeBot } from './fake-attach.ts'
 import assert from 'node:assert/strict'
 import { Agent, Fleet, defineVariant, defineAction, z, sleep, PRIORITY } from '../src/core/index.ts'
 import {
@@ -227,8 +228,7 @@ test('cancelActions stops only matching actions and lets suspended ones resume',
   })
   const agent = new Agent(defineVariant({ name: 't', skills: [{ name: 's', actions: [hold('npc_walk'), hold('scene_hold')] }], brains: [] }), base, { username: 'X', dataDir: 'data/test/scene/X' })
   // Pretend to be connected; these actions never touch the bot.
-  ;(agent as any)._bot = {}
-  ;(agent as any).sessionController = new AbortController()
+  attachFakeBot(agent, {})
   void agent.act('npc_walk', {}, { caller: { kind: 'brain', name: 'npc' }, priority: PRIORITY.npc })
   const scene = agent.act('scene_hold', {}, { caller: { kind: 'brain', name: 'scene:r1:1' }, priority: PRIORITY.scene })
   assert.equal(agent.currentAction?.name, 'scene_hold')

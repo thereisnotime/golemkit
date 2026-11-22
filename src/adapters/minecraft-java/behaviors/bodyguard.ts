@@ -6,7 +6,7 @@
 import type { Bot } from 'mineflayer'
 import type { Agent } from '../../../core/index.ts'
 import { z } from '../../../core/index.ts'
-import { defineBehavior } from '../types.ts'
+import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import { ownerTarget, dist } from './util.ts'
 import { setEscort, lastSeen, playerThreats } from '../../../skills/bodyguard.ts'
 import { WarnLimiter, warnText, warnKey } from '../../../skills/guard-plan.ts'
