@@ -735,6 +735,8 @@ export interface ChoreOptions {
   farmAbove: number
   /** Only walk to the farm from this close (default 128). */
   tendRange: number
+  /** Seeds kept back for replanting (default 4): a full, planted farm doesn't walk for these. */
+  seedReserve?: number
 }
 
 /** How long a chore is left alone after it ran (ok) or failed. */
@@ -758,7 +760,12 @@ export function farmChore (w: ChoreWorld, o: ChoreOptions): { chore: FoodChore, 
   if (o.growFarm && o.startFarm) {
     if (w.hasFarm && w.farmDistance !== null && w.farmDistance <= o.tendRange) {
       if (w.farmWork > 0 && ok('tend_farm')) return { chore: 'tend_farm', reason: `${w.farmWork} cells to plant, re-till or grow (${w.farmSize}x${w.farmSize} of ${w.farmTarget}x${w.farmTarget})` }
-      if (w.farmSeedsWanted > 0 && w.farmSize < w.farmTarget && w.grass && ok('seeds')) return { chore: 'seeds', reason: `farm is ${w.farmSize}x${w.farmSize}, ${w.farmSeedsWanted} seeds short of ${w.farmTarget}x${w.farmTarget}` }
+      // seeds for empty cells inside the farm as well as for growing it: a farm can span its full size with
+      // only a few cells planted, and with no seeds the plan shows no work at all
+      // seedsWanted = cells to fill + reserve - seeds; above the reserve means cells it has no seeds for
+      // (with seeds in hand, tend_farm would already have planted them)
+      const emptyCells = w.farmSeedsWanted > (o.seedReserve ?? 4)
+      if (w.farmSeedsWanted > 0 && (w.farmSize < w.farmTarget || emptyCells) && w.grass && ok('seeds')) return { chore: 'seeds', reason: `farm ${w.farmSize}x${w.farmSize} (target ${w.farmTarget}x${w.farmTarget}) is ${w.farmSeedsWanted} seeds short, ${w.seeds} in hand` }
     }
     if (!w.hasFarm && w.canStartFarm) {
       if (w.seeds >= o.minSeeds && ok('start_farm')) return { chore: 'start_farm', reason: `no farm yet and ${w.seeds} seeds` }

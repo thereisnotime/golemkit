@@ -208,3 +208,10 @@ test('a search that just found food is a source: no farm fallback, the spot come
   // a failed step pauses itself, but spots never pause globally (each spot has its own empty-visit pause)
   assert.equal(STEP_PAUSE_MS.spot, 0)
 })
+
+test('farm chore: a full-size farm with empty cells and no seeds goes for seeds', async () => {
+  const { farmChore } = await import('../src/skills/foodPlan.ts')
+  const w: any = { night: false, danger: false, food: 15, seeds: 0, grass: true, hasFarm: true, farmDistance: 20, farmWork: 0, farmSeedsWanted: 50, farmSize: 9, farmTarget: 9, canStartFarm: true, canBreed: false, paused: {}, now: 1 }
+  const c = farmChore(w, { growFarm: true, startFarm: true, breed: true, minSeeds: 8, farmAbove: 14, tendRange: 128 } as any)
+  assert.equal(c?.chore, 'seeds')
+})

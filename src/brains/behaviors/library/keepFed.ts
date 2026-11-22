@@ -501,7 +501,7 @@ export const keepFed = defineBehavior({
   priority: 'behavior',
   create (o, { agent }) {
     const so = stepOptions(o)
-    const choreOpts = { growFarm: o.growFarm, startFarm: o.startFarm, breed: o.breed, minSeeds: o.minSeeds, farmAbove: o.farmAbove, tendRange: 128 }
+    const choreOpts = { growFarm: o.growFarm, startFarm: o.startFarm, breed: o.breed, minSeeds: o.minSeeds, farmAbove: o.farmAbove, tendRange: 128, seedReserve: o.seedReserve }
     // the ladder sets its own wait after a failed run; the controller's back-off stays short
     let retryAt = 0
     let stockAtFail = ''
