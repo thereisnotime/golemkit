@@ -206,6 +206,6 @@ Specs live in `openspec/`.
 
 ## License
 
-[GNU LGPL v3.0 or later](COPYING.LESSER) (which builds on the [GPL v3.0](COPYING)). The
+[GNU LGPL v3.0 or later](LICENSE) (which builds on the [GPL v3.0](COPYING)). The
 blueprints in `blueprints/library/` come from other projects and keep their own licenses (MIT,
 LGPL-3.0, CC0); see [blueprints/library/LICENSES.md](blueprints/library/LICENSES.md).
