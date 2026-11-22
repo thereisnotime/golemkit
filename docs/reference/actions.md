@@ -544,7 +544,7 @@ Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 
 | param | type | required | default | description |
 |---|---|---|---|---|
 | `count` | integer (1..64) |  | `10` | seeds to get |
-| `radius` | number (4..64) |  | `32` | how far to look for grass |
+| `radius` | number (4..128) |  | `32` | how far to look for grass |
 | `maxMinutes` | number (0.5..10) |  | `3` | give up after this long |
 | `spawnClearance` | number (0..256) |  | `48` | never break grass this close to the world spawn |
 

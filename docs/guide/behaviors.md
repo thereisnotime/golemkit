@@ -709,6 +709,7 @@ Looks after food on its own, climbing a ladder when hungry (or hurt and too hung
 | `farmSize` | integer (3..9) | `9` | side of the square its farm grows towards around the water block |
 | `seedReserve` | integer (0..32) | `4` | seeds kept for replanting: the farm only grows with seeds beyond these |
 | `farmAbove` | number (1..20) | `14` | food at or above this is not urgent: farm work may come before a long search |
+| `seedRange` | number (8..160) | `96` | how far to look for grass to break for seeds between meals |
 | `breed` | boolean | `true` | breed animals near home between meals when it has their food (wheat: cows, sheep; seeds: chickens; carrots: pigs) |
 | `report` | boolean | `true` | when food is critical (6 or less) and nothing works, tell the owner (at most every 10 minutes) |
 

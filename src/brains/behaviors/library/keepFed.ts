@@ -110,6 +110,7 @@ const options = z.object({
   farmSize: z.number().int().min(3).max(9).default(9).describe('side of the square its farm grows towards around the water block'),
   seedReserve: z.number().int().min(0).max(32).default(4).describe('seeds kept for replanting: the farm only grows with seeds beyond these'),
   farmAbove: z.number().min(1).max(20).default(14).describe('food at or above this is not urgent: farm work may come before a long search'),
+  seedRange: z.number().min(8).max(160).default(96).describe('how far to look for grass to break for seeds between meals'),
   breed: z.boolean().default(true).describe('breed animals near home between meals when it has their food (wheat: cows, sheep; seeds: chickens; carrots: pigs)'),
   report: z.boolean().default(true).describe('when food is critical (6 or less) and nothing works, tell the owner (at most every 10 minutes)')
 })
@@ -300,7 +301,8 @@ export function senseChores (agent: Agent, bot: Bot, o: O): ChoreWorld {
   const farm = nearestFarm(agent, bot)
   const near = farm && agent.getAction('tend_farm') ? nearFarmWork(agent, bot, o, 128) : null
   const grassIds = ['short_grass', 'grass', 'tall_grass', 'fern'].map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
-  const grass = !!agent.canDig && !!agent.getAction('gather_seeds') && !!bot.findBlock?.({ matching: grassIds, maxDistance: 32 })
+  // grass near the bot or the farm: around a worked base the closest grass is often further than 32 blocks
+  const grass = !!agent.canDig && !!agent.getAction('gather_seeds') && !!bot.findBlock?.({ matching: grassIds, maxDistance: o.seedRange ?? 96 })
   return {
     food: typeof bot.food === 'number' ? bot.food : 20,
     night: isNightTime(bot),
@@ -334,7 +336,7 @@ async function doChore (ctx: BehaviorContext, chore: FoodChore, o: O): Promise<A
       const farm = nearestFarm(agent, bot)
       const work = farm ? nearFarmWork(agent, bot, o, 128)?.work : undefined
       const want = work ? work.seedsWanted : o.minSeeds - seedCount(invOf(bot))
-      return ctx.act('gather_seeds', { count: Math.max(2, Math.min(32, want)), radius: 32, maxMinutes: 2 })
+      return ctx.act('gather_seeds', { count: Math.max(2, Math.min(32, want)), radius: o.seedRange ?? 96, maxMinutes: 3 })
     }
     case 'breed':
       return ctx.act('breed', { keepSeeds: o.minSeeds })
@@ -439,7 +441,7 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
       const farm = nearestFarm(agent, bot)
       const work = farm ? nearFarmWork(agent, bot, o, 256)?.work : undefined
       const want = Math.max(o.minSeeds - seedCount(invOf(bot)), work?.seedsWanted ?? (farm ? (farmStatus(bot, farm)?.empty ?? 0) - seedCount(invOf(bot)) : 0))
-      return ctx.act('gather_seeds', { count: Math.max(2, Math.min(32, want)), radius: 32 })
+      return ctx.act('gather_seeds', { count: Math.max(2, Math.min(32, want)), radius: o.seedRange ?? 96 })
     }
     case 'start_farm':
       return ctx.act('start_farm', { seeds: o.minSeeds })
@@ -506,11 +508,18 @@ export const keepFed = defineBehavior({
     // between meals: the chore found by the last check (sensing a farm is not free, so at most every 30 s)
     let chore: { chore: FoodChore, reason: string } | null = null
     let choreCheckedAt = 0
+    let idleLoggedAt = 0
     let choreRunning = false
     const checkChore = (bot: Bot) => {
       if (Date.now() - choreCheckedAt < 30_000) return chore
       choreCheckedAt = Date.now()
-      try { chore = (o.growFarm || o.breed) ? farmChore(senseChores(agent, bot, o), choreOpts) : null } catch { chore = null }
+      let sensed: ReturnType<typeof senseChores> | null = null
+      try { sensed = (o.growFarm || o.breed) ? senseChores(agent, bot, o) : null; chore = sensed ? farmChore(sensed, choreOpts) : null } catch { chore = null }
+      // say why it is idle between meals, at most every 5 minutes, so an idle bot is explainable from the log
+      if (!chore && sensed && Date.now() - idleLoggedAt > 300_000) {
+        idleLoggedAt = Date.now()
+        agent.log.child('behaviors').debug(`keep_fed chores: nothing to do (${sensed.night ? 'night' : 'day'}, food ${sensed.food}, seeds ${sensed.seeds}, grass in reach ${sensed.grass}, farm ${sensed.hasFarm ? `${sensed.farmSize}x${sensed.farmSize}, ${sensed.farmWork} cells of work` : 'none'}, breeding ${sensed.canBreed}${sensed.danger ? ', danger' : ''})`)
+      }
       return chore
     }
     return {

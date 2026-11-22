@@ -1009,7 +1009,7 @@ const gatherSeeds = defineAction({
     'Skips protected areas and the world spawn. Needs digging enabled.',
   params: z.object({
     count: z.number().int().min(1).max(64).default(10).describe('seeds to get'),
-    radius: z.number().min(4).max(64).default(32).describe('how far to look for grass'),
+    radius: z.number().min(4).max(128).default(32).describe('how far to look for grass'),
     maxMinutes: z.number().min(0.5).max(10).default(3).describe('give up after this long'),
     spawnClearance: z.number().min(0).max(256).default(48).describe('never break grass this close to the world spawn')
   }),
