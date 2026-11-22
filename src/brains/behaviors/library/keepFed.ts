@@ -431,7 +431,7 @@ export const keepFed = defineBehavior({
             // (a farm was just planted: nothing to harvest yet, so don't plant or scout again this run)
             if (d.step !== 'eat') { tried.clear(); if (d.step === 'start_farm') { tried.add('start_farm'); tried.add('scout') } }
             // scouted: don't scout again this run, but do walk to what it found (spot); been at a spot: don't go again
-            if (d.step === 'scout') tried.add('scout')
+            if (d.step === 'scout') { tried.add('scout'); if (m.paused.spot) { delete m.paused.spot; saveMemory(agent, m) } }
             if (d.step === 'spot') { tried.add('scout'); tried.add('spot') }
             if (['seeds', 'plant', 'breed', 'forage', 'report'].includes(d.step)) tried.add(d.step)
           } else {

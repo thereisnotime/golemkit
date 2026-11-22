@@ -541,7 +541,7 @@ export const STEP_PAUSE_MS: Record<FoodStep, number> = {
   withdraw: 10 * 60_000,
   harvest: 2 * 60_000,
   farm: 10 * 60_000,
-  spot: 5 * 60_000, // spots also carry their own empty-visit pause
+  spot: 0, // each spot carries its own empty-visit pause (a new sighting must not wait)
   hunt: 2 * 60_000,
   scout: 0, // the search records decide
   seeds: 10 * 60_000,
@@ -607,9 +607,11 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
       { radius: ring.radius, minRadius: ring.covered, keepAtLeast: keep, ...(pick ? { seeds: pick } : {}) })
   }
 
-  // 5. no proper source: grow food (and use stopgaps while it grows)
+  // 5. no proper source: grow food (and use stopgaps while it grows). A search that just found
+  // food is a source: the next run goes back to it instead of farming.
+  const justFound = (w.searches ?? []).some(s => s.found && now - s.at < 10 * 60_000)
   const farmWhy = `no proper food source (${searchBlocked})`
-  if (fallback) {
+  if (fallback && !(justFound && ring)) {
     if (critical && (w.forage ?? 0) > 0 && ok('forage')) return d('forage', 'farm', `food ${w.food}/20, berries in range while nothing else works`)
     if (w.hasFarm && (w.farmEmpty ?? 0) > 0 && seeds > 0 && ok('plant')) return d('plant', 'farm', `${farmWhy}; ${w.farmEmpty} empty farmland on its farm and ${seeds} seeds`)
     if (dayOrBold && w.grass && ok('seeds') && ((w.hasFarm && (w.farmEmpty ?? 0) > seeds) || (!w.hasFarm && w.canStartFarm && w.seeds !== undefined && seeds < minSeeds))) {

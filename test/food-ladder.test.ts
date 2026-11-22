@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  planFood, nextRing, recordSearch, dryWaypoint, scoutWaypoints, RING_MEMORY_MS,
+  planFood, nextRing, recordSearch, dryWaypoint, scoutWaypoints, RING_MEMORY_MS, STEP_PAUSE_MS,
   type FoodWorld, type FoodStepOptions, type SearchRecord
 } from '../src/skills/foodPlan.ts'
 import { ringsFor } from '../src/brains/behaviors/library/keepFed.ts'
@@ -196,4 +196,14 @@ test('keep_fed ladder options validate and coerce from chat', async () => {
   assert.deepEqual((d.options as any).rings, [48, 120, 250])
   assert.equal((d.options as any).keepBreeders, true)
   assert.ok(!reg.validate('keep_fed', { rings: [5000] }).ok)
+})
+
+test('a search that just found food is a source: no farm fallback, the spot comes next', () => {
+  const found = { ...bare, searches: [{ radius: 120, at: NOW - MIN, found: true }], seeds: 0, grass: true }
+  const d = planFood(found, opts, new Set(['scout', 'hunt']))
+  assert.equal(d.step, null, 'not seeds or a farm right after finding rabbits')
+  assert.equal(d.retryMs, 20_000, 'and back soon')
+  assert.equal(planFood({ ...found, spotDistance: 50 }, opts, new Set(['scout'])).step, 'spot')
+  // a failed step pauses itself, but spots never pause globally (each spot has its own empty-visit pause)
+  assert.equal(STEP_PAUSE_MS.spot, 0)
 })

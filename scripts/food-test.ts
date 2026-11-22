@@ -6,6 +6,8 @@
 // The bot is FOOD_BOT (default FoodTest), owned by FOOD_TESTER (default FoodTester), who joins
 // and stands by. The bot can't be made hungry without ops, so keep_fed is armed with below=20:
 // it starts as soon as the walk out has cost a point of food. Data lives in data/food-test.
+// The ladder's decisions are debug lines ("keep_fed ladder: rung=..."): run with MC_LOG_LEVEL=debug
+// MC_LOG_DIR=logs to get them in logs/FoodTest.log.
 import { Agent, defineVariant, serverFromEnv, PRIORITY, fmtPos, type ActionResult } from '../src/core/index.ts'
 import { standardSkills, extendedSkills, navigation } from '../src/skills/index.ts'
 import { reflexes, behaviorsBrain } from '../src/brains/index.ts'
@@ -88,8 +90,9 @@ async function run (): Promise<void> {
   await step(bot, 'set_home')
   log(`start: ${state(bot)}`)
   await step(bot, 'behavior_arm', { name: 'stay_safe', options: { retreatBelow: 6, homeAtNight: true } })
-  await step(bot, 'behavior_arm', { name: 'keep_fed', options: { below: 20, healBelow: 20, until: 20, radius: 48, scout: true, scoutRadius: 200 } })
-  await step(bot, 'behavior_arm', { name: 'farm_setup', options: { size: 9 } })
+  // the food ladder: search 48 -> 120 -> 250, then keep_fed's own farm fallback (FOOD_FARM_SETUP=true arms farm_setup too)
+  await step(bot, 'behavior_arm', { name: 'keep_fed', options: { below: 20, healBelow: 20, until: 20, radius: 48, scout: true, rings: (process.env.FOOD_RINGS ?? '48,120,250').split(',').map(Number) } })
+  if (process.env.FOOD_FARM_SETUP === 'true') await step(bot, 'behavior_arm', { name: 'farm_setup', options: { size: 9 } })
   const until = Date.now() + Number(mins) * 60_000
   let farmAt = 0
   while (Date.now() < until) {
