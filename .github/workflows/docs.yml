@@ -26,7 +26,8 @@ jobs:
         with:
           node-version-file: .tool-versions
           cache: npm
-      - run: npm ci --omit=optional
+      # full install: the docs build needs optional native packages (rollup), so --omit=optional breaks it
+      - run: npm ci
       - run: npx vitepress build docs
         env:
           DOCS_BASE: /${{ github.event.repository.name }}/
