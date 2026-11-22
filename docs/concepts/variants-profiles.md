@@ -1,3 +1,7 @@
+---
+scope: core
+---
+
 # Variants, profiles, instances, fleets
 
 Five words cover how bots are defined, configured and run.

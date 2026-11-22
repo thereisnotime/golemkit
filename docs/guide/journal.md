@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "Storage, rollups and queries are game-agnostic; capture listens to Mineflayer events (deaths, blocks, inventory)."
+---
+
 # Event journal
 
 Every bot keeps a journal of what happens to it: deaths, damage, kills, items gained and lost,

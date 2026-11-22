@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "Most skills are Minecraft; journal and config are game-agnostic."
+---
+
 # Skills
 
 Every skill and action that ships with golemkit. Parameters, defaults and flags for each

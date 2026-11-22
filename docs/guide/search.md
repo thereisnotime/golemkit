@@ -1,3 +1,7 @@
+---
+scope: minecraft
+---
+
 # Finding and fetching
 
 Owners ask for things: "where's iron?", "find sheep", "bring me 16 planks", "get my stuff, I

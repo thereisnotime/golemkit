@@ -1,3 +1,7 @@
+---
+scope: minecraft
+---
+
 # WorldEdit
 
 On a server that runs WorldEdit (the NeoForge or Fabric mod, the Bukkit plugin, or

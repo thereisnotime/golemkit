@@ -1,3 +1,7 @@
+---
+scope: core
+---
+
 # Running bots and fleets
 
 ## One bot

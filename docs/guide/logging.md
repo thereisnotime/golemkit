@@ -1,3 +1,7 @@
+---
+scope: core
+---
+
 # Logging
 
 Every bot, brain, skill and the [fleet](/concepts/architecture#fleets-and-multiple-servers) log through one system. You can tune what you see per

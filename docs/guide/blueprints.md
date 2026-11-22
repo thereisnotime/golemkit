@@ -1,3 +1,7 @@
+---
+scope: minecraft
+---
+
 # Blueprint libraries
 
 `build` turns a [blueprint](/guide/goals-and-building#blueprint-format) into blocks (see [Goals and building](./goals-and-building.md)). This

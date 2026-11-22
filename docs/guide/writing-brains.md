@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "The brain interface, act() and chat are game-agnostic; examples that listen to agent.bot are Minecraft."
+---
+
 # Writing brains
 
 A brain decides what the bot does. Skills say *what is possible*; brains pick *what happens

@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "Definitions, brains and storage are game-agnostic; the skills and bot events are Minecraft."
+---
+
 # Writing a variant
 
 A [variant](/concepts/variants-profiles) is a kind of bot: a file in `variants/` that default-exports `defineVariant(...)`,

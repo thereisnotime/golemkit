@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "Programs, the gate and versions are game-agnostic; conditions and steps read Minecraft state (health, time, mobs)."
+---
+
 # Self-improver
 
 `selfImprover()` (src/brains/self/) is an [NPC brain](/guide/npc-brain) that runs its own **program** with no

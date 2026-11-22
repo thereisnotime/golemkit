@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "Arming, scoring and the controller are game-agnostic; the behaviour library (keep_fed, bodyguard, farm) is Minecraft."
+---
+
 # Behaviours
 
 Armed behaviours are things a bot keeps doing on its own until told otherwise: stay fed,

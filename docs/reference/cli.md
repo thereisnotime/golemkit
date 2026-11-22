@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "run, fleet and list are game-agnostic; probes, live tests and benchmarks need a Minecraft server."
+---
+
 # CLI and just recipes
 
 ## just

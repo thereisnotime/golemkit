@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "Goals and continuation are game-agnostic; building, materials and tools are Minecraft."
+---
+
 # Goals and building
 
 Ask an LLM bot to "make an axe, chop some trees and build us a small house" and three things

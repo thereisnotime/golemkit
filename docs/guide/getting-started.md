@@ -1,3 +1,7 @@
+---
+scope: minecraft
+---
+
 # Getting started
 
 ## Requirements

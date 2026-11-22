@@ -1,3 +1,7 @@
+---
+scope: minecraft
+---
+
 # Roads and stairs
 
 Bots join buildings with roads that look like a person built them: straight flights of stairs,

@@ -121,3 +121,17 @@
 .vp-doc .mermaid .statediagram-state .nodeLabel,
 .vp-doc .mermaid .statediagram-state text { color: #0c4a6e !important; fill: #0c4a6e !important; }
 .vp-doc .mermaid .statediagram-state .divider { stroke: #0284c7 !important; }
+
+/* Scope badge at the top of each page (frontmatter `scope`), same pill shape as the roadmap's */
+.scope-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3em 0.6em; margin-bottom: 1.1em; font-size: 13px; line-height: 1.5; }
+.scope-badge {
+  display: inline-block; font-weight: 600; padding: 0.05em 0.7em; border-radius: 999px; border: 1px solid;
+  white-space: nowrap; text-decoration: none; transition: filter 0.15s;
+}
+.scope-badge:hover { filter: brightness(1.15); }
+.scope-badge.core { color: #16a34a; border-color: #16a34a66; background: #16a34a14; }
+.scope-badge.minecraft { color: #0284c7; border-color: #0284c766; background: #0284c714; }
+.scope-badge.neoforge { color: #ea580c; border-color: #ea580c66; background: #ea580c14; }
+.scope-badge.mixed { color: #7c3aed; border-color: #7c3aed66; background: #7c3aed14; }
+.dark .scope-badge.mixed { color: #a78bfa; border-color: #a78bfa66; }
+.scope-note { color: var(--vp-c-text-2); }

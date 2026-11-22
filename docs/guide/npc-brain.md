@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "The utility-AI loop is game-agnostic; the stock behaviours (sleep, eat, flee) use Minecraft state."
+---
+
 # NPC brain
 
 `npcBrain()` (src/brains/npc/) makes a bot live on its own: wander near home, go back at

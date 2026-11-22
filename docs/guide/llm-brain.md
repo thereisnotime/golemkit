@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "Providers, triggers, goals, budgets and usage tracking are game-agnostic; the observation, safety checks and mod teaching read the Minecraft bot."
+---
+
 # LLM brain
 
 `llmBrain()` lets a language model drive a bot. Players talk to it by name or by whisper; the

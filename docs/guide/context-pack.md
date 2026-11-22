@@ -1,3 +1,7 @@
+---
+scope: core
+---
+
 # Context packs and evals
 
 A context pack is a directory of markdown and YAML files next to a [profile](/guide/profiles) that shapes an LLM

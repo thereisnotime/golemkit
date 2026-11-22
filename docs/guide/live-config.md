@@ -1,3 +1,7 @@
+---
+scope: core
+---
+
 # Feature toggles (live config)
 
 Some settings can be changed in game, while the bot runs, without a restart. Changes apply

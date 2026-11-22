@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "LLM, logging and storage settings are game-agnostic; MC_* connection settings are Minecraft."
+---
+
 # Configuration
 
 Precedence, lowest to highest: environment (`.env`) → bot definition → [fleet](/concepts/architecture#fleets-and-multiple-servers) `defaults` →

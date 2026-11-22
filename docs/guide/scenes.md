@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "Casting, beats and pacing are game-agnostic; anchors, movement and props use the Minecraft world."
+---
+
 # Scenes
 
 Scenes let several bots on the same server act something out together: a cart breaks down and

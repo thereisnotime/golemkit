@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "The layer pipeline is game-agnostic; the pattern table and slots name Minecraft actions and items."
+---
+
 # Plain-language commands (intents)
 
 The intents brain lets owners talk to a bot in normal chat without the cloud LLM: "pax guard me",

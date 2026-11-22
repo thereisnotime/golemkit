@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "The format, LLM settings and retries are game-agnostic; humanize timing and some keys assume Minecraft."
+---
+
 # Profiles
 
 A profile is a saved instance of a [variant](/concepts/variants-profiles): who the bot is (username, persona), who it obeys,

@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "defineAction, flags, signals and results are game-agnostic; the example actions drive the Mineflayer bot."
+---
+
 # Writing skills
 
 A skill is a group of related **actions**, plus optional per-session setup and observations.

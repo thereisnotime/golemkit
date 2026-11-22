@@ -1,3 +1,7 @@
+---
+scope: minecraft
+---
+
 # Tool progression and gathering
 
 Bots gather like a quick player: make a wooden pickaxe from the first tree, stone tools from

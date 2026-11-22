@@ -1,3 +1,7 @@
+---
+scope: core
+---
+
 # Deployment
 
 Bots are long-running Node processes. Any process supervisor works; two tested setups below.

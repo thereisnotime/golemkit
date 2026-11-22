@@ -1,3 +1,7 @@
+---
+scope: neoforge
+---
+
 # NeoForge support
 
 Mineflayer only speaks the vanilla protocol. A NeoForge server rejects vanilla clients when

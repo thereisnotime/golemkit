@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "The action lock, brains, chat queue and fleets are game-agnostic; Agent wraps a Mineflayer bot and the NeoForge layer hooks its client."
+---
+
 # Architecture
 
 ```

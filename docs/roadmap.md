@@ -1,3 +1,8 @@
+---
+scope: mixed
+scopeNote: "Covers the game-agnostic core and the Minecraft and NeoForge work."
+---
+
 # Roadmap
 
 What works today, what is being built next and what is only an idea. Every planned item has an

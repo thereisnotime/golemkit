@@ -1,3 +1,7 @@
+---
+scope: minecraft
+---
+
 # Movement, protection and combat
 
 How bots get around, what they learn about the world, and how they fight. These live in core
