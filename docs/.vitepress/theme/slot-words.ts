@@ -29,6 +29,7 @@ function start (el: HTMLElement): void {
   const show = (w: Word) => {
     word.textContent = w.text
     word.dataset.status = w.status
+    reel.dataset.status = w.status
     badge.textContent = BADGE[w.status] ?? w.status
     badge.dataset.status = w.status
   }

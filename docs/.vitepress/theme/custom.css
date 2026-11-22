@@ -73,9 +73,18 @@
 .VPFeature .icon svg { stroke: currentColor; }
 .vp-doc .home-footnote { color: var(--vp-c-text-2); font-size: 0.9em; margin-top: 2.5em; }
 
-/* Slot-machine words on the homepage */
-.slot { display: inline-flex; align-items: baseline; gap: 0.35em; white-space: nowrap; }
-.slot-reel { display: inline-block; overflow: hidden; vertical-align: bottom; line-height: inherit; }
+/* Slot-machine words on the homepage: a tinted box shows the word changes, the status is a small
+   superscript badge */
+.slot { display: inline-flex; align-items: flex-start; gap: 0.12em; white-space: nowrap; }
+.slot-reel {
+  display: inline-block; overflow: hidden; vertical-align: bottom; line-height: 1.15;
+  padding: 0 0.22em; border-radius: 0.18em; border: 1px dashed transparent;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+.slot-reel[data-status="now"] { background: #16a34a1f; border-color: #16a34a55; }
+.slot-reel[data-status="try"] { background: #0284c71f; border-color: #0284c755; }
+.slot-reel[data-status="soon"] { background: #d977061f; border-color: #d9770655; }
+.slot-reel[data-status="idea"] { background: var(--vp-c-default-soft); border-color: var(--vp-c-divider); }
 .slot-word { display: inline-block; }
 .slot-word.slot-roll { animation: slot-roll 0.42s cubic-bezier(.2,.8,.2,1); }
 @keyframes slot-roll { from { transform: translateY(70%); opacity: 0; filter: blur(2px); } to { transform: none; opacity: 1; filter: none; } }
@@ -83,14 +92,14 @@
 .slot-word[data-status="try"] { color: var(--vp-c-text-1); }
 .slot-word[data-status="soon"], .slot-word[data-status="idea"] { color: var(--vp-c-text-2); }
 .slot-badge {
-  font-size: 0.28em; font-weight: 600; letter-spacing: 0.02em; line-height: 1;
-  padding: 0.3em 0.6em; border-radius: 999px; transform: translateY(-0.9em);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em; line-height: 1;
+  padding: 3px 7px; border-radius: 999px; margin-top: 0.15em;
   border: 1px solid var(--vp-c-divider); color: var(--vp-c-text-2); background: var(--vp-c-bg-soft);
 }
-.VPHero .tagline .slot-badge { font-size: 0.6em; transform: translateY(-0.15em); }
+.VPHero .tagline .slot-badge { font-size: 10px; padding: 2px 6px; margin-top: 0; }
 .slot-badge[data-status="now"] { color: #16a34a; border-color: #16a34a66; }
-.slot-badge[data-status="soon"] { color: #d97706; border-color: #d9770666; }
 .slot-badge[data-status="try"] { color: #0284c7; border-color: #0284c766; }
+.slot-badge[data-status="soon"] { color: #d97706; border-color: #d9770666; }
 
 /* Roadmap status pills */
 .vp-doc .rm { display: inline-block; font-size: 0.8em; font-weight: 600; padding: 0.05em 0.6em; border-radius: 999px; border: 1px solid; white-space: nowrap; }
