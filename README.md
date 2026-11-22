@@ -173,6 +173,7 @@ Guides worth starting with:
 - [NPC brain](docs/guide/npc-brain.md), [self-improving NPCs](docs/guide/self-improver.md), [scenes](docs/guide/scenes.md)
 - [Context packs](docs/guide/context-pack.md) and the [journal](docs/guide/journal.md)
 - Concepts: [architecture](docs/concepts/architecture.md), [world, movement and combat](docs/concepts/world.md)
+- [What is game-specific](docs/concepts/scope.md): which code is game-agnostic, Minecraft-specific or NeoForge-specific, ahead of the [game-adapter split](openspec/changes/game-adapters/proposal.md)
 - Reference: [skills](docs/skills.md) and the generated [action reference](docs/reference/actions.md)
 
 ## buddy's commands

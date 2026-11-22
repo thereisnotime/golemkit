@@ -87,6 +87,11 @@ docs-gen:
 docs-links:
     @node scripts/docs-interlink.ts
 
+# Which directories import Mineflayer / PrismarineJS or touch agent.bot (informational, see docs/concepts/scope.md)
+[group('docs')]
+scope-check *args:
+    @node scripts/scope-check.ts {{args}}
+
 # Build the static docs site into docs/.vitepress/dist
 [group('docs')]
 docs-build: docs-gen

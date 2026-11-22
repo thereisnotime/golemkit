@@ -8,6 +8,17 @@ Framework for Minecraft bots on NeoForge servers, built on Mineflayer. TypeScrip
 - `src/core/neoforge/` the NeoForge layer (wire formats from neoforged/NeoForge branch `1.21.1`, `network/payload/`).
 - `src/skills/` actions grouped by topic. `src/brains/` decision loops. `variants/` bot definitions. `scripts/` live-server tools.
 
+## Scope: game-agnostic vs game-specific
+
+The [game-adapters proposal](openspec/changes/game-adapters/proposal.md) splits the code into a game-agnostic core and game adapters (Minecraft Java first). [docs/concepts/scope.md](docs/concepts/scope.md) has the per-directory table with counts; `node scripts/scope-check.ts` prints them.
+
+- Game-agnostic: `src/llm/`, `src/context/`, `src/cli.ts`, and in `src/core/` the events, fleets, log, profile, retry, storage and toggles modules.
+- Mixed (generic framework, Minecraft parts): `src/core/agent.ts`, `helpers.ts`, `humanize.ts`, `protection.ts`, `modded.ts`, `action.ts`, `brain.ts`, `skill.ts`, `definition.ts` (Mineflayer types only), `src/core/journal/capture.ts`, `src/brains/*` (the frameworks are generic; reflexes, the behaviour library and stock NPC behaviours are Minecraft), `profiles/`, `scripts/`.
+- Minecraft-specific: `src/skills/` (except `config`, and the journal actions), `variants/`, `blueprints/`.
+- NeoForge-specific: `src/core/neoforge/`.
+
+New game-agnostic code must not import `mineflayer`, `prismarine-*`, `minecraft-*` or `vec3`, and must not touch `agent.bot`; it goes through `agent.act()` and agent events. Minecraft-specific code goes in a skill or, for the server handshake, in the NeoForge layer. Docs pages carry `scope: core | minecraft | neoforge | mixed` in their frontmatter (`scopeNote` for mixed); set it on new pages.
+
 ## Rules
 
 - Node type stripping: only erasable TS syntax. No `enum`, `namespace`, parameter properties or decorators. Relative imports use the `.ts` extension; type-only imports use `import type`.
