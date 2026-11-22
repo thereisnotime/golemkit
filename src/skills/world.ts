@@ -50,9 +50,24 @@ export function within (bot: Bot, pos: Vec3, reach = REACH): boolean {
   return bot.entity.position.offset(0, bot.entity.height * 0.9, 0).distanceTo(pos.offset(0.5, 0.5, 0.5)) <= reach
 }
 
+/** gotoWithin ran out of time (the message stays "took too long to get there"). */
+export class GotoTimeoutError extends Error {
+  constructor () {
+    super('took too long to get there')
+    this.name = 'GotoTimeoutError'
+  }
+}
+
+/** The pathfinder's error when a path is cut short, e.g. by the previous action's stop landing late. */
+export function isPathStopped (e: unknown): boolean {
+  return /stopped before it could be completed/i.test((e as Error)?.message ?? '')
+}
+
 /**
  * goto with a time limit: pathfinder can wander for minutes towards a goal it can't reach.
- * Throws a plain Error on timeout, ActionAbortedError if the action itself was stopped.
+ * Throws GotoTimeoutError on timeout, ActionAbortedError if the action itself was stopped.
+ * A path stopped within the first moments is started once more; a second stop is reported as
+ * "kept being stopped" instead of the pathfinder's generic text.
  */
 export async function gotoWithin (bot: Bot, goal: any, signal: AbortSignal, ms = 30_000): Promise<void> {
   const ctl = new AbortController()
@@ -66,13 +81,19 @@ export async function gotoWithin (bot: Bot, goal: any, signal: AbortSignal, ms =
     } catch (e) {
       // Right after another action hands over, the old path is still being stopped and that stop can
       // land on our brand-new path ("Path was stopped before it could be completed"). Start again once.
-      if (signal.aborted || ctl.signal.aborted || Date.now() - started > 1500 || !/stopped before it could be completed/i.test((e as Error).message)) throw e
-      await new Promise(r => setTimeout(r, 150))
-      await goto(bot, goal, ctl.signal)
+      if (signal.aborted || ctl.signal.aborted || Date.now() - started > 1500 || !isPathStopped(e)) throw e
+      await new Promise(r => setTimeout(r, 250))
+      checkAborted(signal)
+      try {
+        await goto(bot, goal, ctl.signal)
+      } catch (e2) {
+        if (!ctl.signal.aborted && isPathStopped(e2)) throw new Error('the path kept being stopped (something else is steering the pathfinder)')
+        throw e2
+      }
     }
   } catch (e) {
     checkAborted(signal)
-    if (ctl.signal.aborted) throw new Error('took too long to get there')
+    if (ctl.signal.aborted) throw new GotoTimeoutError()
     throw e
   } finally {
     clearTimeout(timer)

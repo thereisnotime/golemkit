@@ -3,10 +3,10 @@
 import type { Bot } from 'mineflayer'
 import type { Agent } from '../core/index.ts'
 import {
-  defineSkill, defineAction, z, noParams, ok, fail, goals, goto, fmtPos, nearestHostile,
-  ActionAbortedError,
+  defineSkill, defineAction, z, noParams, ok, fail, goals, fmtPos, nearestHostile,
   checkAborted
 } from '../core/index.ts'
+import { gotoWithin as walkWithin, GotoTimeoutError } from './world.ts'
 
 export interface Place {
   x: number
@@ -48,18 +48,36 @@ export function sameDimension (bot: Bot, place: Place): boolean {
 
 /**
  * Walks to a goal but gives up after `ms`. Returns false on timeout, rethrows when the
- * action itself was aborted, so callers can report a partial walk instead of hanging.
+ * action itself was aborted, so callers can report a partial walk instead of hanging. A path
+ * stopped right at the start (the previous action's stop landing on ours) is retried once.
  */
 async function gotoWithin (bot: Bot, goal: unknown, signal: AbortSignal, ms: number): Promise<boolean> {
-  const limited = AbortSignal.any([signal, AbortSignal.timeout(ms)])
   try {
-    await goto(bot, goal, limited)
+    await walkWithin(bot, goal, signal, ms)
     return true
   } catch (e) {
-    if (signal.aborted) throw new ActionAbortedError(String(signal.reason ?? 'aborted'))
-    if (limited.aborted) return false
+    checkAborted(signal)
+    if (e instanceof GotoTimeoutError) return false
     throw e
   }
+}
+
+/** A home a few blocks up or down (a floor above, a cellar, stairs) still counts as there. */
+export const HOME_VERTICAL_SLACK = 3
+
+/**
+ * How far a position is from home for "am I home" checks: horizontal distance to the middle
+ * of the home block, plus only the part of the height difference beyond HOME_VERTICAL_SLACK.
+ * Pure, exported for tests.
+ */
+export function homeOffset (pos: { x: number, y: number, z: number }, home: { x: number, y: number, z: number }): number {
+  const dy = Math.max(0, Math.abs(pos.y - home.y) - HOME_VERTICAL_SLACK)
+  return Math.hypot(pos.x - (home.x + 0.5), dy, pos.z - (home.z + 0.5))
+}
+
+/** Within `range` of home by homeOffset (range 0 still allows standing anywhere on the home block). */
+export function atHome (pos: { x: number, y: number, z: number }, home: { x: number, y: number, z: number }, range: number): boolean {
+  return homeOffset(pos, home) <= Math.max(range, 0.75)
 }
 
 /** A Vec3 at absolute block coordinates, built from the bot's own position (no direct vec3 dependency). */
@@ -91,6 +109,30 @@ export function findStandable (bot: Bot, x: number, y: number, z: number, span =
     if (isPassable(feet) && isPassable(head)) return { x, y: y + dy, z }
   }
   return null
+}
+
+function inWater (bot: Bot): boolean {
+  const p = bot.entity.position
+  return bot.blockAt(p)?.name === 'water' || bot.blockAt(p.offset(0, 1, 0))?.name === 'water'
+}
+
+/**
+ * Swims to the nearest dry spot within 12 blocks (does nothing when not in water). Returns
+ * whether it ended out of the water. For actions that end with the bot afloat: an idle bot
+ * in deep water sinks and drowns.
+ */
+export async function reachDryLand (bot: Bot, signal: AbortSignal): Promise<boolean> {
+  if (!inWater(bot)) return true
+  const p = bot.entity.position
+  for (let r = 2; r <= 12; r += 2) {
+    for (const [dx, dz] of [[r, 0], [-r, 0], [0, r], [0, -r], [r, r], [-r, -r], [r, -r], [-r, r]] as const) {
+      const spot = findStandable(bot, Math.floor(p.x) + dx, Math.floor(p.y), Math.floor(p.z) + dz, 6)
+      if (!spot || bot.blockAt(at(bot, spot.x, spot.y, spot.z))?.name === 'water') continue
+      const there = await gotoWithin(bot, new goals.GoalNear(spot.x, spot.y, spot.z, 1), signal, 20000).catch(() => { checkAborted(signal); return false })
+      if (there || !inWater(bot)) return true
+    }
+  }
+  return !inWater(bot)
 }
 
 const wander = defineAction({
@@ -144,12 +186,17 @@ const goHome = defineAction({
     const home = getHome(agent)
     if (!home) return fail('no home set')
     if (!sameDimension(bot, home)) return fail(`home is in ${home.dimension}`)
+    // already there (inside the walls, a floor up or down): nothing to walk, and no path to fail
+    if (atHome(bot.entity.position, home, range)) return ok(`already home (${fmtPos(home)})`)
+    let arrived = false
     try {
-      await gotoWithin(bot, new goals.GoalNear(home.x, home.y, home.z, range), signal, 60000)
+      arrived = await gotoWithin(bot, new goals.GoalNear(home.x, home.y, home.z, range), signal, 60000)
     } catch (e) {
       checkAborted(signal)
+      if (atHome(bot.entity.position, home, range)) return ok(`home at ${fmtPos(home)}`)
       return fail(`couldn't get home (${(e as Error).message}), at ${fmtPos(bot.entity.position)}`)
     }
+    if (!arrived && !atHome(bot.entity.position, home, range)) return fail(`couldn't get home in time, at ${fmtPos(bot.entity.position)}`)
     return ok(`home at ${fmtPos(home)}`)
   }
 })
