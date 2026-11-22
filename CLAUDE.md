@@ -1,20 +1,5 @@
 # mc-buddy
 
-Framework for Minecraft bots on NeoForge servers, built on Mineflayer. TypeScript run directly by Node (see `.tool-versions`), no build step. Read `docs/concepts/architecture.md` before changing core, skills or brains.
+The project instructions for coding agents live in [AGENTS.md](AGENTS.md).
 
-## Layout
-
-- `src/core/` agent lifecycle, action lock and priorities, chat queue, storage, CLI helpers. `src/core/index.ts` is the public API; skills, brains and bots import from there.
-- `src/core/neoforge/` the NeoForge layer (wire formats from neoforged/NeoForge branch `1.21.1`, `network/payload/`).
-- `src/skills/` actions grouped by topic. `src/brains/` decision loops. `variants/` bot definitions. `scripts/` live-server tools.
-
-## Rules
-
-- Node type stripping: only erasable TS syntax. No `enum`, `namespace`, parameter properties or decorators. Relative imports use the `.ts` extension; type-only imports use `import type`.
-- Every capability is an action with a zod schema and a clear `description` (it's shown to players and LLMs). Long actions must honour `ctx.signal`; use `goto`, `holdGoal`, `sleep`, `checkAborted` from core.
-- Brains act through `agent.act()` with a caller and priority, never by driving the pathfinder directly, so the action lock stays authoritative.
-- Chat goes through `agent.say/whisper/reply` (rate limited), never `bot.chat` directly.
-- When changing the handshake, check the payload id and codec in the NeoForge source; don't guess channel names.
-- Don't add mineflayer plugins that depend on an old mineflayer (mineflayer-pvp does).
-- `just check` (tsc + unit tests) before committing. `just probe` / `just chat-test` hit the real server; keep them out of `npm test`.
-- Update `openspec/` when behaviour changes.
+@AGENTS.md

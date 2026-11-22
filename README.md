@@ -1,13 +1,14 @@
 # mc-buddy
 
-A TypeScript framework for building Minecraft bots on **NeoForge** servers: companions,
+A TypeScript framework for building Minecraft Java bots, with first-class **NeoForge** support: companions,
 bodyguards, self-sufficient NPCs and LLM-driven agents, all from the same pieces (actions,
 skills, brains, behaviours, profiles). Bots are real protocol clients built on
 [Mineflayer](https://github.com/PrismarineJS/mineflayer), not headless Minecraft, so they
 start in a second and use ~100 MB each.
 
-Built and tested on the **mc02** NeoForge 1.21.1 modpack (Create, Ars Nouveau, Curios, ...),
-but the NeoForge layer learns any server's mod channels on its own.
+Built and tested on the **mc02** NeoForge 1.21.1 modpack (Create, Ars Nouveau, Curios, ...).
+The NeoForge layer learns any server's mod channels on its own and stays idle on vanilla and
+Paper servers. See [what's supported](#support-status) for what has been tested.
 
 ## What the bots can do
 
@@ -29,6 +30,47 @@ but the NeoForge layer learns any server's mod channels on its own.
   (`!config_set`) that change behaviour without a restart, fleets of bots in one process.
 - **Keep a record.** A journal of deaths, items, actions and LLM token usage, with daily
   rollups and analysis scripts.
+
+## Support status
+
+✅ supported and tested · 🧪 works but partial or untested here · 🚧 proposed ([OpenSpec](openspec/changes/)) · ❌ not supported
+
+### Servers
+
+| | status | notes |
+|---|---|---|
+| NeoForge 1.21.1 | ✅ | tested daily on mc02; mod channels, registry sync and config tasks handled |
+| Other NeoForge versions | 🧪 | set `MC_VERSION`; the handshake follows the 1.21.1 wire formats |
+| Vanilla, Paper, Spigot | 🧪 | the NeoForge layer stays idle; not part of regular testing |
+| Fabric / Quilt | 🧪 | fine when no mod needs a client side; not tested |
+| Legacy Forge (FML 1.12 to 1.20.1) | ❌ | different handshake, not implemented |
+| Offline auth | ✅ | what mc02 uses |
+| Microsoft accounts | 🧪 | Mineflayer supports it (`MC_AUTH=microsoft`); not tested here |
+| Modded items and mobs | ✅ | real names from NeoForge's registry sync |
+| Modded blocks | 🧪 | treated as full cubes, since their states aren't synced |
+| Mod GUIs, Create contraptions, Ars spells, Curios slots | ❌ | |
+
+### Bot features
+
+| | status | notes |
+|---|---|---|
+| Chat commands (`!follow`, whispers) | ✅ | |
+| Plain-language commands without an LLM | ✅ | [intents](docs/guide/intents.md); known misses: 🚧 [intent-parser-gaps](openspec/changes/intent-parser-gaps/proposal.md) |
+| Local embedding layer (MiniLM) | ✅ | optional dependency, ~2.5 ms per message |
+| Local LLM layer (Ollama, llama.cpp) | 🧪 | built and benchmarked, off by default: small models misfire |
+| LLM brain (Claude / Codex subscription or API) | ✅ | goals, budgets, quota pause, token usage in the journal |
+| NPC mode when the LLM quota runs out | ✅ | default routine: 🚧 [daily-routine](openspec/changes/daily-routine/proposal.md) |
+| Reflexes and combat (weapons, shields, crits, creepers) | ✅ | |
+| Bodyguard | ✅ | a third fewer hits in the [mob-wave benchmark](docs/guide/behaviors.md); 🚧 [guard-intercept](openspec/changes/guard-intercept/proposal.md), [bodyguard-coexistence](openspec/changes/bodyguard-coexistence/proposal.md), [guard-bench-modes](openspec/changes/guard-bench-modes/proposal.md) |
+| Food, farming, woodcutting, mining, tool upgrades | ✅ | |
+| Search and fetch (`find_target`, `bring_item`, `fetch_drops`) | 🧪 | ores and water found live; hunting, shearing and re-runs: 🚧 [search-gaps](openspec/changes/search-gaps/proposal.md) |
+| Building from blueprints, imports (.schem, .litematic, .nbt) | ✅ | |
+| Roads and stairs between buildings | ✅ | stair tower as an action: 🚧 [stair-tower-action](openspec/changes/stair-tower-action/proposal.md) |
+| WorldEdit | 🧪 | needs WorldEdit permission for the bot |
+| Live config, profiles, fleets, journal | ✅ | |
+| Job queue ("farm, then wood, then home") | 🚧 | [job-queue](openspec/changes/job-queue/proposal.md) |
+| Guarding an area or village | 🚧 | [area-guard](openspec/changes/area-guard/proposal.md) |
+| Alerts for unknown players | 🚧 | [player-alerts](openspec/changes/player-alerts/proposal.md) |
 
 ## Quick start
 
