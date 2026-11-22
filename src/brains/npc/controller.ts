@@ -246,7 +246,7 @@ export class NpcController {
         this.log.debug(`score ${b.name}: ${(e as Error).message}`)
       }
       // flickering at the edge of its condition: only an urgent score may start it again for now
-      if (ctx.now < st.flipUntil && score < (this.opts.urgentScore ?? 80) && this.current !== b.name) score = 0
+      if (ctx.now < st.flipUntil && score < (this.opts.flipBypassScore ?? 75) && this.current !== b.name) score = 0
       return { name: b.name, score }
     })
   }

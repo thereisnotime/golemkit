@@ -39,8 +39,9 @@ Every `tickMs` (1.5 s) the brain:
 
    A behaviour that keeps dropping out ("no longer applies") within `flipRunMs` (10 s) of
    starting flickers at the edge of its condition. The first such flip is free; after that it
-   may only start again with an urgent score for `flipCooldownMs` (5 s, doubling per flip up
-   to `maxFlipCooldownMs`, 60 s). A run that finishes by itself resets the count.
+   may only start again with a score of at least `flipBypassScore` (75) for `flipCooldownMs`
+   (5 s, doubling per flip up to `maxFlipCooldownMs`, 60 s), so real dangers such as escaping
+   water (78) are never held back. A run that finishes by itself resets the count.
 
 When it switches, the old behaviour's `signal` aborts and the brain replaces its in-flight
 action with the internal no-op `npc_interrupt`, so the body stops right away.

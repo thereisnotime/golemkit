@@ -23,6 +23,8 @@ export interface SelectOptions {
   flipCooldownMs?: number
   /** Ceiling for the flip pause. Default 60000. */
   maxFlipCooldownMs?: number
+  /** Scores at or above this start even during a flip pause, so real dangers (water escape 78) are never held back. Default 75. */
+  flipBypassScore?: number
 }
 
 export type Decision =

@@ -171,8 +171,8 @@ test('controller: a behaviour that keeps flipping on and off is held back unless
   }
   safe.v = 70; await step(4000)
   assert.equal(c.current, 'chore', 'second quick drop-out: held back for 5 s')
-  safe.v = 90; await step(1000)
-  assert.equal(c.current, 'stay_safe', 'an urgent score still gets through')
+  safe.v = 78; await step(1000)
+  assert.equal(c.current, 'stay_safe', 'a real danger (water escape, 78) still gets through')
   safe.v = 70; await step(2000)
   assert.equal(c.current, 'stay_safe', 'the running one keeps its score')
   c.stop()
