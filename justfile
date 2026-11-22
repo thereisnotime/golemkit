@@ -53,6 +53,12 @@ chat-test cmds="!help,!pos,!hp,!come,!follow,!inventory,!stop":
     @echo "{{BOLD}}{{BLUE}}==> chat test: {{cmds}}{{NORMAL}}"
     node --env-file-if-exists=.env scripts/chat-test.ts "{{cmds}}"
 
+# Bodyguard mob-wave benchmark on the live server (ClaudeTest directs): guard vs follow_owner vs no bot
+[group('debug')]
+guard-bench *args:
+    @echo "{{BOLD}}{{BLUE}}==> guard benchmark {{args}}{{NORMAL}}"
+    node --env-file-if-exists=.env scripts/guard-bench.ts {{args}}
+
 # Forget learned NeoForge channels (relearned on next join)
 [group('debug')]
 reset-channels:
