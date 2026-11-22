@@ -53,7 +53,7 @@ coordinates).
 | `block_broken` / `block_placed` | per 16x16 column, reported 30 s after the first | `blocks`, `count`, `area` |
 | `chat_in` / `chat_out` | public chat heard / sent | `from`, `message` |
 | `whisper` | whispers both ways | `dir` (`in`/`out`), `from` / `to`, `message` |
-| `action` | an action finished | `name`, `caller` (`player:robin`, `brain:llm`), `ok`, `message`, `ms`, `params` (short), `player` |
+| `action` | an action finished | `name`, `caller` (`player:Robin`, `brain:llm`), `ok`, `message`, `ms`, `params` (short), `player` |
 | `goal` | a goals system emits `goal` on the agent or calls `journal.record('goal', ...)` | free-form (`goal`, `status`, ...) |
 | `player_seen` | a player comes into view (once per player per 10 min) | `player`, `distance` |
 | `player_joined` / `player_left` | real joins and leaves (not the list replayed on spawn) | `player` |
@@ -151,16 +151,16 @@ The journal skill's actions are chat commands and LLM tools like every other act
 | `goto_death` | walk back to the last death position and pick up the drops (exclusive, long-running) |
 
 ```
-<robin> !last_death
+<Robin> !last_death
 <Pax> died 1m ago at 549 87 53: Pax was slain by Phantom, while doing goto. Lost 1x
       ars_nouveau:worn_notebook. Died 62s ago, the drops may still be there for about 238s (goto_death)
-<robin> !recall_events type=deaths since=1h
+<Robin> !recall_events type=deaths since=1h
 <Pax> 10:29 died at 549 87 53: Pax was slain by Phantom (lost 1 items); 10:33 died at 609 86 52:
       Pax was shot by Skeleton
-<robin> !history
+<Robin> !history
 <Pax> today: online 11m; 7 deaths (last 32s ago at 539 74 47: Pax hit the ground too hard while
       trying to escape Skeleton); 16 actions, 15 failed (most: collect "the server won't let me
-      break dirt here…" x2); took 170.2 damage; met BuildTest, robin, ...; chat 73 in, 28 out
+      break dirt here…" x2); took 170.2 damage; met BuildTest, Robin, ...; chat 73 in, 28 out
 ```
 
 The tool results also carry the full events (or the rollup section) as data.
@@ -180,7 +180,7 @@ the last hour). Turn it off with `journal.observe: false`.
 const j = agent.journal
 j.query({ types: ['death', 'damage'], since: '1h' })               // oldest first, newest 50
 j.query({ near: { x: 100, z: -20, r: 30 }, since: 'yesterday' })
-j.query({ player: 'robin', text: 'wood', limit: 10 })
+j.query({ player: 'Robin', text: 'wood', limit: 10 })
 j.lastDeath()       // { ts, pos, dim, cause, killer, message, lost, lostCount, keptInventory, itemsMayRemain, ... }
 j.deaths('today')
 j.whereWas(Date.now() - 3_600_000)   // { pos, dim, ts, type } of the closest event with a position
@@ -229,7 +229,7 @@ separated), `MC_JOURNAL_RETENTION_DAYS`, `MC_JOURNAL_SUMMARIZE=<provider>`.
 ## LLM usage
 
 Every LLM turn is an `llm_turn` event: provider, model, billing, input/output tokens, cache reads
-and writes, tool calls, duration, what started the turn (`trigger`: "whisper from robin",
+and writes, tool calls, duration, what started the turn (`trigger`: "whisper from Robin",
 "goal: actionDone", "event: death"...), the cost (API spend, or the CLI's list-price estimate for
 subscription turns), and, when the brain goes through a proxy (`llm.proxy: caveman` or a gateway
 URL), `proxy`: the proxy's Prometheus counters that changed during that turn (scraped from

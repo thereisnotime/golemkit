@@ -14,7 +14,7 @@ servers:
 
 defaults:
   server: mc02
-  owners: [robin]        # who may command the bots
+  owners: [Robin]        # who may command the bots
 
 bots:
   - bot: buddy

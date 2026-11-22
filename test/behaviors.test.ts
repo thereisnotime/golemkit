@@ -75,9 +75,9 @@ test('arm, configure, disarm and reset', () => {
   const reg = defaultBehaviorRegistry()
   const store = new ArmedStore(reg, memStore(), {}, () => 1000)
   assert.deepEqual(store.armed(), [])
-  const r = store.arm('keep_fed', { below: 12 }, 'player:robin')
+  const r = store.arm('keep_fed', { below: 12 }, 'player:Robin')
   assert.ok(r.ok)
-  assert.deepEqual(store.armed().map(a => [a.name, a.options.below, a.by]), [['keep_fed', 12, 'player:robin']])
+  assert.deepEqual(store.armed().map(a => [a.name, a.options.below, a.by]), [['keep_fed', 12, 'player:Robin']])
   assert.ok(!store.arm('keep_fed', { below: 99 }).ok, 'bad options rejected')
   assert.equal(store.options('keep_fed').below, 12, 'unchanged after a rejected arm')
   assert.ok(store.configure('keep_fed', { hunt: false }, 'brain:llm').ok)
@@ -98,7 +98,7 @@ test('config is the base and runtime changes persist across restarts', () => {
   const a = new ArmedStore(reg, backing, config)
   assert.deepEqual(a.armed().map(e => e.name), ['stay_safe', 'keep_fed'])
   assert.equal(a.options('stay_safe').retreatBelow, 12)
-  a.disarm('keep_fed', 'player:robin')
+  a.disarm('keep_fed', 'player:Robin')
   a.arm('follow_owner', { distance: 4 }, 'brain:llm')
 
   const b = new ArmedStore(reg, backing, config) // restart: same storage, same config
@@ -160,7 +160,7 @@ test('hunt filter: only plain adult passive animals', () => {
   assert.equal(huntRefusal({ id: 2, name: 'villager', type: 'passive' }), 'not a huntable animal')
   assert.equal(huntRefusal({ id: 3, name: 'wolf', type: 'animal' }, { metadataKeys: wolfKeys }), 'not a huntable animal')
   assert.equal(huntRefusal({ id: 4, name: 'cat', type: 'animal' }), 'not a huntable animal')
-  assert.equal(huntRefusal({ id: 5, name: 'player', type: 'player', username: 'robin' }), 'player')
+  assert.equal(huntRefusal({ id: 5, name: 'player', type: 'player', username: 'Robin' }), 'player')
   assert.equal(huntRefusal({ id: 6, name: 'cow', type: 'player', username: 'cow' }), 'player', 'a player called cow')
   assert.equal(huntRefusal({ ...cow, metadata: [] }, { animals: ['pig'] }), 'not a huntable animal', 'respects the animal list')
   const owned = { id: 7, name: 'pig', type: 'animal', metadata: [] as unknown[] }
@@ -275,7 +275,7 @@ function fakeAgent (actions: string[], extra: Record<string, unknown> = {}) {
   const calls: { name: string, params: unknown, priority: number }[] = []
   const agent: any = {
     username: 'BehaveTest',
-    owners: ['robin'],
+    owners: ['Robin'],
     canDig: false,
     settings: {},
     definition: { name: 'test' },
@@ -350,7 +350,7 @@ test('a player holding the body pauses every level', async () => {
   const rt = new BehaviorRuntime(f.agent, scripted({ need: 50 }), {})
   rt.store.arm('need')
   const c = new NpcController(f.agent, f.bot, { name: 'behaviors', behaviors: () => rt.behaviors(), autoHome: false })
-  f.setForeign({ name: 'come', params: {}, caller: { kind: 'player', name: 'robin' }, priority: PRIORITY.player })
+  f.setForeign({ name: 'come', params: {}, caller: { kind: 'player', name: 'Robin' }, priority: PRIORITY.player })
   await c.tick(); await flush()
   assert.equal(c.current, null)
   assert.equal(f.calls.length, 0)
@@ -393,10 +393,10 @@ test('behavior actions: owners only from chat, LLM arms as brain:llm, string opt
   const forStranger = await arm!.run(actionCtx(f.agent, llm, 'Stranger'), { name: 'keep_fed' })
   assert.equal((forStranger as ActionResult).ok, false, 'an LLM turn for a non-owner cannot arm')
 
-  const r = await arm!.run(actionCtx(f.agent, { kind: 'player', name: 'robin' }), { name: 'keep_fed', options: 'below=10 hunt=false' }) as ActionResult
+  const r = await arm!.run(actionCtx(f.agent, { kind: 'player', name: 'Robin' }), { name: 'keep_fed', options: 'below=10 hunt=false' }) as ActionResult
   assert.ok(r.ok, r.message)
   assert.match(r.message, /armed keep_fed \(below=10 hunt=false\)/)
-  assert.equal(rt.store.armed()[0]!.by, 'player:robin')
+  assert.equal(rt.store.armed()[0]!.by, 'player:Robin')
 
   const l = await arm!.run(actionCtx(f.agent, llm), { name: 'follow_owner', options: { distance: 5 } }) as ActionResult
   assert.ok(l.ok, l.message)

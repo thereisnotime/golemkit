@@ -85,7 +85,7 @@ In game: `!help`.
 ```bash
 just bots               # list bots
 just actions buddy      # its commands / LLM tools
-just run buddy --username Helper --owners robin
+just run buddy --username Helper --owners Robin
 just fleet fleet.yaml   # several bots in one process (see fleets/example.yaml)
 ```
 
@@ -102,7 +102,7 @@ export default defineVariant({
   username: 'Guardian',
   skills: standardSkills(),
   brains: [commandBrain(), reflexes()],
-  onSpawn: (agent) => agent.act('guard', { player: 'robin' }, { caller: { kind: 'system', name: 'boot' } })
+  onSpawn: (agent) => agent.act('guard', { player: 'Robin' }, { caller: { kind: 'system', name: 'boot' } })
 })
 ```
 

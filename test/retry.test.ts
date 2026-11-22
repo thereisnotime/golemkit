@@ -22,7 +22,7 @@ test('backoff doubles, caps and jitters', () => {
 
 test('what gets retried', () => {
   assert.equal(isRetryableResult('stuck at 1 2 3, 400 blocks left'), true)
-  for (const m of ['busy: follow (player robin)', 'stopped', 'preempted', 'bad parameters for goto: x', 'digging is disabled for this bot']) {
+  for (const m of ['busy: follow (player Robin)', 'stopped', 'preempted', 'bad parameters for goto: x', 'digging is disabled for this bot']) {
     assert.equal(isRetryableResult(m), false, m)
   }
   assert.equal(isTransientLlmError('timed out after 120000ms'), true)

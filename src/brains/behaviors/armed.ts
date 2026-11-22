@@ -11,7 +11,7 @@ export const STORAGE_KEY = 'behaviors'
 export interface ArmedRecord {
   enabled: boolean
   options: Options
-  /** Who changed it last: "player:robin", "brain:llm", "brain:hooks"... */
+  /** Who changed it last: "player:Robin", "brain:llm", "brain:hooks"... */
   by: string
   at: number
 }

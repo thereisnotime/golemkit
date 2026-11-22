@@ -13,6 +13,7 @@
 // A skill is text for the model. Nothing in it is executed.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
+import { expandEnv } from '../core/definition.ts'
 import YAML from 'yaml'
 import { z } from 'zod'
 import type { ExtraTool } from '../llm/tools.ts'
@@ -63,9 +64,9 @@ export function loadSkills (dir: string): Skill[] {
     try { st = statSync(p) } catch { continue }
     if (st.isDirectory()) {
       const f = ['SKILL.md', 'skill.md'].map(n => join(p, n)).find(existsSync)
-      if (f) out.push(parseSkill(readFileSync(f, 'utf8'), f, entry))
+      if (f) out.push(parseSkill(expandEnv(readFileSync(f, 'utf8')), f, entry))
     } else if (entry.endsWith('.md')) {
-      out.push(parseSkill(readFileSync(p, 'utf8'), p, basename(entry, '.md')))
+      out.push(parseSkill(expandEnv(readFileSync(p, 'utf8')), p, basename(entry, '.md')))
     }
   }
   return out

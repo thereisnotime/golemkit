@@ -10,7 +10,7 @@ servers:
 
 defaults:
   server: mc02
-  owners: [robin]          # who may command the actors (and start scenes)
+  owners: [Robin]          # who may command the actors (and start scenes)
   settings:
     scenes:
       ambient: true        # idle filler (gossip_walk) when players are around

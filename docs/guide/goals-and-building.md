@@ -14,17 +14,17 @@ not a hundred. This page covers all three:
 
 ```mermaid
 flowchart TB
-  A["robin: pax, build us a small house"] --> B["chat turn<br/>set_goal + plan"]
+  A["Robin: pax, build us a small house"] --> B["chat turn<br/>set_goal + plan"]
   B --> C["gather_materials template=small_house<br/>(long-running)"]
   C --> C1["chop a tree by hand"] --> C2["craft planks, sticks,<br/>table, wooden axe"] --> C3["chop until enough logs, mine cobble<br/>craft stairs, slabs, door, chest...<br/>try torches, glass, a bed"]
   C3 --> D{"actionDone"}
   D --> E["goal turn<br/>update_goal done=1<br/>build template=small_house"]
-  E --> F["pick a flat natural site<br/>near robin, not protected"]
+  E --> F["pick a flat natural site<br/>near Robin, not protected"]
   F --> G["floor → walls → roof<br/>→ torches → furniture → door<br/>→ check every block, fix once"]
   G --> H{"actionDone"}
   H --> I["goal turn<br/>complete_goal + reply"]
   I --> J(["built a small_house at x y z<br/>121/121 blocks"])
-  D -.->|"same failure 3x"| S["stop turn:<br/>tell robin, ask"]
+  D -.->|"same failure 3x"| S["stop turn:<br/>tell Robin, ask"]
   H -.->|"out of planks"| E2["goal turn<br/>gather more, build again (resumes)"] --> G
 
   classDef chat fill:#f1f5f9,stroke:#475569,color:#0f172a
@@ -61,10 +61,10 @@ restarts and reconnects. Every prompt shows the active goal right after the trig
 
 ```
 ## Your active goal
-Goal (for robin): build us a small house
+Goal (for Robin): build us a small house
 1. [x] gather_materials template=small_house
 2. [ ] build template=small_house   <- next
-Started 4 min ago, 3/30 turns on your own since robin last spoke.
+Started 4 min ago, 3/30 turns on your own since Robin last spoke.
 ```
 
 `observe()` carries a compact form under `llm.goal`. Players can check and cancel with

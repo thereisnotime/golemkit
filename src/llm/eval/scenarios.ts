@@ -64,7 +64,7 @@ export function runCheck (c: Check, o: RunOutcome): boolean {
   }
 }
 
-export const OWNER = 'robin'
+export const OWNER = 'Robin'
 
 export const SCENARIOS: Scenario[] = [
   {

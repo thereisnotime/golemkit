@@ -38,8 +38,8 @@ export const defaultWorld = (): WorldState => ({
   health: 20,
   food: 20,
   inventory: { bread: 3, stone_axe: 1 },
-  online: ['robin'],
-  visible: [{ name: 'robin', position: [24, 64, 18] }],
+  online: ['Robin'],
+  visible: [{ name: 'Robin', position: [24, 64, 18] }],
   trees: true,
   isDay: true
 })

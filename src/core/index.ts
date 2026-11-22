@@ -6,7 +6,7 @@ export {
 } from './action.ts'
 export { defineSkill, type SkillDef } from './skill.ts'
 export { defineBrain, type BrainDef } from './brain.ts'
-export { defineBot, defineVariant, serverFromEnv, type BotDefinition, type VariantDefinition, type ServerConfig, type InstanceOptions } from './definition.ts'
+export { defineBot, defineVariant, serverFromEnv, expandEnv, type BotDefinition, type VariantDefinition, type ServerConfig, type InstanceOptions } from './definition.ts'
 export {
   createLogger, setLogLevel, configureLogging, loggingFromEnv, getLoggingConfig, recentLogs, subscribeLogs, installCrashHandlers, LEVELS,
   type Logger, type Level, type LogEntry, type LogConfig, type LogFields

@@ -11,14 +11,27 @@ just run pax         # profiles/pax.yaml
 just run pax -v      # same, with debug logging
 ```
 
+## Personal values from the environment
+
+Profiles and their context packs (AGENTS.md, USER.md, skills) expand `${NAME}` and
+`${NAME:-default}` from the environment, after loading `.env`. Keep owner names and token
+locations in `.env` instead of the repo:
+
+```yaml
+owners: ["${MC_OWNER:-Robin}"]
+llm:
+  oauthTokenVar: ${MC_OAUTH_TOKEN_VAR:-CLAUDE_CODE_OAUTH_TOKEN}
+  oauthTokenFile: ${MC_OAUTH_TOKEN_FILE:-~/.config/mc-buddy/secrets.env}
+```
+
 ## Format
 
 ```yaml
 # profiles/pax.yaml
 variant: companion            # variants/companion.ts
-description: Test LLM companion (Sonnet 5.5, subscription token), obeys robin
+description: Test LLM companion (Sonnet 5.5, subscription token), obeys Robin
 username: Pax
-owners: [robin]               # who may command it; omit for everyone
+owners: [Robin]               # who may command it; omit for everyone
 canDig: true                  # break blocks, tunnel while pathing
 persona: >-                   # replaces the variant's persona
   Pax, a capable, friendly helper...
@@ -134,11 +147,11 @@ humanize:
 ```mermaid
 sequenceDiagram
   autonumber
-  participant P as robin
+  participant P as Robin
   participant B as Pax (humanized)
   P->>B: "pax can you get some wood"
   Note over B: reaction delay 0.7–2.2 s
-  B->>B: turn to robin, stop walking
+  B->>B: turn to Robin, stop walking
   Note over B: "typing" ~ length / 6–11 chars/s
   B-->>P: "sure, on it"
   Note over B: hesitation 0.25–0.9 s

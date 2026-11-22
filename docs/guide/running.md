@@ -4,7 +4,7 @@
 
 ```bash
 just run <bot> [flags]
-just run buddy --username Helper --owners robin,friend --dig
+just run buddy --username Helper --owners Robin,friend --dig
 ```
 
 `<bot>` is a file in `variants/` (`variants/buddy.ts` or `variants/buddy/index.ts`) or a path to one.
@@ -32,7 +32,7 @@ servers:
     staggerMs: 5000          # gap between logins on this server
 defaults:
   server: mc02
-  owners: [robin]
+  owners: [Robin]
 bots:
   - bot: buddy
     username: McBuddy

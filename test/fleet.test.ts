@@ -19,7 +19,7 @@ test('multi-server with defaults, counts and per-server data dirs', () => {
 servers:
   one: { host: one.example, staggerMs: 1000 }
   two: { host: two.example, port: 25570 }
-defaults: { server: one, owners: [robin] }
+defaults: { server: one, owners: [Robin] }
 bots:
   - bot: buddy
   - bot: villager
@@ -32,7 +32,7 @@ bots:
   assert.equal(plan.servers.two!.port, 25570)
   const [buddy, v1, v2] = plan.agents
   assert.equal(buddy!.server, 'one')
-  assert.deepEqual(buddy!.options.owners, ['robin'])
+  assert.deepEqual(buddy!.options.owners, ['Robin'])
   assert.equal(v1!.options.username, 'Vil1')
   assert.equal(v2!.options.username, 'Vil2')
   assert.equal(resolveUsername(buddy!, 'McBuddy', true).dataDir, 'data/bots/one/McBuddy')

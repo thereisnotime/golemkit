@@ -11,6 +11,8 @@ import { getPlacements } from '../src/skills/construction.ts'
 import { getRoads, scanTerrain } from '../src/skills/roads.ts'
 import { writeFileSync } from 'node:fs'
 import { isNaturalBlock, facingToward } from '../src/skills/blueprint.ts'
+/** The player test bots keep away from (the real owner): MC_OWNER in .env. */
+const AVOID = process.env.MC_OWNER || 'Robin'
 
 const [xs = '1400', zs = '1400'] = process.argv.slice(2)
 const CX = Number(xs)
@@ -52,7 +54,7 @@ async function command (cmd: string): Promise<void> {
 /** Places this test must keep away from (spawn, the village, the fortress): at least 300 blocks. */
 const KEEP_AWAY = [{ x: 545, z: 45 }, { x: -2778, z: 1090 }, { x: 560, z: -43 }]
 function farEnough (x: number, z: number): boolean {
-  const pe = (() => { try { return agent.bot.players.robin?.entity?.position } catch { return undefined } })()
+  const pe = (() => { try { return agent.bot.players[AVOID]?.entity?.position } catch { return undefined } })()
   return [...KEEP_AWAY, ...(pe ? [pe] : [])].every(p => Math.hypot(p.x - x, p.z - z) >= 300)
 }
 function here (): { x: number, z: number } | null {
@@ -108,8 +110,8 @@ function findSites (): { a: { x: number, z: number, y: number }, b: { x: number,
 void agent.start()
 await once()
 log(`spawned at ${JSON.stringify(agent.observe().position)}, game mode ${agent.bot.game.gameMode}`)
-const robin = agent.bot.players.robin?.entity?.position
-if (robin && Math.hypot(robin.x - CX, robin.z - CZ) < 300) { log(`robin is within 300 blocks of ${CX} ${CZ}; pick another spot`); await agent.stop(); process.exit(1) }
+const Robin = agent.bot.players[AVOID]?.entity?.position
+if (Robin && Math.hypot(Robin.x - CX, Robin.z - CZ) < 300) { log(`Robin is within 300 blocks of ${CX} ${CZ}; pick another spot`); await agent.stop(); process.exit(1) }
 if (!farEnough(CX, CZ)) { log(`${CX} ${CZ} is too close to spawn, the village or the fortress`); await agent.stop(); process.exit(1) }
 
 let sites: ReturnType<typeof findSites> = null

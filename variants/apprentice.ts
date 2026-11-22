@@ -61,8 +61,8 @@ export default defineVariant({
         model: 'claude-sonnet-5-5',
         effort: 'low',
         login: '.auth/apprentice',
-        oauthTokenVar: 'CLAUDE_CODE_OAUTH_TOKEN',
-        oauthTokenFile: '~/.config/mc-buddy/secrets.env'
+        oauthTokenVar: process.env.MC_OAUTH_TOKEN_VAR || 'CLAUDE_CODE_OAUTH_TOKEN',
+        oauthTokenFile: process.env.MC_OAUTH_TOKEN_FILE || '~/.config/mc-buddy/secrets.env'
       },
       budget: { turnsPerHour: 10, tokensPerHour: 300_000, tokensPerDay: 1_000_000, callsPerInstruction: 3 },
       npc: { extraBehaviors: [fleeOrFight()] }

@@ -6,7 +6,7 @@ FastAsyncWorldEdit) and lets the bot use it, an owner can have the bot do in one
 server already has. The skill is `worldedit()` in `src/skills/worldedit.ts`, part of the
 extended skills.
 
-It is meant for owners who ask for it. Pax's rules say so too: WorldEdit only when robin asks and
+It is meant for owners who ask for it. Pax's rules say so too: WorldEdit only when Robin asks and
 the server has it.
 
 ## How an action runs

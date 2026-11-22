@@ -201,12 +201,12 @@ function fixture (): JournalEvent[] {
   const ow = 'minecraft:overworld'
   return [
     { ts: T(9, 0), type: 'connect', pos: { x: 0, y: 64, z: 0 }, dim: ow, data: { server: 'x:25565' } },
-    { ts: T(9, 5), type: 'action', pos: { x: 0, y: 64, z: 0 }, dim: ow, data: { name: 'chop_tree', caller: 'player:robin', ok: true, message: 'chopped 5 oak_log', ms: 9000 } },
+    { ts: T(9, 5), type: 'action', pos: { x: 0, y: 64, z: 0 }, dim: ow, data: { name: 'chop_tree', caller: 'player:Robin', ok: true, message: 'chopped 5 oak_log', ms: 9000 } },
     { ts: T(9, 6), type: 'item_gained', pos: { x: 10, y: 64, z: 5 }, dim: ow, data: { items: { oak_log: 5 }, action: 'chop_tree' } },
     { ts: T(9, 7), type: 'block_broken', pos: { x: 10, y: 64, z: 5 }, dim: ow, data: { blocks: { oak_log: 5 }, count: 5, area: '8 8' } },
     { ts: T(9, 10), type: 'action', data: { name: 'goto', caller: 'brain:llm', ok: false, message: 'stuck at 50 64 50', ms: 60000 } },
     { ts: T(9, 11), type: 'action', data: { name: 'goto', caller: 'brain:llm', ok: false, message: 'stuck at 50 64 50', ms: 60000 } },
-    { ts: T(9, 12), type: 'chat_in', data: { from: 'robin', message: 'pax get wood' } },
+    { ts: T(9, 12), type: 'chat_in', data: { from: 'Robin', message: 'pax get wood' } },
     { ts: T(9, 13), type: 'chat_out', data: { message: 'on it' } },
     { ts: T(10, 2), type: 'damage', pos: { x: 100, y: 64, z: 100 }, dim: ow, data: { source: 'Zombie', amount: 6, hits: 2, healthAfter: 4 } },
     { ts: T(10, 3), type: 'death', pos: { x: 101, y: 64, z: 99 }, dim: ow, data: { cause: 'slain', killer: 'Zombie', message: 'Pax was slain by Zombie', healthBefore: 4, action: 'goto', lost: { oak_log: 5, bread: 2 }, lostCount: 7 } },
@@ -238,7 +238,7 @@ test('rollup aggregation is deterministic and complete', () => {
     byName: { chop_tree: { ok: 1, failed: 0 }, goto: { ok: 0, failed: 2 } },
     topFailures: [{ action: 'goto', message: 'stuck at 50 64 50', count: 2 }]
   })
-  assert.deepEqual(t.players, ['Steve', 'robin'])
+  assert.deepEqual(t.players, ['Robin', 'Steve'])
   assert.deepEqual(t.kills, { Zombie: 1 })
   assert.deepEqual(t.damage, { taken: 6, bySource: { Zombie: 6 } })
   assert.deepEqual(t.llm, { turns: 1, inputTokens: 1000, outputTokens: 50 })
@@ -370,7 +370,7 @@ test('journal query helpers over raw files: lastDeath, deaths, whereWas, summary
 
 function fakeCtx (j: Journal, settings: Record<string, unknown> = {}) {
   const agent = { journal: j, settings, username: 'Pax', serverName: 'default', get fleet (): never { throw new Error('no fleet') } }
-  return { agent, bot: {}, signal: new AbortController().signal, caller: { kind: 'player', name: 'robin' }, log: {} } as any
+  return { agent, bot: {}, signal: new AbortController().signal, caller: { kind: 'player', name: 'Robin' }, log: {} } as any
 }
 
 test('journal actions: compact, useful text', async () => {
@@ -378,7 +378,7 @@ test('journal actions: compact, useful text', async () => {
   const now = Date.now()
   const j = new Journal({ dir })
   const ow = 'minecraft:overworld'
-  j.record('chat_in', { from: 'robin', message: 'pax where did you die' }, { ts: now - 120_000 })
+  j.record('chat_in', { from: 'Robin', message: 'pax where did you die' }, { ts: now - 120_000 })
   j.record('death', { cause: 'slain', killer: 'Zombie Villager', message: 'Pax was slain by Zombie Villager', lost: { iron_pickaxe: 1, oak_log: 12 }, lostCount: 13, action: 'chop_tree' }, { pos: { x: 120, y: 64, z: -30 }, dim: ow, ts: now - 60_000 })
   j.record('respawn', { keptInventory: false }, { pos: { x: 0, y: 64, z: 0 }, dim: ow, ts: now - 55_000 })
   const skill = journalSkill()
@@ -395,7 +395,7 @@ test('journal actions: compact, useful text', async () => {
   const params = act('recall_events').params.parse({ type: 'deaths,chat', since: '1h' })
   const re = await act('recall_events').run(fakeCtx(j), params) as { ok: boolean, message: string, data: unknown[] }
   assert.ok(re.ok)
-  assert.match(re.message, /<robin> pax where did you die; \d\d:\d\d died at 120 64 -30: Pax was slain by Zombie Villager \(lost 13 items\)$/)
+  assert.match(re.message, /<Robin> pax where did you die; \d\d:\d\d died at 120 64 -30: Pax was slain by Zombie Villager \(lost 13 items\)$/)
   assert.equal(re.data.length, 2)
   const none = await act('recall_events').run(fakeCtx(j), act('recall_events').params.parse({ type: 'kill' })) as { message: string }
   assert.equal(none.message, 'nothing recorded last 24h for kill')

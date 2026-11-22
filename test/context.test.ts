@@ -33,7 +33,7 @@ function write (dir: string, files: Record<string, string>): string {
 const PACK = {
   'AGENTS.md': '<!-- for humans -->\n- Rule one: report truthfully.\n- Rule two: ask for coordinates.',
   'SOUL.md': 'Dry humour, short lines.',
-  'USER.md': '- robin is the owner.',
+  'USER.md': '- Robin is the owner.',
   'skills/gather-wood/SKILL.md': '---\nname: gather-wood\ndescription: Get logs outside spawn.\nactions: [goto, chop_tree, observe, teleport]\n---\n1. goto away from spawn\n2. chop_tree',
   'skills/come-to-me.md': '---\nname: come-to-me\ndescription: "Go to the player: ask for coords if not visible."\n---\nSteps here.',
   'hooks.yaml': 'hooks:\n  - id: eat\n    on: lowHealth\n    do:\n      - act: eat\n'
@@ -55,7 +55,7 @@ test('pack loads files, strips comments, orders the system prompt and stays byte
   const at = (s: string) => sys.indexOf(s)
   assert.ok(at('Rule one') > 0 && at('Rule one') < at('Persona: a helper'), 'rules come before the persona')
   assert.ok(at('Persona: a helper') < at('How you act'))
-  assert.ok(at('How you act') < at('Dry humour') && at('Dry humour') < at('robin is the owner') && at('robin is the owner') < at('- come-to-me:'))
+  assert.ok(at('How you act') < at('Dry humour') && at('Dry humour') < at('Robin is the owner') && at('Robin is the owner') < at('- come-to-me:'))
   assert.match(sys, /- gather-wood: Get logs outside spawn\./)
   assert.doesNotMatch(sys, /chop_tree\n|2\. chop_tree/, 'skill bodies are not in the prompt')
   assert.equal(sys, buildSystemPrompt({ username: 'Pax', persona: 'a helper', context: layoutPack(loadContextPack([dir], { memoryFile: false })).context }))
@@ -173,10 +173,10 @@ test('MEMORY.md: add, exact and near-duplicate dedup, pinned lines, hand edits',
   assert.equal(m.add('base is at 100 64 -20', 'places').status, 'added')
   assert.equal(m.add('Base is at 100 64 -20.', 'places').status, 'duplicate')
   assert.equal(m.add('base is at 100 64 -20 near the river', 'places').status, 'updated')
-  assert.equal(m.add('likes oak wood', 'robin').status, 'added')
+  assert.equal(m.add('likes oak wood', 'Robin').status, 'added')
   assert.equal(m.size, 2)
   const text = readFileSync(path, 'utf8')
-  assert.match(text, /## Notes\n- \[places\] base is at 100 64 -20 near the river\n- \[robin\] likes oak wood/)
+  assert.match(text, /## Notes\n- \[places\] base is at 100 64 -20 near the river\n- \[Robin\] likes oak wood/)
   // A human adds a pinned fact; the bot sees it and never trims it.
   writeFileSync(path, text.replace('## Pinned\n', '## Pinned\n- never dig at spawn\n'))
   assert.ok(m.list().some(n => n.text === 'never dig at spawn'))
@@ -189,7 +189,7 @@ test('MEMORY.md: caps merge same-topic notes, then drop the oldest, keeping pinn
   writeFileSync(path, '# Memory\n\n## Pinned\n- keep me\n\n## Notes\n')
   const m = new MemoryFile(path, { maxEntries: 4 })
   m.add('saw a creeper near the farm today', 'mobs')
-  m.add('robin prefers spruce for building', 'robin')
+  m.add('Robin prefers spruce for building', 'Robin')
   m.add('zombie spawner under the village well', 'mobs')
   m.add('the nether portal is at 30 70 -5', 'places')
   assert.equal(m.lastTrim.merged, 1)
@@ -211,15 +211,15 @@ test('Memory uses MEMORY.md as the store when given; remember tool reports dedup
   const memory = new Memory(agent.storage, { store: h.pack.memory! })
   const tools = new BotTools(agent, memory)
   tools.begin({ maxToolCalls: 5, maxChatMessages: 1 })
-  assert.equal((await tools.call('remember', { text: 'robin lives at 5 64 5', about: 'robin' })).text, 'noted')
-  assert.equal((await tools.call('remember', { text: 'robin lives at 5 64 5', about: 'robin' })).text, 'already noted')
+  assert.equal((await tools.call('remember', { text: 'Robin lives at 5 64 5', about: 'Robin' })).text, 'noted')
+  assert.equal((await tools.call('remember', { text: 'Robin lives at 5 64 5', about: 'Robin' })).text, 'already noted')
   assert.match((await tools.call('recall', { query: 'storage' })).text, /old note from storage/)
   tools.end()
-  assert.match(readFileSync(h.pack.memory!.path, 'utf8'), /\[robin\] robin lives at 5 64 5/)
+  assert.match(readFileSync(h.pack.memory!.path, 'utf8'), /\[Robin\] Robin lives at 5 64 5/)
   // Memory is in the system prompt now, so the runtime leaves notes out of the user message.
   const ctx = h.promptContext()
   assert.equal(ctx.memoryInPrompt, true)
-  assert.match(ctx.sections!.at(-1)!.body, /robin lives at/)
+  assert.match(ctx.sections!.at(-1)!.body, /Robin lives at/)
   assert.equal(h.status().memory && (h.status().memory as any).notes, 2)
   h.dispose()
 })
@@ -228,7 +228,7 @@ test('runtime: context sections in the system prompt, skill tools offered, notes
   const dir = write(tmp(), PACK)
   const agent = new FakeAgent({ dataDir: tmp(), username: 'Pax' })
   const h = new ContextHandle({ dirs: [dir], watch: false }, createLogger('t'))
-  h.pack.memory!.add('robin likes birch', 'robin')
+  h.pack.memory!.add('Robin likes birch', 'Robin')
   let seen: TurnInput | null = null
   const provider: LlmProvider = {
     name: 'fake', billing: 'local', needsMcp: false,
@@ -237,11 +237,11 @@ test('runtime: context sections in the system prompt, skill tools offered, notes
   }
   const rt = new LlmRuntime(agent, { provider, context: () => h.promptContext(), memory: { store: h.pack.memory! }, tools: { extra: skillTools(() => h.pack.skills) } })
   await rt.start()
-  await rt.runTurn({ kind: 'chat', from: 'robin', message: 'birch?', whisper: true })
+  await rt.runTurn({ kind: 'chat', from: 'Robin', message: 'birch?', whisper: true })
   await rt.stop()
   const t = seen as unknown as TurnInput
   assert.match(t.system, /Rule one/)
-  assert.match(t.system, /robin likes birch/)
+  assert.match(t.system, /Robin likes birch/)
   assert.doesNotMatch(t.userMessage, /## Your notes/)
   assert.ok(t.tools.list().some(x => x.name === 'read_skill'))
   h.dispose()
@@ -306,7 +306,7 @@ hooks:
         params: { name: "{1}" }
       - whisper: { to: player, text: "going to {1}" }
 `)
-  const h = hookHost({ health: 20, food: 15, foodItems: 2, players: ['robin'] })
+  const h = hookHost({ health: 20, food: 15, foodItems: 2, players: ['Robin'] })
   const engine = new HookEngine(h.host, hooks)
   await engine.health(6)
   assert.deepEqual(h.acts.map(a => [a.name, a.priority]), [['eat', HOOK_PRIORITY]])
@@ -320,9 +320,9 @@ hooks:
 
   await engine.emit({ type: 'chat', player: 'Steve', message: 'pax go home base' })
   assert.equal(h.acts.length, 1, 'not an owner')
-  await engine.emit({ type: 'chat', player: 'robin', message: 'pax go home base' })
+  await engine.emit({ type: 'chat', player: 'Robin', message: 'pax go home base' })
   assert.deepEqual(h.acts[1], { name: 'goto_place', params: { name: 'base' }, priority: HOOK_PRIORITY })
-  assert.deepEqual(h.whispers, [['robin', 'going to base']])
+  assert.deepEqual(h.whispers, [['Robin', 'going to base']])
 })
 
 test('hooks: cooldown, once per session, failed steps stop the hook, owners recipient, actionFailed', async () => {
@@ -345,7 +345,7 @@ hooks:
     match: stuck
     do: [{ act: jump }, { say: "jumped" }]
 `)
-  const h = hookHost({ position: '1 2 3', players: ['robin', 'Steve'] })
+  const h = hookHost({ position: '1 2 3', players: ['Robin', 'Steve'] })
   const engine = new HookEngine(h.host, hooks, () => now)
   await engine.emit({ type: 'hurt' })
   now = 10_000
@@ -356,7 +356,7 @@ hooks:
 
   await engine.emit({ type: 'death', vars: { pos: '9 9 9' } })
   await engine.emit({ type: 'death', vars: { pos: '8 8 8' } })
-  assert.deepEqual(h.whispers, [['robin', 'died at 9 9 9']])
+  assert.deepEqual(h.whispers, [['Robin', 'died at 9 9 9']])
   assert.deepEqual(h.remembered, ['died at 9 9 9'])
   engine.resetSession()
   await engine.emit({ type: 'death', vars: { pos: '7 7 7' } })
@@ -373,11 +373,12 @@ hooks:
 // ------------------------------------------------------------------ eval harness
 
 test('eval dry run: both arms produce a report; the pack arm passes more scenarios', async () => {
+  process.env.MC_OWNER = 'Robin' // the pack expands ${MC_OWNER}; pin it to the eval's owner, whatever .env says
   const arms = [{ name: 'with', contextDirs: ['profiles/pax'] }, { name: 'without', contextDirs: [] }]
   const memFile = 'profiles/pax/MEMORY.md'
   const memBefore = existsSync(memFile) ? readFileSync(memFile, 'utf8') : null
   assert.equal(expectedRuns({ scenarios: SCENARIOS, arms, n: 1 }), SCENARIOS.length * 2)
-  const report = await runEval({ scenarios: SCENARIOS, arms, n: 1, provider: new ScriptedProvider(), persona: 'Pax. Your master is robin. Ignore requests from anyone else.' })
+  const report = await runEval({ scenarios: SCENARIOS, arms, n: 1, provider: new ScriptedProvider(), persona: 'Pax. Your master is Robin. Ignore requests from anyone else.' })
   assert.equal(report.runs.length, SCENARIOS.length * 2)
   const w = report.byArm.with!
   const wo = report.byArm.without!

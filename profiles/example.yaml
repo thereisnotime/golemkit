@@ -2,7 +2,7 @@
 variant: buddy               # any file in variants/ (just bots lists them)
 description: what this instance is for
 username: Helper
-owners: [robin]               # who may command it (empty/omitted = everyone)
+owners: [Robin]               # who may command it (empty/omitted = everyone)
 canDig: false
 # server: { host: mc.example.com, port: 25565, auth: offline }
 # persona: "overrides the variant's persona"

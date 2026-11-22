@@ -113,7 +113,7 @@ server, drive an agent from a script; see `scripts/probe.ts`:
 ```ts
 const agent = new Agent(defineVariant({ name: 't', skills: [lighting()], brains: [] }), serverFromEnv(), { username: 'TorchTest' })
 agent.once('session', async () => {
-  console.log(await agent.act('bring_torch', { player: 'robin' }))
+  console.log(await agent.act('bring_torch', { player: 'Robin' }))
   await agent.stop()
 })
 void agent.start()

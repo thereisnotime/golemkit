@@ -152,7 +152,7 @@ sequenceDiagram
   participant L as Action lock
   participant B as Body
   P->>L: act follow (longRunning)
-  L->>B: follow robin
+  L->>B: follow Robin
   Note over B: zombie hits the bot
   R->>L: act defend
   L-->>B: suspend follow (preempted)

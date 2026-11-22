@@ -261,7 +261,7 @@ async function llm (): Promise<void> {
     owners: [TESTER],
     canDig: true,
     dataDir: 'data/build-test-llm',
-    // Pax's provider and budget, but not its persona or context pack (those obey robin only).
+    // Pax's provider and budget, but not its persona or context pack (those obey Robin only).
     persona: `${BOT}, a capable, independent helper. Your master is ${TESTER}: when they ask for something, just do it, ` +
       'pick the details yourself and keep going until it is done. Report briefly when something is finished or truly blocked.',
     settings: { context: false, llm: { login: '.auth/buildtest', aliases: ['buildtest', 'builder'] } }

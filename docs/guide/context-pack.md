@@ -153,7 +153,7 @@ limits (owners, `canDig`, action [priorities](/concepts/architecture#the-action-
 ## USER.md, IDENTITY.md, SOUL.md
 
 Free markdown. Keep USER.md to facts you actually know; the Pax example only states what the
-profile config shows (robin is the owner). IDENTITY.md, when present, replaces the persona
+profile config shows (Robin is the owner). IDENTITY.md, when present, replaces the persona
 from the variant or profile.
 
 ## MEMORY.md
@@ -166,7 +166,7 @@ from the variant or profile.
 
 ## Notes
 - [places] base is at 100 64 -20 near the river
-- [robin] prefers spruce for building
+- [Robin] prefers spruce for building
 ```
 
 - **Authoritative copy.** With a pack, MEMORY.md is the note store: `remember` writes here,

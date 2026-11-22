@@ -64,7 +64,7 @@ classDiagram
 | `buddy` | player assistant driven by `!commands` | `example` |
 | `villager` | self-sufficient NPC (needs, routines, chores) | |
 | `actor` | performs [scenes](/guide/scenes) with other actors | used by `fleets/scenes.example.yaml` |
-| `companion` | LLM companion that talks and acts | `pax` (Sonnet 5.5, subscription token, obeys robin) |
+| `companion` | LLM companion that talks and acts | `pax` (Sonnet 5.5, subscription token, obeys Robin) |
 
 ## How a name is resolved
 

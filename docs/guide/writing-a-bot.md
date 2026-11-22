@@ -19,9 +19,9 @@ export default defineVariant({
   username: 'Guardian',
   skills: standardSkills(),
   brains: [commandBrain(), reflexes()],
-  owners: ['robin'],
+  owners: ['Robin'],
   onSpawn: (agent) => {
-    void agent.act('guard', { player: 'robin' }, { caller: { kind: 'system', name: 'boot' } })
+    void agent.act('guard', { player: 'Robin' }, { caller: { kind: 'system', name: 'boot' } })
   }
 })
 ```

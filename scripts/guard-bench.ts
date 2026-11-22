@@ -15,13 +15,15 @@
 // order flips on every repeat. A tester death is counted, the mobs alive are killed and the
 // tester is reset on the spot. --time day (default) keeps natural spawns out; zombies and
 // skeletons wear leather helmets so they don't burn, and spiders don't pick targets in daylight.
-// --scout only checks the spot (flat, dry, solid) and robin's distance; --cleanup only kills the
+// --scout only checks the spot (flat, dry, solid) and Robin's distance; --cleanup only kills the
 // tagged mobs and clears both players (also done at the end of a run, even a failed one). Results append to
 // data/guard-bench/results.jsonl; a summary table goes to stdout.
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { Agent, defineVariant, serverFromEnv, PRIORITY, fmtPos, type ActionResult } from '../src/core/index.ts'
 import { standardSkills, extendedSkills, navigation, pickup } from '../src/skills/index.ts'
 import { reflexes, behaviorsBrain } from '../src/brains/index.ts'
+/** The player test bots keep away from (the real owner): MC_OWNER in .env. */
+const AVOID = process.env.MC_OWNER || 'Robin'
 
 // ---- arguments ----
 
@@ -175,12 +177,12 @@ async function main (): Promise<void> {
   await waitLive(dir)
   log(`director: ${state(dir)}`)
 
-  // where is robin? /data get prints "<name> has the following entity data: [x, y, z]"
-  const robinDistance = async (): Promise<number | null> => {
+  // where is Robin? /data get prints "<name> has the following entity data: [x, y, z]"
+  const RobinDistance = async (): Promise<number | null> => {
     replies.length = 0
-    await cmd('/data get entity robin Pos')
+    await cmd(`/data get entity ${AVOID} Pos`)
     for (let i = 0; i < 20; i++) {
-      const line = replies.find(r => /robin has the following entity data|No entity was found|not found/i.test(r))
+      const line = replies.find(r => new RegExp(`${AVOID} has the following entity data|No entity was found|not found`, 'i').test(r) || /No entity was found|not found/i.test(r))
       if (line) {
         const m = /\[(-?[\d.]+)d, (-?[\d.]+)d, (-?[\d.]+)d\]/.exec(line)
         if (!m) return null // offline
@@ -188,15 +190,15 @@ async function main (): Promise<void> {
       }
       await pause(250)
     }
-    log('no answer to /data get robin; assuming offline')
+    log('no answer to /data get Robin; assuming offline')
     return null
   }
-  const checkRobin = async () => {
-    const d = await robinDistance()
-    log(`robin: ${d === null ? 'offline' : `${Math.round(d)} blocks away`}`)
-    if (d !== null && d < 200) throw new Error(`robin is ${Math.round(d)} blocks from the spot: aborting`)
+  const checkOwnerFar = async () => {
+    const d = await RobinDistance()
+    log(`Robin: ${d === null ? 'offline' : `${Math.round(d)} blocks away`}`)
+    if (d !== null && d < 200) throw new Error(`Robin is ${Math.round(d)} blocks from the spot: aborting`)
   }
-  await checkRobin()
+  await checkOwnerFar()
 
   // ---- the spot: flat, dry, solid ----
   await cmd(`/gamemode creative ${DIRECTOR}`)
@@ -392,7 +394,7 @@ async function main (): Promise<void> {
       const order = rep % 2 === 0 ? PHASES : [...PHASES].reverse()
       for (const phase of order) {
         // ---- reset ----
-        await checkRobin()
+        await checkOwnerFar()
         log(`== repeat ${rep + 1}, phase ${phase}: resetting`)
         measuring = false
         await cmd(`/time set ${TIME === 'night' ? 14000 : 1000}`)

@@ -1,16 +1,16 @@
 # Pax: test LLM companion on mc02. Claude Sonnet 5.5 through a subscription token
-#, in its own isolated login (.auth/pax). Obeys robin only.
+#, in its own isolated login (.auth/pax). Obeys ${MC_OWNER:-Robin} only.
 #   just run pax
 variant: companion
-description: Test LLM companion (Sonnet 5.5, subscription token), obeys robin
+description: Test LLM companion (Sonnet 5.5, subscription token), obeys ${MC_OWNER:-Robin}
 username: Pax
-owners: [robin]
+owners: ["${MC_OWNER:-Robin}"]
 canDig: true                  # full permissions: digging, breaking blocks, tunnelling when pathing
 persona: >-
   Pax, a capable, independent helper on a modded server (Create, Ars Nouveau). Your master is
-  robin. When robin asks for something, just do it: pick the details yourself (where, which
+  ${MC_OWNER:-Robin}. When ${MC_OWNER:-Robin} asks for something, just do it: pick the details yourself (where, which
   materials, what order) and keep going until it's done. Do NOT ask permission for steps or
-  confirm choices; only ask when you truly can't continue (e.g. you can't see robin and need
+  confirm choices; only ask when you truly can't continue (e.g. you can't see ${MC_OWNER:-Robin} and need
   coordinates). Work like an experienced player: make tools first (wooden axe before chopping,
   pickaxe before stone), equip the right tool, gather enough materials for the whole job in one
   go (gather_materials works out how much), and use several actions per turn. Report briefly
@@ -23,8 +23,8 @@ llm:
   model: claude-sonnet-5-5
   effort: low
   login: .auth/pax
-  oauthTokenVar: CLAUDE_CODE_OAUTH_TOKEN
-  oauthTokenFile: ~/.config/mc-buddy/secrets.env
+  oauthTokenVar: ${MC_OAUTH_TOKEN_VAR:-CLAUDE_CODE_OAUTH_TOKEN}
+  oauthTokenFile: ${MC_OAUTH_TOKEN_FILE:-~/.config/mc-buddy/secrets.env}
   listen: conversation        # mention | conversation | all
   immersive: false            # true = stay in character (reports stay truthful)
   aliases: [pax]
@@ -37,16 +37,16 @@ llm:
     maxToolCalls: 40
     maxTurns: 30              # model round trips per turn (8 was too few for multi-step work)
   goals:                      # persistent goals: follow-up turns until the job is done
-    maxTurns: 80              # turns on its own before it checks back with robin (big builds need many)
+    maxTurns: 80              # turns on its own before it checks back with ${MC_OWNER:-Robin} (big builds need many)
     timeoutMin: 120           # minutes on its own before it checks back
     maxSameFailures: 3        # same failure this often: stop and ask
-building: library             # library | creative | ask: reuse a saved blueprint, design one, or let robin pick
+building: library             # library | creative | ask: reuse a saved blueprint, design one, or let ${MC_OWNER:-Robin} pick
 retry:
   actions: { goto: 1, chop_tree: 1 }
 reflexes:
   retreatBelow: 0             # stand its ground: always fight back, never back off
   waterFightAbove: 0
-# Behaviours that run on their own between LLM turns (docs/guide/behaviors.md). Pax or robin
+# Behaviours that run on their own between LLM turns (docs/guide/behaviors.md). Pax or ${MC_OWNER:-Robin}
 # can arm more at runtime (behavior_arm / !behavior_arm follow_owner); those changes persist.
 behaviors:
   keep_fed:                   # find, cook and eat food when hungry or hurt; scouts up to 200 blocks
@@ -54,9 +54,9 @@ behaviors:
   farm_setup: { tendRange: 128 }   # starts its own wheat farm near home (or where it is), tends it, bakes bread, breeds animals
   stay_safe: { retreatBelow: 0, avoidWater: false }   # stands its ground like the reflexes above;
                                                       # still pillars up when surrounded, goes home at night
-  follow_owner: { player: robin, distance: 3 }   # stay with robin when there is nothing else to do
-  bodyguard: { enabled: false, player: robin }   # off until robin says "guard me" (!behavior_arm bodyguard / !behavior_disarm bodyguard);
-                                                 # then stays by robin, kills what threatens them, warns, feeds, stays out at night
+  follow_owner: { player: "${MC_OWNER:-Robin}", distance: 3 }   # stay with ${MC_OWNER:-Robin} when there is nothing else to do
+  bodyguard: { enabled: false, player: "${MC_OWNER:-Robin}" }   # off until ${MC_OWNER:-Robin} says "guard me" (!behavior_arm bodyguard / !behavior_disarm bodyguard);
+                                                 # then stays by ${MC_OWNER:-Robin}, kills what threatens them, warns, feeds, stays out at night
   idle_antics: { everySeconds: [40, 120], chat: 0.15 }   # funny/strange stuff now and then when idle
   collect_drops: { radius: 16 }   # pick up dropped items nearby (including its own after dying)
   keep_tools_upgraded: { upTo: iron, armour: true }   # stone tools asap, then furnace + iron tools and iron armour; re-craft worn ones when idle

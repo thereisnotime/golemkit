@@ -127,7 +127,7 @@ Every behaviour action is a tool. The descriptions say *when* to arm what ("arm 
 you look after your own food without being asked"), and the LLM arms as `brain:llm` (shown
 in `behavior_status`). Pax's [context pack](/guide/context-pack) has one rule for it:
 
-> For ongoing needs (staying fed, following or guarding robin, guarding a place, farming,
+> For ongoing needs (staying fed, following or guarding Robin, guarding a place, farming,
 > keeping wood stocked) arm a behaviour with behavior_arm instead of doing it turn by turn.
 
 `observe()` includes `behaviors: { armed, running }`, so the model sees what is already on.
@@ -289,7 +289,7 @@ The order flips on every repeat. A tester death is counted, the mobs alive are k
 tester is reset on the spot.
 
 ```sh
-just guard-bench --scout                      # check the spot (flat, dry) and robin's distance
+just guard-bench --scout                      # check the spot (flat, dry) and Robin's distance
 just guard-bench                              # 1250 445, 2 repeats x 3 phases x 4 min
 just guard-bench 1250 445 --minutes 4 --repeats 3 --armour --tag mytest
 just guard-bench --cleanup                    # kill tagged mobs, clear both players

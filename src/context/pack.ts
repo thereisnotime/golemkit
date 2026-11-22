@@ -16,6 +16,7 @@
 // are concatenated with later ids replacing earlier ones.
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { expandEnv } from '../core/definition.ts'
 import type { PromptContext } from '../llm/prompt.ts'
 import { estimateTokens } from '../llm/usage.ts'
 import { MemoryFile } from './memoryFile.ts'
@@ -109,7 +110,7 @@ export function loadContextPack (dirs: string[], opts: ContextPackOptions = {}):
     let found: { file: string, body: string } | null = null
     for (const d of abs) {
       const name = names.find(n => existsSync(join(d, n)))
-      if (name && !isExcluded(exclude, section, name)) found = { file: join(d, name), body: readFileSync(join(d, name), 'utf8') }
+      if (name && !isExcluded(exclude, section, name)) found = { file: join(d, name), body: expandEnv(readFileSync(join(d, name), 'utf8')) }
     }
     if (!found) continue
     const body = stripComments(found.body).trim()
@@ -129,7 +130,7 @@ export function loadContextPack (dirs: string[], opts: ContextPackOptions = {}):
     for (const d of abs) {
       const f = ['hooks.yaml', 'hooks.yml'].map(n => join(d, n)).find(existsSync)
       if (!f) continue
-      const body = readFileSync(f, 'utf8')
+      const body = expandEnv(readFileSync(f, 'utf8'))
       try {
         const { hooks, warnings: w } = parseHooks(body, opts.catalog)
         warnings.push(...w.map(x => `${f}: ${x}`))

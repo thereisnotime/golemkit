@@ -698,7 +698,7 @@ test('goal goes on alone when the owner stays silent', async () => {
   const mem: Record<string, unknown> = {}
   const st = { get: (k: string) => mem[k], set: (k: string, v: unknown) => { mem[k] = v }, delete: (k: string) => { delete mem[k] } } as any
   const g = new GoalStore(st, { ownerWaitMin: 15 }, () => now)
-  g.set('build a thing', ['a', 'b'], 'robin')
+  g.set('build a thing', ['a', 'b'], 'Robin')
   g.update({ wait: true })
   assert.equal(g.resumeIfOwnerSilent(), false, 'too early')
   now += 16 * 60_000
@@ -719,7 +719,7 @@ test('goal does not wait for an owner who is offline', async () => {
   let now = 1_000_000
   const g = new GoalStore(st, {}, () => now)
   g.isOnline = () => false
-  g.set('build', ['a'], 'robin')
+  g.set('build', ['a'], 'Robin')
   g.update({ wait: true })
   assert.equal(g.resumeIfOwnerSilent(), false, 'waits a minute first')
   now += 61_000

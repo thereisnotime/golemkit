@@ -2,7 +2,7 @@
 //
 //   variant: companion
 //   username: Pax
-//   owners: [robin]
+//   owners: [Robin]
 //   server: { host: mc.example.com }
 //   persona: "Pax, a capable helper..."
 //   llm: { provider: claude-subscription, model: claude-sonnet-5-5, listen: conversation }
@@ -14,6 +14,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import YAML from 'yaml'
 import { z } from 'zod'
 import type { InstanceOptions, ServerConfig } from './definition.ts'
+import { expandEnv } from './definition.ts'
 import { LoggingSchema } from './fleetFile.ts'
 
 export const LlmProfileSchema = z.object({
@@ -189,7 +190,7 @@ export function profilePath (name: string, dir = PROFILES_DIR): string | null {
 }
 
 export function parseProfile (text: string, name = 'profile', file = '(inline)'): LoadedProfile {
-  const profile = ProfileSchema.parse(YAML.parse(text))
+  const profile = ProfileSchema.parse(YAML.parse(expandEnv(text)))
   const settings: Record<string, unknown> = { ...profile.settings }
   if (profile.respectBuilds !== undefined) settings.respectBuilds = profile.respectBuilds
   if (profile.selfAware !== undefined) settings.selfAware = profile.selfAware

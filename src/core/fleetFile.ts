@@ -3,7 +3,7 @@
 //   servers:
 //     mc02: { host: mc.example.com }
 //     test: { host: localhost, port: 25566 }
-//   defaults: { server: mc02, owners: [robin] }
+//   defaults: { server: mc02, owners: [Robin] }
 //   bots:
 //     - { bot: buddy, username: McBuddy }
 //     - { bot: villager, server: test, count: 3 }

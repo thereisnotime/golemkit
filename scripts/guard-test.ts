@@ -14,6 +14,8 @@ import { Agent, defineVariant, serverFromEnv, PRIORITY, fmtPos, goals, type Acti
 import { standardSkills, extendedSkills, navigation, pickup } from '../src/skills/index.ts'
 import { reflexes, behaviorsBrain } from '../src/brains/index.ts'
 import { playerHealth } from '../src/skills/bodyguard.ts'
+/** The player test bots keep away from (the real owner): MC_OWNER in .env. */
+const AVOID = process.env.MC_OWNER || 'Robin'
 
 const [mode = 'run', xs = '900', zs = '-300', mins = '5', order = 'guard,follow', tag = 'run'] = process.argv.slice(2)
 const X = Number(xs)
@@ -130,8 +132,8 @@ async function main (): Promise<void> {
   log(`bot: ${state(bot)}`)
   log(`tester: ${state(tester)}`)
   for (const name of ['bodyguard', 'follow_owner']) await step(bot, 'behavior_disarm', { name }).catch(() => null)
-  const robin = bot.bot.players.robin?.entity
-  if (robin) log(`robin is in sight at ${fmtPos(robin.position)}: pick another spot`)
+  const Robin = bot.bot.players[AVOID]?.entity
+  if (Robin) log(`Robin is in sight at ${fmtPos(Robin.position)}: pick another spot`)
 
   if (mode === 'logs') {
     // the tester hands its logs over (drop next to the bot), the bot crafts a sword

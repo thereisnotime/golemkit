@@ -1,13 +1,15 @@
 // Live test of the intents brain with no LLM: starts a bot (INTENTS_BOT, default IntentTest) that
 // obeys only INTENTS_OWNER (default IntentTester), joins as the owner, moves both far from spawn
 // (/spreadplayers when op, else both walk out east; aborts if they end up within 300 blocks of spawn, the village or
-// robin) and says plain requests in chat, printing the bot's replies.
+// Robin) and says plain requests in chat, printing the bot's replies.
 //   node scripts/intents-test.ts ["follow me,come here,chop some wood,what are you doing,stop"] [x z]
 // INTENTS_EMBEDDINGS=1 adds the embeddings layer after the patterns (decision log on; see it with
 // MC_LOG_LEVEL='info,*/intents=debug').
 import { Agent, defineVariant, serverFromEnv, PRIORITY, configureLogging, loggingFromEnv } from '../src/core/index.ts'
 import { standardSkills, extendedSkills, navigation } from '../src/skills/index.ts'
 import { commandBrain, reflexes, intentsBrain } from '../src/brains/index.ts'
+/** The player test bots keep away from (the real owner): MC_OWNER in .env. */
+const AVOID = process.env.MC_OWNER || 'Robin'
 
 const BOT = process.env.INTENTS_BOT || 'IntentTest'
 const OWNER = process.env.INTENTS_OWNER || 'IntentTester'
@@ -42,7 +44,7 @@ function pos (a: Agent): { x: number, y: number, z: number } | null {
 function farEnough (a: Agent): boolean {
   const p = pos(a)
   if (!p) return false
-  const pe = (() => { try { return owner.bot.players.robin?.entity?.position } catch { return undefined } })()
+  const pe = (() => { try { return owner.bot.players[AVOID]?.entity?.position } catch { return undefined } })()
   return [...KEEP_AWAY, ...(pe ? [pe] : [])].every(k => Math.hypot(k.x - p.x, k.z - p.z) >= 300)
 }
 
@@ -71,7 +73,7 @@ async function main (): Promise<void> {
     bot.resetToggle('canDig')
     log(`owner: ${a.message}; bot: ${b.message}; now ${BOT} ${JSON.stringify(pos(bot))}, ${OWNER} ${JSON.stringify(pos(owner))}`)
   }
-  if (!farEnough(bot) || !farEnough(owner)) { log('ABORT: too close to spawn, the village or robin'); return }
+  if (!farEnough(bot) || !farEnough(owner)) { log('ABORT: too close to spawn, the village or Robin'); return }
   for (const phrase of phrases) {
     if (/^come here/.test(phrase)) {
       // step away first so "come here" has somewhere to go

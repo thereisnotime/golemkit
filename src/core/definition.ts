@@ -42,12 +42,21 @@ export interface ServerConfig {
   version: string
 }
 
+/**
+ * Expands `${NAME}` and `${NAME:-default}` from the environment (after loading `.env`), so
+ * profiles can keep personal values (owner names, token locations) out of the repo.
+ */
+export function expandEnv (text: string, env: NodeJS.ProcessEnv = process.env): string {
+  if (env === process.env) loadDotEnvOnce()
+  return text.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}/g, (_m, name: string, def?: string) => env[name] || def || '')
+}
+
 /** Defaults for a server running on this machine; set MC_HOST etc. in `.env` for anything else. */
 export const DEFAULT_SERVER: ServerConfig = { host: 'localhost', port: 25565, auth: 'offline', version: '1.21.1' }
 
 let envFileTried = false
 /** Loads `.env` from the working directory once, if it exists and the process wasn't started with it. */
-function loadDotEnvOnce (): void {
+export function loadDotEnvOnce (): void {
   if (envFileTried) return
   envFileTried = true
   try { process.loadEnvFile('.env') } catch { /* no .env: defaults apply */ }

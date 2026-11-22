@@ -7,7 +7,7 @@ test('profile maps to instance options; llm goes to settings.llm', () => {
   const p = parseProfile(`
 variant: companion
 username: Pax
-owners: [robin]
+owners: [Robin]
 canDig: true
 persona: test persona
 server: { host: example.net }
@@ -16,7 +16,7 @@ settings: { home: [1, 2, 3] }
 `, 'pax')
   assert.equal(p.profile.variant, 'companion')
   assert.equal(p.server.host, 'example.net')
-  assert.deepEqual(p.options.owners, ['robin'])
+  assert.deepEqual(p.options.owners, ['Robin'])
   assert.equal(p.options.canDig, true)
   assert.equal(p.options.persona, 'test persona')
   assert.deepEqual((p.options.settings as any).home, [1, 2, 3])
