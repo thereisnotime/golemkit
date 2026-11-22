@@ -1,14 +1,39 @@
-# golemkit
+<p align="center">
+  <img src="docs/public/golem.svg" alt="golemkit" width="160">
+</p>
 
-A TypeScript framework for building Minecraft Java bots, with first-class **NeoForge** support: companions,
-bodyguards, self-sufficient NPCs and LLM-driven agents, all from the same pieces (actions,
-skills, brains, behaviours, profiles). Bots are real protocol clients built on
-[Mineflayer](https://github.com/PrismarineJS/mineflayer), not headless Minecraft, so they
-start in a second and use ~100 MB each.
+<h1 align="center">golemkit</h1>
 
-Built and tested on the **mc02** NeoForge 1.21.1 modpack (Create, Ars Nouveau, Curios, ...).
-The NeoForge layer learns any server's mod channels on its own and stays idle on vanilla and
-Paper servers. See [what's supported](#support-status) for what has been tested.
+<p align="center">
+  <b>Minecraft bots that pull their weight.</b><br>
+  A TypeScript framework for companions, bodyguards, NPCs and LLM agents,<br>
+  built on Mineflayer with first-class NeoForge support. Useful with or without an LLM.
+</p>
+
+<p align="center">
+  <a href="https://github.com/thereisnotime/golemkit/blob/main/LICENSE"><img alt="License: LGPL-3.0" src="https://img.shields.io/badge/license-LGPL--3.0-blue"></a>
+  <a href="https://thereisnotime.github.io/golemkit/"><img alt="Docs" src="https://img.shields.io/badge/docs-online-14b8a6"></a>
+  <a href="https://github.com/thereisnotime/golemkit/actions/workflows/docs.yml"><img alt="Docs build" src="https://github.com/thereisnotime/golemkit/actions/workflows/docs.yml/badge.svg"></a>
+  <img alt="Node 26" src="https://img.shields.io/badge/node-26-339933?logo=nodedotjs&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white">
+  <img alt="Minecraft Java 1.21.1" src="https://img.shields.io/badge/Minecraft%20Java-1.21.1-62b47a">
+  <img alt="NeoForge" src="https://img.shields.io/badge/NeoForge-supported-f26522">
+  <a href="https://github.com/PrismarineJS/mineflayer"><img alt="Mineflayer" src="https://img.shields.io/badge/built%20on-Mineflayer-6b7280"></a>
+</p>
+
+<p align="center">
+  <a href="https://thereisnotime.github.io/golemkit/">Documentation</a> ·
+  <a href="https://thereisnotime.github.io/golemkit/guide/getting-started">Getting started</a> ·
+  <a href="https://thereisnotime.github.io/golemkit/guide/intents">Talking to bots</a> ·
+  <a href="https://thereisnotime.github.io/golemkit/roadmap">Roadmap</a>
+</p>
+
+---
+
+Bots are real protocol clients, not headless Minecraft, so they start in a second and use about
+100 MB each. golemkit is built and tested on a NeoForge 1.21.1 modpack (Create, Ars Nouveau,
+Curios, ...); the NeoForge layer learns any server's mod channels on its own and stays idle on
+vanilla and Paper servers. See the [support status](#support-status) for what has been tested.
 
 ## What the bots can do
 
@@ -76,12 +101,14 @@ Paper servers. See [what's supported](#support-status) for what has been tested.
 ## Quick start
 
 ```bash
+git clone https://github.com/thereisnotime/golemkit.git && cd golemkit
 asdf install            # node + just from .tool-versions
 just setup              # npm ci, creates .env from .env.example
+$EDITOR .env            # MC_HOST, MC_OWNER, ...
 just run                # runs variants/buddy.ts
 ```
 
-In game: `!help`.
+In game: say `help` to the bot, or `!help` for the exact commands.
 
 ```bash
 just bots               # list bots
@@ -185,13 +212,6 @@ Mineflayer only speaks vanilla. `src/core/neoforge/` adds:
 5. **Modded blocks are solid.** Unknown block states are treated as full cubes so bots don't
    fall through Create casings.
 
-## Limitations
-
-- Modded items and mobs have real names (from NeoForge's registry sync); modded blocks are
-  all `modded_block` (full cubes), since their states aren't in the sync.
-- Packets with modded items may be skipped, so inventories can be incomplete.
-- No interaction with Create contraptions, Ars spells, Curios slots or mod GUIs yet.
-
 ## Development
 
 ```bash
@@ -203,6 +223,13 @@ just chat-test  # join as a second player and send commands to a running bot
 
 TypeScript runs directly on Node 26 (type stripping), no build step; `tsc` only typechecks.
 Specs live in `openspec/`.
+
+## Contributing
+
+Issues and pull requests are welcome. Run `just check` (typecheck and unit tests) before sending
+a change, and describe behaviour changes in [`openspec/`](openspec/): planned work lives in
+[`openspec/changes/`](openspec/changes/) and on the [roadmap](https://thereisnotime.github.io/golemkit/roadmap).
+Agent and coding conventions are in [AGENTS.md](AGENTS.md).
 
 ## License
 

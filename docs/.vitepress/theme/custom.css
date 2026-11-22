@@ -52,10 +52,10 @@
 .diagram-stage.dragging { cursor: grabbing; }
 .diagram-stage > svg { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
 
-/* Mermaid: natural size with horizontal scroll instead of shrinking wide charts to unreadable text;
-   labels may overflow their measured box rather than being clipped */
-.vp-doc .mermaid { overflow-x: auto; padding: 8px 0 4px; text-align: center; }
-.vp-doc .mermaid svg { max-width: none; height: auto; display: block; margin: 0 auto; }
+/* Mermaid: fit the column (big charts open full screen with the expand button); labels may overflow
+   their measured box rather than being clipped */
+.vp-doc .mermaid { padding: 8px 0 4px; text-align: center; }
+.vp-doc .mermaid svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
 .vp-doc .mermaid foreignObject { overflow: visible; }
 .vp-doc .mermaid .nodeLabel, .vp-doc .mermaid .edgeLabel, .vp-doc .mermaid .label { overflow: visible; }
 /* the expand button sits above the chart instead of on top of a node */
@@ -69,5 +69,32 @@
   --vp-home-hero-image-filter: blur(56px);
 }
 .VPHero .image-src { image-rendering: pixelated; width: 240px; height: 240px; max-width: 60vw; max-height: 60vw; }
-.VPFeature .icon { font-size: 26px; background: var(--vp-c-default-soft); }
+.VPFeature .icon { background: var(--vp-c-brand-soft); color: var(--vp-c-brand-1); }
+.VPFeature .icon svg { stroke: currentColor; }
 .vp-doc .home-footnote { color: var(--vp-c-text-2); font-size: 0.9em; margin-top: 2.5em; }
+
+/* Slot-machine words on the homepage */
+.slot { display: inline-flex; align-items: baseline; gap: 0.35em; white-space: nowrap; }
+.slot-reel { display: inline-block; overflow: hidden; vertical-align: bottom; line-height: inherit; }
+.slot-word { display: inline-block; }
+.slot-word.slot-roll { animation: slot-roll 0.42s cubic-bezier(.2,.8,.2,1); }
+@keyframes slot-roll { from { transform: translateY(70%); opacity: 0; filter: blur(2px); } to { transform: none; opacity: 1; filter: none; } }
+.slot-word[data-status="now"] { background: linear-gradient(120deg, #22c55e, #14b8a6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.slot-word[data-status="try"] { color: var(--vp-c-text-1); }
+.slot-word[data-status="soon"], .slot-word[data-status="idea"] { color: var(--vp-c-text-2); }
+.slot-badge {
+  font-size: 0.28em; font-weight: 600; letter-spacing: 0.02em; line-height: 1;
+  padding: 0.3em 0.6em; border-radius: 999px; transform: translateY(-0.9em);
+  border: 1px solid var(--vp-c-divider); color: var(--vp-c-text-2); background: var(--vp-c-bg-soft);
+}
+.VPHero .tagline .slot-badge { font-size: 0.6em; transform: translateY(-0.15em); }
+.slot-badge[data-status="now"] { color: #16a34a; border-color: #16a34a66; }
+.slot-badge[data-status="soon"] { color: #d97706; border-color: #d9770666; }
+.slot-badge[data-status="try"] { color: #0284c7; border-color: #0284c766; }
+
+/* Roadmap status pills */
+.vp-doc .rm { display: inline-block; font-size: 0.8em; font-weight: 600; padding: 0.05em 0.6em; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+.vp-doc .rm.now { color: #16a34a; border-color: #16a34a66; background: #16a34a14; }
+.vp-doc .rm.try { color: #0284c7; border-color: #0284c766; background: #0284c714; }
+.vp-doc .rm.soon { color: #d97706; border-color: #d9770666; background: #d9770614; }
+.vp-doc .rm.idea { color: var(--vp-c-text-2); border-color: var(--vp-c-divider); }

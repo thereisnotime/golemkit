@@ -8,7 +8,22 @@ export default withMermaid(defineConfig({
   cleanUrls: true,
   // '/' locally; the GitHub Pages workflow sets DOCS_BASE=/golemkit/ (the site lives under the repo name)
   base: process.env.DOCS_BASE || '/',
-  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: `${process.env.DOCS_BASE || '/'}favicon.svg` }]],
+  head: [
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${process.env.DOCS_BASE || '/'}favicon.svg` }],
+    ['link', { rel: 'apple-touch-icon', href: `${process.env.DOCS_BASE || '/'}apple-touch-icon.png` }],
+    ['meta', { name: 'theme-color', content: '#14b8a6' }],
+    // link previews (GitHub, Slack, Discord, X): absolute URLs, since crawlers don't resolve the base
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:site_name', content: 'golemkit' }],
+    ['meta', { property: 'og:title', content: 'golemkit: Minecraft bots that pull their weight' }],
+    ['meta', { property: 'og:description', content: 'A TypeScript framework for companions, bodyguards, NPCs and LLM agents on Mineflayer, with first-class NeoForge support. Useful with or without an LLM.' }],
+    ['meta', { property: 'og:image', content: 'https://thereisnotime.github.io/golemkit/og.png' }],
+    ['meta', { property: 'og:image:width', content: '1200' }],
+    ['meta', { property: 'og:image:height', content: '630' }],
+    ['meta', { property: 'og:url', content: 'https://thereisnotime.github.io/golemkit/' }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+    ['meta', { name: 'twitter:image', content: 'https://thereisnotime.github.io/golemkit/og.png' }]
+  ],
   lastUpdated: false,
   srcExclude: ['**/README.md'],
   markdown: {
@@ -46,7 +61,8 @@ export default withMermaid(defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Concepts', link: '/concepts/architecture' },
-      { text: 'Reference', link: '/reference/actions' }
+      { text: 'Reference', link: '/reference/actions' },
+      { text: 'Roadmap', link: '/roadmap' }
     ],
     sidebar: [
       {
@@ -140,9 +156,9 @@ export default withMermaid(defineConfig({
     // system fonts, not the site's Inter web font: mermaid measures labels when it renders, and if
     // Inter arrives later the text is wider than its box and gets cut off
     fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-    flowchart: { useMaxWidth: false, padding: 14, wrappingWidth: 220, nodeSpacing: 40, rankSpacing: 50 },
-    sequence: { useMaxWidth: false },
-    state: { useMaxWidth: false },
+    flowchart: { useMaxWidth: true, padding: 14, wrappingWidth: 220, nodeSpacing: 40, rankSpacing: 50 },
+    sequence: { useMaxWidth: true },
+    state: { useMaxWidth: true },
     themeVariables: {
       fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
       fontSize: '15px',
