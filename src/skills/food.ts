@@ -16,7 +16,9 @@ import { pickupNearby } from './pickup.ts'
 import { climbOut, roofAbove } from './survival.ts'
 import { ensureTool } from './toolkit.ts'
 import { collectBlocks } from './gather.ts'
-import { craftItem } from './crafting.ts'
+import { craftItem, pickFuel } from './crafting.ts'
+import { planFarmWork, farmWorkCount, oddSize, type FarmCell, type FarmGrid, type FarmWork } from './farmPlan.ts'
+import { inDangerZone, wayThroughDanger } from './food-danger.ts'
 import {
   scoutWaypoints, scoutStopReason, nextWaypoint, sectorsText, compass, sectorOf, mergeSpot, markSpotEmpty, rankSpots, dryWaypoint,
   chooseFarmSite, plotLayout, pickFarmSeed, seedCount, breedPlan, BREED_FOOD, DEFAULT_SCOUT_LIMITS,
@@ -170,11 +172,101 @@ export function farmStatus (bot: Bot, farm: Farm): { ripe: number, growing: numb
   return { ripe, growing, empty }
 }
 
+/** The farm's square (target size) as planFarmWork sees it, or null when it isn't loaded. */
+export function farmGrid (agent: Agent, bot: Bot, farm: Farm, targetSize: number, clearance = 48): FarmGrid | null {
+  if (typeof bot.blockAt !== 'function') return null
+  const h = (oddSize(Math.max(targetSize, 3)) - 1) / 2
+  const cells: Record<string, FarmCell> = {}
+  for (let dx = -h; dx <= h; dx++) {
+    for (let dz = -h; dz <= h; dz++) {
+      const x = farm.x + dx; const z = farm.z + dz
+      const g = bot.blockAt(vec(bot, x, farm.y, z))
+      if (!g) return null
+      let kind: FarmCell = 'blocked'
+      if (g.name === 'farmland') {
+        const top = bot.blockAt(vec(bot, x, farm.y + 1, z))
+        if (!top || top.name === 'air') kind = 'bare'
+        else if (CROPS[top.name]) kind = ripeTest(top) ? 'ripe' : 'growing'
+      } else {
+        // the farm's own ground: its dirt counts, wherever the site check would have said 'farmland' around it
+        const k = cellKind(agent, bot, x, farm.y, z, dx === 0 && dz === 0 ? 0 : clearance)
+        kind = k === 'water' ? 'water' : k === 'tillable' ? 'dirt' : 'blocked'
+      }
+      cells[`${dx},${dz}`] = kind
+    }
+  }
+  return { center: { x: farm.x, y: farm.y, z: farm.z }, cells }
+}
+
+/** What its farm needs, from what is carried. Null when the farm isn't loaded. */
+export function farmWorkFor (agent: Agent, bot: Bot, farm: Farm, o: { targetSize: number, seedReserve: number, clearance?: number }): FarmWork | null {
+  const grid = farmGrid(agent, bot, farm, o.targetSize, o.clearance)
+  if (!grid) return null
+  const inv = inventory(bot)
+  const canTill = !!agent.canDig
+  const canWater = canPlace(agent) && (!!inv.water_bucket || !!inv.bucket)
+  return planFarmWork(grid, { targetSize: o.targetSize, seeds: seedCount(inv), seedReserve: o.seedReserve, canTill, canWater })
+}
+
 /** Ripe sweet berry bushes (age 2+) near a point, nearest first. */
 export function ripeBerries (bot: Bot, center: Vec3, radius: number, count = 16): Vec3[] {
   const id = bot.registry.blocksByName.sweet_berry_bush?.id
   if (id === undefined || typeof bot.findBlocks !== 'function') return []
   return bot.findBlocks({ point: center, matching: id, maxDistance: radius, count, useExtraInfo: (b: Block) => Number((b.getProperties() as { age?: number | string }).age) >= 2 })
+}
+
+/** Natural (not player-placed) oak and dark oak leaves in reach of the ground near a point: apples drop from these. */
+export function appleLeaves (bot: Bot, center: Vec3, radius = 6, count = 32): Vec3[] {
+  const ids = ['oak_leaves', 'dark_oak_leaves'].map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
+  if (!ids.length || typeof bot.findBlocks !== 'function') return []
+  return bot.findBlocks({
+    point: center,
+    matching: ids,
+    maxDistance: radius,
+    count,
+    useExtraInfo: (b: Block) => String((b.getProperties() as { persistent?: unknown }).persistent) !== 'true' &&
+      b.position.y >= center.y - 1 && b.position.y <= center.y + 4
+  })
+}
+
+/**
+ * Kelp it can cut from the shore without diving: per column, the lowest kelp block no more
+ * than 2 below the water surface, with dry standing ground within 3 blocks. Cutting it breaks
+ * the whole stalk above. Nearest first.
+ */
+export function shoreKelp (bot: Bot, center: Vec3, radius: number, count = 16): Vec3[] {
+  const ids = ['kelp', 'kelp_plant'].map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
+  if (!ids.length || typeof bot.findBlocks !== 'function') return []
+  const found = bot.findBlocks({ point: center, matching: ids, maxDistance: radius, count: count * 8 })
+  const out: Vec3[] = []
+  const seen = new Set<string>()
+  for (const p of found) {
+    const col = `${p.x},${p.z}`
+    if (seen.has(col)) continue
+    // find the surface above this column
+    let top = p.y
+    while (/kelp|water/.test(bot.blockAt(p.offset(0, top - p.y + 1, 0))?.name ?? '') && top - p.y < 24) top++
+    if (bot.blockAt(p.offset(0, top - p.y + 1, 0))?.name !== 'air') continue
+    const surface = top // the top water/kelp block
+    const lowest = Math.max(surface - 2, p.y - 32)
+    let y = lowest
+    while (y <= surface && !/kelp/.test(bot.blockAt(p.offset(0, y - p.y, 0))?.name ?? '')) y++
+    if (y > surface) continue
+    seen.add(col)
+    let shore = false
+    for (let dx = -3; dx <= 3 && !shore; dx++) {
+      for (let dz = -3; dz <= 3 && !shore; dz++) {
+        for (const dy of [0, 1]) {
+          const g = bot.blockAt(p.offset(dx, surface - p.y + dy, dz))
+          const a = bot.blockAt(p.offset(dx, surface - p.y + dy + 1, dz))
+          if (g && g.boundingBox === 'block' && !/water/.test(g.name) && a?.name === 'air') { shore = true; break }
+        }
+      }
+    }
+    if (shore) out.push(p.offset(0, y - p.y, 0))
+    if (out.length >= count) break
+  }
+  return out
 }
 
 /**
@@ -310,7 +402,7 @@ const findFood = defineAction({
 
     // 1. known spots, best first
     const known = rankSpots(getFoodSpots(agent), p.crops ? ['animals', 'village_farm'] : ['animals'], Date.now(), center, dim)
-      .filter(s => Math.hypot(s.x - center.x, s.z - center.z) <= p.radius * 1.5).slice(0, 2)
+      .filter(s => Math.hypot(s.x - center.x, s.z - center.z) <= p.radius * 1.5 && !inDangerZone(agent, s)).slice(0, 2)
     const checked: string[] = []
     for (const s of known) {
       checkAborted(signal)
@@ -329,7 +421,18 @@ const findFood = defineAction({
     // 2. expanding spiral; start on the side away from the world spawn (busy, hunted out)
     const spawn = spawnOf(bot)
     const away = spawn && Math.hypot(center.x - spawn.x, center.z - spawn.z) > 4 ? Math.atan2(center.z - spawn.z, center.x - spawn.x) : Math.random() * Math.PI * 2
-    const wps: Waypoint[] = scoutWaypoints(center, p.radius, { startAngle: away, minRadius: p.minRadius, skip: (w) => offLimits(agent, bot, w, 0) })
+    // never towards a remembered danger zone: waypoints in one, or with the way out through one, are dropped
+    let avoided = 0
+    const wps: Waypoint[] = scoutWaypoints(center, p.radius, {
+      startAngle: away,
+      minRadius: p.minRadius,
+      skip: (w) => {
+        if (offLimits(agent, bot, w, 0)) return true
+        if (inDangerZone(agent, w) || wayThroughDanger(agent, center, w)) { avoided++; return true }
+        return false
+      }
+    })
+    if (avoided) log.debug('find_food: skipped waypoints towards remembered danger zones', { avoided })
     const seedsAtStart = seedCount(inventory(bot))
     const visited = new Set<number>()
     const blocked = new Map<number, number>()
@@ -428,6 +531,7 @@ const findFood = defineAction({
       legs ? `scouted ${farthest} blocks ${sectorsText(sectors)} of ${centerName}, no animals${p.crops ? ' or village crops' : ''}` : 'did not get to scout',
       `stopped: ${reason}`,
       ...(water ? [`saw water at ${fmtPos(water)}`] : []),
+      ...(avoided ? [`kept away from a remembered danger zone (${avoided} waypoints)`] : []),
       ...(p.seeds && seedCount(inventory(bot)) > seedsAtStart ? [`picked up ${seedCount(inventory(bot)) - seedsAtStart} seeds`] : [])
     ]
     return fail(parts.join('; '), { farthest, legs, reason })
@@ -698,8 +802,11 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
   try { await gotoWithin(bot, new goals.GoalNear(water.x, water.y + 1, water.z, 3), signal, 45_000) } catch (e) { checkAborted(signal) }
   let tilled = 0
   let refused = 0
+  // only as many cells as it has seeds for (bare farmland dries back to dirt); tend_farm grows the rest later
+  const tillMax = Math.max(4, seedCount(inventory(bot)))
   for (const c of layout.till) {
     checkAborted(signal)
+    if (tilled >= tillMax) break
     if (site.cells[`${c.x - site.water.x},${c.z - site.water.z}`] !== 'tillable') continue
     try {
       if (await tillAt(bot, vec(bot, c.x, c.y, c.z), signal)) tilled++
@@ -794,6 +901,106 @@ const startFarmAction = defineAction({
   run: (ctx, p) => startFarm(ctx, p)
 })
 
+// ------------------------------------------------------------------ tend_farm
+
+/** The seed for a farm: its own crop's seed when carried, else what there is most of. */
+function seedForFarm (bot: Bot, farm: Farm): string | null {
+  const inv = inventory(bot)
+  const own = ({ wheat: 'wheat_seeds', carrot: 'carrot', potato: 'potato', beetroot: 'beetroot_seeds' } as Record<string, string>)[farm.crop]
+  return own && (inv[own] ?? 0) > 0 ? own : pickFarmSeed(inv)
+}
+
+const tendFarm = defineAction({
+  name: 'tend_farm',
+  description: 'Look after its own farm (farm:1, farm:2...): put the water back if it is gone (with a bucket), plant bare farmland, ' +
+    'till trampled dirt again and plant it, and grow the plot a ring at a time towards `size` around its water with the seeds ' +
+    'it has, keeping `seedReserve` seeds for replanting. Use harvest for ripe crops. Needs digging enabled for tilling.',
+  params: z.object({
+    farm: z.string().optional().describe('which farm (farm:1...); default the nearest'),
+    size: z.number().int().min(3).max(9).default(9).describe('side of the square to grow the farm towards (one water block keeps 9x9 wet)'),
+    seedReserve: z.number().int().min(0).max(32).default(4).describe('seeds kept for replanting: new cells only from seeds beyond these'),
+    maxCells: z.number().int().min(1).max(80).default(40).describe('cells to plant or till at most this run'),
+    spawnClearance: z.number().min(0).max(256).default(48).describe('never till within this distance of the world spawn')
+  }),
+  longRunning: true,
+  async run (ctx, p): Promise<ActionResult> {
+    const { bot, agent, signal, log } = ctx
+    const farm = p.farm ? getFarms(agent).find(f => f.name === p.farm!.toLowerCase()) : nearestFarm(agent, bot)
+    if (!farm) return fail(p.farm ? `I have no farm called ${p.farm}` : 'I have no farm of my own (start_farm makes one)')
+    if (Math.hypot(farm.x - bot.entity.position.x, farm.z - bot.entity.position.z) > 8) {
+      try { await travel(bot, { x: farm.x, y: farm.y + 1, z: farm.z }, signal, { range: 4 }) } catch (e) { checkAborted(signal); return fail(`couldn't get to ${farm.name}: ${(e as Error).message}`) }
+    }
+    const work = farmWorkFor(agent, bot, farm, { targetSize: p.size, seedReserve: p.seedReserve, clearance: p.spawnClearance })
+    if (!work) return fail(`${farm.name} isn't loaded`)
+    log.debug('tend_farm: plan', { farm: farm.name, size: work.size, target: work.target, plant: work.plant.length, retill: work.retill.length, extend: work.extend.length, water: !!work.water, reason: work.reason })
+    if (!farmWorkCount(work)) return fail(`${farm.name} (${work.size}x${work.size}, ${work.farmland} farmland): ${work.reason}`)
+    const done: string[] = []
+
+    if (work.water) {
+      const hole = vec(bot, work.water.x, work.water.y, work.water.z)
+      try {
+        if (!findItem(bot, 'water_bucket')) {
+          const src = surfaceWater(bot, bot.entity.position, 48, 8).find(w => !w.equals(hole))
+          if (src) await fillBucket(bot, src, signal)
+        }
+        const b = bot.blockAt(hole)
+        if (b && b.name !== 'air' && b.name !== 'water' && TILLABLE.includes(b.name)) await digBlock(bot, b, signal)
+        if (await pourWater(bot, hole, signal)) done.push('put the water back')
+      } catch (e) { checkAborted(signal); log.debug('tend_farm: water failed', { error: (e as Error).message }) }
+    }
+
+    let cells = 0
+    let planted = 0
+    for (const c of work.plant) {
+      if (cells >= p.maxCells) break
+      checkAborted(signal)
+      const seed = seedForFarm(bot, farm)
+      if (!seed) break
+      cells++
+      if (await plantOn(bot, vec(bot, c.x, c.y, c.z), seed, signal).catch(() => false)) planted++
+    }
+    if (planted) done.push(`planted ${planted} bare farmland`)
+
+    const tillAndPlant = async (list: Pos[]): Promise<number> => {
+      let n = 0
+      let refused = 0
+      for (const c of list) {
+        if (cells >= p.maxCells) break
+        checkAborted(signal)
+        const seed = seedForFarm(bot, farm)
+        if (!seed) break
+        cells++
+        try {
+          const soil = vec(bot, c.x, c.y, c.z)
+          if (!await tillAt(bot, soil, signal)) continue
+          if (await plantOn(bot, soil, seed, signal).catch(() => false)) n++
+        } catch (e) {
+          checkAborted(signal)
+          if (e instanceof DigRefusedError) { agent.markProtected(c); if (++refused >= 2) break }
+        }
+      }
+      return n
+    }
+    if (work.retill.length || work.extend.length) {
+      const hoe = agent.canDig ? await getHoe(ctx, p.spawnClearance) : fail('digging is off')
+      if (!hoe.ok) done.push(`no hoe for tilling (${hoe.message})`)
+      else {
+        const re = await tillAndPlant(work.retill)
+        if (re) done.push(`re-tilled and planted ${re}`)
+        const grown = await tillAndPlant(work.extend)
+        if (grown) done.push(`grew it by ${grown}`)
+      }
+    }
+    const after = farmWorkFor(agent, bot, farm, { targetSize: p.size, seedReserve: p.seedReserve, clearance: p.spawnClearance })
+    const size = Math.max(farm.size, after?.size ?? work.size)
+    saveFarm(agent, { ...farm, size, tended: Date.now() })
+    const state = after ? `now ${after.size}x${after.size} with ${after.farmland} farmland, ${seedCount(inventory(bot))} seeds left` : ''
+    const changed = done.filter(t => !t.startsWith('no hoe'))
+    if (!changed.length) return fail(`${farm.name}: ${done.join(', ') || `could not do any of: ${work.reason}`}`)
+    return ok(`${farm.name}: ${done.join(', ')}${state ? `; ${state}` : ''}`, { planted, size: after?.size, farmland: after?.farmland })
+  }
+})
+
 // ------------------------------------------------------------------ gather_seeds, forage
 
 const gatherSeeds = defineAction({
@@ -816,39 +1023,115 @@ const gatherSeeds = defineAction({
   }
 })
 
+const FORAGE_KINDS = ['berries', 'kelp', 'apples'] as const
+
+/** Whether kelp is worth cutting: it can be smelted into dried kelp (a furnace near, carried or craftable, and fuel). */
+export function canSmeltKelp (bot: Bot): boolean {
+  const names = bot.inventory.items().map(i => itemName(i))
+  const has = (n: string) => countItem(bot, n)
+  const furnace = !!bot.registry.blocksByName.furnace && (!!bot.findBlock?.({ matching: bot.registry.blocksByName.furnace.id, maxDistance: 32 }) ||
+    has('furnace') > 0 || has('cobblestone') + has('cobbled_deepslate') + has('blackstone') >= 8)
+  return furnace && !!pickFuel(names, 'kelp')
+}
+
 const forage = defineAction({
   name: 'forage',
-  description: 'Pick sweet berries from ripe bushes nearby (right-click, the bush stays and regrows). A stopgap food while a farm grows; ' +
-    'never on protected land.',
+  description: 'Stopgap food from what grows wild nearby: pick ripe sweet berries (the bush stays), cut kelp at the shore without ' +
+    'diving (smelt it into dried kelp later), and with apples=true break oak and dark oak leaves for apples (about 1 in 200) and ' +
+    'pick up apples lying around. Never on protected land.',
   params: z.object({
-    radius: z.number().min(4).max(64).default(32).describe('how far to look for berry bushes'),
-    max: z.number().int().min(1).max(32).default(8).describe('bushes to pick at most')
+    radius: z.number().min(4).max(64).default(32).describe('how far to look'),
+    max: z.number().int().min(1).max(32).default(8).describe('bushes or kelp stalks to take at most'),
+    kinds: z.array(z.enum(FORAGE_KINDS)).default(['berries', 'kelp']).describe('what to forage'),
+    apples: z.boolean().default(false).describe('also break leaves for apples (slow, low odds: a last resort)'),
+    leaves: z.number().int().min(1).max(64).default(24).describe('leaves to break at most for apples')
   }),
   longRunning: true,
   async run ({ bot, agent, signal, log }, p): Promise<ActionResult> {
-    const before = countItem(bot, 'sweet_berries')
-    let picked = 0
+    const kinds = new Set<string>([...p.kinds, ...(p.apples ? ['apples'] : [])])
+    const before = { sweet_berries: countItem(bot, 'sweet_berries'), kelp: countItem(bot, 'kelp'), apple: countItem(bot, 'apple') }
+    const notes: string[] = []
+    let taken = 0
     const skip = new Set<string>()
-    for (let i = 0; i < p.max * 2 && picked < p.max; i++) {
-      checkAborted(signal)
-      const at = ripeBerries(bot, bot.entity.position, p.radius).find(v => !skip.has(v.toString()) && !offLimits(agent, bot, v, 0))
-      if (!at) break
-      skip.add(at.toString())
-      try {
-        await reachBlock(bot, at, signal, 3, 20_000)
-        const b = bot.blockAt(at)
-        if (!b || b.name !== 'sweet_berry_bush') continue
-        await bot.activateBlock(b)
-        await sleep(300, signal)
-        picked++
-      } catch (e) {
+    if (kinds.has('berries')) {
+      for (let i = 0; i < p.max * 2 && taken < p.max; i++) {
         checkAborted(signal)
-        log.debug('forage: could not pick', { at: fmtPos(at), error: (e as Error).message })
+        const at = ripeBerries(bot, bot.entity.position, p.radius).find(v => !skip.has(v.toString()) && !offLimits(agent, bot, v, 0))
+        if (!at) break
+        skip.add(at.toString())
+        try {
+          await reachBlock(bot, at, signal, 3, 20_000)
+          const b = bot.blockAt(at)
+          if (!b || b.name !== 'sweet_berry_bush') continue
+          await bot.activateBlock(b)
+          await sleep(300, signal)
+          taken++
+        } catch (e) {
+          checkAborted(signal)
+          log.debug('forage: could not pick', { at: fmtPos(at), error: (e as Error).message })
+        }
+      }
+      if (taken) await pickupNearby(bot, signal, { radius: 6, maxMs: 6000 }).catch(() => 0)
+    }
+    if (kinds.has('kelp') && agent.canDig && taken < p.max) {
+      let cut = 0
+      for (let i = 0; i < p.max * 2 && taken < p.max; i++) {
+        checkAborted(signal)
+        const at = shoreKelp(bot, bot.entity.position, p.radius).find(v => !skip.has(v.toString()) && !offLimits(agent, bot, v, 0))
+        if (!at) break
+        skip.add(at.toString())
+        try {
+          await reachBlock(bot, at, signal, 4, 20_000)
+          const b = bot.blockAt(at)
+          if (!b || !/kelp/.test(b.name)) continue
+          await digBlock(bot, b, signal)
+          cut++; taken++
+          await pickupNearby(bot, signal, { radius: 5, item: 'kelp', maxMs: 5000 }).catch(() => 0)
+        } catch (e) {
+          checkAborted(signal)
+          if (e instanceof DigRefusedError) agent.markProtected(at)
+          log.debug('forage: could not cut kelp', { at: fmtPos(at), error: (e as Error).message })
+        }
+      }
+      if (cut && !canSmeltKelp(bot)) notes.push('no furnace or fuel to dry the kelp yet')
+    }
+    if (kinds.has('apples')) {
+      await pickupNearby(bot, signal, { radius: Math.min(16, p.radius), item: 'apple', maxMs: 8000 }).catch(() => 0)
+      if (agent.canDig) {
+        let broken = 0
+        for (let i = 0; i < p.leaves * 2 && broken < p.leaves; i++) {
+          checkAborted(signal)
+          const at = appleLeaves(bot, bot.entity.position, 6).find(v => !skip.has(v.toString()) && !offLimits(agent, bot, v, 0))
+          if (!at) {
+            // walk to the next tree with oak leaves within the radius
+            const next = appleLeaves(bot, bot.entity.position, Math.min(24, p.radius)).find(v => !skip.has(v.toString()) && !offLimits(agent, bot, v, 0))
+            if (!next) break
+            skip.add(next.toString())
+            try { await reachBlock(bot, next, signal, 4, 20_000) } catch (e) { checkAborted(signal) }
+            continue
+          }
+          skip.add(at.toString())
+          try {
+            const b = bot.blockAt(at)
+            if (!b || !/_leaves$/.test(b.name)) continue
+            await reachBlock(bot, at, signal, 4, 10_000)
+            await digBlock(bot, b, signal, 50)
+            broken++
+          } catch (e) {
+            checkAborted(signal)
+            if (e instanceof DigRefusedError) { agent.markProtected(at); break }
+          }
+        }
+        if (broken) {
+          await pickupNearby(bot, signal, { radius: 8, item: 'apple', maxMs: 8000 }).catch(() => 0)
+          notes.push(`broke ${broken} leaves`)
+        }
       }
     }
-    if (picked) await pickupNearby(bot, signal, { radius: 6, maxMs: 6000 }).catch(() => 0)
-    const got = countItem(bot, 'sweet_berries') - before
-    return got > 0 ? ok(`picked ${got} sweet berries from ${picked} bushes`, { got }) : fail(picked ? `picked ${picked} bushes but got no berries` : `no ripe berry bushes within ${p.radius} blocks`)
+    const got = Object.entries(before).map(([n, b]) => [n, countItem(bot, n) - b] as const).filter(([, d]) => d > 0)
+    const text = got.map(([n, d]) => `${d} ${n === 'sweet_berries' ? 'sweet berries' : n === 'apple' ? (d === 1 ? 'apple' : 'apples') : n}`).join(', ')
+    const extra = notes.length ? ` (${notes.join(', ')})` : ''
+    return got.length ? ok(`foraged ${text}${extra}`, Object.fromEntries(got)) : fail(`nothing foraged within ${p.radius} blocks (${[...kinds].join(', ')})${extra}`)
   }
 })
 
@@ -935,8 +1218,8 @@ const breed = defineAction({
 
 export const food = () => defineSkill({
   name: 'food',
-  description: 'Food self-sufficiency: scouting for animals and village farms, starting a farm of its own, gathering seeds, picking berries, breeding animals.',
-  actions: [findFood, startFarmAction, gatherSeeds, forage, breed],
+  description: 'Food self-sufficiency: scouting for animals and village farms, starting, tending and growing a farm of its own, gathering seeds, foraging berries, kelp and apples, breeding animals.',
+  actions: [findFood, startFarmAction, tendFarm, gatherSeeds, forage, breed],
   observe: (agent) => {
     const farms = getFarms(agent).map(f => `${f.name} ${f.crop} at ${fmtPos(f)}`)
     const spots = getFoodSpots(agent).filter(s => s.kind !== 'water').length

@@ -1,6 +1,7 @@
 // Live test of food self-sufficiency (keep_fed scouting, start_farm, farm_setup) on a real server.
 //   node scripts/food-test.ts run 760 45 [minutes]   walk to x/z, empty the inventory, set home, arm keep_fed + farm_setup, watch
 //   node scripts/food-test.ts farm 800 -40           walk to x/z and run start_farm there directly (no behaviours)
+//   node scripts/food-test.ts tend [seeds]           go to the farm the last run made, gather seeds, run tend_farm and show the plot
 //   node scripts/food-test.ts report                  farms and food spots the last run remembered
 //   node scripts/food-test.ts remove                  break the crops, fences and torches of the farms the last run made
 // The bot is FOOD_BOT (default FoodTest), owned by FOOD_TESTER (default FoodTester), who joins
@@ -137,6 +138,37 @@ async function farm (): Promise<void> {
   await bot.stop()
 }
 
+async function tend (): Promise<void> {
+  const bot = new Agent(variant, server, { username: BOT, dataDir: DATA, canDig: true, owners: [TESTER] })
+  bot.on('actionEnd', (info: any, r: ActionResult) => { if (info.caller?.name !== 'food-test') log(`${r.ok ? 'done' : 'FAIL'} ${info.name} (${info.caller.kind}:${info.caller.name}): ${r.message}`) })
+  await connect(bot)
+  for (const name of ['keep_fed', 'farm_setup', 'stay_safe']) await step(bot, 'behavior_disarm', { name }).catch(() => null)
+  const f = getFarms(bot)[0]
+  if (!f) { log('no farm remembered: run farm first'); await bot.stop(); return }
+  await waitForDay(bot)
+  await step(bot, 'goto', { x: f.x + 2, y: f.y + 1, z: f.z + 2 })
+  const show = () => {
+    const rows: string[] = []
+    for (let dz = -4; dz <= 4; dz++) {
+      let row = ''
+      for (let dx = -4; dx <= 4; dx++) {
+        const g = bot.bot.blockAt(bot.bot.entity.position.clone().set(f.x + dx, f.y, f.z + dz))
+        const a = bot.bot.blockAt(bot.bot.entity.position.clone().set(f.x + dx, f.y + 1, f.z + dz))
+        row += !g ? '?' : g.name === 'water' ? '~' : g.name === 'farmland' ? (/wheat|carrots|potatoes|beetroots/.test(a?.name ?? '') ? 'w' : '_') : /dirt|grass_block/.test(g.name) ? '.' : '#'
+      }
+      rows.push(row)
+    }
+    log(`plot (~ water, w crop, _ bare farmland, . dirt, # other):\n${rows.join('\n')}`)
+  }
+  show()
+  await step(bot, 'gather_seeds', { count: process.argv[3] ? Number(xs) : 12, radius: 32, maxMinutes: 4 })
+  await step(bot, 'tend_farm', { farm: f.name, size: 9 })
+  show()
+  log(state(bot))
+  bot.storage.flush()
+  await bot.stop()
+}
+
 async function report (): Promise<void> {
   const bot = new Agent(variant, server, { username: BOT, dataDir: DATA, canDig: true })
   // read storage without connecting
@@ -165,5 +197,5 @@ async function remove (): Promise<void> {
   await bot.stop()
 }
 
-const main = mode === 'report' ? report : mode === 'remove' ? remove : mode === 'farm' ? farm : run
+const main = mode === 'report' ? report : mode === 'tend' ? tend : mode === 'remove' ? remove : mode === 'farm' ? farm : run
 main().then(() => process.exit(0), e => { console.error(e); process.exit(1) })

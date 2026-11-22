@@ -450,8 +450,14 @@ export interface FoodWorld {
   farmEmpty?: number
   /** Crops on its own farm that are planted but not ripe yet. */
   farmGrowing?: number
-  /** Ripe stopgap food in range (sweet berry bushes). */
+  /** Ripe stopgap food in range: sweet berry bushes, and kelp at the shore when it can smelt it. */
   forage?: number
+  /** Natural oak / dark oak leaves in reach (apples, about 1 in 200): only tried when critical. */
+  apples?: number
+  /** Work its farm needs that it can do now (plant, re-till, grow, put water back), from planFarmWork. */
+  farmWork?: number
+  /** Seeds it lacks to plant, re-till and grow its farm to the target size (and keep the reserve). */
+  farmSeedsWanted?: number
   /** A breeding pair and food for them are at hand. */
   canBreed?: boolean
   /** Hostiles close by: no far trips now. */
@@ -489,6 +495,10 @@ export interface FoodStepOptions {
   ringMemoryMs?: number
   /** Seeds to have before starting a farm; fewer, with grass near, means gather first (default 8). */
   minSeeds?: number
+  /** Tend, grow or start its farm alongside the other sources when food is at least farmAbove (default: with startFarm). */
+  growFarm?: boolean
+  /** Food at or above this is not urgent: farm work may come before searching (default 14). */
+  farmAbove?: number
   /** Spare this many adults of each kind for breeding (default 0 here; keep_fed's default is 2). */
   keepAtLeast?: number
   /** Food at or below this is critical (default 6). */
@@ -509,6 +519,8 @@ export interface FoodDecision {
   seeds?: number
   /** hunt/scout: adults of each kind to spare. */
   keepAtLeast?: number
+  /** forage: also break leaves for apples (critical only). */
+  apples?: boolean
   /** When no step is left: how long until it is worth trying again. */
   retryMs: number
 }
@@ -569,6 +581,12 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   const huntable = w.animals > 0 || (!!w.starving && (w.herd ?? 0) > 0)
   const keep = w.starving ? 0 : (o.keepAtLeast ?? 0)
   const critical = (w.food ?? 20) <= (o.critical ?? 6)
+  const seeds = w.seeds ?? 0
+  const minSeeds = o.minSeeds ?? 8
+  const fallback = !!o.startFarm
+  // farm work it can do now: planFarmWork's count when known, else bare farmland it has seeds for
+  const work = w.farmWork !== undefined ? w.farmWork : (seeds > 0 ? (w.farmEmpty ?? 0) : 0)
+  const forageNow = (w.forage ?? 0) > 0 || (critical && (w.apples ?? 0) > 0)
   const d = (step: FoodStep, rung: FoodRung, reason: string, extra: Partial<FoodDecision> = {}): FoodDecision => ({ step, rung, reason, retryMs: RETRY.soon, ...extra })
 
   // 1. what it carries
@@ -589,10 +607,14 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
     return d('hunt', 'known', w.animals > 0 ? `${w.animals} animals to spare in range` : `starving, hunting the breeders too (${w.herd})`, { keepAtLeast: keep })
   }
 
+  // 2b. not urgent: a farm is long-term food, so tend, grow or start it before a long search
+  const food = w.food ?? 0
+  if (fallback && o.growFarm !== false && food >= (o.farmAbove ?? 14) && !w.starving && dayOrBold && !w.danger) {
+    if (w.hasFarm && work > 0 && ok('plant')) return d('plant', 'farm', `food ${food}/20 is not urgent: tending its farm first (${work} cells to plant, re-till or grow)`)
+    if (!w.hasFarm && w.canStartFarm && seeds >= minSeeds && ok('start_farm')) return d('start_farm', 'farm', `food ${food}/20 is not urgent and it has ${seeds} seeds: starting a farm alongside`)
+  }
+
   // 3. search, one ring wider than the last empty one
-  const fallback = !!o.startFarm
-  const seeds = w.seeds ?? 0
-  const minSeeds = o.minSeeds ?? 8
   const rings = o.rings?.length ? o.rings : DEFAULT_RINGS
   const ring = nextRing(w.searches ?? [], rings, now, o.ringMemoryMs ?? RING_MEMORY_MS)
   let searchBlocked = ''
@@ -612,14 +634,15 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   const justFound = (w.searches ?? []).some(s => s.found && now - s.at < 10 * 60_000)
   const farmWhy = `no proper food source (${searchBlocked})`
   if (fallback && !(justFound && ring)) {
-    if (critical && (w.forage ?? 0) > 0 && ok('forage')) return d('forage', 'farm', `food ${w.food}/20, berries in range while nothing else works`)
-    if (w.hasFarm && (w.farmEmpty ?? 0) > 0 && seeds > 0 && ok('plant')) return d('plant', 'farm', `${farmWhy}; ${w.farmEmpty} empty farmland on its farm and ${seeds} seeds`)
-    if (dayOrBold && w.grass && ok('seeds') && ((w.hasFarm && (w.farmEmpty ?? 0) > seeds) || (!w.hasFarm && w.canStartFarm && w.seeds !== undefined && seeds < minSeeds))) {
+    if (critical && forageNow && ok('forage')) return d('forage', 'farm', `food ${w.food}/20, ${(w.forage ?? 0) > 0 ? 'berries or kelp' : 'leaves for apples'} in range while nothing else works`, { apples: (w.apples ?? 0) > 0 })
+    if (w.hasFarm && work > 0 && ok('plant')) return d('plant', 'farm', `${farmWhy}; ${work} cells on its farm to plant, re-till or grow, ${seeds} seeds`)
+    const farmShort = (w.farmEmpty ?? 0) > seeds || (w.farmSeedsWanted ?? 0) > 0
+    if (dayOrBold && w.grass && ok('seeds') && ((w.hasFarm && farmShort) || (!w.hasFarm && w.canStartFarm && w.seeds !== undefined && seeds < minSeeds))) {
       return d('seeds', 'farm', `${farmWhy}; ${seeds} seeds, breaking grass for more`)
     }
     if (!w.hasFarm && w.canStartFarm && dayOrBold && ok('start_farm')) return d('start_farm', 'farm', `${farmWhy}; ${seeds} seeds, starting a farm`)
     if (w.canBreed && ok('breed')) return d('breed', 'farm', `${farmWhy}; breeding animals for later`)
-    if ((w.forage ?? 0) > 0 && ok('forage')) return d('forage', 'farm', `${farmWhy}; berries as a stopgap`)
+    if (forageNow && ok('forage')) return d('forage', 'farm', `${farmWhy}; ${(w.forage ?? 0) > 0 ? 'berries or kelp' : 'apples from leaves'} as a stopgap`, critical && (w.apples ?? 0) > 0 ? { apples: true } : {})
   }
 
   // 6. critical and nothing works: say so once, stay safe
@@ -641,4 +664,107 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
 /** The next step only (planFood's step). */
 export function nextFoodStep (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<FoodStep> = new Set()): FoodStep | null {
   return planFood(w, o, tried).step
+}
+
+// ------------------------------------------------------------------ danger
+
+/**
+ * The straight way from `from` to `to` passes a point for which `inZone` is true (sampled
+ * every `step` blocks, both ends included).
+ */
+export function crossesDanger (from: XZ, to: XZ, inZone: (p: XZ) => boolean, step = 8): boolean {
+  const len = Math.hypot(to.x - from.x, to.z - from.z)
+  const n = Math.max(1, Math.ceil(len / Math.max(1, step)))
+  for (let i = 0; i <= n; i++) {
+    const t = i / n
+    if (inZone({ x: Math.round(from.x + (to.x - from.x) * t), z: Math.round(from.z + (to.z - from.z) * t) })) return true
+  }
+  return false
+}
+
+/**
+ * keep_fed's danger signal, the same ones stay_safe acts on: shooters calling for cover
+ * (stay_safe's `ranged`), being surrounded (3+ hostiles within 6), hostiles close while
+ * badly hurt, or standing in a remembered danger zone.
+ */
+export function foodDanger (s: { ranged: boolean, close: number, near: number, health: number, inZone: boolean, surroundedBy?: number }): string | null {
+  if (s.ranged) return 'shooters around'
+  if (s.close >= (s.surroundedBy ?? 3)) return `${s.close} hostiles close`
+  if (s.near > 0 && s.health <= 8) return `hurt (${Math.round(s.health)}/20) with mobs near`
+  if (s.inZone) return 'in a remembered danger zone'
+  return null
+}
+
+// ------------------------------------------------------------------ chores when not hungry
+
+export type FoodChore = 'tend_farm' | 'start_farm' | 'seeds' | 'breed'
+
+export interface ChoreWorld {
+  food: number
+  night: boolean
+  danger: boolean
+  hasFarm: boolean
+  /** start_farm is there and it may dig. */
+  canStartFarm: boolean
+  seeds: number
+  /** Grass close by to break for seeds (and gather_seeds is there). */
+  grass: boolean
+  /** Distance to its nearest farm, or null. */
+  farmDistance: number | null
+  /** Farm work it can do now (planFarmWork's count), when the farm is loaded. */
+  farmWork: number
+  /** Seeds short for the farm's work and reserve. */
+  farmSeedsWanted: number
+  /** Side of the square its farmland covers, and the target. */
+  farmSize: number
+  farmTarget: number
+  /** A breeding pair near home and food for them. */
+  canBreed: boolean
+  /** Chores that ran recently, with the time until which they are left alone. */
+  paused?: Partial<Record<FoodChore, number>>
+  now?: number
+}
+
+export interface ChoreOptions {
+  /** Farm work between meals (default true). */
+  growFarm: boolean
+  startFarm: boolean
+  breed: boolean
+  minSeeds: number
+  /** Below this food it is keep_fed's ladder, not a chore (default 14). */
+  farmAbove: number
+  /** Only walk to the farm from this close (default 128). */
+  tendRange: number
+}
+
+/** How long a chore is left alone after it ran (ok) or failed. */
+export const CHORE_PAUSE_MS: Record<FoodChore, { ok: number, fail: number }> = {
+  tend_farm: { ok: 4 * 60_000, fail: 15 * 60_000 },
+  start_farm: { ok: 5 * 60_000, fail: 20 * 60_000 },
+  seeds: { ok: 8 * 60_000, fail: 20 * 60_000 },
+  breed: { ok: 6 * 60_000, fail: 15 * 60_000 }
+}
+
+/**
+ * Food work to do between meals, or null: tend and grow its farm when there is work it can do,
+ * break grass when the farm is small and short of seeds, start a farm once it has the seeds
+ * (even while animals are around: a farm is long-term food), breed animals near home. Never
+ * at night, in danger or while hungry (the ladder's turn).
+ */
+export function farmChore (w: ChoreWorld, o: ChoreOptions): { chore: FoodChore, reason: string } | null {
+  const now = w.now ?? Date.now()
+  const ok = (c: FoodChore) => !((w.paused?.[c] ?? 0) > now)
+  if (w.night || w.danger || w.food < o.farmAbove) return null
+  if (o.growFarm && o.startFarm) {
+    if (w.hasFarm && w.farmDistance !== null && w.farmDistance <= o.tendRange) {
+      if (w.farmWork > 0 && ok('tend_farm')) return { chore: 'tend_farm', reason: `${w.farmWork} cells to plant, re-till or grow (${w.farmSize}x${w.farmSize} of ${w.farmTarget}x${w.farmTarget})` }
+      if (w.farmSeedsWanted > 0 && w.farmSize < w.farmTarget && w.grass && ok('seeds')) return { chore: 'seeds', reason: `farm is ${w.farmSize}x${w.farmSize}, ${w.farmSeedsWanted} seeds short of ${w.farmTarget}x${w.farmTarget}` }
+    }
+    if (!w.hasFarm && w.canStartFarm) {
+      if (w.seeds >= o.minSeeds && ok('start_farm')) return { chore: 'start_farm', reason: `no farm yet and ${w.seeds} seeds` }
+      if (w.grass && ok('seeds')) return { chore: 'seeds', reason: `no farm yet, ${w.seeds} of ${o.minSeeds} seeds` }
+    }
+  }
+  if (o.breed && w.canBreed && ok('breed')) return { chore: 'breed', reason: 'a pair near home and food for them' }
+  return null
 }

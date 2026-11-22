@@ -79,6 +79,8 @@ const harvest = defineAction({
     const point = x !== undefined && y !== undefined && cz !== undefined ? vec(bot, x, y, cz) : undefined
     let harvested = 0
     let replanted = 0
+    // cells not replanted right away, with the crop that grew there (a village carrot field gets carrots back)
+    const missed: { pos: Vec3, seed: string }[] = []
     while (harvested < max) {
       checkAborted(signal)
       const found = bot.findBlock({ ...(point ? { point } : {}), matching: ids, maxDistance: radius, useExtraInfo: (b: Block) => isMature(b.name, age(b)) })
@@ -99,14 +101,20 @@ const harvest = defineAction({
         await sleep(100, signal)
         const seed = seedFor(crop)
         if (seed && findItem(bot, seed) && await plantOn(bot, pos.offset(0, -1, 0), seed, signal).catch(() => false)) replanted++
+        else if (seed) missed.push({ pos: pos.offset(0, -1, 0), seed })
       }
       // pick up every few crops so drops don't despawn or scatter
       if (harvested % 8 === 0) await pickupNearby(bot, signal, { radius: 6, maxMs: 8000 })
     }
     if (!harvested) return fail(`no ripe crops within ${radius} blocks${point ? ` of ${fmtPos(point)}` : ''}`)
     await pickupNearby(bot, signal, { radius: 8, maxMs: 15000 })
-    // seeds may only have arrived with the pickup: fill whatever farmland we left bare
+    // seeds may only have arrived with the pickup: replant what grew there first, then fill other bare farmland
     if (replant) {
+      for (const m of missed) {
+        checkAborted(signal)
+        if (!findItem(bot, m.seed) || !isReplaceable(bot.blockAt(m.pos.offset(0, 1, 0))?.name)) continue
+        if (await plantOn(bot, m.pos, m.seed, signal).catch(() => false)) replanted++
+      }
       for (const p of emptyFarmland(bot, Math.min(radius, 12), harvested - replanted, point)) {
         checkAborted(signal)
         const seed = pickSeed(bot)

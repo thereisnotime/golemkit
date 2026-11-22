@@ -115,7 +115,7 @@ export const farmSetup = defineBehavior({
     'wheat and breeds animals it has food for. By day only. Arm it on any bot that should feed itself long term.',
   options,
   requires: ['start_farm', 'harvest'],
-  uses: ['craft', 'goto', 'breed'],
+  uses: ['craft', 'goto', 'breed', 'tend_farm'],
   needs: { dig: true },
   priority: 'npc',
   create (o, { agent }) {
@@ -151,8 +151,11 @@ export const farmSetup = defineBehavior({
             }
             saveFarm(agent, { ...farm, tended: Date.now() })
             const r = await ctx.act('harvest', { radius: Math.ceil((farm.size - 1) / 2 * 1.5) + 1, max: 81, x: farm.x, y: farm.y + 1, z: farm.z })
+            // then the upkeep: bare farmland, trampled dirt, a ring more when there are seeds to spare
+            const t = agent.getAction('tend_farm') ? await ctx.act('tend_farm', { farm: farm.name, size: o.size }) : null
+            const upkeep = t?.ok ? `; ${t.message.replace(`${farm.name}: `, '')}` : ''
             // nothing ripe yet is not a failure: we checked
-            return r.ok ? { ok: true, message: `${farm.name}: ${r.message}` } : { ok: true, message: `${farm.name}: nothing ripe yet` }
+            return r.ok ? { ok: true, message: `${farm.name}: ${r.message}${upkeep}` } : { ok: true, message: `${farm.name}: nothing ripe yet${upkeep}` }
           }
           case 'bake': {
             const n = breadToBake(inv(ctx.bot).wheat ?? 0, o.breed ? o.keepWheat : 0)
