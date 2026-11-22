@@ -1,7 +1,7 @@
 import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
 import type { Vec3 } from 'vec3'
-import { defineSkill, defineAction, z, ok, fail, checkAborted, fmtPos, goals, sleep, type ActionResult, type ActionContext } from '../core/index.ts'
+import { defineSkill, defineAction, z, ok, fail, checkAborted, fmtPos, goals, sleep, dangerMemory, type ActionResult, type ActionContext } from '../core/index.ts'
 import { reachBlock, within, placeAt, findItem, isReplaceable, digBlock, DigRefusedError, gotoWithin } from './world.ts'
 import { pickupNearby } from './pickup.ts'
 import { ensureTool, inventoryCounts, planksFor } from './toolkit.ts'
@@ -110,8 +110,16 @@ export async function fellTree ({ bot, agent, signal, log }: Pick<ActionContext,
     if (axe.ok && (axe.data as { crafted?: boolean } | undefined)?.crafted) axeNote = `crafted a ${(axe.data as { item: string }).item}, `
   }
   // Trees in areas where the server refuses breaking (spawn protection) are skipped; if a cut
-  // gets refused anyway, the area is remembered and the next tree is tried.
-  const skip = (p: Vec3) => agent.protectedAreas.isProtected(p)
+  // gets refused anyway, the area is remembered and the next tree is tried. Trees in (or past) a
+  // remembered danger zone (a skeleton or patrol from a recent fight) are skipped too.
+  const danger = dangerMemory(agent)
+  const from = bot.entity.position.clone()
+  let avoided = 0
+  const skip = (p: Vec3) => {
+    if (agent.protectedAreas.isProtected(p)) return true
+    if (danger.isInDanger(p) || danger.crosses(from, p)) { avoided++; return true }
+    return false
+  }
   let tree = findTree(bot, radius, skip)
   const logsBefore = logsHeld(bot)
   let firstCut = 0
@@ -137,6 +145,7 @@ export async function fellTree ({ bot, agent, signal, log }: Pick<ActionContext,
   if (!tree) {
     const me = bot.entity.position
     const zoneNear = agent.protectedAreas.zones.some(z => Math.hypot(z.x - me.x, z.z - me.z) < radius + 24)
+    if (avoided && !zoneNear) return fail(`no tree within ${radius} blocks outside the danger zones I remember (${danger.active().map(z => z.kind).join(', ')} nearby)`)
     return fail(zoneNear
       ? `no tree I'm allowed to cut within ${radius} blocks (trees near spawn are protected); try further away`
       : `no natural tree within ${radius} blocks`)

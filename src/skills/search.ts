@@ -8,7 +8,7 @@ import type { Entity } from 'prismarine-entity'
 import type { Agent, ActionContext, ActionResult } from '../core/index.ts'
 import {
   defineSkill, defineAction, z, ok, fail, goals, travel, sleep, checkAborted, fmtPos, needsSurvival, itemName,
-  surfaceY, parseDeathMessage
+  surfaceY, parseDeathMessage, dangerMemory, describeZone
 } from '../core/index.ts'
 import { getPlaces, setPlace, sameDimension } from './navigation.ts'
 import { digBlock, DigRefusedError, reachBlock, vec, gotoWithin, findItem } from './world.ts'
@@ -294,7 +294,9 @@ async function scout (ctx: Ctx, center: Pos, radius: number, maxMinutes: number,
   const t0 = Date.now()
   const spawn = spawnOf(bot)
   const away = spawn && Math.hypot(center.x - spawn.x, center.z - spawn.z) > 4 ? Math.atan2(center.z - spawn.z, center.x - spawn.x) : Math.random() * Math.PI * 2
-  const wps: Waypoint[] = scoutWaypoints(center, radius, { startAngle: away, skip: (w) => offLimits(agent, bot, w, 0) })
+  // remembered danger zones (a skeleton, a pillager patrol from a fight a few minutes ago) are left out
+  const danger = dangerMemory(agent)
+  const wps: Waypoint[] = scoutWaypoints(center, radius, { startAngle: away, skip: (w) => offLimits(agent, bot, w, 0) || !!danger.isInDanger(w) })
   const visited = new Set<number>()
   const blocked = new Map<number, number>()
   const sectors: number[] = []
@@ -316,6 +318,8 @@ async function scout (ctx: Ctx, center: Pos, radius: number, maxMinutes: number,
     if (i < 0) { reason = `covered every direction out to ${radius} blocks`; break }
     visited.add(i)
     const w = wps[i]!
+    const zone = danger.isInDanger(w) ?? danger.crosses(bot.entity.position, w)
+    if (zone) { log.debug('find_target: skipping waypoint in or past a danger zone', { at: `${w.x} ${w.z}`, zone: describeZone(zone, Date.now()) }); continue }
     const top = surfaceAt(bot, w.x, Math.floor(bot.entity.position.y), w.z)
     if (top && /water|lava/.test(top.name)) { log.debug('find_target: skipping wet waypoint', { at: `${w.x} ${w.z}`, block: top.name }); continue }
     const start = bot.entity.position.clone()

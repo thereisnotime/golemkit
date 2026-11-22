@@ -20,6 +20,10 @@ export { Fleet, Blackboard, type FleetMessage, type FleetEvents } from './fleet.
 export { goals, Movements, goto, gotoTimed, travel, surfaceY, roofed, TravelUndergroundError, TravelUnderwaterError, holdGoal, playerEntity, isHostile, FLYING, nearestHostile, itemName, fmtPos, needsSurvival, gameModeNote } from './helpers.ts'
 export { isModdedBlock, MODDED_BLOCK } from './modded.ts'
 export {
+  DangerMemory, dangerMemory, rememberDanger, activeZones, isInDanger, avoidZones, crossesDanger, clearDanger, describeZone,
+  DANGER_TTL_MS, PATROL_TTL_MS, DANGER_RADIUS, type DangerZone, type DangerSighting, type DangerPos
+} from './danger.ts'
+export {
   Journal, JournalCapture, resolveJournalConfig, fleetQuery, parseDeathMessage, parseAdvancement, parseRange,
   fmtEvent, fmtSection, fmtRollup, fmtCounts, ago, buildDayRollup, buildSection, ITEM_DESPAWN_MS, JOURNAL_TYPES,
   type JournalEvent, type JournalQuery, type JournalConfig, type JournalType, type DeathView, type DayRollup,
