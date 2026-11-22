@@ -137,6 +137,8 @@ export interface FightOptions {
   flags?: WeaponFlags
   /** Only melee/ranged decisions: no outnumbered/heal stops (hunting animals). Default: true for hostiles. */
   tactical?: boolean
+  /** Checked before every shot: true holds fire (a bodyguard's player in the line of fire) and the loop closes in instead. */
+  holdFire?: (target: Entity) => boolean
 }
 
 /**
@@ -302,7 +304,7 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
           held = await swapIfNeeded()
           if (Date.now() - lastSwing >= attackCooldownMs(held)) { bot.attack(target); lastSwing = Date.now(); res.hits++ }
           await sleep(50, signal)
-        } else if (flags.ranged && hasRanged(bot) && dist < 32 && Date.now() - lastSwing > 300) {
+        } else if (flags.ranged && hasRanged(bot) && dist < 32 && Date.now() - lastSwing > 300 && !opts.holdFire?.(target)) {
           await shootAt(bot, target, signal)
           held = await equipForTarget(bot, target, flags)
           lastSwing = Date.now()
@@ -323,7 +325,7 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
           await sleep(100, signal)
           continue
         }
-        if (archer && flags.ranged && hasRanged(bot) && dist > 6 && dist < 32) {
+        if (archer && flags.ranged && hasRanged(bot) && dist > 6 && dist < 32 && !opts.holdFire?.(target)) {
           lowerShield()
           if (mode === 'path') { bot.pathfinder.setGoal(null); mode = 'still' }
           clearMoves(bot)

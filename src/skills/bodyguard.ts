@@ -10,7 +10,7 @@ import { defineSkill, defineAction, z, ok, fail, goals, isHostile, FLYING, sleep
 import { fightTarget, creeperFuseLit, eatNow } from './fight.ts'
 import { combatRefusal, recentAttacker } from './combat.ts'
 import { weaponFlags, hasRanged, readyShield, isRangedMob } from './weapons.ts'
-import { rankGuardThreats, guardSpot, blockSpot, feedDecision, motion, facingTowards, type GuardThreat, type Sample, type FoodItem, type V3 } from './guard-plan.ts'
+import { rankGuardThreats, guardSpot, blockSpot, feedDecision, motion, facingTowards, shouldRetarget, inLineOfFire, type GuardThreat, type Sample, type FoodItem, type V3 } from './guard-plan.ts'
 
 const EYE = 1.62
 const HURT_MS = 8000
@@ -277,6 +277,7 @@ const protect = defineAction({
           }
           setMode(`fighting ${t.name} (${top.reason})`)
           bot.pathfinder.setGoal(null)
+          let reranked = Date.now()
           const sub = subFight(signal, () => {
             const q = player()
             if (!q) return 'player gone'
@@ -286,11 +287,22 @@ const protect = defineAction({
               const c = bot.nearestEntity(e => e.name === 'creeper' && isHostile(e) && e.position.distanceTo(q.position) <= 6)
               if (c && c.id !== t.id) return 'creeper by the player'
             }
+            // something more urgent came up (a zombie hitting the player while we chase an archer)
+            if (Date.now() - reranked >= 600) {
+              reranked = Date.now()
+              const next = shouldRetarget(t.id, playerThreats(bot, q, p.range))
+              if (next) return 'a more urgent threat'
+            }
             return null
           })
           let r
           try {
-            r = await fightTarget(bot, t, sub.signal, { maxMs: archer || FLYING.has(t.name ?? '') ? 20_000 : 12_000, flags: { ...flags, maxChase: p.range } })
+            // never shoot past or through the player
+            const holdFire = (e: Entity) => {
+              const q = player()
+              return !!q && inLineOfFire(bot.entity.position.offset(0, EYE, 0), e.position.offset(0, (e.height ?? 1.8) * 0.5, 0), q.position)
+            }
+            r = await fightTarget(bot, t, sub.signal, { maxMs: archer || FLYING.has(t.name ?? '') ? 20_000 : 12_000, flags: { ...flags, maxChase: p.range }, holdFire })
           } catch (e) {
             if (signal.aborted || !(e instanceof ActionAbortedError)) throw e
             r = null // the watcher stopped it: re-rank

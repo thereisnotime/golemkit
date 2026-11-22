@@ -8,6 +8,8 @@ export interface V3 { x: number, y: number, z: number }
 
 const RANGED = new Set(['skeleton', 'stray', 'bogged', 'pillager', 'blaze', 'ghast', 'witch'])
 const FLYERS = new Set(['phantom', 'ghast', 'vex', 'blaze', 'breeze', 'bee'])
+/** A melee mob this close to the player that hurt them is hitting them now. */
+const MELEE_CONTACT = 3
 
 export interface GuardThreat {
   id: number
@@ -67,9 +69,44 @@ export function threatReason (t: GuardThreat, range: number): string | null {
 export function guardScore (t: GuardThreat, range = 16): number {
   const base = threatScore({ id: t.id, name: t.name, dist: t.distPlayer, los: t.losPlayer, fuseLit: t.fuseLit, attacking: t.hurtPlayer })
   let s = base + (t.hurtPlayer ? 40 : 0) + (t.approaching || t.diving ? 10 : 0)
+  // a melee mob hitting the player right now does more damage than an archer's next arrow, and
+  // it is the one next to the bot: it goes before archers (still after a creeper by them)
+  if (t.hurtPlayer && t.distPlayer <= MELEE_CONTACT && !RANGED.has(t.name) && t.name !== 'creeper') s += 120
   const reason = threatReason(t, range)
   if (reason === 'on me' || reason === 'attacked me') s -= 60
   return s
+}
+
+/**
+ * Whether protect should drop the mob it is fighting for another one: the current target is no
+ * longer a threat at all, or the top threat now scores at least `margin` more (a zombie that
+ * started hitting the player while the bot chases an archer). The margin stops flip-flopping
+ * between two mobs of the same kind.
+ */
+export function shouldRetarget (currentId: number, ranked: readonly { id: number, score: number }[], margin = 60): { id: number, score: number } | null {
+  const top = ranked[0]
+  if (!top || top.id === currentId) return null
+  const cur = ranked.find(t => t.id === currentId)
+  if (!cur) return top
+  return top.score >= cur.score + margin ? top : null
+}
+
+/**
+ * Whether the player stands in (or close to) the line of fire from `shooter` to `target`: their
+ * body within `clearance` blocks of the line, between the shooter and up to 4 blocks past the
+ * target (arrows that miss keep going). protect holds its bow then and closes in instead.
+ */
+export function inLineOfFire (shooter: V3, target: V3, player: V3, clearance = 1.5): boolean {
+  const body = { x: player.x, y: player.y + 0.9, z: player.z }
+  const dx = target.x - shooter.x
+  const dy = target.y - shooter.y
+  const dz = target.z - shooter.z
+  const len = Math.hypot(dx, dy, dz)
+  if (len < 0.1) return false
+  const t = ((body.x - shooter.x) * dx + (body.y - shooter.y) * dy + (body.z - shooter.z) * dz) / (len * len)
+  if (t <= 0 || t > (len + 4) / len) return false
+  const off = Math.hypot(shooter.x + dx * t - body.x, shooter.y + dy * t - body.y, shooter.z + dz * t - body.z)
+  return off < clearance
 }
 
 /** The threats among `list`, most urgent first, each with its reason. */

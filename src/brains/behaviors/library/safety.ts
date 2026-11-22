@@ -16,6 +16,9 @@ import { canPlace } from '../runtime.ts'
 import { hostilesNear } from './util.ts'
 import { escorting } from '../../../skills/bodyguard.ts'
 
+/** Health at or below which an escorting bodyguard treats a crowd around it as surrounded. */
+const ESCORT_SURROUNDED_HEALTH = 12
+
 type Danger = 'surrounded' | 'low_health' | 'water' | 'night' | 'shelter' | null
 
 function inWater (bot: Bot): boolean {
@@ -56,7 +59,9 @@ export function assessDanger (ctx: Pick<NpcContext, 'agent' | 'bot' | 'bb'> & { 
   if (!pos) return null
   const health = typeof bot.health === 'number' ? bot.health : 20
   const close = hostilesNear(bot, pos, 6)
-  if (close.length >= o.surroundedBy) return 'surrounded'
+  // a bodyguard is surrounded whenever a wave reaches its player: it fights next to them while
+  // it is healthy and only pillars or backs off once it is getting hurt
+  if (close.length >= o.surroundedBy && (health <= ESCORT_SURROUNDED_HEALTH || !escorting(agent))) return 'surrounded'
   const near = hostilesNear(bot, pos, running ? Math.max(20, o.mobRadius) : o.mobRadius)
   if (near.length && o.retreatBelow > 0 && health <= (running ? o.retreatBelow + 2 : o.retreatBelow)) return 'low_health'
   if (o.avoidWater && near.length && health < 16 && inWater(bot)) return 'water'

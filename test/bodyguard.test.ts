@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   threatReason, rankGuardThreats, guardSpot, blockSpot, feedDecision, WarnLimiter, compass, relativeDir, warnText, warnKey,
-  motion, facingTowards, type GuardThreat, type FeedState
+  motion, facingTowards, shouldRetarget, inLineOfFire, type GuardThreat, type FeedState
 } from '../src/skills/guard-plan.ts'
 import { attackRefusal, type AttackCandidate } from '../src/skills/tactics.ts'
 import { assessDanger } from '../src/brains/behaviors/library/safety.ts'
@@ -19,7 +19,12 @@ test('threats to the player: creepers within 6 always come first', () => {
     mob({ name: 'phantom', distPlayer: 4, diving: true })
   ], 16)
   assert.equal(ranked[0]!.name, 'creeper')
-  assert.equal(ranked[1]!.name, 'skeleton', 'an archer that hit the player beats melee')
+  assert.equal(ranked[1]!.name, 'zombie', 'a zombie hitting the player beats an archer')
+  assert.equal(ranked[2]!.name, 'skeleton')
+  const loose = rankGuardThreats([mob({ name: 'zombie', distPlayer: 5, hurtPlayer: true }), mob({ name: 'skeleton', distPlayer: 8, losPlayer: true, hurtPlayer: true })], 16)
+  assert.equal(loose[0]!.name, 'skeleton', 'an archer that hit the player beats melee that is not on them')
+  const contact = rankGuardThreats([mob({ name: 'zombie', distPlayer: 1.5, hurtPlayer: true }), mob({ name: 'creeper', distPlayer: 5.9 })], 16)
+  assert.equal(contact[0]!.name, 'creeper', 'a creeper by the player still goes first')
   const lit = rankGuardThreats([mob({ name: 'creeper', distPlayer: 6 }), mob({ name: 'creeper', id: 7, distPlayer: 5.9, fuseLit: true })], 16)
   assert.equal(lit[0]!.id, 7, 'lit fuse first')
 })
@@ -170,4 +175,40 @@ test('bodyguard is registered, at behaviour level, with the documented options',
   const v = reg.validate('bodyguard', { player: 'robin' })
   assert.ok(v.ok)
   if (v.ok) assert.deepEqual({ ...v.options }, { player: 'robin', distance: 3, range: 16, feed: true, keepFood: 4, warn: true, chat: true, whisper: false, whenGone: 'stay', catchUp: 48 })
+})
+
+test('protect drops its target for a clearly more urgent one, not for a close call', () => {
+  const archer = mob({ name: 'skeleton', id: 1, distPlayer: 9, losPlayer: true })
+  const zombieOnPlayer = mob({ name: 'zombie', id: 2, distPlayer: 1.2, hurtPlayer: true })
+  const ranked = rankGuardThreats([archer, zombieOnPlayer], 16)
+  assert.equal(shouldRetarget(1, ranked)?.id, 2, 'chasing an archer while a zombie hits the player')
+  assert.equal(shouldRetarget(2, ranked), null, 'already on the top threat')
+  const two = rankGuardThreats([mob({ name: 'zombie', id: 3, distPlayer: 4, approaching: true }), mob({ name: 'zombie', id: 4, distPlayer: 6, approaching: true })], 16)
+  assert.equal(shouldRetarget(4, two), null, 'two zombies a few blocks apart: keep the current one')
+  assert.equal(shouldRetarget(99, two)?.id, 3, 'the current target is no threat any more')
+  assert.equal(shouldRetarget(3, []), null)
+})
+
+test('stay_safe: a healthy bodyguard keeps fighting in a crowd, a hurt one still gets out', () => {
+  const agent: any = { storage: { get: (_k: string, d: unknown) => d }, protectedAreas: { isProtected: () => false }, getAction: () => null, canDig: false }
+  const at = (x: number) => ({ x, y: 64, z: 0 })
+  const zombie = (id: number, x: number) => ({ id, name: 'zombie', type: 'hostile', position: at(x) })
+  const bot: any = { entity: { position: at(0) }, health: 20, entities: { 1: zombie(1, 2), 2: zombie(2, -2), 3: zombie(3, 3) }, inventory: { items: () => [] } }
+  const bb: any = { facts: { isNight: false, sleeping: false, homeDistance: null } }
+  const o = { retreatBelow: 10, mobRadius: 10, surroundedBy: 3, pillar: true, avoidWater: true, homeAtNight: true, homeRange: 8, shelterUnprepared: false }
+  assert.equal(assessDanger({ agent, bot, bb }, o), 'surrounded', 'not escorting: 3 zombies within 6 is surrounded')
+  setEscort(agent, 'Owner')
+  assert.equal(assessDanger({ agent, bot, bb }, o), null, 'escorting at full health: fight')
+  bot.health = 12
+  assert.equal(assessDanger({ agent, bot, bb }, o), 'surrounded', 'escorting and hurt: get out')
+})
+
+test('protect holds fire when the player is in the line of fire', () => {
+  const bot = { x: 0, y: 65.6, z: 0 }
+  const skeleton = { x: 10, y: 65, z: 0 }
+  assert.equal(inLineOfFire(bot, skeleton, { x: 5, y: 64, z: 0.5 }), true, 'player between the bot and the skeleton')
+  assert.equal(inLineOfFire(bot, skeleton, { x: 12, y: 64, z: 0 }), true, 'player just behind the skeleton: a miss hits them')
+  assert.equal(inLineOfFire(bot, skeleton, { x: 5, y: 64, z: 4 }), false, 'player off to the side')
+  assert.equal(inLineOfFire(bot, skeleton, { x: -3, y: 64, z: 0 }), false, 'player behind the bot')
+  assert.equal(inLineOfFire(bot, skeleton, { x: 20, y: 64, z: 0 }), false, 'player far past the skeleton')
 })
