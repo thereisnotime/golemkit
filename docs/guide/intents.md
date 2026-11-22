@@ -52,20 +52,20 @@ be reordered, switched off live and [benchmarked](#benchmark):
 | `cloud_llm` | not a classifier: hands the line to the [LLM brain](/guide/llm-brain), the existing handoff, always last | a turn | on |
 
 ```mermaid
-flowchart LR
+flowchart TD
   C["owner chat line<br/>(addressed, mode allows)"]
   P["patterns<br/>sync, ~0 ms"]
   E["embeddings<br/>MiniLM, ~3 ms"]
   L["local_llm<br/>JSON, &le; 2 s"]
   S{"strategy<br/>first_confident<br/>vote / best"}
-  V["slots from the line<br/>validated"]
-  ACT["claim + agent.act(...)<br/>reply with the result"]
+  V["slots from<br/>the line<br/>validated"]
+  ACT["claim +<br/>agent.act(...)<br/>reply with<br/>the result"]
   H{"LLM can<br/>think?"}
-  CL["cloud_llm handoff<br/>LlmRuntime.handoff"]
-  HINT["hint: say pax help"]
-  LOG["decision log<br/>one debug line"]
+  CL["cloud_llm<br/>handoff<br/>LlmRuntime.handoff"]
+  HINT["hint: say<br/>pax help"]
+  LOG["decision log<br/>one debug<br/>line"]
   C --> P --> E --> L --> S
-  S -- "a layer is confident" --> V --> ACT
+  S -- "a layer is<br/>confident" --> V --> ACT
   S -- "nobody is" --> H
   H -- yes --> CL
   H -- no --> HINT
@@ -245,20 +245,20 @@ answers once every 20 s: `didn't get that (LLM off: ...); say "Pax help"`.
 ## One message, one handler
 
 ```mermaid
-flowchart LR
+flowchart TD
   C["owner chat line"]
   P{"! prefix?"}
   A{"addressed?<br/>name, whisper,<br/>alone, follow-up"}
   M{"intents.mode"}
   L{"LLM can<br/>think?"}
-  X["parse<br/>intent + confidence"]
+  X["parse<br/>intent +<br/>confidence"]
   T{"confidence<br/>&ge; 0.7?"}
-  CL["claim the line<br/>msg.claimedBy = intents"]
+  CL["claim the line<br/>msg.claimedBy<br/>= intents"]
   ACT["agent.act(...)<br/>priority player (50)<br/>or behavior_arm"]
   R["reply: result<br/>or can't: reason"]
   LLM["LLM runtime<br/>normal turn"]
-  CMD["command brain"]
-  H["hint: say pax help"]
+  CMD["command<br/>brain"]
+  H["hint: say<br/>pax help"]
   C --> P
   P -- yes --> CMD
   P -- no --> A
@@ -270,9 +270,9 @@ flowchart LR
   L -- yes --> LLM
   L -- no --> X
   X --> T
+  T -- "no,<br/>LLM up" --> LLM
   T -- yes --> CL --> ACT --> R
-  T -- "no, LLM up" --> LLM
-  T -- "no, LLM down" --> H
+  T -- "no,<br/>LLM down" --> H
   classDef in fill:#f1f5f9,stroke:#475569,color:#0f172a
   classDef dec fill:#fef3c7,stroke:#d97706,color:#78350f
   classDef me fill:#dcfce7,stroke:#16a34a,color:#14532d

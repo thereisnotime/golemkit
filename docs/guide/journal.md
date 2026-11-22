@@ -9,7 +9,7 @@ Recording is in core, so every bot gets it whatever brains it runs. The actions 
 journal come with the `journal` skill, which is part of `standardSkills()`.
 
 ```mermaid
-flowchart LR
+flowchart TD
   subgraph cap["Capture (core, every bot)"]
     BOT["mineflayer events<br/>death · health · inventory<br/>dig · place · players"]
     AG["agent events<br/>actions · chat · LLM usage<br/>protected areas · goals"]
@@ -17,12 +17,12 @@ flowchart LR
   BOT --> LIM
   AG --> LIM
   LIM{{"debounce, aggregate<br/>caps per type/minute<br/>redact secrets"}} --> RAW[("raw JSONL<br/>journal/YYYY-MM-DD.jsonl")]
-  RAW -- "hour / day closes,<br/>on demand" --> ROLL[("rollups<br/>journal/rollups/YYYY-MM-DD.json")]
+  RAW -- "hour / day closes,<br/>on demand" --> ROLL[("rollups<br/>journal/rollups/<br/>YYYY-MM-DD.json")]
   ROLL -. "journal.summarize<br/>(optional)" .-> SUM["LLM paragraph<br/>in the rollup"]
   RAW -- "retention: deleted only<br/>after a final rollup" --> X(["gone"])
   RAW --> Q["agent.journal.query()<br/>lastDeath · whereWas · summary"]
   ROLL --> Q
-  Q --> T["actions = !commands + LLM tools<br/>recall_events · last_death<br/>history · goto_death"]
+  Q --> T["actions =<br/>!commands + LLM tools<br/>recall_events · last_death<br/>history · goto_death"]
   Q --> OBS["observe(): recentEvents<br/>(with a context pack)"]
   classDef cap fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef lim fill:#fee2e2,stroke:#dc2626,color:#7f1d1d

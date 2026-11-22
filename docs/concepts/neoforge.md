@@ -12,22 +12,22 @@ sequenceDiagram
   autonumber
   participant B as Bot (golemkit)
   participant S as NeoForge server
-  Note over B: first ever connection, no cache
+  Note over B: first ever connection,<br/>no cache
   B->>S: login (offline / microsoft)
-  S->>B: neoforge:register (empty query)
+  S->>B: neoforge:register<br/>(empty query)
   B->>S: channel list (empty)
-  S-->>B: setup_failed: 210 channels missing
-  Note over B: learn names, save data/channels-*.json
-  B->>S: reconnect, offer 210 channels
-  S-->>B: setup_failed: flow mismatch on some
+  S-->>B: setup_failed:<br/>210 channels missing
+  Note over B: learn names, save<br/>data/channels-*.json
+  B->>S: reconnect,<br/>offer 210 channels
+  S-->>B: setup_failed:<br/>flow mismatch on some
   B->>S: reconnect, fixed flows
-  S-->>B: setup_failed: version mismatch on some
+  S-->>B: setup_failed:<br/>version mismatch on some
   B->>S: reconnect, fixed versions
   S->>B: neoforge:network (accepted)
-  S->>B: frozen registries (items, entities, blocks)
-  B->>S: registry sync completed, enum/flag acks
+  S->>B: frozen registries<br/>(items, entities, blocks)
+  B->>S: registry sync completed,<br/>enum/flag acks
   S->>B: tags, finish_configuration
-  Note over B,S: play: tolerant parser drops packets with modded item data
+  Note over B,S: play: tolerant parser drops<br/>packets with modded item data
 ```
 
 Later logins start from the cache and are accepted on the first try.

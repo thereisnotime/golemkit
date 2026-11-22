@@ -46,34 +46,27 @@ parts that change what happens; the eval is how you find out by how much.
 ```mermaid
 flowchart TB
   subgraph dirs["Pack directories (later wins)"]
-    V["settings.contextDefaults<br/>(variant)"]
-    P["profiles/pax/<br/>or context: in the profile"]
+    V["settings.<br/>contextDefaults<br/>(variant)"]
+    P["profiles/pax/<br/>or context:<br/>in the profile"]
   end
   V --> L["loadContextPack<br/>strip HTML comments<br/>per-section caps"]
   P --> L
-  L --> R["AGENTS.md / RULES.md"]
-  L --> I["IDENTITY.md"]
-  L --> S["SOUL.md"]
-  L --> U["USER.md"]
-  L --> K["skills/ index<br/>(name: description)"]
+  L --> F["AGENTS.md /<br/>RULES.md<br/>IDENTITY.md<br/>SOUL.md · USER.md"]
+  L --> K["skills/ index<br/>(name:<br/>description)"]
   L --> M["MEMORY.md<br/>(read live)"]
   L --> H["hooks.yaml"]
-  R --> SP
-  I --> SP
-  S --> SP
-  U --> SP
-  K --> SP
-  M --> SP
-  SP["system prompt<br/>1 header line<br/>2 operational rules<br/>3 identity or persona<br/>4 framework rules, honesty, style<br/>5 soul, user, skills<br/>6 memory (last)"]
-  K -. "read_skill / list_skills" .-> T["BotTools"]
-  M -. "remember / recall" .-> T
+  F & K & M --> SP
+  SP["system prompt<br/>1 header line<br/>2 operational rules<br/>3 identity or persona<br/>4 framework rules,<br/>honesty, style<br/>5 soul, user, skills<br/>6 memory (last)"]
+  K -. "read_skill /<br/>list_skills" .-> T["BotTools"]
+  M -. "remember /<br/>recall" .-> T
+  T ~~~ H
   H --> HB["hooks brain<br/>(no LLM)"]
   classDef dir fill:#dcfce7,stroke:#16a34a,color:#14532d
   classDef file fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef out fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
   classDef hook fill:#fef3c7,stroke:#d97706,color:#78350f
   class V,P dir
-  class R,I,S,U,K,M file
+  class F,K,M file
   class SP,T out
   class H,HB hook
   style L fill:#f1f5f9,stroke:#475569,color:#0f172a
@@ -283,17 +276,22 @@ regexes or too-short timers disable that hook, unknown actions are warned about.
 ## A/B evals
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph setup["Same for every run"]
+    direction TB
     PR["provider + model<br/>(or scripted, --dry)"]
     SC["scenarios<br/>task, world, checks"]
     LIM["per-turn limits<br/>from the profile"]
   end
-  SC --> RUN
-  PR --> RUN
-  LIM --> RUN
-  A["arm A: with pack"] --> RUN
-  B["arm B: no pack / pack minus a file"] --> RUN
+  subgraph arms[" "]
+    direction TB
+    A["arm A: with pack"]
+    B["arm B: no pack /<br/>pack minus a file"]
+  end
+  PR ~~~ SC ~~~ LIM
+  A ~~~ B
+  setup --> RUN
+  arms --> RUN
   RUN["N reps, arms interleaved<br/>FakeAgent + scripted world<br/>real LlmRuntime turn"] --> CH["checks<br/>calls, order, reply text,<br/>forbidden calls, spawn digs"]
   CH --> AG["per arm and scenario:<br/>success, tool calls,<br/>latency, tokens, cost"]
   AG --> OUT["console table<br/>data/evals/*.md + *.json"]

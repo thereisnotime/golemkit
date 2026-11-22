@@ -227,23 +227,29 @@ player looks when the click arrives. The planner (`planPlacement` in `src/skills
 pure and unit tested) works backwards from the state a blueprint wants:
 
 ```mermaid
-flowchart LR
-  W(["cell + wanted state<br/>oak_stairs facing=north half=bottom"]) --> F{"block family"}
-  F -->|stairs, slab| H["half: top face of the block below = bottom,<br/>bottom face of the block above = top,<br/>side face: cursor y 0.25 / 0.75"]
-  F -->|log, pillar| A["only faces on the wanted axis"]
-  F -->|door, bed, gate| Y["yaw = facing;<br/>door hinge from cursor x/z"]
-  F -->|trapdoor| T["side face = facing,<br/>or top/bottom face with yaw = opposite"]
-  F -->|wall torch, ladder| M["the wall behind it,<br/>level look at the wall"]
-  F -->|chest, furnace| O["yaw = opposite of facing"]
-  H & A & Y & T & M & O --> R["options: reference block, face,<br/>cursor, yaw, pitch (best first)"]
+flowchart TD
+  W(["cell + wanted state<br/>oak_stairs facing=north<br/>half=bottom"]) --> F{"block family"}
+  subgraph FAM[" "]
+    direction TB
+    H["<b>stairs, slab</b><br/>half: top face of the<br/>block below = bottom,<br/>bottom face of the<br/>block above = top,<br/>side face: cursor y<br/>0.25 / 0.75"]
+    A["<b>log, pillar</b><br/>only faces on<br/>the wanted axis"]
+    Y["<b>door, bed, gate</b><br/>yaw = facing;<br/>door hinge from<br/>cursor x/z"]
+    T["<b>trapdoor</b><br/>side face = facing,<br/>or top/bottom face<br/>with yaw = opposite"]
+    M["<b>wall torch, ladder</b><br/>the wall behind it,<br/>level look at the wall"]
+    O["<b>chest, furnace</b><br/>yaw = opposite<br/>of facing"]
+    H ~~~ A ~~~ Y
+    T ~~~ M ~~~ O
+  end
+  F --> FAM
+  FAM --> R["options: reference block,<br/>face, cursor, yaw, pitch<br/>(best first)"]
   R --> E{"any?"}
-  E -- no --> D["defer the cell,<br/>retry after the next placement"]
-  E -- yes --> S["stand within reach of the<br/>reference block, not in the cell"]
-  S --> L["look (yaw, pitch), wait a tick,<br/>click face at cursor"]
+  E -- no --> D["defer the cell,<br/>retry after the<br/>next placement"]
+  E -- yes --> S["stand within reach<br/>of the reference block,<br/>not in the cell"]
+  S --> L["look (yaw, pitch),<br/>wait a tick,<br/>click face at cursor"]
   L --> V{"read back:<br/>state right?"}
   V -- yes --> OK(["placed"])
   V -- "only open/closed" --> U["use it once"] --> OK
-  V -- "wrong facing/half/axis" --> X["break it, next option,<br/>once"] --> L
+  V -- "wrong facing/<br/>half/axis" --> X["break it,<br/>next option, once"] --> L
   classDef in fill:#f1f5f9,stroke:#475569,color:#0f172a
   classDef rule fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
   classDef act fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
@@ -641,11 +647,11 @@ A creative build has two methods (the `build` action's `method`, else `build.cre
   why runs are merged; the result says how many were sent.
 
 ```mermaid
-flowchart LR
+flowchart TD
   B(["build in creative"]) --> M{"method"}
-  M -- "hand / auto" --> H["stock from creative inventory,<br/>walk or fly, place with delay"]
-  M -- commands --> C["clear air cells, fill dips,<br/>/fill runs bottom-up, attachments last"]
-  C --> R{"first reply:<br/>unknown command / no permission?"}
+  M -- "hand / auto" --> H["stock from creative<br/>inventory, walk or fly,<br/>place with delay"]
+  M -- commands --> C["clear air cells,<br/>fill dips, /fill runs<br/>bottom-up, attachments last"]
+  C --> R{"first reply:<br/>unknown command /<br/>no permission?"}
   R -- yes --> H
   R -- no --> V["read back: N/M right"]
   classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e

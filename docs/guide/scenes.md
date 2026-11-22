@@ -45,26 +45,27 @@ brain, but it combines well: villagers living their lives who drop everything wh
 scene starts.
 
 ```mermaid
+%%{init: {"sequence": {"width": 100, "actorMargin": 20, "diagramMarginX": 10}}}%%
 sequenceDiagram
   autonumber
   participant O as Owner
-  participant D as Director (lowest name)
+  participant D as Director<br/>(lowest<br/>name)
   participant H as Hauler
   participant F as Foreman
-  participant P as Passing player
-  O->>D: !scene_start broken_cart
-  D->>D: cast roles from free actors
-  D->>H: scene:do goto mark "cart"
-  D->>F: scene:do goto mark "office"
+  participant P as Passing<br/>player
+  O->>D: !scene_start<br/>broken_cart
+  D->>D: cast roles from<br/>free actors
+  D->>H: scene:do goto<br/>mark "cart"
+  D->>F: scene:do goto<br/>mark "office"
   H-->>D: scene:done
-  D->>H: say "the wheel's gone again!"
-  Note over D: chat pacer ≥1.6 s between lines
-  D->>F: say "you broke it, you fix it"
-  P->>H: walks within 8 blocks
-  D->>D: pause timeline (approach hook)
-  D->>H: say "hey, got a spare plank?"
+  D->>H: say "the wheel's<br/>gone again!"
+  Note over D: chat pacer<br/>≥1.6 s between<br/>lines
+  D->>F: say "you broke it,<br/>you fix it"
+  P->>H: walks within<br/>8 blocks
+  D->>D: pause timeline<br/>(approach hook)
+  D->>H: say "hey, got a<br/>spare plank?"
   D->>D: resume
-  D-->>O: scene finished, cast released
+  D-->>O: scene finished,<br/>cast released
 ```
 
 ## Writing your first scene

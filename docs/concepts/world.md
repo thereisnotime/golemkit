@@ -10,7 +10,7 @@ of blocks away used to "arrive" without moving. `travel()` (core helper, used by
 in legs:
 
 ```mermaid
-flowchart LR
+flowchart TD
   S(["goto 3000 blocks away"]) --> D{"remaining<br/>≤ 64 blocks?"}
   D -- no --> L["leg: aim 64 blocks<br/>towards the target"]
   L --> P{"progress<br/>≥ 8 blocks?"}
@@ -52,6 +52,13 @@ like success to mineflayer: it marks the block as air, then the server restores 
 these areas instead of looping:
 
 ```mermaid
+---
+config:
+  sequence:
+    width: 110
+    actorMargin: 30
+    diagramMarginX: 10
+---
 sequenceDiagram
   autonumber
   participant B as Bot
@@ -59,11 +66,11 @@ sequenceDiagram
   participant P as protectedAreas
   participant PF as Pathfinder
   B->>S: dig dirt at 545 70 45
-  S-->>B: block_change: dirt is back
+  S-->>B: block_change:<br/>dirt is back
   B->>P: markProtected(545 70 45)
-  P->>P: new zone (radius 20), save data/protected-host-port.json
-  P->>PF: digging inside zones costs ∞, re-plan now
-  Note over B: collect / chop_tree skip blocks in zones,<br/>walk out once if everything nearby is protected
+  P->>P: new zone (radius 20),<br/>save data/<br/>protected-host-port.json
+  P->>PF: digging inside<br/>zones costs ∞,<br/>re-plan now
+  Note over B,PF: collect / chop_tree skip blocks in zones,<br/>walk out once if everything nearby<br/>is protected
 ```
 
 - Zones are saved per server and loaded on every start, for every bot on that server.
@@ -117,37 +124,54 @@ Unknown modded weapons count as a generic sword/axe by name.
 
 ```mermaid
 flowchart TB
-  P(["defend: threats around"]) --> T["pick target<br/>lit/close creeper › archer in sight › nearest melee<br/>(never players, villagers, golems, pets, named;<br/>neutral mobs only while they attack)"]
-  T --> L{"stop?<br/>outnumbered, health ≤ 4 with food,<br/>chased past maxChase, water/lava/drop/dark cave,<br/>no progress 3 s"}
-  L -- no --> R{"in reach?<br/>eyes → hitbox ≤ 3"}
-  R -- no --> A["approach<br/>pathfinder far, steer close by;<br/>archers: zig-zag or shield;<br/>spider on a wall: wait"]
-  A --> L
-  R -- yes --> C{"charged?<br/>1 / attack speed"}
-  C -- "first hit" --> SK["sprint hit<br/>(knockback)"]
-  C -- "≤ 300 ms left" --> J["jump"]
-  J --> F["falling + charged:<br/>crit ×1.5"]
-  C -- "not yet" --> S["spacing<br/>&lt; 2.2 back, &gt; 2.9 forward,<br/>else strafe (safe steps only)"]
-  SK --> B["step back out of its swing"]
-  F --> B
-  B --> S
-  S --> E{"lull and hungry?"}
-  E -- yes --> EAT["eat"]
-  E -- no --> L
-  EAT --> L
-  L -- "health ≤ 4, food" --> H["back off, eat,<br/>re-engage"]
-  L -- outnumbered --> O["pillar 2 and hit from the top,<br/>or go home, or back off"]
-  L -- "archer out of reach" --> LOF["back out of its<br/>line of fire"]
+  P(["defend: threats around"]) --> T["pick target<br/>lit/close creeper ›<br/>archer in sight ›<br/>nearest melee<br/>(never players, villagers,<br/>golems, pets, named;<br/>neutral mobs only<br/>while they attack)"]
+  T --> L{"stop?<br/>outnumbered,<br/>health ≤ 4 with food,<br/>chased past maxChase,<br/>water/lava/drop/<br/>dark cave,<br/>no progress 3 s"}
+  L -- no --> M["melee step<br/>(below)"]
+  M --> L
+  L -- "health ≤ 4,<br/>food" --> H["back off, eat,<br/>re-engage"]
+  L -- outnumbered --> O["pillar 2 and hit<br/>from the top,<br/>or go home,<br/>or back off"]
+  L -- "archer out<br/>of reach" --> LOF["back out of its<br/>line of fire"]
   H --> T
+  H ~~~ LOF
   classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
   classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
   classDef r fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
   classDef v fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-  class P,T,A a
-  class L,R,C,E d
-  class SK,J,F,B,S v
-  class EAT,H g
+  class P,T a
+  class L d
+  class M v
+  class H g
   class O,LOF r
+```
+
+Each melee step:
+
+```mermaid
+flowchart TB
+  M(["melee step"]) --> R{"in reach?<br/>eyes → hitbox ≤ 3"}
+  R -- no --> A["approach<br/>pathfinder far,<br/>steer close by;<br/>archers: zig-zag<br/>or shield;<br/>spider on a wall: wait"]
+  R -- yes --> C{"charged?<br/>1 / attack speed"}
+  C -- "first hit" --> SK["sprint hit<br/>(knockback)"]
+  C -- "≤ 300 ms left" --> J["jump"]
+  J --> F["falling + charged:<br/>crit ×1.5"]
+  C -- "not yet" --> S["spacing<br/>&lt; 2.2 back,<br/>&gt; 2.9 forward,<br/>else strafe<br/>(safe steps only)"]
+  SK --> B["step back out<br/>of its swing"]
+  F --> B
+  B --> S
+  S --> E{"lull and<br/>hungry?"}
+  E -- yes --> EAT["eat"]
+  A --> BK(["back to stop?"])
+  E -- no --> BK
+  EAT --> BK
+  classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
+  classDef v fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+  class M,A,BK a
+  class R,C,E d
+  class SK,J,F,B,S v
+  class EAT g
 ```
 
 - **Timing**: the swing waits for the held weapon's full charge (sword 625 ms, iron axe 1.1 s,
@@ -206,15 +230,16 @@ climbs per run before it gives up).
 flowchart TB
   H(["bot got hurt"]) --> M{"hostile within 8<br/>(flyers: 20)?"}
   M -- no --> X(["ignore"])
-  M -- yes --> R{"retreat?<br/>health ≤ retreatBelow, or<br/>mob in water and health &lt; waterFightAbove<br/>(never for flyers)"}
+  M -- yes --> R{"retreat?<br/>health ≤ retreatBelow, or<br/>mob in water and health<br/>&lt; waterFightAbove<br/>(never for flyers)"}
   R -- yes --> RT["retreat: back off 18 blocks"]
   R -- no --> DF["defend: fight it"]
-  T(["every 2 s"]) --> LOW{"health ≤ 4, mob close,<br/>food (disengageToHeal)?"}
+  T(["every 2 s"]) --> LOW{"health ≤ 4, mob close,<br/>food<br/>(disengageToHeal)?"}
   LOW -- yes --> DF
-  LOW -- no --> G{"better armour,<br/>shield or totem? (autoArmor)"}
+  LOW -- no --> G{"better armour,<br/>shield or totem?<br/>(autoArmor)"}
   G -- yes --> GU["gear_up<br/>(beside the current action)"]
   G -- no --> E{"food &lt; eatBelow<br/>or hurt and safe?"}
   E -- yes --> EAT["eat best food"]
+  RT ~~~ T
   classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
   classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d

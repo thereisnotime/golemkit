@@ -48,29 +48,29 @@ All three are long-running: they honour the stop signal, whisper milestones to w
 ## find_target
 
 ```mermaid
-flowchart TB
+flowchart TD
   S(["find_target iron"]) --> R{"resolve the word"}
-  R -- unknown --> X(["fail: I don't know what ... is<br/>(similar names)"])
-  R --> V{"in view?<br/>loaded blocks / entities / biome samples"}
+  R -- unknown --> X(["fail: I don't know<br/>what ... is<br/>(similar names)"])
+  R --> V{"in view? loaded<br/>blocks / entities<br/>/ biome samples"}
   V -- yes --> F["found"]
-  V -- no --> M{"remembered?<br/>found:&lt;target&gt;, food spots"}
+  V -- no --> M{"remembered?<br/>found:&lt;target&gt;,<br/>food spots"}
   M -- "yes, still there" --> F
-  M -- "no / empty (forgotten)" --> N{"day, or at_night?"}
-  N -- yes --> SC["spiral scout on the surface<br/>skip water, lava, protected areas<br/>climb out when a leg goes under"]
+  M -- "no / empty<br/>(forgotten)" --> N{"day, or at_night?"}
+  N -- yes --> SC["spiral scout on the surface<br/>skip water, lava,<br/>protected areas<br/>climb out when a leg<br/>goes under"]
   SC -- "sees it" --> F
-  SC -- "stop rule" --> P{"ore, prospect or bring,<br/>can dig, height band reachable?"}
+  SC -- "stop rule" --> P{"ore, prospect<br/>or bring, can dig,<br/>height band<br/>reachable?"}
   N -- no --> P
-  P -- yes --> PM["safe strip mine<br/>(staircase ≤ 20 down, 3-wide strip)"]
+  P -- yes --> PM["safe strip mine<br/>(staircase ≤ 20 down,<br/>3-wide strip)"]
   PM -- "mined some" --> F
-  P -- no --> NF(["fail: what it tried, why it stopped;<br/>walks back"])
+  P -- no --> NF(["fail: what it tried,<br/>why it stopped;<br/>walks back"])
   PM -- nothing --> NF
   F --> REM["remember found:&lt;target&gt;<br/>journal event 'found'"]
   REM --> B{"bring?"}
-  B -- yes --> FE["collect / chop / harvest / fill buckets"]
+  B -- yes --> FE["collect / chop / harvest<br/>/ fill buckets"]
   B -- no --> G{"go?"}
   FE --> G
   G -- yes --> STAY(["walk there and stay"])
-  G -- no --> BACK(["come back to the owner,<br/>hand over what it fetched,<br/>report x y z, distance, direction"])
+  G -- no --> BACK(["come back to the owner,<br/>hand over what it fetched,<br/>report x y z, distance,<br/>direction"])
   classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
   classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -105,20 +105,21 @@ outlines a vertical rectangle of 4..23 by 5..23 with at most the corners missing
 ## bring_item
 
 ```mermaid
-flowchart LR
+flowchart TD
   S(["bring_item bread 2"]) --> I{"in inventory?"}
-  I -- enough --> D
-  I -- no --> C{"own chests?<br/>placed by me or<br/>settings.storage.chests"}
+  I -- no --> C{"own chests?<br/>placed by me or<br/>settings<br/>.storage.chests"}
   C -- has it --> W["withdraw"] --> D
   C -- no --> K{"recipe?"}
-  K -- yes --> KR["craft<br/>(ingredients: obtain wheat,<br/>planks, coal the same way)"] --> D
+  K -- no --> GA{"gather nearby?<br/>collect / chop<br/>/ harvest"}
+  K -- yes --> KR["craft (ingredients:<br/>obtain wheat, planks,<br/>coal the same way)"] --> D
   K -- "wood product" --> GM["gather_materials<br/>chop + craft"] --> D
-  K -- no --> GA{"gather nearby?<br/>collect / chop / harvest"}
   GA -- got it --> D
-  GA -- "none close" --> FT["find_target its source,<br/>walk there, gather"] --> D
+  GA -- "none close" --> FT["find_target<br/>its source,<br/>walk there,<br/>gather"] --> D
+  W ~~~ KR ~~~ GM ~~~ FT
+  I -- enough --> D
   D["deliver: walk to the player,<br/>follow if they move,<br/>look at them, toss"] --> A{"picked up?"}
   A -- all --> OK(["ok: gave Steve 2 bread"])
-  A -- "some / none" --> PART(["fail: tossed 2 bread next to Steve;<br/>they haven't picked it up yet"])
+  A -- "some / none" --> PART(["fail: tossed 2 bread<br/>next to Steve;<br/>they haven't picked<br/>it up yet"])
   classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
   classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d

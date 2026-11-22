@@ -85,17 +85,20 @@ journal:                      # optional, event journal settings (on by default)
 ## LLM listening modes
 
 ```mermaid
-flowchart TB
+flowchart TD
   M["chat line"] --> W{"whisper?"}
-  W -- yes --> T(["LLM turn"])
   W -- no --> N{"names the bot<br/>or an alias?"}
-  N -- yes --> T
   N -- no --> L{"listen mode"}
-  L -- mention --> X["ignored<br/>(kept in memory)"]
-  L -- conversation --> C{"talked with this<br/>player in the last<br/>conversationMs?"}
-  C -- yes --> T
+  L -- mention --> X["ignored<br/>(kept in<br/>memory)"]
+  L -- conversation --> C{"talked with<br/>this player<br/>in the last<br/>conversationMs?"}
+  L -- all --> B["batched with<br/>other overheard<br/>lines"]
+  B --> R{"ambientMinGapMs<br/>passed?"}
+  R -- yes --> A(["LLM turn:<br/>'overheard, reply<br/>only if relevant'"])
   C -- no --> X
-  L -- all --> B["batched with other<br/>overheard lines"] --> R{"ambientMinGapMs<br/>passed?"} -- yes --> A(["LLM turn:<br/>'overheard, reply<br/>only if relevant'"])
+  X ~~~ B
+  C -- yes --> T
+  N -- yes --> T
+  W -- yes --> T(["LLM turn"])
   classDef turn fill:#dcfce7,stroke:#16a34a,color:#14532d
   classDef skip fill:#f1f5f9,stroke:#94a3b8,color:#334155
   classDef dec fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e

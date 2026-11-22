@@ -35,7 +35,7 @@ Common parameters: `width` (1, 3 or 5), `palette`, `lanterns`, `bridge`, `maxCut
 ## From plan to blocks
 
 ```mermaid
-flowchart LR
+flowchart TD
   subgraph PLAN["plan (pure)"]
     direction TB
     E(["endpoints<br/>door fronts, points,<br/>existing roads"]) --> S["world scan → height map<br/>ground, BLOCKED, MARGIN,<br/>LIQUID, ROAD, RAIL"]
@@ -51,12 +51,12 @@ flowchart LR
   end
   subgraph BUILD["build"]
     direction TB
-    M{"survival or<br/>creative?"} -- survival --> GA["gather_materials<br/>stone bricks, stairs, walls,<br/>cobblestone"] --> H["row by row: clear head-room,<br/>base, floor or stair, railing"]
+    M{"survival or<br/>creative?"} -- survival --> GA["gather_materials<br/>stone bricks, stairs,<br/>walls, cobblestone"] --> H["row by row: clear<br/>head-room, base,<br/>floor or stair, railing"]
     M -- "creative, hand" --> H
-    M -- "creative, commands" --> C["merged /fill runs<br/>(hand without op)"]
+    M -- "creative,<br/>commands" --> C["merged /fill runs<br/>(hand without op)"]
     H --> V["read back:<br/>walkable end to end?"]
     C --> V
-    V --> RES(["honest result + road.built record"])
+    V --> RES(["honest result +<br/>road.built record"])
   end
   G --> R
   W --> M

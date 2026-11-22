@@ -13,42 +13,16 @@ src/core/               agent lifecycle, action lock, chat, storage, NeoForge la
 
 ```mermaid
 flowchart TB
-  subgraph run["How you run it"]
-    CLI["just run / just fleet"]
-    PROF["profiles/*.yaml"]
-    FLEET["fleets/*.yaml"]
-  end
-  subgraph proc["One Node process: a Fleet"]
-    direction TB
-    subgraph agent["Agent (one per bot)"]
-      direction TB
-      BR["Brains<br/>command · reflexes · hooks · npc · scene · llm · self"]
-      CTX["Context pack<br/>AGENTS · USER · MEMORY · skills · hooks"]
-      LOCK{{"Action lock<br/>priorities · retries"}}
-      SK["Skills → actions<br/>movement/travel · combat · crafting · farming · journal · ..."]
-      CHAT["Chat queue<br/>rate limit · humanize"]
-      ST[("Storage + journal<br/>data/bots/…")]
-      PA[("Protected areas<br/>per server")]
-    end
-    BUS["Fleet bus + blackboard<br/>(per server)"]
-  end
-  subgraph lib["Libraries"]
-    MF["Mineflayer + pathfinder"]
-    NF["NeoForge layer<br/>handshake · registries · tolerant parser"]
-  end
-  LLM["LLM providers<br/>Claude · Codex · OpenCode · API"]
-  SRV[("Minecraft server<br/>NeoForge 1.21.1")]
-
-  CLI --> PROF & FLEET --> agent
-  BR -->|"agent.act()"| LOCK --> SK --> MF
-  BR --> CHAT --> MF
-  BR <-.-> BUS
-  CTX -.-> BR
-  BR -.->|"llm / self brains<br/>(proxy optional)"| LLM
-  SK -.-> PA
-  MF --> NF --> SRV
-  agent --- ST
-
+  CLI["just run / just fleet"]
+  CLI --> PROF["profiles/*.yaml"] & FLEET["fleets/*.yaml"]
+  AG["One Node process: a Fleet<br/>Agent (one per bot)<br/>brains · skills<br/>action lock · chat · storage"]
+  BUS["Fleet bus +<br/>blackboard<br/>(per server)"]
+  PROF & FLEET --> AG
+  AG <-.->|"brains"| BUS
+  AG -->|"skills,<br/>chat queue"| MF["Mineflayer + pathfinder"]
+  AG -.->|"llm / self brains<br/>(proxy optional)"| LLM["LLM providers<br/>Claude · Codex<br/>OpenCode · API"]
+  MF --> NF["NeoForge layer<br/>handshake · registries<br/>tolerant parser"]
+  NF --> SRV[("Minecraft server<br/>NeoForge 1.21.1")]
   classDef run fill:#f1f5f9,stroke:#475569,color:#0f172a
   classDef brain fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
   classDef lock fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
@@ -56,11 +30,36 @@ flowchart TB
   classDef lib fill:#dcfce7,stroke:#16a34a,color:#14532d
   classDef ext fill:#fef3c7,stroke:#d97706,color:#78350f
   class CLI,PROF,FLEET run
-  class BR,CHAT,CTX brain
-  class LOCK lock
-  class SK,ST,BUS,PA skill
+  class AG brain
+  class BUS skill
   class MF,NF lib
   class LLM,SRV ext
+```
+
+Inside one agent:
+
+```mermaid
+flowchart TB
+  CTX["Context pack<br/>AGENTS · USER · MEMORY<br/>skills · hooks"]
+  CTX -.-> BR["Brains<br/>command · reflexes · hooks<br/>npc · scene · llm · self"]
+  BR -->|"agent.act()"| LOCK{{"Action lock<br/>priorities · retries"}}
+  BR --> CHAT["Chat queue<br/>rate limit · humanize"]
+  LOCK --> SK["Skills → actions<br/>movement/travel · combat<br/>crafting · farming<br/>journal · ..."]
+  SK -.-> PA[("Protected areas<br/>per server")]
+  ST[("Storage + journal<br/>data/bots/…")]
+  CHAT ~~~ ST
+  SK --> MF["Mineflayer + pathfinder"]
+  CHAT --> MF
+  classDef run fill:#f1f5f9,stroke:#475569,color:#0f172a
+  classDef brain fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+  classDef lock fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+  classDef skill fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef lib fill:#dcfce7,stroke:#16a34a,color:#14532d
+  classDef ext fill:#fef3c7,stroke:#d97706,color:#78350f
+  class BR,CHAT,CTX brain
+  class LOCK lock
+  class SK,ST,PA skill
+  class MF lib
 ```
 
 Brains decide, skills provide actions, the action lock arbitrates the body, and the NeoForge
@@ -87,11 +86,11 @@ a new *session* with a fresh mineflayer `Bot`, and skills/brains get their `setu
 stateDiagram-v2
   [*] --> Connecting: start()
   Connecting --> Negotiating: login
-  Negotiating --> Connecting: rejected, learned channels (retry in 4.5 s)
-  Negotiating --> Configuring: channel list accepted
-  Configuring --> Playing: spawn (skills setup, brains session)
-  Playing --> Waiting: kicked / disconnected / server restart
-  Waiting --> Connecting: after MC_RECONNECT_DELAY_MS
+  Negotiating --> Connecting: rejected,<br/>learned channels<br/>(retry in 4.5 s)
+  Negotiating --> Configuring: channel list<br/>accepted
+  Configuring --> Playing: spawn (skills setup,<br/>brains session)
+  Playing --> Waiting: kicked / disconnected<br/>/ server restart
+  Waiting --> Connecting: after<br/>MC_RECONNECT_DELAY_MS
   Playing --> [*]: stop()
   note right of Playing
     actions run, brains decide,
@@ -145,23 +144,24 @@ following you). Equal priority replaces. Lower priority is rejected with `busy: 
 `stopActions()` aborts everything and clears the suspended stack.
 
 ```mermaid
+%%{init: {"sequence": {"width": 95, "actorMargin": 10}}}%%
 sequenceDiagram
   autonumber
-  participant P as Player (prio 50)
-  participant R as Reflexes (prio 60)
+  participant P as Player<br/>(prio 50)
+  participant R as Reflexes<br/>(prio 60)
   participant L as Action lock
   participant B as Body
-  P->>L: act follow (longRunning)
+  P->>L: act follow<br/>(longRunning)
   L->>B: follow Robin
-  Note over B: zombie hits the bot
+  Note over B: zombie hits<br/>the bot
   R->>L: act defend
-  L-->>B: suspend follow (preempted)
+  L-->>B: suspend follow<br/>(preempted)
   L->>B: defend
   B-->>L: zombie dead
   L->>B: resume follow
-  participant N as NPC brain (prio 20)
+  participant N as NPC brain<br/>(prio 20)
   N->>L: act wander
-  L-->>N: busy: follow (player)
+  L-->>N: busy: follow<br/>(player)
 ```
  `cancelActions(match)` aborts
 and drops only the actions matching a predicate (a scene uses it to stop exactly what it

@@ -74,8 +74,8 @@ Behaviours have their own live commands: `!behavior_arm`, `!behavior_configure`,
 ## How it works
 
 ```mermaid
-flowchart LR
-  P(["owner: !config_set llm.listen all"]) --> V{"known toggle?<br/>valid value?"}
+flowchart TD
+  P(["owner: !config_set<br/>llm.listen all"]) --> V{"known toggle?<br/>valid value?"}
   V -- no --> E(["error: what's allowed"])
   V -- yes --> S[("agent.storage<br/>settings.overrides")]
   S --> M["effective settings =<br/>profile ⊕ overrides"]

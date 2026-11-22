@@ -12,23 +12,23 @@ the server has it.
 ## How an action runs
 
 ```mermaid
-flowchart LR
+flowchart TD
   A(["we_set stone_bricks"]) --> O{"owner?"}
   O -->|no| X["refuse"]
   O -->|yes| D{"WorldEdit<br/>available?"}
   D -->|settings| S["worldedit.enabled"]
-  D -->|server signals| C["worldedit:* channels<br/>or registry entries"]
-  D -->|neither| P["probe: /we version,<br/>then //size for permission"]
+  D -->|server<br/>signals| C["worldedit:*<br/>channels or<br/>registry entries"]
+  D -->|neither| P["probe: /we version,<br/>then //size<br/>for permission"]
   S --> K
   C --> K
   P -->|"version reply"| K{"checks"}
-  P -->|"unknown command,<br/>no permission, no reply"| N["not available<br/>(reason)"]
-  K -->|"over maxBlocks,<br/>protected area,<br/>not whitelisted"| X
-  K -->|ok| Q["agent.command<br/>(rate-limited queue, logged)"]
+  P -->|"unknown command,<br/>no permission,<br/>no reply"| N["not available<br/>(reason)"]
+  K -->|"over maxBlocks,<br/>protected area,<br/>not whitelisted"| X2["refuse"]
+  K -->|ok| Q["agent.command<br/>(rate-limited queue,<br/>logged)"]
   Q --> R["collect server messages<br/>until quiet"]
   R --> M{"parse reply"}
   M -->|"blocks affected"| OK["ok: 75 blocks set"]
-  M -->|"no permission, too big,<br/>no selection, unknown block"| F["fail with the reason"]
+  M -->|"no permission,<br/>too big, no selection,<br/>unknown block"| F["fail with the reason"]
 
   classDef cmd fill:#f1f5f9,stroke:#475569,color:#0f172a
   classDef prof fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -39,7 +39,7 @@ flowchart LR
   class O,D,K,M vari
   class S,C,P,Q,R inst
   class OK prof
-  class X,N,F ask
+  class X,X2,N,F ask
 ```
 
 ### Detection

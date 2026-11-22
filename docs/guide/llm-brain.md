@@ -23,14 +23,23 @@ Then in game: `Pip, follow me` or `/msg Pip what's in your inventory?`. `!stop` 
 
 ## How it fits together
 
-```
-chat / events / timer ──► LlmRuntime ──► provider.run(turn) ──► model
-                           │  queue, lock,      │                  │ tool calls
-                           │  budget, memory    │                  ▼
-                           └──────────────── BotTools ◄── in-process (API providers)
-                                               │      ◄── MCP bridge (CLI providers)
-                                               ▼
-                                agent.act(..., priority: llm)
+```mermaid
+flowchart TD
+  IN(["chat / events / timer"]) --> RT["LlmRuntime<br/>queue, lock,<br/>budget, memory"]
+  RT --> PR["provider.run(turn)"] --> MOD["model"]
+  MOD -- "tool calls" --> IP["in-process<br/>(API providers)"]
+  MOD -- "tool calls" --> MB["MCP bridge<br/>(CLI providers)"]
+  IP --> BT["BotTools"]
+  MB --> BT
+  RT --- BT
+  BT --> ACT(["agent.act(...,<br/>priority: llm)"])
+  classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
+  classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
+  classDef r fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+  class IN,ACT a
+  class MOD d
+  class RT,PR,IP,MB,BT g
 ```
 
 - **BotTools** (`src/llm/tools.ts`) is the tool set: every non-internal action plus
@@ -49,7 +58,7 @@ chat / events / timer ──► LlmRuntime ──► provider.run(turn) ──�
   turn). If the model sends no chat but returns text, that text is the reply.
 
 ```mermaid
-flowchart LR
+flowchart TD
   subgraph trig["Triggers"]
     T1["chat / whisper<br/>(listen mode)"]
     T2["events: death,<br/>joins, action done"]

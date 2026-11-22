@@ -8,10 +8,10 @@ it took and what was left behind.
 ## The upgrade path
 
 ```mermaid
-flowchart LR
+flowchart TD
   START(["empty inventory"]) --> LOGS["fell a tree<br/>logs → planks, sticks"]
   LOGS --> WP["wooden pickaxe<br/>(+ crafting table)"]
-  WP --> COB["mine cobblestone<br/>3 per pickaxe/axe, 1 shovel, 2 sword"]
+  WP --> COB["mine cobblestone<br/>3 per pickaxe/axe,<br/>1 shovel, 2 sword"]
   COB --> STONE["stone tools"]
   STONE --> FURN["furnace<br/>8 cobblestone"]
   STONE --> ORE{"iron ore seen?"}
@@ -19,10 +19,10 @@ flowchart LR
   ORE -->|yes| RAW["mine raw iron<br/>(stone pickaxe)"]
   RAW --> FUEL{"coal?"}
   FUEL -->|yes| SMELT["smelt iron"]
-  FUEL -->|"no, ≤ 3 raw iron"| PLANKS["burn planks"] --> SMELT
-  FUEL -->|"no, more"| CHAR["logs → charcoal"] --> SMELT
+  FUEL -->|"no, ≤ 3<br/>raw iron"| PLANKS["burn planks"] --> SMELT
+  FUEL -->|"no, more"| CHAR["logs →<br/>charcoal"] --> SMELT
   FURN --> SMELT
-  SMELT --> IRON["iron tools<br/>pickaxe first, armour optional"]
+  SMELT --> IRON["iron tools<br/>pickaxe first,<br/>armour optional"]
   IRON --> DIA{"diamonds?"}
   DIA -->|yes| DT["diamond tools"]
   DIA -->|no| STOPI(["stays on iron"])

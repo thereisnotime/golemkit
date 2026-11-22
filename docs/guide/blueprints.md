@@ -286,12 +286,12 @@ flowchart TB
   N -->|no| P["blueprint_pick<br/>search the libraries"]
   P --> M{"policy"}
   M -->|library| L{"a match?"}
-  L -->|yes| B2["build the best match"]
+  L -->|yes| B2["build the<br/>best match"]
   L -->|no| D["blueprint_design<br/>validate, save"]
   M -->|creative| D
   D -->|problems| F["fix and retry"] --> D
   D -->|keeps failing| B2
-  D -->|saved| B3["build the design"]
+  D -->|saved| B3["build the<br/>design"]
   M -->|ask| O{"owner online<br/>and matches?"}
   O -->|yes| A["offer 2-3 matches<br/>wait for the owner"]
   O -->|no| L

@@ -5,14 +5,14 @@ bot and per subsystem, write files per bot, switch to JSON for tooling, and subs
 log stream from code.
 
 ```mermaid
-flowchart LR
+flowchart TD
   SRC["log.info(msg, fields)<br/>McBuddy/action/goto"] --> LVL{"level rule<br/>most specific match"}
   LVL -- below --> DROP(["dropped"])
   LVL -- passes --> RED["redact secrets"]
   RED --> BUF[("ring buffer<br/>recentLogs()")]
   RED --> SUB["subscribers<br/>(UI, streams)"]
-  RED --> CON["console<br/>pretty / plain / json"]
-  RED --> FILE["files<br/>combined + per bot<br/>rotation"]
+  RED ---> CON["console<br/>pretty / plain / json"]
+  RED ---> FILE["files<br/>combined + per bot<br/>rotation"]
   classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
   classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d

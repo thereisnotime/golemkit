@@ -12,7 +12,7 @@ Five words cover how bots are defined, configured and run.
 
 ```mermaid
 classDiagram
-  direction LR
+  direction TB
   class Variant {
     variants/name.ts
     skills[]
@@ -71,7 +71,7 @@ classDiagram
 `just run <name>` and fleet entries accept either a profile or a variant:
 
 ```mermaid
-flowchart LR
+flowchart TD
   A["just run pax"] --> B{"profiles/pax.yaml<br/>exists?"}
   B -- yes --> C["load profile"] --> D["variant: companion<br/>variants/companion.ts"]
   B -- no --> E["variants/pax.ts"]
@@ -93,8 +93,9 @@ flowchart LR
 Lowest to highest. Each layer only overrides what it sets.
 
 ```mermaid
-flowchart LR
-  E[".env / environment"] --> V["variant defaults<br/>(code)"] --> P["profile<br/>(profiles/*.yaml)"] --> FD["fleet defaults"] --> FE["fleet entry"] --> C["CLI flags"]
+flowchart TD
+  E[".env / environment"] --> V["variant defaults<br/>(code)"] --> P["profile<br/>(profiles/*.yaml)"]
+  P --> FD["fleet defaults"] --> FE["fleet entry"] --> C["CLI flags"]
   style E fill:#f1f5f9,stroke:#64748b,color:#0f172a
   style V fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   style P fill:#dcfce7,stroke:#16a34a,color:#14532d

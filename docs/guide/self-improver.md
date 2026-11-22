@@ -19,26 +19,15 @@ brains: [
 ]
 ```
 
-```
-owner: "Apprentice, learn: when someone says hello, jump and greet them"
-         |
-         v
-  LLM (one call, tool submit_program) --> gate: validate, catalog, limits, dry run
-         ^                                   |
-         +---- errors (up to N repairs) -----+  ok
-                                             v
-                 programs/v001.json  -->  interpreter + NPC controller (no LLM)
-```
-
 ```mermaid
-flowchart LR
-  OWN["owner: 'learn: greet people<br/>who say hello'"] --> INT{"owner?"}
+flowchart TD
+  OWN["owner: 'Apprentice, learn:<br/>when someone says hello,<br/>jump and greet them'"] --> INT{"owner?"}
   INT -- no --> IGN(["ignored"])
   INT -- yes --> LLM["one LLM call<br/>spec + program + instruction"]
   LLM --> SUB["submit_program<br/>(full or patch)"]
   SUB --> GATE{"gate: zod, catalog,<br/>deny list, limits,<br/>dry run x8 worlds"}
-  GATE -- errors --> LLM
-  GATE -- ok --> VER[("vNNN.json<br/>history + rollback")]
+  GATE -- "errors<br/>(up to N repairs)" --> LLM
+  GATE -- ok --> VER[("programs/vNNN.json<br/>(v001, v002, ...)<br/>history + rollback")]
   VER --> RUN["interpreter runs the program<br/>NPC controller, no LLM"]
   RUN --> RUN
   classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e

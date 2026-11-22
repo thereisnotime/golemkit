@@ -38,33 +38,38 @@ brains: [
 ## How it fits together
 
 ```mermaid
-flowchart LR
-  subgraph src["Arming sources"]
+flowchart TB
+  subgraph s1["Arming sources (load)"]
     direction TB
-    VAR["variant defaults<br/>behaviorsBrain({ defaults })"]
+    VAR["variant defaults<br/>behaviorsBrain(<br/>{ defaults })"]
     PROF["profile<br/>behaviors: block"]
+  end
+  subgraph s2["Arming sources (runtime)"]
+    direction TB
     CHAT["owner chat<br/>!behavior_arm"]
-    LLM["LLM tool call<br/>behavior_arm (brain:llm)"]
+    LLM["LLM tool call<br/>behavior_arm<br/>(brain:llm)"]
     HOOK["hooks.yaml<br/>act: behavior_arm"]
     SELF["self-improver<br/>act step"]
   end
   subgraph rt["Behaviours brain"]
     direction TB
-    CFG["config<br/>(validated at load)"]
-    ST[("agent.storage<br/>behaviors: runtime changes")]
+    CFG["config<br/>(validated<br/>at load)"]
+    ST[("agent.storage<br/>behaviors:<br/>runtime changes")]
     ARM["armed set<br/>name + options"]
-    CTL["NpcController<br/>score · decide · back off"]
+    CTL["NpcController<br/>score · decide ·<br/>back off"]
   end
   subgraph body["Body"]
-    direction TB
     LOCK{{"Action lock"}}
-    ACT["actions<br/>hunt · smelt · eat · follow · retreat"]
+    ACT["actions<br/>hunt · smelt · eat ·<br/>follow · retreat"]
   end
-  VAR & PROF --> CFG --> ARM
-  CHAT & LLM & HOOK & SELF -->|"behavior_* actions"| ST --> ARM
-  ARM -->|"keep_fed 35 · stay_safe 35<br/>follow_owner 20 · wander 10"| CTL
-  CTL -->|"agent.act(caller brain:behaviors)"| LOCK --> ACT
-  REF["reflexes 60 · players 50<br/>hooks 40 · LLM 30"] -->|"outrank"| LOCK
+  VAR ~~~ PROF
+  CHAT ~~~ LLM ~~~ HOOK ~~~ SELF
+  s1 --> CFG --> ARM
+  s2 -->|"behavior_* actions"| ST --> ARM
+  ARM -->|"keep_fed 35<br/>stay_safe 35<br/>follow_owner 20<br/>wander 10"| CTL
+  CTL -->|"agent.act(caller<br/>brain:behaviors)"| LOCK --> ACT
+
+  REF["reflexes 60<br/>players 50<br/>hooks 40<br/>LLM 30"] -->|"outrank"| LOCK
 
   classDef src fill:#f1f5f9,stroke:#475569,color:#0f172a
   classDef brain fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
@@ -224,19 +229,19 @@ range=20 warn=false`.
 ```mermaid
 flowchart TB
   T(["tick"]) --> ON{"player online?"}
-  ON -- no --> G["wait where they were last seen<br/>or go home (whenGone)"]
-  ON -- "yes, out of sight" --> C["walk to where they<br/>were last seen"]
+  ON -- no --> G["wait where they<br/>were last seen or<br/>go home (whenGone)"]
   ON -- "yes, in sight" --> W["warn in chat<br/>(rate limited)"]
-  W --> R{"threats to the player?<br/>ranked from the player"}
-  R -- "creeper within 6" --> F["fight it first"]
-  R -- "archer with a shot" --> A{"can reach it?"}
+  ON -- "yes, out<br/>of sight" --> C["walk to where<br/>they were<br/>last seen"]
+  W --> R{"threats to<br/>the player?<br/>ranked from<br/>the player"}
+  R -- "creeper<br/>within 6" --> F["fight it first"]
+  R -- "archer with<br/>a shot" --> A{"can reach it?"}
   A -- yes --> F
-  A -- no --> B["stand in its line of fire<br/>behind a shield"]
-  R -- "diving phantom,<br/>mob coming for them,<br/>hurt them" --> F
-  R -- none --> Q{"player hurt,<br/>bot has spare food?"}
+  A -- no --> B["stand in its<br/>line of fire<br/>behind a shield"]
+  R -- "diving phantom,<br/>mob coming<br/>for them,<br/>hurt them" --> F
+  R -- none ----> Q{"player hurt,<br/>bot has<br/>spare food?"}
   Q -- yes --> FD["toss food"]
-  Q -- no --> P["stand between the player<br/>and the nearest mob, or follow"]
-  F -- "outnumbered or about to die" --> E["reflexes / stay_safe:<br/>retreat, eat, pillar"]
+  Q -- no --> P["stand between<br/>the player and<br/>the nearest mob,<br/>or follow"]
+  F -- "outnumbered or<br/>about to die" --> E["reflexes / stay_safe:<br/>retreat, eat, pillar"]
   classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
   classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -363,26 +368,26 @@ flowchart TB
   H(["hungry: food below `below`,<br/>or hurt and food below 18"]) --> E{"ready food<br/>in the bag?"}
   E -- yes --> EAT["1 · eat"]
   E -- no --> C{"raw meat/potato,<br/>furnace + fuel?"}
-  C -- yes --> COOK["2 · cook (smelt)"]
   C -- no --> B{"3+ wheat?"}
+  C -- yes --> COOK["2 · cook (smelt)"]
   B -- yes --> BREAD["3 · bake bread"]
   B -- no --> CH{"food in a<br/>known chest?"}
-  CH -- yes --> WD["withdraw"]
   CH -- no --> F{"own farm ripe<br/>(or due a visit)?<br/>village crops in range?"}
+  CH -- yes --> WD["withdraw"]
   F -- yes --> FARM["4 · harvest farm:n<br/>(replants)"]
   F -- no --> SP{"remembered spot<br/>food:animals ·<br/>food:village_farm?"}
-  SP -- "yes (in range, or nothing<br/>to hunt here)" --> SPOT["5 · go there, look"]
   SP -- no --> HU{"animals above<br/>keepAtLeast?<br/>(any, if starving)"}
-  HU -- yes --> HUNT["6 · hunt (safety filter)"]
+  SP -- "yes (in range,<br/>or nothing<br/>to hunt here)" --> SPOT["5 · go there, look"]
+  HU -- yes --> HUNT["6 · hunt<br/>(safety filter)"]
   HU -- no --> N{"day, or<br/>scoutAtNight?"}
   N -- no --> BACK(["fail truthfully, back off<br/>stay_safe takes it home"])
   N -- yes --> SC["7 · scout: find_food<br/>spiral out to scoutRadius"]
-  SC -- "found animals / crops" --> HU
+  SC -- "found animals<br/>/ crops" --> HU
   SC -- "nothing" --> SF{"no farm yet,<br/>seeds or grass?"}
   SF -- yes --> START["8 · start_farm by water<br/>(food in a few days)"]
   SF -- no --> BACK
   START --> BACK
-  EAT & COOK & BREAD & WD & FARM & SPOT & HUNT -->|"re-sense, loop"| E
+  LOOP(["after 1–6 and withdraw:<br/>re-sense, loop"]) -.-> E
 
   classDef trig fill:#f1f5f9,stroke:#475569,color:#0f172a
   classDef ask fill:#fef3c7,stroke:#d97706,color:#78350f
@@ -390,7 +395,7 @@ flowchart TB
   classDef far fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef grow fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
   classDef stop fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-  class H trig
+  class H,LOOP trig
   class E,C,B,CH,F,SP,HU,N,SF ask
   class EAT,COOK,BREAD,WD,HUNT near
   class FARM,SPOT,SC far

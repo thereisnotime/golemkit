@@ -50,22 +50,24 @@ The brain only acts via `agent.act()` as `brain:npc` at `PRIORITY.npc`, so the [
 stays in charge. A player's `!stop` aborts the NPC's action and also makes it back off.
 
 ```mermaid
-flowchart TB
+flowchart TD
   TICK(["tick every 1.5 s"]) --> BB["refresh blackboard<br/>needs + facts"]
   BB --> HK["run hooks<br/>(greetings ...)"]
-  HK --> HELD{"body held by<br/>player / LLM / reflex?"}
-  HELD -- yes --> BACK["back off<br/>3–20 s"] --> TICK
-  HELD -- no --> SC["score every behaviour 0–100"]
-  SC --> PICK{"best beats current<br/>by 10 (or ≥ 80)?"}
-  PICK -- no --> KEEP["keep running current"] --> TICK
-  PICK -- yes --> SW["abort current,<br/>start best"] --> RUN["behaviour runs:<br/>agent.act at npc (20)"]
-  RUN -- done --> CD["cooldown"] --> TICK
-  RUN -- failed --> FB["failure backoff<br/>5 s doubling to 2 min"] --> TICK
+  HK --> HELD{"body held by<br/>player / LLM<br/>/ reflex?"}
+  HELD -- yes --> BACK["back off<br/>3–20 s"]
+  HELD -- no --> SC["score every<br/>behaviour 0–100"]
+  SC --> PICK{"best beats<br/>current by 10<br/>(or ≥ 80)?"}
+  PICK -- no --> KEEP["keep running<br/>current"]
+  PICK -- yes --> SW["abort current,<br/>start best"]
+  SW --> RUN["behaviour runs:<br/>agent.act at npc (20)"]
+  RUN -- done --> CD["cooldown"]
+  RUN -- failed --> FB["failure backoff<br/>5 s doubling<br/>to 2 min"]
+  BACK & KEEP & CD & FB --> NEXT(["next tick"])
   classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
   classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
   classDef r fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-  class TICK,BB,HK,SC a
+  class TICK,BB,HK,SC,NEXT a
   class HELD,PICK d
   class SW,RUN,KEEP,CD g
   class BACK,FB r
