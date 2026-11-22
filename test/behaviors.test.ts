@@ -220,9 +220,13 @@ function foodWorld () {
   }
   const actions = ['eat', 'hunt', 'smelt', 'craft', 'harvest', 'withdraw']
   const calls: { name: string, params: any }[] = []
+  const said: string[] = []
   const agent: any = {
+    owners: ['Robin'],
     getAction: (n: string) => actions.includes(n) ? { name: n } : undefined,
-    protectedAreas: { isProtected: () => false }
+    protectedAreas: { isProtected: () => false },
+    say: (t: string) => said.push(t),
+    whisper: (_: string, t: string) => said.push(t)
   }
   const act = async (name: string, params: any = {}): Promise<ActionResult> => {
     calls.push({ name, params })
@@ -236,7 +240,7 @@ function foodWorld () {
     }
     return fail('unexpected')
   }
-  return { bot, agent, calls, act, add }
+  return { bot, agent, calls, act, add, said }
 }
 
 test('keep_fed run: hunts, crafts a furnace, cooks and eats until fed', async () => {
@@ -265,6 +269,8 @@ test('keep_fed fails truthfully when there is no food anywhere', async () => {
   assert.equal(r.ok, false)
   assert.match(r.message, /still hungry/)
   assert.deepEqual(w.calls, [], 'never touched the villager')
+  assert.equal(w.said.length, 1, 'food 6 with nothing to try: told the owner once')
+  assert.match(w.said[0]!, /starving \(food 6\/20\)/)
 })
 
 // ------------------------------------------------------------------ runtime + controller
