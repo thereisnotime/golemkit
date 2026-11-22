@@ -20,8 +20,9 @@ if (tsc.status !== 0) failed = true
 const t = spawnSync('node', ['--test', 'test/'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
 const num = (k: string) => Number(new RegExp(`ℹ ${k} (\\d+)`).exec(t.stdout)?.[1] ?? NaN)
 rows.push(['unit tests', `${num('tests')} tests, ${num('pass')} pass, ${num('fail')} fail, ${num('skipped')} skipped`])
-const golden = (t.stdout.match(/^✔ golden: .*$/gm) ?? []).length
-const goldenFail = (t.stdout.match(/^✖ golden: .*$/gm) ?? []).length
+const names = (re: RegExp) => new Set((t.stdout.match(re) ?? []).map(l => l.replace(/ \([\d.]+ms\)$/, ''))).size
+const golden = names(/^✔ golden: .*$/gm)
+const goldenFail = names(/^✖ golden: .*$/gm)
 rows.push(['golden snapshots', `${golden} identical, ${goldenFail} differ`])
 const replay = /^✔ replay: /m.test(t.stdout) ? 'identical' : /^✖ replay: /m.test(t.stdout) ? 'DIFFERS' : 'not run'
 rows.push(['packet replay', replay])
