@@ -1,0 +1,331 @@
+{
+  "disconnected": {
+    "connected": false
+  },
+  "survivalDay": {
+    "username": "Golem",
+    "self": {
+      "variant": "golden",
+      "brains": [
+        "command",
+        "reflexes",
+        "behaviors",
+        "intents",
+        "hooks"
+      ],
+      "owners": [
+        "owner"
+      ],
+      "settings": {
+        "canDig": false,
+        "respectBuilds": false
+      },
+      "changedInGame": [],
+      "howToChange": "owners: !config_list / !config_set <key> <value>; behaviours: !behavior_configure"
+    },
+    "position": "1250 70 445",
+    "dimension": "overworld",
+    "spawnPoint": "545 70 45",
+    "gameMode": "survival",
+    "gameModeNote": "survival: hunger and damage apply; gather and craft what you need",
+    "health": 17,
+    "food": 14,
+    "timeOfDay": 6000,
+    "isDay": true,
+    "heldItem": "stone_pickaxe",
+    "currentAction": null,
+    "players": [
+      "Owner",
+      "FarAway"
+    ],
+    "nearby": [
+      {
+        "name": "item",
+        "type": "other",
+        "distance": 1,
+        "position": "1251 70 446"
+      },
+      {
+        "name": "Owner",
+        "type": "player",
+        "distance": 3,
+        "position": "1253 70 447"
+      },
+      {
+        "name": "zombie",
+        "type": "hostile",
+        "distance": 8,
+        "position": "1258 70 445"
+      },
+      {
+        "name": "cow",
+        "type": "animal",
+        "distance": 8,
+        "position": "1245 70 440"
+      },
+      {
+        "name": "skeleton",
+        "type": "hostile",
+        "distance": 18,
+        "position": "1240 70 460"
+      }
+    ],
+    "inventory": {
+      "bread": 7,
+      "oak_log": 12,
+      "stone_pickaxe": 1,
+      "cobblestone": 40,
+      "iron_ingot": 3
+    },
+    "nearestHostile": {
+      "name": "zombie",
+      "distance": 8
+    },
+    "armour": 5,
+    "hasFood": true,
+    "sleeping": false,
+    "home": null,
+    "homeDistance": null,
+    "places": {},
+    "containersNearby": 0,
+    "ripeCropsNearby": 0,
+    "tools": "stone pickaxe, none axe, none shovel, none sword",
+    "droppedItemsNearby": 1,
+    "intents": {
+      "mode": "fallback"
+    }
+  },
+  "survivalDay:companion": {
+    "username": "Golem",
+    "self": {
+      "variant": "companion",
+      "brains": [
+        "command",
+        "reflexes",
+        "hooks",
+        "behaviors",
+        "intents",
+        "llm"
+      ],
+      "owners": [
+        "owner"
+      ],
+      "settings": {
+        "canDig": false,
+        "respectBuilds": false
+      },
+      "changedInGame": [],
+      "howToChange": "owners: !config_list / !config_set <key> <value>; behaviours: !behavior_configure"
+    },
+    "position": "1250 70 445",
+    "dimension": "overworld",
+    "spawnPoint": "545 70 45",
+    "gameMode": "survival",
+    "gameModeNote": "survival: hunger and damage apply; gather and craft what you need",
+    "health": 17,
+    "food": 14,
+    "timeOfDay": 6000,
+    "isDay": true,
+    "heldItem": "stone_pickaxe",
+    "currentAction": null,
+    "players": [
+      "Owner",
+      "FarAway"
+    ],
+    "nearby": [
+      {
+        "name": "item",
+        "type": "other",
+        "distance": 1,
+        "position": "1251 70 446"
+      },
+      {
+        "name": "Owner",
+        "type": "player",
+        "distance": 3,
+        "position": "1253 70 447"
+      },
+      {
+        "name": "zombie",
+        "type": "hostile",
+        "distance": 8,
+        "position": "1258 70 445"
+      },
+      {
+        "name": "cow",
+        "type": "animal",
+        "distance": 8,
+        "position": "1245 70 440"
+      },
+      {
+        "name": "skeleton",
+        "type": "hostile",
+        "distance": 18,
+        "position": "1240 70 460"
+      }
+    ],
+    "inventory": {
+      "bread": 7,
+      "oak_log": 12,
+      "stone_pickaxe": 1,
+      "cobblestone": 40,
+      "iron_ingot": 3
+    },
+    "nearestHostile": {
+      "name": "zombie",
+      "distance": 8
+    },
+    "armour": 5,
+    "hasFood": true,
+    "sleeping": false,
+    "home": null,
+    "homeDistance": null,
+    "places": {},
+    "containersNearby": 0,
+    "ripeCropsNearby": 0,
+    "tools": "stone pickaxe, none axe, none shovel, none sword",
+    "droppedItemsNearby": 1,
+    "intents": {
+      "mode": "fallback"
+    }
+  },
+  "creativeNight": {
+    "username": "Golem",
+    "self": {
+      "variant": "golden",
+      "brains": [
+        "command",
+        "reflexes",
+        "behaviors",
+        "intents",
+        "hooks"
+      ],
+      "owners": [
+        "owner"
+      ],
+      "settings": {
+        "canDig": false,
+        "respectBuilds": false
+      },
+      "changedInGame": [],
+      "howToChange": "owners: !config_list / !config_set <key> <value>; behaviours: !behavior_configure"
+    },
+    "position": "-401 64 900",
+    "dimension": "the_nether",
+    "spawnPoint": null,
+    "gameMode": "creative",
+    "gameModeNote": "creative: any item via creative_get, can fly, no hunger or damage, blocks break instantly; build freely, do not gather",
+    "health": 20,
+    "food": 20,
+    "timeOfDay": 18000,
+    "isDay": false,
+    "heldItem": null,
+    "currentAction": null,
+    "players": [],
+    "nearby": [
+      {
+        "name": "creeper",
+        "type": "hostile",
+        "distance": 7,
+        "position": "-395 64 905"
+      },
+      {
+        "name": "phantom",
+        "type": "mob",
+        "distance": 22,
+        "position": "-410 80 890"
+      }
+    ],
+    "inventory": {
+      "diamond_block": 64,
+      "modded#9001": 3
+    },
+    "nearestHostile": {
+      "name": "creeper",
+      "distance": 7
+    },
+    "armour": 0,
+    "hasFood": false,
+    "sleeping": false,
+    "home": null,
+    "homeDistance": null,
+    "places": {},
+    "containersNearby": 0,
+    "ripeCropsNearby": 0,
+    "tools": "none pickaxe, none axe, none shovel, none sword",
+    "droppedItemsNearby": 0,
+    "intents": {
+      "mode": "fallback"
+    }
+  },
+  "creativeNight:companion": {
+    "username": "Golem",
+    "self": {
+      "variant": "companion",
+      "brains": [
+        "command",
+        "reflexes",
+        "hooks",
+        "behaviors",
+        "intents",
+        "llm"
+      ],
+      "owners": [
+        "owner"
+      ],
+      "settings": {
+        "canDig": false,
+        "respectBuilds": false
+      },
+      "changedInGame": [],
+      "howToChange": "owners: !config_list / !config_set <key> <value>; behaviours: !behavior_configure"
+    },
+    "position": "-401 64 900",
+    "dimension": "the_nether",
+    "spawnPoint": null,
+    "gameMode": "creative",
+    "gameModeNote": "creative: any item via creative_get, can fly, no hunger or damage, blocks break instantly; build freely, do not gather",
+    "health": 20,
+    "food": 20,
+    "timeOfDay": 18000,
+    "isDay": false,
+    "heldItem": null,
+    "currentAction": null,
+    "players": [],
+    "nearby": [
+      {
+        "name": "creeper",
+        "type": "hostile",
+        "distance": 7,
+        "position": "-395 64 905"
+      },
+      {
+        "name": "phantom",
+        "type": "mob",
+        "distance": 22,
+        "position": "-410 80 890"
+      }
+    ],
+    "inventory": {
+      "diamond_block": 64,
+      "modded#9001": 3
+    },
+    "nearestHostile": {
+      "name": "creeper",
+      "distance": 7
+    },
+    "armour": 0,
+    "hasFood": false,
+    "sleeping": false,
+    "home": null,
+    "homeDistance": null,
+    "places": {},
+    "containersNearby": 0,
+    "ripeCropsNearby": 0,
+    "tools": "none pickaxe, none axe, none shovel, none sword",
+    "droppedItemsNearby": 0,
+    "intents": {
+      "mode": "fallback"
+    }
+  }
+}

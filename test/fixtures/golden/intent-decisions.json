@@ -1,0 +1,1772 @@
+{
+  "seen": [
+    [
+      "follow me",
+      "follow",
+      {
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "Follow me!",
+      "follow",
+      {
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "can you follow me?",
+      "follow",
+      {
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "please follow me around",
+      "follow",
+      {
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "come with me",
+      "follow",
+      {
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "tag along",
+      "follow",
+      {
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "stick with us",
+      "follow",
+      {
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "follow steve",
+      "follow",
+      {
+        "player": "steve"
+      },
+      "patterns"
+    ],
+    [
+      "follow me at 5 blocks",
+      "follow",
+      {
+        "player": "Tester",
+        "distance": 5
+      },
+      "patterns"
+    ],
+    [
+      "stop following me",
+      "unfollow",
+      {},
+      "patterns"
+    ],
+    [
+      "don't follow me",
+      "unfollow",
+      {},
+      "patterns"
+    ],
+    [
+      "leave me alone",
+      "unfollow",
+      {},
+      "patterns"
+    ],
+    [
+      "come here",
+      "come",
+      {
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "come here please",
+      "come",
+      {
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "get over here",
+      "come",
+      {
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "come back",
+      "come",
+      {
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "over here!",
+      "come",
+      {
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "could you come to me",
+      "come",
+      {
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "go home",
+      "go_home",
+      {},
+      "patterns"
+    ],
+    [
+      "head back home",
+      "go_home",
+      {},
+      "patterns"
+    ],
+    [
+      "return to base",
+      "go_home",
+      {},
+      "patterns"
+    ],
+    [
+      "go to the farm",
+      "goto",
+      {
+        "place": "farm"
+      },
+      "patterns"
+    ],
+    [
+      "go to farm:1",
+      "goto",
+      {
+        "place": "farm:1"
+      },
+      "patterns"
+    ],
+    [
+      "go to 100 64 -20",
+      "goto",
+      {
+        "x": 100,
+        "y": 64,
+        "z": -20
+      },
+      "patterns"
+    ],
+    [
+      "walk to 100 -20",
+      "goto",
+      {
+        "x": 100,
+        "z": -20
+      },
+      "patterns"
+    ],
+    [
+      "go there",
+      "goto",
+      {
+        "at": "speaker"
+      },
+      "patterns"
+    ],
+    [
+      "go to steve",
+      "goto",
+      {
+        "place": "steve"
+      },
+      "patterns"
+    ],
+    [
+      "set home",
+      "set_home",
+      {},
+      "patterns"
+    ],
+    [
+      "set home here",
+      "set_home",
+      {
+        "at": "speaker"
+      },
+      "patterns"
+    ],
+    [
+      "this is your home",
+      "set_home",
+      {
+        "at": "speaker"
+      },
+      "patterns"
+    ],
+    [
+      "remember this place as the mine",
+      "remember_place",
+      {
+        "name": "mine",
+        "at": "speaker"
+      },
+      "patterns"
+    ],
+    [
+      "save this spot as wheat field",
+      "remember_place",
+      {
+        "name": "wheat_field",
+        "at": "speaker"
+      },
+      "patterns"
+    ],
+    [
+      "guard me",
+      "guard",
+      {
+        "target": "player",
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "protect me",
+      "guard",
+      {
+        "target": "player",
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "be my bodyguard",
+      "guard",
+      {
+        "target": "player",
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "watch my back",
+      "guard",
+      {
+        "target": "player",
+        "player": "Tester"
+      },
+      "patterns"
+    ],
+    [
+      "guard here",
+      "guard",
+      {
+        "target": "here"
+      },
+      "patterns"
+    ],
+    [
+      "defend this area",
+      "guard",
+      {
+        "target": "here"
+      },
+      "patterns"
+    ],
+    [
+      "guard the farm",
+      "guard",
+      {
+        "target": "place",
+        "place": "farm"
+      },
+      "patterns"
+    ],
+    [
+      "stop guarding",
+      "unguard",
+      {},
+      "patterns"
+    ],
+    [
+      "stand down",
+      "unguard",
+      {},
+      "patterns"
+    ],
+    [
+      "stop",
+      "stop",
+      {},
+      "patterns"
+    ],
+    [
+      "STOP!!",
+      "stop",
+      {},
+      "patterns"
+    ],
+    [
+      "cancel that",
+      "stop",
+      {},
+      "patterns"
+    ],
+    [
+      "never mind",
+      "stop",
+      {},
+      "patterns"
+    ],
+    [
+      "stay here",
+      "stop",
+      {
+        "stay": true
+      },
+      "patterns"
+    ],
+    [
+      "wait",
+      "stop",
+      {},
+      "patterns"
+    ],
+    [
+      "start farming",
+      "behavior_on",
+      {
+        "activity": "farming"
+      },
+      "patterns"
+    ],
+    [
+      "keep chopping",
+      "behavior_on",
+      {
+        "activity": "chopping"
+      },
+      "patterns"
+    ],
+    [
+      "go exploring",
+      "behavior_on",
+      {
+        "activity": "exploring"
+      },
+      "patterns"
+    ],
+    [
+      "stop chopping",
+      "behavior_off",
+      {
+        "activity": "chopping"
+      },
+      "patterns"
+    ],
+    [
+      "stop farming for now",
+      "behavior_off",
+      {
+        "activity": "farming"
+      },
+      "patterns"
+    ],
+    [
+      "turn on keep_fed",
+      "behavior_on",
+      {
+        "behavior": "keep_fed"
+      },
+      "patterns"
+    ],
+    [
+      "disarm farm_loop",
+      "behavior_off",
+      {
+        "behavior": "farm_loop"
+      },
+      "patterns"
+    ],
+    [
+      "farm the wheat",
+      "farm",
+      {
+        "crop": "wheat"
+      },
+      "patterns"
+    ],
+    [
+      "harvest the crops",
+      "farm",
+      {
+        "crop": "crops"
+      },
+      "patterns"
+    ],
+    [
+      "farm at farm:1",
+      "farm",
+      {
+        "place": "farm:1"
+      },
+      "patterns"
+    ],
+    [
+      "make a farm",
+      "farm",
+      {
+        "create": true
+      },
+      "patterns"
+    ],
+    [
+      "start a farm here",
+      "farm",
+      {
+        "create": true,
+        "at": "speaker"
+      },
+      "patterns"
+    ],
+    [
+      "chop some wood",
+      "chop",
+      {
+        "unit": "log"
+      },
+      "patterns"
+    ],
+    [
+      "get wood",
+      "chop",
+      {
+        "unit": "log"
+      },
+      "patterns"
+    ],
+    [
+      "chop wood",
+      "chop",
+      {
+        "unit": "log"
+      },
+      "patterns"
+    ],
+    [
+      "chop a tree",
+      "chop",
+      {
+        "count": 1,
+        "unit": "tree"
+      },
+      "patterns"
+    ],
+    [
+      "chop down three trees",
+      "chop",
+      {
+        "count": 3,
+        "unit": "tree"
+      },
+      "patterns"
+    ],
+    [
+      "get 20 logs",
+      "chop",
+      {
+        "count": 20,
+        "unit": "log"
+      },
+      "patterns"
+    ],
+    [
+      "gather a stack of wood",
+      "chop",
+      {
+        "count": 64,
+        "unit": "log"
+      },
+      "patterns"
+    ],
+    [
+      "get me some planks",
+      "chop",
+      {
+        "unit": "planks"
+      },
+      "patterns"
+    ],
+    [
+      "get 16 oak logs",
+      "chop",
+      {
+        "count": 16,
+        "unit": "log",
+        "wood": "oak"
+      },
+      "patterns"
+    ],
+    [
+      "get 64 cobblestone",
+      "collect",
+      {
+        "item": "cobblestone",
+        "count": 64
+      },
+      "patterns"
+    ],
+    [
+      "get a stack of cobble",
+      "collect",
+      {
+        "item": "cobblestone",
+        "count": 64
+      },
+      "patterns"
+    ],
+    [
+      "mine 10 iron",
+      "collect",
+      {
+        "item": "iron_ore",
+        "count": 10
+      },
+      "patterns"
+    ],
+    [
+      "mine ten iron",
+      "collect",
+      {
+        "item": "iron_ore",
+        "count": 10
+      },
+      "patterns"
+    ],
+    [
+      "dig some dirt",
+      "collect",
+      {
+        "item": "dirt"
+      },
+      "patterns"
+    ],
+    [
+      "collect a few sand",
+      "collect",
+      {
+        "item": "sand",
+        "count": 3
+      },
+      "patterns"
+    ],
+    [
+      "get sixty four stone",
+      "collect",
+      {
+        "item": "stone",
+        "count": 64
+      },
+      "patterns"
+    ],
+    [
+      "get two stacks of gravel",
+      "collect",
+      {
+        "item": "gravel",
+        "count": 128
+      },
+      "patterns"
+    ],
+    [
+      "mine a couple of diamonds",
+      "collect",
+      {
+        "item": "diamond_ore",
+        "count": 2
+      },
+      "patterns"
+    ],
+    [
+      "go mine some coal",
+      "collect",
+      {
+        "item": "coal_ore"
+      },
+      "patterns"
+    ],
+    [
+      "collect 5 sand blocks",
+      "collect",
+      {
+        "item": "sand",
+        "count": 5
+      },
+      "patterns"
+    ],
+    [
+      "find iron",
+      "find",
+      {
+        "target": "iron"
+      },
+      "patterns"
+    ],
+    [
+      "find a village",
+      "find",
+      {
+        "target": "village"
+      },
+      "patterns"
+    ],
+    [
+      "look for water",
+      "find",
+      {
+        "target": "water"
+      },
+      "patterns"
+    ],
+    [
+      "find me some diamonds",
+      "find",
+      {
+        "target": "diamonds"
+      },
+      "patterns"
+    ],
+    [
+      "where is the nearest village?",
+      "find",
+      {
+        "target": "village"
+      },
+      "patterns"
+    ],
+    [
+      "find diamonds and bring them back",
+      "find",
+      {
+        "target": "diamonds",
+        "bring": true
+      },
+      "patterns"
+    ],
+    [
+      "locate a cherry grove within 500 blocks",
+      "find",
+      {
+        "target": "cherry_grove",
+        "radius": 500
+      },
+      "patterns"
+    ],
+    [
+      "bring me bread",
+      "bring",
+      {
+        "item": "bread"
+      },
+      "patterns"
+    ],
+    [
+      "bring me bread 5",
+      "bring",
+      {
+        "item": "bread",
+        "count": 5
+      },
+      "patterns"
+    ],
+    [
+      "bring me 5 bread",
+      "bring",
+      {
+        "item": "bread",
+        "count": 5
+      },
+      "patterns"
+    ],
+    [
+      "bring me some iron",
+      "bring",
+      {
+        "item": "iron_ingot"
+      },
+      "patterns"
+    ],
+    [
+      "fetch the torches to me",
+      "bring",
+      {
+        "item": "torch"
+      },
+      "patterns"
+    ],
+    [
+      "get me some bread",
+      "bring",
+      {
+        "item": "bread",
+        "viaGet": true
+      },
+      "patterns"
+    ],
+    [
+      "give me your bread",
+      "give",
+      {
+        "item": "bread"
+      },
+      "patterns"
+    ],
+    [
+      "give me 3 of your apples",
+      "give",
+      {
+        "item": "apple",
+        "count": 3
+      },
+      "patterns"
+    ],
+    [
+      "gimme your logs",
+      "give",
+      {
+        "item": "log"
+      },
+      "patterns"
+    ],
+    [
+      "give me 10 cobblestone",
+      "give",
+      {
+        "item": "cobblestone",
+        "count": 10
+      },
+      "patterns"
+    ],
+    [
+      "drop your dirt",
+      "drop",
+      {
+        "item": "dirt"
+      },
+      "patterns"
+    ],
+    [
+      "drop 5 cobble",
+      "drop",
+      {
+        "item": "cobblestone",
+        "count": 5
+      },
+      "patterns"
+    ],
+    [
+      "drop everything",
+      "drop",
+      {
+        "item": "all"
+      },
+      "patterns"
+    ],
+    [
+      "throw away the rotten flesh",
+      "drop",
+      {
+        "item": "rotten_flesh"
+      },
+      "patterns"
+    ],
+    [
+      "eat",
+      "eat",
+      {},
+      "patterns"
+    ],
+    [
+      "eat something",
+      "eat",
+      {},
+      "patterns"
+    ],
+    [
+      "go to sleep",
+      "sleep",
+      {},
+      "patterns"
+    ],
+    [
+      "go to bed",
+      "sleep",
+      {},
+      "patterns"
+    ],
+    [
+      "status",
+      "status",
+      {},
+      "patterns"
+    ],
+    [
+      "what are you doing?",
+      "status",
+      {},
+      "patterns"
+    ],
+    [
+      "what's up",
+      "status",
+      {},
+      "patterns"
+    ],
+    [
+      "where are you?",
+      "where",
+      {},
+      "patterns"
+    ],
+    [
+      "coords",
+      "where",
+      {},
+      "patterns"
+    ],
+    [
+      "inventory",
+      "inventory",
+      {},
+      "patterns"
+    ],
+    [
+      "what do you have?",
+      "inventory",
+      {},
+      "patterns"
+    ],
+    [
+      "help",
+      "help",
+      {},
+      "patterns"
+    ],
+    [
+      "what can you do?",
+      "help",
+      {},
+      "patterns"
+    ],
+    [
+      "build a house",
+      "build",
+      {
+        "template": "small_house"
+      },
+      "patterns"
+    ],
+    [
+      "build a house here",
+      "build",
+      {
+        "template": "small_house",
+        "at": "speaker"
+      },
+      "patterns"
+    ],
+    [
+      "build me a log cabin",
+      "build",
+      {
+        "template": "cabin"
+      },
+      "patterns"
+    ],
+    [
+      "build a watchtower over there",
+      "build",
+      {
+        "template": "watchtower",
+        "at": "speaker"
+      },
+      "patterns"
+    ],
+    [
+      "put up a shelter",
+      "build",
+      {
+        "template": "shelter"
+      },
+      "patterns"
+    ],
+    [
+      "did you follow him?",
+      null,
+      null,
+      null
+    ],
+    [
+      "do you have bread?",
+      null,
+      null,
+      null
+    ],
+    [
+      "are you going home?",
+      null,
+      null,
+      null
+    ],
+    [
+      "i think we should go home",
+      null,
+      null,
+      null
+    ],
+    [
+      "lol",
+      null,
+      null,
+      null
+    ],
+    [
+      "nice house",
+      null,
+      null,
+      null
+    ],
+    [
+      "I'm going to get some wood",
+      null,
+      null,
+      null
+    ],
+    [
+      "steve come here",
+      null,
+      null,
+      null
+    ],
+    [
+      "why did you stop?",
+      null,
+      null,
+      null
+    ],
+    [
+      "how do I build a house?",
+      null,
+      null,
+      null
+    ],
+    [
+      "is there a way to get iron",
+      null,
+      null,
+      null
+    ],
+    [
+      "that creeper blew up my farm",
+      null,
+      null,
+      null
+    ],
+    [
+      "follow me and then chop some wood and build a house",
+      null,
+      null,
+      null
+    ],
+    [
+      "build a road to the village",
+      null,
+      null,
+      null
+    ],
+    [
+      "have you eaten?",
+      null,
+      null,
+      null
+    ],
+    [
+      "you should not have done that",
+      null,
+      null,
+      null
+    ],
+    [
+      "should I go home?",
+      null,
+      null,
+      null
+    ],
+    [
+      "the guard is asleep",
+      null,
+      null,
+      null
+    ],
+    [
+      "",
+      null,
+      null,
+      null
+    ]
+  ],
+  "heldout": [
+    [
+      "stay right behind me",
+      null,
+      null,
+      null
+    ],
+    [
+      "come along with me for a walk",
+      null,
+      null,
+      null
+    ],
+    [
+      "shadow me",
+      null,
+      null,
+      null
+    ],
+    [
+      "keep close",
+      null,
+      null,
+      null
+    ],
+    [
+      "you are with me, lets move",
+      null,
+      null,
+      null
+    ],
+    [
+      "quit following me",
+      "unfollow",
+      {},
+      "patterns"
+    ],
+    [
+      "stop trailing after me",
+      null,
+      null,
+      null
+    ],
+    [
+      "you can stop tagging along now",
+      null,
+      null,
+      null
+    ],
+    [
+      "get over to me",
+      null,
+      null,
+      null
+    ],
+    [
+      "come to my side",
+      "goto",
+      {
+        "place": "side"
+      },
+      "patterns"
+    ],
+    [
+      "hurry back to me",
+      null,
+      null,
+      null
+    ],
+    [
+      "come here quick",
+      null,
+      null,
+      null
+    ],
+    [
+      "could you head back to base",
+      "go_home",
+      {},
+      "patterns"
+    ],
+    [
+      "go on back home",
+      null,
+      null,
+      null
+    ],
+    [
+      "return to your house",
+      "goto",
+      {
+        "place": "house"
+      },
+      "patterns"
+    ],
+    [
+      "get back to the base",
+      "go_home",
+      {},
+      "patterns"
+    ],
+    [
+      "head over to the village",
+      null,
+      null,
+      null
+    ],
+    [
+      "walk to the mine",
+      "goto",
+      {
+        "place": "mine"
+      },
+      "patterns"
+    ],
+    [
+      "travel to 200 70 -300",
+      "goto",
+      {
+        "x": 200,
+        "y": 70,
+        "z": -300
+      },
+      "patterns"
+    ],
+    [
+      "make your way over to the lake",
+      null,
+      null,
+      null
+    ],
+    [
+      "keep me covered",
+      null,
+      null,
+      null
+    ],
+    [
+      "protect me from the mobs",
+      null,
+      null,
+      null
+    ],
+    [
+      "keep the creepers away from me",
+      null,
+      null,
+      null
+    ],
+    [
+      "look out for me",
+      null,
+      null,
+      null
+    ],
+    [
+      "guard this spot",
+      "guard",
+      {
+        "target": "here"
+      },
+      "patterns"
+    ],
+    [
+      "defend the house",
+      "guard",
+      {
+        "target": "here"
+      },
+      "patterns"
+    ],
+    [
+      "you can relax now, stop protecting",
+      null,
+      null,
+      null
+    ],
+    [
+      "stop being my bodyguard",
+      null,
+      null,
+      null
+    ],
+    [
+      "no need to guard me anymore",
+      null,
+      null,
+      null
+    ],
+    [
+      "hold it",
+      "guard",
+      {
+        "target": "here"
+      },
+      "patterns"
+    ],
+    [
+      "stop right there",
+      null,
+      null,
+      null
+    ],
+    [
+      "stop what you are up to",
+      null,
+      null,
+      null
+    ],
+    [
+      "stay where you are",
+      null,
+      null,
+      null
+    ],
+    [
+      "do not go anywhere",
+      null,
+      null,
+      null
+    ],
+    [
+      "start chopping trees on your own",
+      null,
+      null,
+      null
+    ],
+    [
+      "go back to farming",
+      "goto",
+      {
+        "place": "farming"
+      },
+      "patterns"
+    ],
+    [
+      "quit exploring",
+      "behavior_off",
+      {
+        "activity": "exploring"
+      },
+      "patterns"
+    ],
+    [
+      "stop the farming",
+      null,
+      null,
+      null
+    ],
+    [
+      "harvest the potatoes",
+      "farm",
+      {
+        "crop": "potatoes"
+      },
+      "patterns"
+    ],
+    [
+      "go harvest the field",
+      "farm",
+      {
+        "crop": "field"
+      },
+      "patterns"
+    ],
+    [
+      "set up a new farm over here",
+      "farm",
+      {
+        "create": true,
+        "at": "speaker"
+      },
+      "patterns"
+    ],
+    [
+      "bring in the wheat harvest",
+      null,
+      null,
+      null
+    ],
+    [
+      "chop me some logs",
+      "chop",
+      {
+        "unit": "log"
+      },
+      "patterns"
+    ],
+    [
+      "cut down two trees",
+      "chop",
+      {
+        "count": 2,
+        "unit": "tree"
+      },
+      "patterns"
+    ],
+    [
+      "go collect 32 spruce logs",
+      "collect",
+      {
+        "item": "spruce_log",
+        "count": 32
+      },
+      "patterns"
+    ],
+    [
+      "grab some wood",
+      "chop",
+      {
+        "unit": "log"
+      },
+      "patterns"
+    ],
+    [
+      "fell some trees",
+      "chop",
+      {
+        "unit": "tree"
+      },
+      "patterns"
+    ],
+    [
+      "grab me some cobble",
+      "collect",
+      {
+        "item": "cobblestone"
+      },
+      "patterns"
+    ],
+    [
+      "dig up twenty sand",
+      null,
+      null,
+      null
+    ],
+    [
+      "mine a stack of stone",
+      "collect",
+      {
+        "item": "stone",
+        "count": 64
+      },
+      "patterns"
+    ],
+    [
+      "get us some gravel",
+      "bring",
+      {
+        "item": "gravel",
+        "viaGet": true
+      },
+      "patterns"
+    ],
+    [
+      "go mining for iron",
+      null,
+      null,
+      null
+    ],
+    [
+      "dig out some coal",
+      null,
+      null,
+      null
+    ],
+    [
+      "look around for a village",
+      null,
+      null,
+      null
+    ],
+    [
+      "hunt for diamonds",
+      null,
+      null,
+      null
+    ],
+    [
+      "search for a desert temple",
+      "find",
+      {
+        "target": "desert_temple"
+      },
+      "patterns"
+    ],
+    [
+      "where can we find some sheep",
+      null,
+      null,
+      null
+    ],
+    [
+      "bring me some torches",
+      "bring",
+      {
+        "item": "torch"
+      },
+      "patterns"
+    ],
+    [
+      "fetch me a pickaxe",
+      "bring",
+      {
+        "item": "pickaxe",
+        "count": 1
+      },
+      "patterns"
+    ],
+    [
+      "bring 3 apples over here",
+      "bring",
+      {
+        "item": "apple",
+        "count": 3
+      },
+      "patterns"
+    ],
+    [
+      "i could use some bread",
+      null,
+      null,
+      null
+    ],
+    [
+      "hand me your bread",
+      "give",
+      {
+        "item": "bread"
+      },
+      "patterns"
+    ],
+    [
+      "give me some of your coal",
+      "give",
+      {
+        "item": "coal"
+      },
+      "patterns"
+    ],
+    [
+      "pass me your torches",
+      "give",
+      {
+        "item": "torch"
+      },
+      "patterns"
+    ],
+    [
+      "drop the gravel",
+      "drop",
+      {
+        "item": "gravel"
+      },
+      "patterns"
+    ],
+    [
+      "toss out your dirt",
+      "drop",
+      {
+        "item": "out_your_dirt"
+      },
+      "patterns"
+    ],
+    [
+      "empty your pockets",
+      "drop",
+      {
+        "item": "all"
+      },
+      "patterns"
+    ],
+    [
+      "get some food in you",
+      "bring",
+      {
+        "item": "food_in_you"
+      },
+      "patterns"
+    ],
+    [
+      "have a meal",
+      null,
+      null,
+      null
+    ],
+    [
+      "grab some food yourself and eat",
+      null,
+      null,
+      null
+    ],
+    [
+      "go get some rest in the bed",
+      null,
+      null,
+      null
+    ],
+    [
+      "off to bed with you",
+      null,
+      null,
+      null
+    ],
+    [
+      "catch some sleep",
+      null,
+      null,
+      null
+    ],
+    [
+      "how are you doing",
+      null,
+      null,
+      null
+    ],
+    [
+      "what are you busy with",
+      null,
+      null,
+      null
+    ],
+    [
+      "tell me where you are",
+      null,
+      null,
+      null
+    ],
+    [
+      "what is your location",
+      null,
+      null,
+      null
+    ],
+    [
+      "what is in your bag",
+      null,
+      null,
+      null
+    ],
+    [
+      "show me what you are carrying",
+      "find",
+      {
+        "target": "what_you_are_carrying"
+      },
+      "patterns"
+    ],
+    [
+      "what commands do you know",
+      null,
+      null,
+      null
+    ],
+    [
+      "make this spot your home",
+      null,
+      null,
+      null
+    ],
+    [
+      "remember this spot as the quarry",
+      "remember_place",
+      {
+        "name": "quarry",
+        "at": "speaker"
+      },
+      "patterns"
+    ],
+    [
+      "build a small house over here",
+      "build",
+      {
+        "template": "small_house",
+        "at": "speaker"
+      },
+      "patterns"
+    ],
+    [
+      "put up a watchtower",
+      "build",
+      {
+        "template": "watchtower"
+      },
+      "patterns"
+    ],
+    [
+      "build me a cabin",
+      "build",
+      {
+        "template": "cabin"
+      },
+      "patterns"
+    ],
+    [
+      "i followed the river yesterday",
+      null,
+      null,
+      null
+    ],
+    [
+      "did you eat already?",
+      null,
+      null,
+      null
+    ],
+    [
+      "are you guarding the farm?",
+      null,
+      null,
+      null
+    ],
+    [
+      "where did you put the bread?",
+      null,
+      null,
+      null
+    ],
+    [
+      "i just got home",
+      null,
+      null,
+      null
+    ],
+    [
+      "my house burned down lol",
+      null,
+      null,
+      null
+    ],
+    [
+      "steve, give me your sword",
+      null,
+      null,
+      null
+    ],
+    [
+      "that skeleton almost killed me",
+      null,
+      null,
+      null
+    ],
+    [
+      "why are you following me?",
+      null,
+      null,
+      null
+    ],
+    [
+      "have you seen a village around here?",
+      null,
+      null,
+      null
+    ],
+    [
+      "we should build a castle sometime",
+      null,
+      null,
+      null
+    ],
+    [
+      "i hate creepers",
+      null,
+      null,
+      null
+    ],
+    [
+      "how do you mine obsidian?",
+      null,
+      null,
+      null
+    ],
+    [
+      "good night everyone",
+      null,
+      null,
+      null
+    ],
+    [
+      "what a nice sunset",
+      null,
+      null,
+      null
+    ],
+    [
+      "you did great earlier",
+      null,
+      null,
+      null
+    ],
+    [
+      "do not ever touch my chest",
+      null,
+      null,
+      null
+    ],
+    [
+      "is it day yet?",
+      null,
+      null,
+      null
+    ],
+    [
+      "i need to go afk for a bit",
+      null,
+      null,
+      null
+    ],
+    [
+      "can anyone trade me some iron",
+      null,
+      null,
+      null
+    ],
+    [
+      "the server restarts at noon",
+      null,
+      null,
+      null
+    ],
+    [
+      "go to sleep and then chop wood and then build a tower",
+      null,
+      null,
+      null
+    ]
+  ]
+}

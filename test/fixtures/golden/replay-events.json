@@ -1,0 +1,184 @@
+{
+  "events": [
+    {
+      "event": "session",
+      "position": "1252 89 -301",
+      "dimension": "overworld",
+      "gameMode": "survival"
+    },
+    {
+      "event": "chat",
+      "from": "ClaudeTest",
+      "message": "replay check, public line",
+      "whisper": false
+    },
+    {
+      "event": "chat",
+      "from": "ClaudeTest",
+      "message": "replay check, whisper",
+      "whisper": true
+    }
+  ],
+  "packets": {
+    "configuration:custom_payload": 150,
+    "configuration:feature_flags": 1,
+    "configuration:finish_configuration": 1,
+    "configuration:ping": 1,
+    "configuration:registry_data": 13,
+    "configuration:select_known_packs": 1,
+    "configuration:tags": 1,
+    "login:compress": 1,
+    "login:success": 1,
+    "play:abilities": 1,
+    "play:advancements": 1,
+    "play:block_change": 19,
+    "play:bundle_delimiter": 292,
+    "play:chunk_batch_finished": 56,
+    "play:chunk_batch_start": 56,
+    "play:custom_payload": 602,
+    "play:damage_event": 5,
+    "play:difficulty": 1,
+    "play:entity_destroy": 14,
+    "play:entity_equipment": 35,
+    "play:entity_head_rotation": 6197,
+    "play:entity_look": 134,
+    "play:entity_metadata": 750,
+    "play:entity_move_look": 3989,
+    "play:entity_status": 354,
+    "play:entity_teleport": 768,
+    "play:entity_update_attributes": 142,
+    "play:entity_velocity": 3686,
+    "play:experience": 1,
+    "play:game_state_change": 1,
+    "play:held_item_slot": 1,
+    "play:initialize_world_border": 1,
+    "play:keep_alive": 2,
+    "play:login": 1,
+    "play:map_chunk": 453,
+    "play:multi_block_change": 9,
+    "play:player_info": 6,
+    "play:playerlist_header": 152,
+    "play:position": 1,
+    "play:profileless_chat": 2,
+    "play:rel_entity_move": 2695,
+    "play:scoreboard_display_objective": 1,
+    "play:scoreboard_objective": 1,
+    "play:scoreboard_score": 3,
+    "play:server_data": 1,
+    "play:set_ticking_state": 1,
+    "play:sound_effect": 3,
+    "play:spawn_entity": 146,
+    "play:spawn_position": 1,
+    "play:step_tick": 1,
+    "play:teams": 4,
+    "play:unlock_recipes": 1,
+    "play:update_health": 1,
+    "play:update_time": 32,
+    "play:update_view_position": 1,
+    "play:window_items": 1,
+    "play:world_event": 3
+  },
+  "registry": {
+    "items": 3111,
+    "entities": 200,
+    "moddedItems": [
+      "ars_additions:advanced_dominion_wand",
+      "ars_additions:ancient_codex_entry",
+      "ars_additions:archwood_chain",
+      "ars_additions:archwood_lantern",
+      "ars_additions:archwood_magelight_lantern",
+      "ars_additions:codex_entry",
+      "ars_additions:cracked_polished_sourcestone",
+      "ars_additions:cracked_polished_sourcestone_large_bricks",
+      "ars_additions:cracked_polished_sourcestone_small_bricks",
+      "ars_additions:cracked_polished_sourcestone_wall",
+      "ars_additions:cracked_sourcestone",
+      "ars_additions:cracked_sourcestone_large_bricks",
+      "ars_additions:cracked_sourcestone_small_bricks",
+      "ars_additions:cracked_sourcestone_wall",
+      "ars_additions:dispel_protection_charm",
+      "ars_additions:enchanting_wixie_cauldron",
+      "ars_additions:ender_mask_charm",
+      "ars_additions:ender_source_jar",
+      "ars_additions:exploration_warp_scroll",
+      "ars_additions:fall_prevention_charm"
+    ]
+  },
+  "observe": {
+    "username": "GuardTester",
+    "self": {
+      "variant": "replay",
+      "brains": [],
+      "owners": [
+        "tester"
+      ],
+      "settings": {
+        "canDig": false,
+        "respectBuilds": false
+      },
+      "changedInGame": [],
+      "howToChange": "owners: !config_list / !config_set <key> <value>; behaviours: !behavior_configure"
+    },
+    "position": "1252 89 -301",
+    "dimension": "overworld",
+    "spawnPoint": "544 80 48",
+    "gameMode": "survival",
+    "gameModeNote": "survival: hunger and damage apply; gather and craft what you need",
+    "health": 20,
+    "food": 20,
+    "timeOfDay": 6523,
+    "isDay": true,
+    "heldItem": null,
+    "currentAction": null,
+    "players": [
+      "Pax",
+      "ClaudeTest"
+    ],
+    "nearby": [
+      {
+        "name": "ClaudeTest",
+        "type": "player",
+        "distance": 7,
+        "position": "1250 92 -295"
+      },
+      {
+        "name": "item",
+        "type": "other",
+        "distance": 9,
+        "position": "1258 95 -298"
+      },
+      {
+        "name": "item",
+        "type": "other",
+        "distance": 14,
+        "position": "1260 98 -295"
+      },
+      {
+        "name": "zombie",
+        "type": "hostile",
+        "distance": 22,
+        "position": "1266 72 -297"
+      },
+      {
+        "name": "zombie",
+        "type": "hostile",
+        "distance": 22,
+        "position": "1248 67 -304"
+      },
+      {
+        "name": "zombie",
+        "type": "hostile",
+        "distance": 24,
+        "position": "1268 72 -296"
+      }
+    ],
+    "inventory": {},
+    "nearestHostile": null,
+    "armour": 0,
+    "hasFood": false,
+    "sleeping": false,
+    "home": null,
+    "homeDistance": null,
+    "places": {}
+  }
+}

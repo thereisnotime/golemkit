@@ -1,0 +1,798 @@
+{
+  "results": [
+    {
+      "config": "patterns",
+      "set": "seen",
+      "n": 137,
+      "accuracy": 1,
+      "macroF1": 1,
+      "falseTriggerCount": 0,
+      "misses": 0,
+      "slotAccuracy": 1,
+      "slotCases": 85,
+      "errors": []
+    },
+    {
+      "config": "patterns",
+      "set": "heldout",
+      "n": 107,
+      "accuracy": 0.495,
+      "macroF1": 0.381,
+      "falseTriggerCount": 0,
+      "misses": 46,
+      "slotAccuracy": 0.962,
+      "slotCases": 26,
+      "errors": [
+        {
+          "text": "stay right behind me",
+          "gold": "follow",
+          "got": null
+        },
+        {
+          "text": "come along with me for a walk",
+          "gold": "follow",
+          "got": null
+        },
+        {
+          "text": "shadow me",
+          "gold": "follow",
+          "got": null
+        },
+        {
+          "text": "keep close",
+          "gold": "follow",
+          "got": null
+        },
+        {
+          "text": "you are with me, lets move",
+          "gold": "follow",
+          "got": null
+        },
+        {
+          "text": "stop trailing after me",
+          "gold": "unfollow",
+          "got": null
+        },
+        {
+          "text": "you can stop tagging along now",
+          "gold": "unfollow",
+          "got": null
+        },
+        {
+          "text": "get over to me",
+          "gold": "come",
+          "got": null
+        },
+        {
+          "text": "come to my side",
+          "gold": "come",
+          "got": "goto",
+          "args": {
+            "place": "side"
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "hurry back to me",
+          "gold": "come",
+          "got": null
+        },
+        {
+          "text": "come here quick",
+          "gold": "come",
+          "got": null
+        },
+        {
+          "text": "go on back home",
+          "gold": "go_home",
+          "got": null
+        },
+        {
+          "text": "return to your house",
+          "gold": "go_home",
+          "got": "goto",
+          "args": {
+            "place": "house"
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "head over to the village",
+          "gold": "goto",
+          "got": null
+        },
+        {
+          "text": "make your way over to the lake",
+          "gold": "goto",
+          "got": null
+        },
+        {
+          "text": "keep me covered",
+          "gold": "guard",
+          "got": null
+        },
+        {
+          "text": "protect me from the mobs",
+          "gold": "guard",
+          "got": null
+        },
+        {
+          "text": "keep the creepers away from me",
+          "gold": "guard",
+          "got": null
+        },
+        {
+          "text": "look out for me",
+          "gold": "guard",
+          "got": null
+        },
+        {
+          "text": "you can relax now, stop protecting",
+          "gold": "unguard",
+          "got": null
+        },
+        {
+          "text": "stop being my bodyguard",
+          "gold": "unguard",
+          "got": null
+        },
+        {
+          "text": "no need to guard me anymore",
+          "gold": "unguard",
+          "got": null
+        },
+        {
+          "text": "hold it",
+          "gold": "stop",
+          "got": "guard",
+          "args": {
+            "target": "here"
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "stop right there",
+          "gold": "stop",
+          "got": null
+        },
+        {
+          "text": "stop what you are up to",
+          "gold": "stop",
+          "got": null
+        },
+        {
+          "text": "stay where you are",
+          "gold": "stop",
+          "got": null
+        },
+        {
+          "text": "do not go anywhere",
+          "gold": "stop",
+          "got": null
+        },
+        {
+          "text": "start chopping trees on your own",
+          "gold": "behavior_on",
+          "got": null
+        },
+        {
+          "text": "go back to farming",
+          "gold": "behavior_on",
+          "got": "goto",
+          "args": {
+            "place": "farming"
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "stop the farming",
+          "gold": "behavior_off",
+          "got": null
+        },
+        {
+          "text": "bring in the wheat harvest",
+          "gold": "farm",
+          "got": null
+        },
+        {
+          "text": "go collect 32 spruce logs",
+          "gold": "chop",
+          "got": "collect",
+          "args": {
+            "item": "spruce_log",
+            "count": 32
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "dig up twenty sand",
+          "gold": "collect",
+          "got": null
+        },
+        {
+          "text": "get us some gravel",
+          "gold": "collect",
+          "got": "bring",
+          "args": {
+            "item": "gravel",
+            "viaGet": true
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "go mining for iron",
+          "gold": "collect",
+          "got": null
+        },
+        {
+          "text": "dig out some coal",
+          "gold": "collect",
+          "got": null
+        },
+        {
+          "text": "look around for a village",
+          "gold": "find",
+          "got": null
+        },
+        {
+          "text": "hunt for diamonds",
+          "gold": "find",
+          "got": null
+        },
+        {
+          "text": "where can we find some sheep",
+          "gold": "find",
+          "got": null
+        },
+        {
+          "text": "i could use some bread",
+          "gold": "bring",
+          "got": null
+        },
+        {
+          "text": "toss out your dirt",
+          "gold": "drop",
+          "got": "drop",
+          "args": {
+            "item": "out_your_dirt"
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "get some food in you",
+          "gold": "eat",
+          "got": "bring",
+          "args": {
+            "item": "food_in_you"
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "have a meal",
+          "gold": "eat",
+          "got": null
+        },
+        {
+          "text": "grab some food yourself and eat",
+          "gold": "eat",
+          "got": null
+        },
+        {
+          "text": "go get some rest in the bed",
+          "gold": "sleep",
+          "got": null
+        },
+        {
+          "text": "off to bed with you",
+          "gold": "sleep",
+          "got": null
+        },
+        {
+          "text": "catch some sleep",
+          "gold": "sleep",
+          "got": null
+        },
+        {
+          "text": "how are you doing",
+          "gold": "status",
+          "got": null
+        },
+        {
+          "text": "what are you busy with",
+          "gold": "status",
+          "got": null
+        },
+        {
+          "text": "tell me where you are",
+          "gold": "where",
+          "got": null
+        },
+        {
+          "text": "what is your location",
+          "gold": "where",
+          "got": null
+        },
+        {
+          "text": "what is in your bag",
+          "gold": "inventory",
+          "got": null
+        },
+        {
+          "text": "show me what you are carrying",
+          "gold": "inventory",
+          "got": "find",
+          "args": {
+            "target": "what_you_are_carrying"
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "what commands do you know",
+          "gold": "help",
+          "got": null
+        },
+        {
+          "text": "make this spot your home",
+          "gold": "set_home",
+          "got": null
+        }
+      ]
+    },
+    {
+      "config": "embeddings",
+      "set": "seen",
+      "n": 137,
+      "accuracy": 0.905,
+      "macroF1": 0.907,
+      "falseTriggerCount": 0,
+      "misses": 9,
+      "slotAccuracy": 1,
+      "slotCases": 75,
+      "errors": [
+        {
+          "text": "follow steve",
+          "gold": "follow",
+          "got": null
+        },
+        {
+          "text": "go to the farm",
+          "gold": "goto",
+          "got": null
+        },
+        {
+          "text": "go to farm:1",
+          "gold": "goto",
+          "got": "farm",
+          "args": {},
+          "by": "embeddings"
+        },
+        {
+          "text": "save this spot as wheat field",
+          "gold": "remember_place",
+          "got": null
+        },
+        {
+          "text": "guard the farm",
+          "gold": "guard",
+          "got": null
+        },
+        {
+          "text": "stand down",
+          "gold": "unguard",
+          "got": null
+        },
+        {
+          "text": "never mind",
+          "gold": "stop",
+          "got": null
+        },
+        {
+          "text": "turn on keep_fed",
+          "gold": "behavior_on",
+          "got": null
+        },
+        {
+          "text": "disarm farm_loop",
+          "gold": "behavior_off",
+          "got": null
+        },
+        {
+          "text": "find iron",
+          "gold": "find",
+          "got": "collect",
+          "args": {
+            "item": "iron_ore"
+          },
+          "by": "embeddings"
+        },
+        {
+          "text": "gimme your logs",
+          "gold": "give",
+          "got": "chop",
+          "args": {
+            "unit": "log"
+          },
+          "by": "embeddings"
+        },
+        {
+          "text": "give me 10 cobblestone",
+          "gold": "give",
+          "got": "collect",
+          "args": {
+            "item": "cobblestone",
+            "count": 10
+          },
+          "by": "embeddings"
+        },
+        {
+          "text": "help",
+          "gold": "help",
+          "got": null
+        }
+      ]
+    },
+    {
+      "config": "embeddings",
+      "set": "heldout",
+      "n": 107,
+      "accuracy": 0.729,
+      "macroF1": 0.78,
+      "falseTriggerCount": 0,
+      "misses": 27,
+      "slotAccuracy": 1,
+      "slotCases": 33,
+      "errors": [
+        {
+          "text": "shadow me",
+          "gold": "follow",
+          "got": null
+        },
+        {
+          "text": "keep close",
+          "gold": "follow",
+          "got": null
+        },
+        {
+          "text": "you are with me, lets move",
+          "gold": "follow",
+          "got": null
+        },
+        {
+          "text": "stop trailing after me",
+          "gold": "unfollow",
+          "got": null
+        },
+        {
+          "text": "you can stop tagging along now",
+          "gold": "unfollow",
+          "got": null
+        },
+        {
+          "text": "come to my side",
+          "gold": "come",
+          "got": null
+        },
+        {
+          "text": "hurry back to me",
+          "gold": "come",
+          "got": null
+        },
+        {
+          "text": "head over to the village",
+          "gold": "goto",
+          "got": null
+        },
+        {
+          "text": "walk to the mine",
+          "gold": "goto",
+          "got": null
+        },
+        {
+          "text": "travel to 200 70 -300",
+          "gold": "goto",
+          "got": null
+        },
+        {
+          "text": "make your way over to the lake",
+          "gold": "goto",
+          "got": null
+        },
+        {
+          "text": "keep the creepers away from me",
+          "gold": "guard",
+          "got": null
+        },
+        {
+          "text": "look out for me",
+          "gold": "guard",
+          "got": null
+        },
+        {
+          "text": "defend the house",
+          "gold": "guard",
+          "got": null
+        },
+        {
+          "text": "stop being my bodyguard",
+          "gold": "unguard",
+          "got": null
+        },
+        {
+          "text": "hold it",
+          "gold": "stop",
+          "got": null
+        },
+        {
+          "text": "stop what you are up to",
+          "gold": "stop",
+          "got": null
+        },
+        {
+          "text": "stay where you are",
+          "gold": "stop",
+          "got": null
+        },
+        {
+          "text": "do not go anywhere",
+          "gold": "stop",
+          "got": null
+        },
+        {
+          "text": "start chopping trees on your own",
+          "gold": "behavior_on",
+          "got": "chop",
+          "args": {
+            "unit": "tree"
+          },
+          "by": "embeddings"
+        },
+        {
+          "text": "search for a desert temple",
+          "gold": "find",
+          "got": null
+        },
+        {
+          "text": "where can we find some sheep",
+          "gold": "find",
+          "got": null
+        },
+        {
+          "text": "fetch me a pickaxe",
+          "gold": "bring",
+          "got": null
+        },
+        {
+          "text": "bring 3 apples over here",
+          "gold": "bring",
+          "got": null
+        },
+        {
+          "text": "give me some of your coal",
+          "gold": "give",
+          "got": "collect",
+          "args": {
+            "item": "coal_ore"
+          },
+          "by": "embeddings"
+        },
+        {
+          "text": "drop the gravel",
+          "gold": "drop",
+          "got": null
+        },
+        {
+          "text": "empty your pockets",
+          "gold": "drop",
+          "got": null
+        },
+        {
+          "text": "have a meal",
+          "gold": "eat",
+          "got": null
+        },
+        {
+          "text": "put up a watchtower",
+          "gold": "build",
+          "got": null
+        }
+      ]
+    },
+    {
+      "config": "patterns+embeddings",
+      "set": "seen",
+      "n": 137,
+      "accuracy": 1,
+      "macroF1": 1,
+      "falseTriggerCount": 0,
+      "misses": 0,
+      "slotAccuracy": 1,
+      "slotCases": 85,
+      "errors": []
+    },
+    {
+      "config": "patterns+embeddings",
+      "set": "heldout",
+      "n": 107,
+      "accuracy": 0.766,
+      "macroF1": 0.779,
+      "falseTriggerCount": 0,
+      "misses": 16,
+      "slotAccuracy": 0.974,
+      "slotCases": 39,
+      "errors": [
+        {
+          "text": "shadow me",
+          "gold": "follow",
+          "got": null
+        },
+        {
+          "text": "keep close",
+          "gold": "follow",
+          "got": null
+        },
+        {
+          "text": "you are with me, lets move",
+          "gold": "follow",
+          "got": null
+        },
+        {
+          "text": "stop trailing after me",
+          "gold": "unfollow",
+          "got": null
+        },
+        {
+          "text": "you can stop tagging along now",
+          "gold": "unfollow",
+          "got": null
+        },
+        {
+          "text": "come to my side",
+          "gold": "come",
+          "got": "goto",
+          "args": {
+            "place": "side"
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "hurry back to me",
+          "gold": "come",
+          "got": null
+        },
+        {
+          "text": "return to your house",
+          "gold": "go_home",
+          "got": "goto",
+          "args": {
+            "place": "house"
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "head over to the village",
+          "gold": "goto",
+          "got": null
+        },
+        {
+          "text": "make your way over to the lake",
+          "gold": "goto",
+          "got": null
+        },
+        {
+          "text": "keep the creepers away from me",
+          "gold": "guard",
+          "got": null
+        },
+        {
+          "text": "look out for me",
+          "gold": "guard",
+          "got": null
+        },
+        {
+          "text": "stop being my bodyguard",
+          "gold": "unguard",
+          "got": null
+        },
+        {
+          "text": "hold it",
+          "gold": "stop",
+          "got": "guard",
+          "args": {
+            "target": "here"
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "stop what you are up to",
+          "gold": "stop",
+          "got": null
+        },
+        {
+          "text": "stay where you are",
+          "gold": "stop",
+          "got": null
+        },
+        {
+          "text": "do not go anywhere",
+          "gold": "stop",
+          "got": null
+        },
+        {
+          "text": "start chopping trees on your own",
+          "gold": "behavior_on",
+          "got": "chop",
+          "args": {
+            "unit": "tree"
+          },
+          "by": "embeddings"
+        },
+        {
+          "text": "go back to farming",
+          "gold": "behavior_on",
+          "got": "goto",
+          "args": {
+            "place": "farming"
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "go collect 32 spruce logs",
+          "gold": "chop",
+          "got": "collect",
+          "args": {
+            "item": "spruce_log",
+            "count": 32
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "get us some gravel",
+          "gold": "collect",
+          "got": "bring",
+          "args": {
+            "item": "gravel",
+            "viaGet": true
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "where can we find some sheep",
+          "gold": "find",
+          "got": null
+        },
+        {
+          "text": "toss out your dirt",
+          "gold": "drop",
+          "got": "drop",
+          "args": {
+            "item": "out_your_dirt"
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "get some food in you",
+          "gold": "eat",
+          "got": "bring",
+          "args": {
+            "item": "food_in_you"
+          },
+          "by": "patterns"
+        },
+        {
+          "text": "have a meal",
+          "gold": "eat",
+          "got": null
+        },
+        {
+          "text": "show me what you are carrying",
+          "gold": "inventory",
+          "got": "find",
+          "args": {
+            "target": "what_you_are_carrying"
+          },
+          "by": "patterns"
+        }
+      ]
+    }
+  ]
+}
