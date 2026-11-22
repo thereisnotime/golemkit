@@ -202,3 +202,9 @@ just chat-test  # join as a second player and send commands to a running bot
 
 TypeScript runs directly on Node 26 (type stripping), no build step; `tsc` only typechecks.
 Specs live in `openspec/`.
+
+## License
+
+[GNU LGPL v3.0 or later](COPYING.LESSER) (which builds on the [GPL v3.0](COPYING)). The
+blueprints in `blueprints/library/` come from other projects and keep their own licenses (MIT,
+LGPL-3.0, CC0); see [blueprints/library/LICENSES.md](blueprints/library/LICENSES.md).
