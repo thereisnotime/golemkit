@@ -2,7 +2,7 @@
 // gets hit with the bodyguard armed, with follow_owner only, and with no bot at all.
 //   node scripts/guard-bench.ts [x z] [--minutes 4] [--repeats 2] [--phases guard,follow,none]
 //        [--seed 1] [--sword stone|iron] [--armour] [--tester-food 8] [--interval 30] [--cap 8]
-//        [--time day|night] [--phantoms] [--waves mixed|ranged] [--bow] [--blocks 0] [--no-intercept] [--no-pull]
+//        [--time day|night] [--phantoms] [--waves mixed|ranged] [--bow] [--blocks 0] [--no-intercept] [--no-pull] [--variants a,b]
 //        [--tag run] [--scout] [--cleanup] [--force]
 // DIRECTOR (default ClaudeTest, an op) runs everything with commands: before every phase it sets
 // the time, kills leftover tagged mobs, fills explosion holes in the arena floor, resets both
@@ -15,7 +15,8 @@
 // pillagers on every other wave, to see how the bot keeps itself alive under fire. --bow also gives
 // the bot a bow and 32 arrows; --blocks N gives it N cobblestone (to build cover against archers).
 // --no-intercept and --no-pull arm the bodyguard with intercept or pulling aggro off, so each can be
-// measured on its own (the results carry `variant`). The tester stands still (no self-defence, eats). Phases: guard (bodyguard armed for
+// measured on its own (the results carry `variant`); --variants all,no-intercept,no-pull runs a guard
+// phase for each in one session. The tester stands still (no self-defence, eats). Phases: guard (bodyguard armed for
 // the tester), follow (follow_owner only), none (the bot is offline: the baseline). The phase
 // order flips on every repeat. A tester death is counted, the mobs alive are killed and the
 // tester is reset on the spot. --time day (default) keeps natural spawns out; zombies and
@@ -53,10 +54,11 @@ const PHANTOMS = flag('phantoms')
 const WAVES = opt('waves', 'mixed') as 'mixed' | 'ranged'
 const BOW = flag('bow')
 const BLOCKS = Number(opt('blocks', '0'))
-const INTERCEPT = !flag('no-intercept')
-const PULL = !flag('no-pull')
-/** Which bodyguard tactics are on: all, no-intercept, no-pull, neither. */
-const VARIANT = INTERCEPT && PULL ? 'all' : !INTERCEPT && !PULL ? 'neither' : !INTERCEPT ? 'no-intercept' : 'no-pull'
+type Variant = 'all' | 'no-intercept' | 'no-pull' | 'neither'
+/** Which bodyguard tactics are on: all, no-intercept, no-pull, neither. --variants runs several guard phases, one per variant. */
+const VARIANTS: Variant[] = opt('variants', '') ? opt('variants', '').split(',') as Variant[]
+  : [!flag('no-intercept') && !flag('no-pull') ? 'all' : flag('no-intercept') && flag('no-pull') ? 'neither' : flag('no-intercept') ? 'no-intercept' : 'no-pull']
+const tactics = (v: Variant) => ({ intercept: v === 'all' || v === 'no-pull', pullAggro: v === 'all' || v === 'no-intercept' })
 const RUN_TAG = opt('tag', 'run')
 
 type Phase = 'guard' | 'follow' | 'none'
@@ -412,8 +414,10 @@ async function main (): Promise<void> {
     const results: any[] = []
 
     for (let rep = 0; rep < REPEATS; rep++) {
-      const order = rep % 2 === 0 ? PHASES : [...PHASES].reverse()
-      for (const phase of order) {
+      // a guard phase per variant (--variants all,no-pull), the order flipped on every repeat
+      const runs: { phase: Phase, variant: Variant }[] = PHASES.flatMap((ph): { phase: Phase, variant: Variant }[] => ph === 'guard' ? VARIANTS.map(v => ({ phase: ph, variant: v })) : [{ phase: ph, variant: VARIANTS[0]! }])
+      const order = rep % 2 === 0 ? runs : [...runs].reverse()
+      for (const { phase, variant: VARIANT } of order) {
         // ---- reset ----
         await checkOwnerFar()
         log(`== repeat ${rep + 1}, phase ${phase}: resetting`)
@@ -446,7 +450,7 @@ async function main (): Promise<void> {
         await heal(TESTER)
         if (phase !== 'none') {
           await heal(BOT)
-          const r = await step(bot, 'behavior_arm', { name: phase === 'guard' ? 'bodyguard' : 'follow_owner', options: phase === 'guard' ? { player: TESTER, whisper: true, intercept: INTERCEPT, pullAggro: PULL } : { player: TESTER } })
+          const r = await step(bot, 'behavior_arm', { name: phase === 'guard' ? 'bodyguard' : 'follow_owner', options: phase === 'guard' ? { player: TESTER, whisper: true, ...tactics(VARIANT) } : { player: TESTER } })
           if (!r.ok) throw new Error(`couldn't arm ${phase}: ${r.message}`)
         }
         await pause(2000)
@@ -564,9 +568,10 @@ async function main (): Promise<void> {
 export function printSummary (results: any[]): void {
   const row = (cells: (string | number)[]) => cells.map((c, i) => String(c).padStart(i === 0 ? 7 : 9)).join(' ')
   console.log('\n' + row(['phase', 'run', 'summoned', 'hits', 'damage', 'deaths', 'hits/10mob', 'firstHitS', 'botDeath', 'botHits', 'kills', 'boom@6', 'warns', 'feeds']))
-  const phases = [...new Set(results.map(r => r.phase))]
+  const label = (r: any) => r.phase === 'guard' && r.variant && r.variant !== 'all' ? `g:${r.variant}` : r.phase
+  const phases = [...new Set(results.map(label))]
   for (const p of phases) {
-    const rs = results.filter(r => r.phase === p)
+    const rs = results.filter(r => label(r) === p)
     for (const r of rs) console.log(row([p, r.repeat, r.summoned, r.testerHits, r.testerDamage, r.testerDeaths, (r.testerHits / Math.max(1, r.summoned) * 10).toFixed(1), r.firstHitMedianS ?? '-', r.botDeaths, r.botHits ?? '-', r.killCount, r.explosionsNearTester, r.warnings, r.feeds]))
     const m = (k: string) => rs.reduce((a, r) => a + r[k], 0) / rs.length
     const sd = (k: string) => { const mu = m(k); return Math.sqrt(rs.reduce((a, r) => a + (r[k] - mu) ** 2, 0) / Math.max(1, rs.length - 1)) }

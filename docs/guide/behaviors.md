@@ -367,7 +367,8 @@ tester is reset on the spot. `--waves ranged` summons archers only (2 skeletons 
 with crossbows, a third pillager every other wave) to measure how the bot keeps itself alive
 under fire; `--bow` also gives the bot a bow and 32 arrows, `--blocks 16` 16 cobblestone (to
 build cover with). `--no-intercept` and `--no-pull` arm the bodyguard with that tactic off, so
-each can be compared with the default (results carry `variant`). The bot's own hits taken and deaths
+each can be compared with the default (results carry `variant`); `--variants all,no-intercept,no-pull`
+runs a guard phase for each in one session. The bot's own hits taken and deaths
 are counted in every phase. In the guard phase the bodyguard whispers its warnings to the
 tester, so nobody else on the server sees them.
 
