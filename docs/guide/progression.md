@@ -103,8 +103,10 @@ behind, and the strip mine sweeps its tunnel before it stops.
 **Seeds and food.** Wheat seeds come from breaking grass (about 1 in 8 drops). The crafting
 junk cleaner keeps 16 wheat seeds and 8 beetroot seeds, so seeds picked up while `keep_fed`
 searches for food survive until the bot starts a farm. `gather_seeds` breaks grass on purpose,
-`forage` picks sweet berries, and the whole food ladder (search 48, 120, 250 blocks, then a farm
-near home) is in [behaviours](/guide/behaviors#food-keep-fed-the-food-ladder-and-farm-setup).
+`forage` picks sweet berries, cuts kelp (smelted into dried kelp) and, when desperate, breaks
+leaves for apples, `tend_farm` keeps a farm planted and grows it towards 9x9 with seeds beyond a
+small reserve, and the whole food ladder (search 48, 120, 250 blocks, then a farm near home,
+with farm work between meals) is in [behaviours](/guide/behaviors#food-keep-fed-the-food-ladder-and-farm-setup).
 
 ## Speed
 

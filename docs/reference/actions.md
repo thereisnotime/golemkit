@@ -10,7 +10,7 @@ scopeNote: "Generated from the skills: most are Minecraft; the journal and confi
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-25 skills, 105 actions.
+25 skills, 106 actions.
 
 ## blueprint-library
 
@@ -480,7 +480,7 @@ Turn dirt or grass into farmland with a hoe, either at x y z or the nearest spot
 
 ## food
 
-Food self-sufficiency: scouting for animals and village farms, starting a farm of its own, gathering seeds, picking berries, breeding animals.
+Food self-sufficiency: scouting for animals and village farms, starting, tending and growing a farm of its own, gathering seeds, foraging berries, kelp and apples, breeding animals.
 
 ### `find_food`
 
@@ -518,6 +518,20 @@ Start a small farm of its own: picks grass or dirt by water near home (or a plac
 | `light` | boolean |  | `true` | put torches on the corners when it has torches or coal |
 | `spawnClearance` | number (0..256) |  | `48` | never farm within this distance of the world spawn |
 
+### `tend_farm`
+
+Look after its own farm (farm:1, farm:2...): put the water back if it is gone (with a bucket), plant bare farmland, till trampled dirt again and plant it, and grow the plot a ring at a time towards `size` around its water with the seeds it has, keeping `seedReserve` seeds for replanting. Use harvest for ripe crops. Needs digging enabled for tilling.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `farm` | string |  |  | which farm (farm:1...); default the nearest |
+| `size` | integer (3..9) |  | `9` | side of the square to grow the farm towards (one water block keeps 9x9 wet) |
+| `seedReserve` | integer (0..32) |  | `4` | seeds kept for replanting: new cells only from seeds beyond these |
+| `maxCells` | integer (1..80) |  | `40` | cells to plant or till at most this run |
+| `spawnClearance` | number (0..256) |  | `48` | never till within this distance of the world spawn |
+
 ### `gather_seeds`
 
 Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. Skips protected areas and the world spawn. Needs digging enabled.
@@ -533,14 +547,17 @@ Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 
 
 ### `forage`
 
-Pick sweet berries from ripe bushes nearby (right-click, the bush stays and regrows). A stopgap food while a farm grows; never on protected land.
+Stopgap food from what grows wild nearby: pick ripe sweet berries (the bush stays), cut kelp at the shore without diving (smelt it into dried kelp later), and with apples=true break oak and dark oak leaves for apples (about 1 in 200) and pick up apples lying around. Never on protected land.
 
 *long-running*
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `radius` | number (4..64) |  | `32` | how far to look for berry bushes |
-| `max` | integer (1..32) |  | `8` | bushes to pick at most |
+| `radius` | number (4..64) |  | `32` | how far to look |
+| `max` | integer (1..32) |  | `8` | bushes or kelp stalks to take at most |
+| `kinds` | array |  | `["berries","kelp"]` | what to forage |
+| `apples` | boolean |  | `false` | also break leaves for apples (slow, low odds: a last resort) |
+| `leaves` | integer (1..64) |  | `24` | leaves to break at most for apples |
 
 ### `breed`
 
