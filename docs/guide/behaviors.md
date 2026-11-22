@@ -363,7 +363,9 @@ tester every 30 s while fewer than 8 are alive: 2 zombies and a skeleton (leathe
 they don't burn, the skeleton with a bow), a spider, and a creeper every other wave. Phases:
 `guard` (bodyguard armed for the tester), `follow` (`follow_owner` only), `none` (bot offline).
 The order flips on every repeat. A tester death is counted, the mobs alive are killed and the
-tester is reset on the spot. `--waves ranged` summons archers only (2 skeletons and 2 pillagers
+tester is reset on the spot. During a run both accounts' spawnpoint is set next to the arena (put
+back to the world spawn at the end), so a death never leaves them standing at spawn, and they are
+teleported back before anything else. `--waves ranged` summons archers only (2 skeletons and 2 pillagers
 with crossbows, a third pillager every other wave) to measure how the bot keeps itself alive
 under fire; `--bow` also gives the bot a bow and 32 arrows, `--blocks 16` 16 cobblestone (to
 build cover with). `--no-intercept` and `--no-pull` arm the bodyguard with that tactic off, so

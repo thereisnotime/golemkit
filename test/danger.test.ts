@@ -69,3 +69,24 @@ test('danger zones: a kill clears the zone, memory per owner with a clock', () =
   assert.equal(m.isInDanger({ x: 10, z: 10 }), null)
   assert.ok(m instanceof DangerMemory)
 })
+
+test('find_food skips a zone remembered by the ranged code', async () => {
+  // importing ranged.ts registers the shared check with the food adapter
+  const { dangerZoneCheck } = await import('../src/skills/ranged.ts')
+  const { inDangerZone, wayThroughDanger, useDangerZones } = await import('../src/skills/food-danger.ts')
+  const { scoutWaypoints } = await import('../src/skills/foodPlan.ts')
+  const agent: any = {}
+  try {
+    assert.equal(inDangerZone(agent, { x: 60, z: 0 }), false, 'nothing remembered yet')
+    dangerMemory(agent).remember({ x: 60, y: 64, z: 0, kind: 'patrol', radius: 32, count: 4 })
+    assert.equal(inDangerZone(agent, { x: 60, z: 0 }), true)
+    assert.equal(inDangerZone({} as any, { x: 60, z: 0 }), false, 'another bot does not share the memory')
+    assert.equal(wayThroughDanger(agent, { x: 0, z: 0 }, { x: 120, z: 0 }), true)
+    // find_food's spiral, with the skip it uses: no waypoint ends up in or past the patrol
+    const center = { x: 0, y: 64, z: 0 }
+    const wps = scoutWaypoints(center, 96, { startAngle: 0, skip: (w: any) => inDangerZone(agent, w) || wayThroughDanger(agent, center, w) })
+    assert.ok(wps.length > 0)
+    assert.ok(wps.every((w: any) => Math.hypot(w.x - 60, w.z) > 32), 'no waypoint inside the zone')
+    assert.ok(!wps.some((w: any) => w.x > 90 && Math.abs(w.z) < 10), 'none straight past it either')
+  } finally { useDangerZones(dangerZoneCheck) }
+})

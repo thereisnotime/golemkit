@@ -19,6 +19,7 @@ import { wornArmorPoints } from './gear.ts'
 import { facingTowards } from './guard-plan.ts'
 import { fillerBlock, pillarUp } from './survival.ts'
 import { placeAt, isReplaceable } from './world.ts'
+import { useDangerZones } from './food-danger.ts'
 import {
   isShooter, incoming, patrolCount, rangedResponse, activeShooters, findCover, cappedRetreat, canEatUnderFire, shooterRange,
   hideMs, stillHiding, leaveCover, planWall, ILLAGERS, PROJECTILES, RETREAT_CAP,
@@ -295,6 +296,10 @@ async function buildWall (bot: Bot, plan: WallPlan & { block: string }, signal: 
   }
   return placed
 }
+
+/** keep_fed and find_food read the zones through their adapter; this hands them the per-agent memory. */
+export const dangerZoneCheck = (pos: { x: number, y?: number, z: number }, agent?: Agent): boolean => !!agent && !!dangerMemory(agent).isInDanger(pos)
+useDangerZones(dangerZoneCheck)
 
 /** Notes the shooters (and the patrol) around as danger zones for the bot's other jobs. */
 function rememberShooters (agent: Agent, s: RangedSituation): void {

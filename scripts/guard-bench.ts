@@ -256,7 +256,8 @@ async function main (): Promise<void> {
   for (let dx = -14; dx <= 14; dx++) for (let dz = -14; dz <= 14; dz++) for (let dy = 1; dy <= 6; dy++) { const b = dir.bot.blockAt(dir.bot.entity.position.clone().set(X + dx, G - dy, Z + dz)); if (b && /air$/.test(b.name)) holes++ }
   log(`air pockets 1-6 below the floor within 14: ${holes}`)
   const fair = odd.filter(o => /water|lava/.test(o)).length === 0 && off <= 20
-  if (!fair && !flag('force')) throw new Error('the spot is not flat and dry enough (use --force to run anyway)')
+  // a clean-up after a broken run (creeper holes left in the floor) must always be possible
+  if (!fair && !flag('force') && !flag('cleanup')) throw new Error('the spot is not flat and dry enough (use --force to run anyway)')
   if (flag('scout')) { await dir.stop(); return }
   // out of the arena (creative: mobs ignore it), close enough to keep the chunks loaded
   const park = surface(X + 24, Z)
@@ -387,8 +388,18 @@ async function main (): Promise<void> {
   await waitLive(bot)
   await waitLive(tester)
   spotV = tester.bot.entity.position.clone().set(spot.x, spot.y, spot.z)
+  // respawn next to the arena, not at world spawn where real players come through; put back at the end
+  const worldSpawn = (dir.bot as any).spawnPoint as { x: number, y: number, z: number } | undefined
+  const parkY = (park?.y ?? G) + 1
+  const setSpawns = async (arena: boolean) => {
+    for (const p of [BOT, TESTER]) {
+      if (arena) await cmd(`/spawnpoint ${p} ${X + 24} ${parkY} ${Z}`)
+      else if (worldSpawn) await cmd(`/spawnpoint ${p} ${Math.floor(worldSpawn.x)} ${Math.floor(worldSpawn.y)} ${Math.floor(worldSpawn.z)}`)
+    }
+  }
   const cleanUp = async () => {
     measuring = false
+    await setSpawns(false)
     await killTagged()
     await parkPlayers()
     await pause(1000)
@@ -408,6 +419,7 @@ async function main (): Promise<void> {
     await disarmAll()
     await cmd(`/gamemode survival ${BOT}`)
     await cmd(`/gamemode survival ${TESTER}`)
+    await setSpawns(true)
     log(`difficulty ${(tester.bot.game as any).difficulty ?? '?'}`)
 
     const schedule = waveSchedule(SEED, Math.ceil(MINUTES * 60 / INTERVAL_S) + 4, PHANTOMS, WAVES)
@@ -477,7 +489,8 @@ async function main (): Promise<void> {
               // count it, clear the mobs that did it, reset the tester on the spot
               testerDied = false
               await waitLive(tester)
-              await pause(2500)
+              await pause(500)
+              await placeTester() // straight back from wherever it respawned (never left standing at world spawn)
               await cmd(`/kill @e[tag=${TAG}]`)
               await gearTester()
               await placeTester()
@@ -486,7 +499,8 @@ async function main (): Promise<void> {
             if (botDied && phase !== 'none') {
               botDied = false
               await waitLive(bot)
-              await pause(2500)
+              await pause(500)
+              await placeBot()
               await gearBot()
               await placeBot()
               continue
