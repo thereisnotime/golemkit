@@ -1,0 +1,203 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import {
+  isShooter, incoming, patrolCount, rangedResponse, activeShooters, canEatUnderFire, lineBlocked, findCover, retreatPoint,
+  type RangedState, type ShooterView
+} from '../src/skills/ranged-plan.ts'
+import { rangedDanger } from '../src/brains/behaviors/library/safety.ts'
+import { creeperMove } from '../src/skills/tactics.ts'
+import { threatReason, rankGuardThreats, etaToPlayer, interceptPoint, pullPlan, type GuardThreat } from '../src/skills/guard-plan.ts'
+
+test('shooters: archers, pillagers, witches, blazes, ghasts; drowned only with a trident', () => {
+  for (const n of ['skeleton', 'stray', 'bogged', 'pillager', 'witch', 'blaze', 'ghast']) assert.ok(isShooter(n), n)
+  assert.ok(isShooter('drowned', 'trident'))
+  assert.ok(!isShooter('drowned', null))
+  assert.ok(!isShooter('zombie'))
+  assert.ok(!isShooter('vindicator'))
+})
+
+test('projectiles: an arrow on course for the bot is incoming, one going past is not', () => {
+  const bot = { x: 0, y: 64, z: 0 }
+  // fired from 15 blocks east at chest height, flat and fast: hits
+  const hit = incoming({ name: 'arrow', pos: { x: 15, y: 65.5, z: 0 }, vel: { x: -2.4, y: 0.12, z: 0 } }, bot)
+  assert.ok(hit, 'straight at the bot')
+  assert.ok(hit!.ticks > 4 && hit!.ticks < 9, `about 6 ticks, got ${hit!.ticks}`)
+  // same speed, aimed 5 blocks to the side
+  assert.equal(incoming({ name: 'arrow', pos: { x: 15, y: 65.5, z: 5 }, vel: { x: -2.4, y: 0.12, z: 0 } }, bot), null)
+  // flying away from the bot
+  assert.equal(incoming({ name: 'arrow', pos: { x: 3, y: 65, z: 0 }, vel: { x: 2.4, y: 0.1, z: 0 } }, bot), null)
+  // stuck in the ground
+  assert.equal(incoming({ name: 'arrow', pos: { x: 1, y: 64, z: 0 }, vel: { x: 0, y: 0, z: 0 } }, bot), null)
+  // a ghast fireball has no gravity: aimed level it stays level
+  assert.ok(incoming({ name: 'fireball', pos: { x: 0, y: 65, z: 30 }, vel: { x: 0, y: 0, z: -1 } }, bot))
+  // a lobbed splash potion from a witch comes down on the bot
+  assert.ok(incoming({ name: 'potion', pos: { x: 6, y: 65.5, z: 0 }, vel: { x: -0.6, y: 0.3, z: 0 } }, bot, { radius: 1.5 }))
+})
+
+test('patrol: pillagers, vindicators, ravagers within range are counted, witches and far ones are not', () => {
+  const c = { x: 0, y: 64, z: 0 }
+  const mobs = [
+    { name: 'pillager', pos: { x: 5, y: 64, z: 0 } },
+    { name: 'pillager', pos: { x: 8, y: 64, z: 3 } },
+    { name: 'vindicator', pos: { x: 6, y: 64, z: -2 } },
+    { name: 'pillager', pos: { x: 40, y: 64, z: 0 } },
+    { name: 'witch', pos: { x: 3, y: 64, z: 0 } },
+    { name: 'skeleton', pos: { x: 3, y: 64, z: 0 } }
+  ]
+  assert.equal(patrolCount(mobs, c), 3)
+  assert.equal(patrolCount(mobs, c, 7), 2)
+})
+
+const sh = (o: Partial<ShooterView> & { name: string }): ShooterView => ({ id: Math.floor(Math.random() * 1e6), dist: 12, los: true, ...o })
+const st = (o: Partial<RangedState>): RangedState => ({ health: 20, armor: 0, bow: false, shield: false, melee: true, shooters: [], patrol: 0, coverNear: true, ...o })
+
+test('response: only shooters with a line to the bot (or that just hit it) count', () => {
+  assert.equal(rangedResponse(st({ shooters: [sh({ name: 'skeleton', los: false })] })), null)
+  assert.ok(rangedResponse(st({ shooters: [sh({ name: 'skeleton', los: false, hurtMe: true })] })))
+  assert.deepEqual(activeShooters([sh({ name: 'skeleton', id: 1, dist: 30 }), sh({ name: 'skeleton', id: 2, dist: 10 })]).map(s => s.id), [2], 'beyond 24 blocks is ignored')
+})
+
+test('response: by health and gear', () => {
+  const one = [sh({ name: 'skeleton', id: 9, dist: 12 })]
+  assert.equal(rangedResponse(st({ shooters: one, bow: true }))!.act, 'shoot')
+  assert.equal(rangedResponse(st({ shooters: one, bow: true }))!.target, 9)
+  assert.equal(rangedResponse(st({ shooters: [sh({ name: 'skeleton', dist: 3 })], bow: true, shield: true }))!.act, 'shield_close', 'too close to draw a bow')
+  assert.equal(rangedResponse(st({ shooters: one, shield: true }))!.act, 'shield_close')
+  assert.equal(rangedResponse(st({ shooters: one }))!.act, 'charge', 'healthy with a sword against one skeleton')
+  assert.equal(rangedResponse(st({ shooters: one, health: 12 }))!.act, 'cover', 'no shield and hurt: hide')
+  assert.equal(rangedResponse(st({ shooters: one, health: 12, coverNear: false }))!.act, 'retreat')
+  assert.equal(rangedResponse(st({ shooters: one, melee: false }))!.act, 'cover', 'bare hands')
+  // low health hides whatever the gear
+  assert.equal(rangedResponse(st({ shooters: one, health: 6, bow: true, shield: true, armor: 20 }))!.act, 'cover')
+  assert.equal(rangedResponse(st({ shooters: one, useBow: false, bow: true, shield: true }))!.act, 'shield_close', 'combat.ranged off')
+})
+
+test('response: a pillager patrol outnumbers a bot without good gear', () => {
+  const patrol = [sh({ name: 'pillager', dist: 8 }), sh({ name: 'pillager', dist: 10 }), sh({ name: 'pillager', dist: 11 })]
+  assert.equal(rangedResponse(st({ shooters: patrol, bow: true, shield: true }))!.act, 'cover')
+  assert.equal(rangedResponse(st({ shooters: patrol, bow: true, shield: true, coverNear: false }))!.act, 'retreat')
+  // one pillager in sight, but the patrol around is three strong
+  assert.equal(rangedResponse(st({ shooters: [patrol[0]!], shield: true, patrol: 3 }))!.act, 'cover')
+  // iron armour and a shield: fight
+  assert.equal(rangedResponse(st({ shooters: patrol, bow: true, shield: true, armor: 15 }))!.act, 'shoot')
+})
+
+test('response: ghasts and blazes', () => {
+  assert.equal(rangedResponse(st({ shooters: [sh({ name: 'ghast', dist: 20 })], shield: true }))!.act, 'cover', 'no bow: a ghast can not be reached')
+  assert.equal(rangedResponse(st({ shooters: [sh({ name: 'ghast', dist: 20 })], bow: true }))!.act, 'shoot')
+  assert.equal(rangedResponse(st({ shooters: [sh({ name: 'blaze', dist: 10 })] }))!.act, 'cover')
+  assert.equal(rangedResponse(st({ shooters: [sh({ name: 'blaze', dist: 10 })], shield: true }))!.act, 'shield_close')
+})
+
+test('eating under fire: only out of sight and with nothing in flight', () => {
+  const base = { health: 8, food: 14, hasFood: true, exposed: false, incoming: false }
+  assert.ok(canEatUnderFire(base))
+  assert.ok(!canEatUnderFire({ ...base, exposed: true }), 'not in the open')
+  assert.ok(!canEatUnderFire({ ...base, incoming: true }))
+  assert.ok(!canEatUnderFire({ ...base, hasFood: false }))
+  assert.ok(!canEatUnderFire({ ...base, health: 20, food: 20 }), 'nothing to gain')
+})
+
+// a flat world at y 63 (ground) with a few extra blocks
+function world (blocks: [number, number, number][]) {
+  const set = new Set(blocks.map(b => b.join(',')))
+  const solid = (x: number, y: number, z: number) => y <= 63 || set.has(`${x},${y},${z}`)
+  const standable = (x: number, y: number, z: number) => solid(x, y - 1, z) && !solid(x, y, z) && !solid(x, y + 1, z)
+  return { solid, standable }
+}
+
+test('cover: a line through a block is blocked, a clear one is not', () => {
+  const { solid } = world([[5, 64, 0], [5, 65, 0]])
+  assert.ok(lineBlocked({ x: 0.5, y: 65.6, z: 0.5 }, { x: 10.5, y: 65.6, z: 0.5 }, solid))
+  assert.ok(!lineBlocked({ x: 0.5, y: 65.6, z: 3.5 }, { x: 10.5, y: 65.6, z: 3.5 }, solid))
+  assert.ok(!lineBlocked({ x: 0.5, y: 65.6, z: 0.5 }, { x: 0.5, y: 65.6, z: 0.5 }, solid), 'zero length')
+})
+
+test('cover: the nearest spot behind a 2-high wall, on the far side from the shooter', () => {
+  // wall at x = 3, z -2..2, two high; shooter 12 blocks east; bot in the open 2 blocks west of... the wall's east side
+  const wall: [number, number, number][] = []
+  for (let z = -2; z <= 2; z++) for (const y of [64, 65]) wall.push([3, y, z])
+  const { solid, standable } = world(wall)
+  const spot = findCover({ bot: { x: 5.5, y: 64, z: 0.5 }, shooters: [{ x: 16.5, y: 65.5, z: 0.5 }], solid, standable })
+  assert.ok(spot, 'found cover')
+  assert.ok(spot!.x < 3, `west of the wall, got ${spot!.x}`)
+  assert.ok(Math.abs(spot!.z - 0.5) <= 2, 'behind the wall, not beside it')
+  // open field: nothing
+  const open = world([])
+  assert.equal(findCover({ bot: { x: 0.5, y: 64, z: 0.5 }, shooters: [{ x: 12.5, y: 65.5, z: 0.5 }], solid: open.solid, standable: open.standable }), null)
+})
+
+test('cover: two shooters on opposite sides need a spot blocked from both', () => {
+  // a 2x? pillar box: blocks at x=0 east and west walls; standing between two walls x=-1 and x=1 at z=0
+  const blocks: [number, number, number][] = []
+  for (const y of [64, 65]) { blocks.push([2, y, 0]); blocks.push([-2, y, 0]) }
+  const { solid, standable } = world(blocks)
+  const spot = findCover({ bot: { x: 0.5, y: 64, z: 3.5 }, shooters: [{ x: 12.5, y: 65.5, z: 0.5 }, { x: -11.5, y: 65.5, z: 0.5 }], solid, standable })
+  assert.ok(spot)
+  assert.equal(Math.floor(spot!.z), 0)
+  assert.ok(Math.floor(spot!.x) > -2 && Math.floor(spot!.x) < 2, 'between the two walls')
+})
+
+test('retreat point: straight away from the shooters', () => {
+  const p = retreatPoint({ x: 0, y: 64, z: 0 }, [{ x: 10, y: 64, z: 0 }, { x: 10, y: 64, z: 4 }], 20)
+  assert.ok(p.x < -18)
+  assert.ok(Math.abs(p.z) < 5)
+})
+
+test('stay_safe ranged danger: hurt, outnumbered, escorting', () => {
+  const base = { active: 1, patrol: 0, health: 20, armor: 0, shield: true, escorting: false }
+  assert.ok(!rangedDanger(base), 'one skeleton at full health: the reflex handles it')
+  assert.ok(rangedDanger({ ...base, health: 12 }))
+  assert.ok(rangedDanger({ ...base, patrol: 3 }), 'a patrol without armour')
+  assert.ok(!rangedDanger({ ...base, patrol: 3, armor: 15 }), 'iron and a shield')
+  assert.ok(!rangedDanger({ ...base, active: 0, health: 4 }), 'nobody with a shot')
+  assert.ok(!rangedDanger({ ...base, health: 12, escorting: true }), 'a bodyguard stays with its player')
+  assert.ok(rangedDanger({ ...base, health: 8, escorting: true }))
+})
+
+test('creeper: back off a lit fuse, shoot from range, else hit and step back', () => {
+  assert.equal(creeperMove({ dist: 2.5, fuseLit: true, bow: true }), 'back_off')
+  assert.equal(creeperMove({ dist: 4.5, fuseLit: true, bow: false }), 'back_off')
+  assert.equal(creeperMove({ dist: 8, fuseLit: false, bow: true }), 'shoot')
+  assert.equal(creeperMove({ dist: 8, fuseLit: false, bow: true, holdFire: true }), 'melee', 'player in the line')
+  assert.equal(creeperMove({ dist: 3, fuseLit: false, bow: true }), 'melee')
+  assert.equal(creeperMove({ dist: 8, fuseLit: false, bow: false }), 'melee')
+})
+
+const gm = (o: Partial<GuardThreat> & { name: string }): GuardThreat => ({ id: Math.floor(Math.random() * 1e6), distPlayer: 10, distBot: 10, losPlayer: true, hostile: true, ...o })
+
+test('intercept: a mob walking at the player 6-12 blocks out', () => {
+  assert.equal(threatReason(gm({ name: 'zombie', distPlayer: 10, approaching: true }), 16), 'intercept')
+  assert.equal(threatReason(gm({ name: 'zombie', distPlayer: 14, approaching: true }), 16), 'coming for the player')
+  assert.equal(threatReason(gm({ name: 'zombie', distPlayer: 10, facing: true }), 16), 'coming for the player', 'only looking: not yet')
+  assert.equal(threatReason(gm({ name: 'skeleton', distPlayer: 10, approaching: true, losPlayer: true }), 16), 'has a shot at the player')
+  // of two zombies the same distance out, the faster one goes first
+  const r = rankGuardThreats([gm({ name: 'zombie', id: 1, distPlayer: 9, approaching: true, eta: 4 }), gm({ name: 'zombie', id: 2, distPlayer: 9, approaching: true, eta: 1.5 })], 16)
+  assert.equal(r[0]!.id, 2)
+})
+
+test('intercept: eta and the meeting point', () => {
+  assert.equal(etaToPlayer({ dist: 10, y: 0, flat: 10, at: 0 }, { dist: 9, y: 0, flat: 9, at: 1000 }), 7, '1 block/s, 7 blocks to go')
+  assert.equal(etaToPlayer({ dist: 10, y: 0, flat: 10, at: 0 }, { dist: 10, y: 0, flat: 10, at: 1000 }), undefined)
+  const player = { x: 0, y: 64, z: 0 }
+  // zombie 10 east walking west at 2 b/s, bot next to the player: meet it part way
+  const at = interceptPoint(player, { x: 10, y: 64, z: 0 }, { x: -2, z: 0 }, { x: 1, y: 64, z: 0 })
+  assert.ok(at.x > 3 && at.x < 10, `between, got ${at.x}`)
+  assert.deepEqual(interceptPoint(player, { x: 10, y: 64, z: 0 }, null, { x: 1, y: 64, z: 0 }), { x: 10, y: 64, z: 0 })
+})
+
+test('pull aggro: two mobs on the player, hit the untagged one, then step off the player', () => {
+  const player = { x: 0, y: 64, z: 0 }
+  const bot = { x: 3, y: 64, z: 0 }
+  const mobs = [
+    { id: 1, name: 'zombie', pos: { x: -1, y: 64, z: 1 }, distPlayer: 1.4, hurtPlayer: true },
+    { id: 2, name: 'zombie', pos: { x: -2, y: 64, z: -1 }, distPlayer: 2.2, hurtPlayer: true },
+    { id: 3, name: 'skeleton', pos: { x: -3, y: 64, z: 0 }, distPlayer: 3, hurtPlayer: true }
+  ]
+  const p = pullPlan(mobs, player, bot, new Set())
+  assert.equal(p!.id, 1)
+  assert.ok(p!.spot.x > 5, 'on the bot\'s side, 6 out')
+  assert.equal(pullPlan(mobs, player, bot, new Set([1]))!.id, 2)
+  assert.equal(pullPlan(mobs, player, bot, new Set([1, 2])), null, 'all tagged')
+  assert.equal(pullPlan(mobs.slice(0, 1), player, bot, new Set()), null, 'one mob: just fight it')
+})

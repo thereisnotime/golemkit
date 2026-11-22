@@ -17,11 +17,28 @@ import { failureCooldown } from '../../npc/index.ts'
 import { canPlace } from '../runtime.ts'
 import { hostilesNear } from './util.ts'
 import { escorting } from '../../../skills/bodyguard.ts'
+import { rangedSituation } from '../../../skills/ranged.ts'
+import { GOOD_ARMOR, RANGED_OUTNUMBERED } from '../../../skills/ranged-plan.ts'
 
 /** Health at or below which an escorting bodyguard treats a crowd around it as surrounded. */
 const ESCORT_SURROUNDED_HEALTH = 12
 
-type Danger = 'surrounded' | 'low_health' | 'water' | 'night' | 'hold' | 'shelter' | null
+type Danger = 'surrounded' | 'ranged' | 'low_health' | 'water' | 'night' | 'hold' | 'shelter' | null
+
+/** Health at or below which stay_safe takes cover from shooters with a line to the bot. */
+export const RANGED_COVER_HEALTH = 12
+
+/**
+ * Whether shooters around call for cover now (pure): one with a line to the bot (or that just
+ * shot it) and the bot hurt, or a patrol / several shooters without good gear. An escorting
+ * bodyguard only at 8 health or less (protect fights archers for its player). Exported for tests.
+ */
+export function rangedDanger (s: { active: number, patrol: number, health: number, armor: number, shield: boolean, escorting: boolean }): boolean {
+  if (!s.active) return false
+  if (s.escorting) return s.health <= 8
+  if (s.health <= RANGED_COVER_HEALTH) return true
+  return Math.max(s.active, s.patrol) >= RANGED_OUTNUMBERED && !(s.armor >= GOOD_ARMOR && s.shield)
+}
 
 /** After a failed go_home, how long before stay_safe tries it again (doubles per failure, capped). */
 export const HOME_BACKOFF_MS = 60_000
@@ -80,7 +97,8 @@ const stayOptions = z.object({
   avoidWater: z.boolean().default(true).describe('get out of water when hostiles are near and health is below 16'),
   homeAtNight: z.boolean().default(true).describe('go home at night if a home is set'),
   homeRange: z.number().min(2).max(64).default(8).describe('how close to home counts as home at night'),
-  shelterUnprepared: z.boolean().default(true).describe('at night without armour, a weapon or food and no home: dig in (bunker) until morning')
+  shelterUnprepared: z.boolean().default(true).describe('at night without armour, a weapon or food and no home: dig in (bunker) until morning'),
+  ranged: z.boolean().default(true).describe('take cover (or back out of range) from skeletons, pillagers and other shooters when hurt or outnumbered, and eat behind cover')
 })
 
 /** Why the bot shouldn't be out tonight (no armour, weapon or food), or null. Exported for tests. */
@@ -107,6 +125,14 @@ export function assessDanger (ctx: Pick<NpcContext, 'agent' | 'bot' | 'bb'> & { 
   // a bodyguard is surrounded whenever a wave reaches its player: it fights next to them while
   // it is healthy and only pillars or backs off once it is getting hurt
   if (close.length >= o.surroundedBy && (health <= ESCORT_SURROUNDED_HEALTH || !escorting(agent))) return 'surrounded'
+  // shooters with a line to us: hide and eat behind cover instead of backing off through the open
+  if (o.ranged && agent.getAction?.('ranged_defense')) {
+    try {
+      const r = rangedSituation(bot)
+      const shield = bot.inventory?.slots?.[45]?.name === 'shield' || !!bot.inventory?.items?.().some(i => i.name === 'shield')
+      if (rangedDanger({ active: r.active.length, patrol: r.patrol, health, armor: bot.inventory?.slots ? wornArmorPoints(bot) : 0, shield, escorting: !!escorting(agent) })) return 'ranged'
+    } catch {}
+  }
   const near = hostilesNear(bot, pos, running ? Math.max(20, o.mobRadius) : o.mobRadius)
   if (near.length && o.retreatBelow > 0 && health <= (running ? o.retreatBelow + 2 : o.retreatBelow)) return 'low_health'
   if (o.avoidWater && near.length && health < 16 && inWater(bot)) return 'water'
@@ -131,10 +157,11 @@ export const staySafe = defineBehavior({
   name: 'stay_safe',
   category: 'safety',
   description: 'Keeps the bot alive: backs away from mobs at low health, pillars up when surrounded (if it can place blocks), ' +
+    'takes cover from skeletons, pillagers and other shooters when hurt or outnumbered (and eats behind cover), ' +
     'gets out of water when mobs are around, heads home at night if a home is set (sooner when it has no armour, weapon or food), ' +
     'and without a home digs in for the night when it is unprepared. Arm it on any bot that roams.',
   options: stayOptions,
-  uses: ['retreat', 'flee', 'pillar', 'goto', 'go_home', 'bunker'],
+  uses: ['retreat', 'flee', 'pillar', 'goto', 'go_home', 'bunker', 'ranged_defense'],
   priority: 'behavior',
   create (o, { agent }) {
     const trips = newHomeTrips()
@@ -160,6 +187,7 @@ export const staySafe = defineBehavior({
         if (!needsSurvival(ctx.bot)) return 0 // creative/spectator: mobs can't hurt us
         switch (assessDanger(ctx, o, trips)) {
           case 'surrounded': return 92
+          case 'ranged': return 91 // above keep_fed's 90: starving is no reason to walk through crossbow fire
           case 'low_health': return 88
           case 'water': return 78
           case 'night': return nightUnready(ctx.bot) ? 70 : ctx.current === 'stay_safe' ? 50 : 48 // unprepared: home beats other jobs
@@ -183,6 +211,8 @@ export const staySafe = defineBehavior({
               }
             }
             return back ? ctx.act(back, { distance: 20 }) : 'surrounded and nothing to do about it'
+          case 'ranged':
+            return ctx.act('ranged_defense', { cover: true })
           case 'low_health':
             return back ? ctx.act(back, { distance: 20 }) : 'no way to back off'
           case 'water': {

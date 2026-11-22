@@ -160,7 +160,7 @@ test('stay_safe does not go home at night while a bodyguard escorts someone', ()
   agent.storage.get = (k: string, d: unknown) => k === 'home' ? home : d
   const bot: any = { entity: { position: { x: 0, y: 64, z: 0, offset: () => ({}) } }, health: 20, entities: {}, inventory: { items: () => [] } }
   const bb: any = { facts: { isNight: true, sleeping: false, homeDistance: 141 } }
-  const o = { retreatBelow: 10, mobRadius: 10, surroundedBy: 3, pillar: true, avoidWater: true, homeAtNight: true, homeRange: 8, shelterUnprepared: true }
+  const o = { retreatBelow: 10, mobRadius: 10, surroundedBy: 3, pillar: true, avoidWater: true, homeAtNight: true, homeRange: 8, shelterUnprepared: true, ranged: true }
   const before = assessDanger({ agent, bot, bb }, o)
   setEscort(agent, 'Owner')
   assert.equal(escorting(agent), 'Owner')
@@ -195,7 +195,7 @@ test('stay_safe: a healthy bodyguard keeps fighting in a crowd, a hurt one still
   const zombie = (id: number, x: number) => ({ id, name: 'zombie', type: 'hostile', position: at(x) })
   const bot: any = { entity: { position: at(0) }, health: 20, entities: { 1: zombie(1, 2), 2: zombie(2, -2), 3: zombie(3, 3) }, inventory: { items: () => [] } }
   const bb: any = { facts: { isNight: false, sleeping: false, homeDistance: null } }
-  const o = { retreatBelow: 10, mobRadius: 10, surroundedBy: 3, pillar: true, avoidWater: true, homeAtNight: true, homeRange: 8, shelterUnprepared: false }
+  const o = { retreatBelow: 10, mobRadius: 10, surroundedBy: 3, pillar: true, avoidWater: true, homeAtNight: true, homeRange: 8, shelterUnprepared: false, ranged: true }
   assert.equal(assessDanger({ agent, bot, bb }, o), 'surrounded', 'not escorting: 3 zombies within 6 is surrounded')
   setEscort(agent, 'Owner')
   assert.equal(assessDanger({ agent, bot, bb }, o), null, 'escorting at full health: fight')

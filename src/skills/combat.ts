@@ -9,6 +9,7 @@ import { rankTargets, attackRefusal, type ThreatInfo } from './tactics.ts'
 import { fillerBlock } from './survival.ts'
 import { getHome } from './navigation.ts'
 import { gearUp, wornArmorPoints } from './gear.ts'
+import { rangedDefense, installRangedWatch } from './ranged.ts'
 const WEAPONS = ['netherite_sword', 'diamond_sword', 'iron_sword', 'stone_sword', 'golden_sword', 'wooden_sword',
   'netherite_axe', 'diamond_axe', 'iron_axe', 'stone_axe']
 
@@ -438,12 +439,14 @@ const hunt = defineAction({
 export const combat = () => defineSkill({
   name: 'combat',
   description: 'Fighting hostile mobs, guarding players and hunting animals for food.',
-  actions: [attack, guard, defend, retreat, hunt, gearUp],
+  actions: [attack, guard, defend, retreat, hunt, gearUp, rangedDefense],
   setup: (_agent, bot) => {
     // remember who hit us: neutral mobs are fought only while they attack
     const onHurt = (e: Entity) => { if (e === bot.entity) noteAttacker(bot) }
     bot.on('entityHurt', onHurt)
-    return () => { bot.off('entityHurt', onHurt) }
+    // projectiles flying at the bot and hits from range (ranged.ts)
+    const unwatch = installRangedWatch(bot)
+    return () => { bot.off('entityHurt', onHurt); unwatch() }
   },
   observe: (_agent, bot) => {
     const mob = threats(bot, 16)[0] ?? nearestHostile(bot, bot.entity.position, 16)

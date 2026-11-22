@@ -101,7 +101,7 @@ function nightCtx (pos: { x: number, y: number, z: number }, current: string | n
   return { agent, bot, bb, current, now }
 }
 
-const O = { retreatBelow: 10, mobRadius: 10, surroundedBy: 3, pillar: true, avoidWater: true, homeAtNight: true, homeRange: 8, shelterUnprepared: true }
+const O = { retreatBelow: 10, mobRadius: 10, surroundedBy: 3, pillar: true, avoidWater: true, homeAtNight: true, homeRange: 8, shelterUnprepared: true, ranged: true }
 
 test('stay_safe: no flapping at the edge of homeRange', () => {
   // from the log: 564 68 -38 is 8.3 out, 561 61 -39 only 7.7 once the height slack applies

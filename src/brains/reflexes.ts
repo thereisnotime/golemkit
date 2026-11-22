@@ -1,6 +1,10 @@
 // Reflexes: things the bot does on its own regardless of other brains: fight back when hit,
 // eat when hungry. They run at reflex priority, so they briefly preempt everything else and
 // long-running actions (follow, guard) resume afterwards.
+// Mobs shooting at the bot get their own reflex (ranged_defense, skills/ranged.ts): it starts on
+// an arrow or bolt on course for the bot, a hit from range, or a shooter in range looking at it,
+// and picks shoot back / shield up / cover / back off by health and gear. It preempts whatever
+// job runs (scouting for food, chopping), which resumes afterwards.
 import { defineBrain, PRIORITY, nearestHostile, isHostile, FLYING, needsSurvival } from '../core/index.ts'
 import { bestFood, isClimbingOut, keepClimbing } from '../skills/survival.ts'
 import { isRangedMob } from '../skills/weapons.ts'
@@ -8,6 +12,9 @@ import { threats } from '../skills/combat.ts'
 import { fightFood } from '../skills/fight.ts'
 import { gearPlan, hasGearUpgrade } from '../skills/gear.ts'
 import { escorting } from '../skills/bodyguard.ts'
+import { rangedSituation, onRangedAlarm, noteUnexplainedHit } from '../skills/ranged.ts'
+import { isShooter, rangedResponse } from '../skills/ranged-plan.ts'
+import { wornArmorPoints } from '../skills/gear.ts'
 
 export interface ReflexOptions {
   selfDefense?: boolean
@@ -18,7 +25,12 @@ export interface ReflexOptions {
   retreatBelow?: number
   /** Don't fight mobs standing in water below this health (drowned, guardians). Default 14. */
   waterFightAbove?: number
+  /** React to mobs shooting at the bot (ranged_defense). Default true. */
+  rangedDefense?: boolean
 }
+
+/** Actions the ranged reflex never interrupts. */
+const RANGED_KEEP = new Set(['ranged_defense', 'retreat', 'bunker', 'pillar', 'climb_out', 'eat'])
 
 export const reflexes = (defaults: ReflexOptions = {}) => {
   const caller = { kind: 'reflex', name: 'reflexes' } as const
@@ -30,14 +42,14 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       // use, so in-game changes (config_set reflexes.*) apply immediately.
       const cfg = () => {
         const o: ReflexOptions = { ...defaults, ...(agent.settings.reflexes as ReflexOptions | undefined) }
-        return { selfDefense: o.selfDefense ?? true, autoEat: o.autoEat ?? true, eatBelow: o.eatBelow ?? 15, retreatBelow: o.retreatBelow ?? 8, waterFightAbove: o.waterFightAbove ?? 14 }
+        return { selfDefense: o.selfDefense ?? true, autoEat: o.autoEat ?? true, eatBelow: o.eatBelow ?? 15, retreatBelow: o.retreatBelow ?? 8, waterFightAbove: o.waterFightAbove ?? 14, rangedDefense: o.rangedDefense ?? true }
       }
       let busy = false
       let bunkerFailedAt = 0
       let gearTriedAt = 0
       const combatCfg = () => (agent.settings.combat ?? {}) as { autoArmor?: boolean, disengageToHeal?: boolean }
-      const reflex = async (action: string) => {
-        if (busy) return
+      const reflex = async (action: string, force = false) => {
+        if (busy && !force) return
         busy = true
         try { await agent.act(action, {}, { caller, priority: PRIORITY.reflex }) } finally { busy = false }
       }
@@ -59,6 +71,41 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         const q = mob.position
         return keepClimbing({ dist: Math.hypot(q.x - p.x, q.z - p.z), dy: q.y - p.y, ranged: isRangedMob(mob.name) || FLYING.has(mob.name ?? ''), creeper: mob.name === 'creeper' })
       }
+
+      // ---- ranged: something is shooting at us ----
+      let rangedTriedAt = 0
+      const rangedCheck = () => {
+        const c = cfg()
+        if (!c.selfDefense || !c.rangedDefense || !needsSurvival(bot) || !bot.entity || bot.health <= 0) return
+        if (!agent.getAction('ranged_defense') || Date.now() - rangedTriedAt < 1500) return
+        const cur = agent.currentAction?.name ?? ''
+        if (RANGED_KEEP.has(cur)) return
+        const s = rangedSituation(bot)
+        if (!s.active.length || !(s.underFire || s.aimed)) return
+        if (climbingAway(s.active[0]!.e)) return
+        const hide = rangedResponse({
+          health: bot.health,
+          armor: wornArmorPoints(bot),
+          bow: false,
+          shield: true,
+          melee: true,
+          shooters: s.active,
+          patrol: s.patrol,
+          coverNear: true
+        })
+        const mustHide = hide?.act === 'cover' || hide?.act === 'retreat'
+        // a fight already running (defend, attack) goes for archers itself; only take over to hide
+        if ((cur === 'defend' || cur === 'attack') && !mustHide) return
+        // a melee mob on us: defend deals with it first (it ranks archers with a shot right after)
+        const melee = nearestHostile(bot, bot.entity.position, 3)
+        if (melee && !isShooter(melee.name, (melee as any).heldItem?.name) && !mustHide) return
+        // a bodyguard fights archers for its player; take over only when it is about to die
+        if (cur === 'protect' && bot.health > 6) return
+        rangedTriedAt = Date.now()
+        void reflex('ranged_defense', true)
+      }
+      const unalarm = onRangedAlarm(bot, () => setImmediate(() => { try { rangedCheck() } catch {} }))
+      const rangedTimer = setInterval(() => { try { rangedCheck() } catch {} }, 500)
 
       const onHurt = (entity: any) => {
         if (!cfg().selfDefense || entity !== bot.entity || !needsSurvival(bot)) return
@@ -89,6 +136,11 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           return
         }
         if (climbingAway(mob)) return
+        // a shooter out of reach: the ranged reflex picks shoot back / shield / cover / back off by health and gear
+        if (cfg().rangedDefense && isShooter(mob.name, mob.heldItem?.name) && mob.position.distanceTo(bot.entity.position) > 4 && agent.getAction('ranged_defense')) {
+          if (cur !== 'ranged_defense' && !(cur === 'protect' && bot.health > 6)) { rangedTriedAt = Date.now(); void reflex('ranged_defense', true) }
+          return
+        }
         if (shouldRetreat(mob) && agent.getAction('retreat')) {
           if (cur !== 'retreat') void reflex('retreat')
           return
@@ -104,9 +156,18 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       const onHealth = () => {
         const dropped = bot.health < lastHealth && bot.health > 0
         lastHealth = bot.health
-        if (dropped && cfg().selfDefense && needsSurvival(bot) && !busy && bot.food > 0) setImmediate(() => { try { onHurtNow() } catch {} })
+        if (!dropped || !cfg().selfDefense || !needsSurvival(bot)) return
+        // Starving (food 0) drains health too, so a drop alone isn't a hit then. But a shooter with
+        // a line to us is: Pax, starving while it scouted for food, was shot dead by a pillager and
+        // only reacted to the last bolt.
+        const shot = !nearestHostile(bot, bot.entity.position, 4) && noteUnexplainedHit(bot)
+        if (shot) setImmediate(() => { try { rangedCheck() } catch {} })
+        else if (!busy && (bot.food > 0 || nearestHostile(bot, bot.entity.position, 4))) setImmediate(() => { try { onHurtNow() } catch {} })
       }
       bot.on('health', onHealth)
+      // respawned: put on whatever armour there is at the next tick instead of up to 10 s later
+      const onSpawn = () => { gearTriedAt = 0 }
+      bot.on('spawn', onSpawn)
 
       const timer = setInterval(() => {
         if (!needsSurvival(bot)) return // creative/spectator: no hunger, no danger
@@ -147,7 +208,10 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       return () => {
         bot.off('entityHurt', onHurt)
         bot.off('health', onHealth)
+        bot.off('spawn', onSpawn)
         clearInterval(timer)
+        clearInterval(rangedTimer)
+        unalarm()
       }
     }
   })
