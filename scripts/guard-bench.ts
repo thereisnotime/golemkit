@@ -2,7 +2,7 @@
 // gets hit with the bodyguard armed, with follow_owner only, and with no bot at all.
 //   node scripts/guard-bench.ts [x z] [--minutes 4] [--repeats 2] [--phases guard,follow,none]
 //        [--seed 1] [--sword stone|iron] [--armour] [--tester-food 8] [--interval 30] [--cap 8]
-//        [--time day|night] [--phantoms] [--tag run] [--scout] [--force]
+//        [--time day|night] [--phantoms] [--tag run] [--scout] [--cleanup] [--force]
 // DIRECTOR (default ClaudeTest, an op) runs everything with commands: before every phase it sets
 // the time, kills leftover tagged mobs, fills explosion holes in the arena floor, resets both
 // players to full health and hunger, gives the same gear (GUARD_BOT: a sword, a shield, 16 bread,
@@ -15,7 +15,8 @@
 // order flips on every repeat. A tester death is counted, the mobs alive are killed and the
 // tester is reset on the spot. --time day (default) keeps natural spawns out; zombies and
 // skeletons wear leather helmets so they don't burn, and spiders don't pick targets in daylight.
-// --scout only checks the spot (flat, dry, solid) and robin's distance. Results append to
+// --scout only checks the spot (flat, dry, solid) and robin's distance; --cleanup only kills the
+// tagged mobs and clears both players (also done at the end of a run, even a failed one). Results append to
 // data/guard-bench/results.jsonl; a summary table goes to stdout.
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { Agent, defineVariant, serverFromEnv, PRIORITY, fmtPos, type ActionResult } from '../src/core/index.ts'
@@ -27,7 +28,7 @@ import { reflexes, behaviorsBrain } from '../src/brains/index.ts'
 const argv = process.argv.slice(2)
 const flag = (name: string) => argv.includes(`--${name}`)
 const opt = (name: string, def: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : def }
-const BOOL_FLAGS = ['--armour', '--phantoms', '--scout', '--force']
+const BOOL_FLAGS = ['--armour', '--phantoms', '--scout', '--force', '--cleanup']
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i > 0 && argv[i - 1].startsWith('--') && !BOOL_FLAGS.includes(argv[i - 1])))
 const X = Number(positional[0] ?? 1250)
 const Z = Number(positional[1] ?? 445)
@@ -113,20 +114,18 @@ async function step (agent: Agent, name: string, params: Record<string, unknown>
   return r
 }
 
-/** Connects, retrying kicks (duplicate_login while someone else uses the account) and timeouts. */
-async function connect (agent: Agent): Promise<void> {
-  for (let i = 1; i <= 10; i++) {
-    const ready = new Promise<boolean>(resolve => {
-      const to = setTimeout(() => resolve(false), 60_000)
-      agent.once('session', () => { clearTimeout(to); setTimeout(() => resolve(true), 4000) })
-    })
-    void agent.start().catch(() => {})
-    if (await ready) return
-    log(`${agent.username}: no session yet (try ${i}), retrying in 30 s`)
-    await agent.stop().catch(() => {})
-    await pause(30_000)
-  }
-  throw new Error(`${agent.username} could not connect`)
+/**
+ * Starts an agent and waits for its first session. Agent.start() keeps reconnecting by itself
+ * (kicks, duplicate_login while someone else uses the account), and a stopped Agent can't be
+ * started again, so this only waits; the bot gets a new Agent for every phase it plays in.
+ */
+async function connect (agent: Agent, minutes = 15): Promise<void> {
+  const ready = new Promise<boolean>(resolve => {
+    const to = setTimeout(() => resolve(false), minutes * 60_000)
+    agent.once('session', () => { clearTimeout(to); setTimeout(() => resolve(true), 4000) })
+  })
+  void agent.start().catch(() => {})
+  if (!await ready) { await agent.stop().catch(() => {}); throw new Error(`${agent.username} could not connect in ${minutes} min`) }
 }
 
 const live = (a: Agent) => { try { return !!a.bot?.entity } catch { return false } }
@@ -247,7 +246,8 @@ async function main (): Promise<void> {
   await cmd(`/tp ${DIRECTOR} ${X + 24.5} ${(park?.y ?? G) + 1} ${Z + 0.5}`)
 
   // ---- bot and tester ----
-  const bot = new Agent(botVariant, server, { username: BOT, dataDir: `${DATA}/agents`, canDig: true, owners: [TESTER] })
+  const newBot = () => new Agent(botVariant, server, { username: BOT, dataDir: `${DATA}/agents`, canDig: true, owners: [TESTER] })
+  let bot = newBot()
   const tester = new Agent(testerVariant, server, { username: TESTER, dataDir: `${DATA}/agents`, canDig: true })
   let st = fresh()
   let measuring = false
@@ -258,10 +258,6 @@ async function main (): Promise<void> {
   let spotV: any = null // the spot as a Vec3, once the tester is in
   const lastWave = () => st.waves[st.waves.length - 1]
 
-  bot.on('actionEnd', (info: any, r: ActionResult) => {
-    if (info.caller?.name === 'guard-bench' || info.name === 'npc_interrupt') return
-    if (measuring) log(`bot ${r.ok ? 'done' : 'FAIL'} ${info.name} (${info.caller.kind}:${info.caller.name}): ${r.message}`)
-  })
   tester.on('session', () => {
     const b = tester.bot
     // a hit: damage with a source entity, or with a hostile within 5 (not hunger, not falls)
@@ -295,17 +291,24 @@ async function main (): Promise<void> {
       log(`EXPLOSION ${d.toFixed(1)} from the tester`)
     })
   })
-  bot.on('session', () => {
-    const b = bot.bot
-    const hitAt = new Map<number, number>()
-    const orig = b.attack.bind(b)
-    ;(b as any).attack = (e: any) => { hitAt.set(e.id, Date.now()); return orig(e) }
-    b.on('entityDead', (e: any) => {
-      const t = hitAt.get(e.id)
-      if (measuring && t && Date.now() - t < 4000 && e !== b.entity && e.type !== 'player') { st.kills[e.name] = (st.kills[e.name] ?? 0) + 1; log(`KILL ${e.name}`) }
+  const watchBot = (a: Agent) => {
+    a.on('actionEnd', (info: any, r: ActionResult) => {
+      if (info.caller?.name === 'guard-bench' || info.name === 'npc_interrupt') return
+      if (measuring) log(`bot ${r.ok ? 'done' : 'FAIL'} ${info.name} (${info.caller.kind}:${info.caller.name}): ${r.message}`)
     })
-    b.on('death', () => { if (measuring) { st.botDeaths++; botDied = true } log('BOT DIED') })
-  })
+    a.on('session', () => {
+      const b = a.bot
+      const hitAt = new Map<number, number>()
+      const orig = b.attack.bind(b)
+      ;(b as any).attack = (e: any) => { hitAt.set(e.id, Date.now()); return orig(e) }
+      b.on('entityDead', (e: any) => {
+        const t = hitAt.get(e.id)
+        if (measuring && t && Date.now() - t < 4000 && e !== b.entity && e.type !== 'player') { st.kills[e.name] = (st.kills[e.name] ?? 0) + 1; log(`KILL ${e.name}`) }
+      })
+      b.on('death', () => { if (measuring) { st.botDeaths++; botDied = true } log('BOT DIED') })
+    })
+  }
+  watchBot(bot)
 
   const killTagged = async () => {
     await cmd(`/kill @e[tag=${TAG}]`)
@@ -334,6 +337,10 @@ async function main (): Promise<void> {
   // the tester faces north (yaw 180 in commands) so "behind you" warnings mean the same every phase
   const placeTester = () => cmd(`/tp ${TESTER} ${spot.x} ${spot.y} ${spot.z} 180 0`)
   const placeBot = () => cmd(`/tp ${BOT} ${spot.x + 3} ${spot.y} ${spot.z} 90 0`)
+  // next to the director while the floor is repaired (filling a crater with the tester in it buries it)
+  const parkPlayers = async () => {
+    for (const [p, dz] of [[TESTER, 2], [BOT, -2]] as const) if (p === TESTER ? live(tester) : live(bot)) await cmd(`/tp ${p} ${X + 24.5} ${(park?.y ?? G) + 1} ${Z + 0.5 + dz}`)
+  }
   const repairFloor = async () => {
     // creeper holes: fill air under the floor level with dirt, and remove pillars the bot left
     await cmd(`/fill ${X - 16} ${G - 4} ${Z - 16} ${X + 16} ${G} ${Z + 16} minecraft:dirt replace minecraft:air`)
@@ -351,163 +358,174 @@ async function main (): Promise<void> {
   await waitLive(bot)
   await waitLive(tester)
   spotV = tester.bot.entity.position.clone().set(spot.x, spot.y, spot.z)
-  await disarmAll()
-  await cmd(`/gamemode survival ${BOT}`)
-  await cmd(`/gamemode survival ${TESTER}`)
-  log(`difficulty ${(tester.bot.game as any).difficulty ?? '?'}`)
-
-  const schedule = waveSchedule(SEED, Math.ceil(MINUTES * 60 / INTERVAL_S) + 4, PHANTOMS)
-  const results: any[] = []
-
-  for (let rep = 0; rep < REPEATS; rep++) {
-    const order = rep % 2 === 0 ? PHASES : [...PHASES].reverse()
-    for (const phase of order) {
-      // ---- reset ----
-      await checkRobin()
-      log(`== repeat ${rep + 1}, phase ${phase}: resetting`)
-      measuring = false
-      await cmd(`/time set ${TIME === 'night' ? 14000 : 1000}`)
-      await killTagged()
-      await repairFloor()
-      if (phase === 'none') {
-        if (live(bot)) { await disarmAll(); await cmd(`/clear ${BOT}`); await pause(1500) }
-        await bot.stop().catch(() => {})
-      } else if (!live(bot)) {
-        await connect(bot)
-        await waitLive(bot)
-        await cmd(`/gamemode survival ${BOT}`)
-      }
-      if (!live(tester)) { await connect(tester); await waitLive(tester) }
-      await gearTester()
-      await placeTester()
-      if (phase !== 'none') {
-        await disarmAll()
-        await gearBot()
-        await placeBot()
-      }
-      await pause(4000) // land, put the gear on
-      await killTagged()
-      await heal(TESTER)
-      if (phase !== 'none') {
-        await heal(BOT)
-        const r = await step(bot, 'behavior_arm', { name: phase === 'guard' ? 'bodyguard' : 'follow_owner', options: { player: TESTER } })
-        if (!r.ok) throw new Error(`couldn't arm ${phase}: ${r.message}`)
-      }
-      await pause(2000)
-      log(`tester ${state(tester)}`)
-      const around = Object.values(tester.bot.entities).filter((e: any) => e.type !== 'player' && e.type !== 'object' && e.type !== 'orb' && e.position && e.position.distanceTo(spotV) < 32).map((e: any) => e.name)
-      if (around.length) log(`already around the spot (untagged or not yet gone): ${around.join(' ')}`)
-      if (phase !== 'none') log(`bot ${state(bot)}`)
-
-      // ---- measure ----
-      st = fresh()
-      testerDied = false
-      botDied = false
-      measuring = true
-      const start = Date.now()
-      const until = start + MINUTES * 60_000
-      let next = 0
-      let lastLog = 0
-      log(`measuring ${phase} for ${MINUTES} min`)
-      while (Date.now() < until) {
-        try {
-          await pause(1000)
-          if (!live(dir)) continue
-          if (testerDied) {
-            // count it, clear the mobs that did it, reset the tester on the spot
-            testerDied = false
-            await waitLive(tester)
-            await pause(2500)
-            await cmd(`/kill @e[tag=${TAG}]`)
-            await gearTester()
-            await placeTester()
-            continue
-          }
-          if (botDied && phase !== 'none') {
-            botDied = false
-            await waitLive(bot)
-            await pause(2500)
-            await gearBot()
-            await placeBot()
-            continue
-          }
-          if (!live(tester)) continue
-          const tp = tester.bot.entity.position
-          const alive = Object.values(tester.bot.entities).filter((e: any) => WAVE_MOBS.has(e.name) && e.position && e.position.distanceTo(spotV) < 32).length // 3D: cave mobs below don't count
-          const due = start + 5000 + next * INTERVAL_S * 1000
-          if (Date.now() >= due && alive < CAP && next < schedule.length) {
-            const wave = schedule[next++]
-            st.waves.push({ at: Date.now(), mobs: wave.length, firstHitMs: null })
-            for (const s of wave) {
-              const sx = spot.x + s.dx
-              const sz = spot.z + s.dz
-              const sy = s.mob === 'phantom' ? spot.y + 12 : spot.y
-              await cmd(`/summon minecraft:${s.mob} ${sx.toFixed(1)} ${sy} ${sz.toFixed(1)} ${summonNbt(s.mob)}`)
-            }
-            st.summoned += wave.length
-            log(`wave ${next}: ${wave.map(s => s.mob).join(', ')} (${alive} alive)`)
-          }
-          // knocked off the spot: walk back (a respawn is teleported above)
-          if (toSpot(tp) > 3 && !tester.currentAction) void step(tester, 'goto', { x: Math.floor(spot.x), y: spot.y, z: Math.floor(spot.z) })
-          if (Date.now() - lastLog > 15_000) {
-            lastLog = Date.now()
-            log(`status: hits ${st.hits} deaths ${st.testerDeaths} alive ${alive} | tester hp ${Math.round(tester.bot.health)} food ${tester.bot.food} | bot ${phase === 'none' ? '-' : state(bot)}`)
-          }
-        } catch (e) { log(`loop: ${(e as Error).message}`) }
-      }
-      measuring = false
-      const firsts = st.waves.map(w => w.firstHitMs).filter((x): x is number => x !== null)
-      const result = {
-        tag: RUN_TAG,
-        phase,
-        repeat: rep + 1,
-        at: new Date().toISOString(),
-        spot: [X, G + 1, Z],
-        minutes: MINUTES,
-        seed: SEED,
-        time: TIME,
-        sword: SWORD,
-        armour: ARMOUR,
-        waves: st.waves.length,
-        summoned: st.summoned,
-        testerHits: st.hits,
-        testerDamage: Math.round(st.damage),
-        testerDeaths: st.testerDeaths,
-        hitBy: st.hitBy,
-        botDeaths: st.botDeaths,
-        kills: st.kills,
-        killCount: Object.values(st.kills).reduce((a, b) => a + b, 0),
-        explosionsNearTester: st.explosionsNear,
-        explosions: st.explosions,
-        wavesWithHit: firsts.length,
-        firstHitMedianS: firsts.length ? Math.round(median(firsts)! / 100) / 10 : null,
-        warnings: st.warnings,
-        feeds: st.feeds,
-        said: st.said.slice(0, 15)
-      }
-      log(`RESULT ${JSON.stringify(result)}`)
-      appendFileSync(`${DATA}/results.jsonl`, JSON.stringify(result) + '\n')
-      results.push(result)
-      await disarmAll()
-      await killTagged()
-    }
+  const cleanUp = async () => {
+    measuring = false
+    await killTagged()
+    await parkPlayers()
+    await pause(1000)
+    await repairFloor()
+    if (live(bot)) await disarmAll()
+    await cmd(`/clear ${BOT}`)
+    await cmd(`/clear ${TESTER}`)
+    await cmd(`/effect clear ${BOT}`)
+    await cmd(`/effect clear ${TESTER}`)
+    await pause(1500)
+    await bot.stop().catch(() => {})
+    await tester.stop().catch(() => {})
+    await dir.stop().catch(() => {})
   }
+  if (flag('cleanup')) { await cleanUp(); return }
+  try {
+    await disarmAll()
+    await cmd(`/gamemode survival ${BOT}`)
+    await cmd(`/gamemode survival ${TESTER}`)
+    log(`difficulty ${(tester.bot.game as any).difficulty ?? '?'}`)
 
-  // ---- summary ----
-  printSummary(results)
+    const schedule = waveSchedule(SEED, Math.ceil(MINUTES * 60 / INTERVAL_S) + 4, PHANTOMS)
+    const results: any[] = []
 
-  // ---- clean up ----
-  await killTagged()
-  await repairFloor()
-  if (live(bot)) await disarmAll()
-  await cmd(`/clear ${BOT}`)
-  await cmd(`/clear ${TESTER}`)
-  await cmd(`/effect clear ${BOT}`)
-  await cmd(`/effect clear ${TESTER}`)
-  await pause(1500)
-  await bot.stop().catch(() => {})
-  await tester.stop().catch(() => {})
-  await dir.stop().catch(() => {})
+    for (let rep = 0; rep < REPEATS; rep++) {
+      const order = rep % 2 === 0 ? PHASES : [...PHASES].reverse()
+      for (const phase of order) {
+        // ---- reset ----
+        await checkRobin()
+        log(`== repeat ${rep + 1}, phase ${phase}: resetting`)
+        measuring = false
+        await cmd(`/time set ${TIME === 'night' ? 14000 : 1000}`)
+        await killTagged()
+        await parkPlayers()
+        await pause(1000)
+        await repairFloor()
+        if (phase === 'none') {
+          if (live(bot)) { await disarmAll(); await cmd(`/clear ${BOT}`); await pause(1500) }
+          await bot.stop().catch(() => {})
+        } else if (!live(bot)) {
+          bot = newBot()
+          watchBot(bot)
+          await connect(bot)
+          await waitLive(bot)
+          await cmd(`/gamemode survival ${BOT}`)
+        }
+        if (!live(tester)) { await connect(tester); await waitLive(tester) }
+        await gearTester()
+        await placeTester()
+        if (phase !== 'none') {
+          await disarmAll()
+          await gearBot()
+          await placeBot()
+        }
+        await pause(4000) // land, put the gear on
+        await killTagged()
+        await heal(TESTER)
+        if (phase !== 'none') {
+          await heal(BOT)
+          const r = await step(bot, 'behavior_arm', { name: phase === 'guard' ? 'bodyguard' : 'follow_owner', options: { player: TESTER } })
+          if (!r.ok) throw new Error(`couldn't arm ${phase}: ${r.message}`)
+        }
+        await pause(2000)
+        log(`tester ${state(tester)}`)
+        const around = Object.values(tester.bot.entities).filter((e: any) => e.type !== 'player' && e.type !== 'object' && e.type !== 'orb' && e.position && e.position.distanceTo(spotV) < 32).map((e: any) => e.name)
+        if (around.length) log(`already around the spot (untagged or not yet gone): ${around.join(' ')}`)
+        if (phase !== 'none') log(`bot ${state(bot)}`)
+
+        // ---- measure ----
+        st = fresh()
+        testerDied = false
+        botDied = false
+        measuring = true
+        const start = Date.now()
+        const until = start + MINUTES * 60_000
+        let next = 0
+        let lastLog = 0
+        log(`measuring ${phase} for ${MINUTES} min`)
+        while (Date.now() < until) {
+          try {
+            await pause(1000)
+            if (!live(dir)) continue
+            if (testerDied) {
+              // count it, clear the mobs that did it, reset the tester on the spot
+              testerDied = false
+              await waitLive(tester)
+              await pause(2500)
+              await cmd(`/kill @e[tag=${TAG}]`)
+              await gearTester()
+              await placeTester()
+              continue
+            }
+            if (botDied && phase !== 'none') {
+              botDied = false
+              await waitLive(bot)
+              await pause(2500)
+              await gearBot()
+              await placeBot()
+              continue
+            }
+            if (!live(tester)) continue
+            const tp = tester.bot.entity.position
+            const alive = Object.values(tester.bot.entities).filter((e: any) => WAVE_MOBS.has(e.name) && e.position && e.position.distanceTo(spotV) < 32).length // 3D: cave mobs below don't count
+            const due = start + 5000 + next * INTERVAL_S * 1000
+            if (Date.now() >= due && alive < CAP && next < schedule.length) {
+              const wave = schedule[next++]
+              st.waves.push({ at: Date.now(), mobs: wave.length, firstHitMs: null })
+              for (const s of wave) {
+                const sx = spot.x + s.dx
+                const sz = spot.z + s.dz
+                const sy = s.mob === 'phantom' ? spot.y + 12 : spot.y
+                await cmd(`/summon minecraft:${s.mob} ${sx.toFixed(1)} ${sy} ${sz.toFixed(1)} ${summonNbt(s.mob)}`)
+              }
+              st.summoned += wave.length
+              log(`wave ${next}: ${wave.map(s => s.mob).join(', ')} (${alive} alive)`)
+            }
+            // knocked off the spot: walk back (a respawn is teleported above)
+            if (toSpot(tp) > 3 && !tester.currentAction) void step(tester, 'goto', { x: Math.floor(spot.x), y: spot.y, z: Math.floor(spot.z) })
+            if (Date.now() - lastLog > 15_000) {
+              lastLog = Date.now()
+              log(`status: hits ${st.hits} deaths ${st.testerDeaths} alive ${alive} | tester hp ${Math.round(tester.bot.health)} food ${tester.bot.food} | bot ${phase === 'none' ? '-' : state(bot)}`)
+            }
+          } catch (e) { log(`loop: ${(e as Error).message}`) }
+        }
+        measuring = false
+        const firsts = st.waves.map(w => w.firstHitMs).filter((x): x is number => x !== null)
+        const result = {
+          tag: RUN_TAG,
+          phase,
+          repeat: rep + 1,
+          at: new Date().toISOString(),
+          spot: [X, G + 1, Z],
+          minutes: MINUTES,
+          seed: SEED,
+          time: TIME,
+          sword: SWORD,
+          armour: ARMOUR,
+          waves: st.waves.length,
+          summoned: st.summoned,
+          testerHits: st.hits,
+          testerDamage: Math.round(st.damage),
+          testerDeaths: st.testerDeaths,
+          hitBy: st.hitBy,
+          botDeaths: st.botDeaths,
+          kills: st.kills,
+          killCount: Object.values(st.kills).reduce((a, b) => a + b, 0),
+          explosionsNearTester: st.explosionsNear,
+          explosions: st.explosions,
+          wavesWithHit: firsts.length,
+          firstHitMedianS: firsts.length ? Math.round(median(firsts)! / 100) / 10 : null,
+          warnings: st.warnings,
+          feeds: st.feeds,
+          said: st.said.slice(0, 15)
+        }
+        log(`RESULT ${JSON.stringify(result)}`)
+        appendFileSync(`${DATA}/results.jsonl`, JSON.stringify(result) + '\n')
+        results.push(result)
+        await disarmAll()
+        await killTagged()
+      }
+    }
+
+    printSummary(results)
+  } finally {
+    await cleanUp().catch(e => log(`clean-up: ${(e as Error).message}`))
+  }
 }
 
 export function printSummary (results: any[]): void {
