@@ -432,7 +432,8 @@ export const keepFed = defineBehavior({
             // (a report changes nothing in the world: keep what was tried)
             if (d.step !== 'eat' && d.step !== 'report') { tried.clear(); if (d.step === 'start_farm') { tried.add('start_farm'); tried.add('scout') } }
             // scouted: don't scout again this run, but do walk to what it found (spot); been at a spot: don't go again
-            if (d.step === 'scout') { tried.add('scout'); if (m.paused.spot) { delete m.paused.spot; saveMemory(agent, m) } }
+            // a new sighting: going there and hunting are worth trying again even if they failed a minute ago
+            if (d.step === 'scout') { tried.add('scout'); delete m.paused.spot; delete m.paused.hunt; saveMemory(agent, m) }
             if (d.step === 'spot') { tried.add('scout'); tried.add('spot') }
             if (['seeds', 'plant', 'breed', 'forage', 'report'].includes(d.step)) tried.add(d.step)
           } else {
