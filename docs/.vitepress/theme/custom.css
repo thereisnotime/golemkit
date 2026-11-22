@@ -107,3 +107,17 @@
 .vp-doc .rm.try { color: #0284c7; border-color: #0284c766; background: #0284c714; }
 .vp-doc .rm.soon { color: #d97706; border-color: #d9770666; background: #d9770614; }
 .vp-doc .rm.idea { color: var(--vp-c-text-2); border-color: var(--vp-c-divider); }
+
+/* Mermaid measures labels at its own line height; the page's 1.75 made multi-line labels taller than
+   their boxes and cut the last line */
+.vp-doc .mermaid { line-height: 1.5; }
+.vp-doc .mermaid foreignObject div, .vp-doc .mermaid foreignObject span, .vp-doc .mermaid foreignObject p { line-height: 1.5; margin: 0; }
+
+/* State diagrams: the base theme fills states with the page background, so names were dark on dark;
+   give them the same light-blue node style as the flowcharts */
+.vp-doc .mermaid .statediagram-state rect.basic,
+.vp-doc .mermaid .statediagram-state .label-container,
+.vp-doc .mermaid .statediagram-state rect { fill: #e0f2fe !important; stroke: #0284c7 !important; }
+.vp-doc .mermaid .statediagram-state .nodeLabel,
+.vp-doc .mermaid .statediagram-state text { color: #0c4a6e !important; fill: #0c4a6e !important; }
+.vp-doc .mermaid .statediagram-state .divider { stroke: #0284c7 !important; }
