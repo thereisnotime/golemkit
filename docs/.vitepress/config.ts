@@ -47,31 +47,61 @@ export default withMermaid(defineConfig({
     ],
     sidebar: [
       {
-        text: 'Guide',
+        text: 'Start here',
         items: [
           { text: 'Getting started', link: '/guide/getting-started' },
           { text: 'Running bots and fleets', link: '/guide/running' },
           { text: 'Profiles', link: '/guide/profiles' },
           { text: 'Feature toggles (live config)', link: '/guide/live-config' },
-          { text: 'Writing a variant', link: '/guide/writing-a-bot' },
-          { text: 'Writing skills', link: '/guide/writing-skills' },
-          { text: 'Writing brains', link: '/guide/writing-brains' },
-          { text: 'NPC brain', link: '/guide/npc-brain' },
-          { text: 'Behaviours', link: '/guide/behaviors' },
-          { text: 'LLM brain', link: '/guide/llm-brain' },
+          { text: 'Deployment', link: '/guide/deployment' }
+        ]
+      },
+      {
+        text: 'Talking to bots',
+        collapsed: false,
+        items: [
           { text: 'Plain-language commands', link: '/guide/intents' },
-          { text: 'Goals and building', link: '/guide/goals-and-building' },
-          { text: 'Roads and stairs', link: '/guide/roads' },
+          { text: 'LLM brain', link: '/guide/llm-brain' },
+          { text: 'Context packs and evals', link: '/guide/context-pack' }
+        ]
+      },
+      {
+        text: 'Behaviour and protection',
+        collapsed: false,
+        items: [
+          { text: 'Behaviours and bodyguard', link: '/guide/behaviors' },
+          { text: 'NPC brain', link: '/guide/npc-brain' },
+          { text: 'Self-improver', link: '/guide/self-improver' },
+          { text: 'Scenes', link: '/guide/scenes' }
+        ]
+      },
+      {
+        text: 'Working in the world',
+        collapsed: false,
+        items: [
           { text: 'Tool progression and gathering', link: '/guide/progression' },
           { text: 'Finding and fetching', link: '/guide/search' },
+          { text: 'Goals and building', link: '/guide/goals-and-building' },
           { text: 'Blueprint libraries', link: '/guide/blueprints' },
-          { text: 'WorldEdit', link: '/guide/worldedit' },
-          { text: 'Self-improver', link: '/guide/self-improver' },
-          { text: 'Context packs and evals', link: '/guide/context-pack' },
-          { text: 'Logging', link: '/guide/logging' },
+          { text: 'Roads and stairs', link: '/guide/roads' },
+          { text: 'WorldEdit', link: '/guide/worldedit' }
+        ]
+      },
+      {
+        text: 'Extending',
+        collapsed: true,
+        items: [
+          { text: 'Writing a variant', link: '/guide/writing-a-bot' },
+          { text: 'Writing skills', link: '/guide/writing-skills' },
+          { text: 'Writing brains', link: '/guide/writing-brains' }
+        ]
+      },
+      {
+        text: 'Observing',
+        collapsed: true,
+        items: [
           { text: 'Event journal', link: '/guide/journal' },
-          { text: 'Scenes', link: '/guide/scenes' },
-          { text: 'Deployment', link: '/guide/deployment' }
+          { text: 'Logging', link: '/guide/logging' }
         ]
       },
       {
@@ -104,8 +134,15 @@ export default withMermaid(defineConfig({
   },
   mermaid: {
     theme: 'base',
+    // system fonts, not the site's Inter web font: mermaid measures labels when it renders, and if
+    // Inter arrives later the text is wider than its box and gets cut off
+    fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+    flowchart: { useMaxWidth: false, padding: 14, wrappingWidth: 220, nodeSpacing: 40, rankSpacing: 50 },
+    sequence: { useMaxWidth: false },
+    state: { useMaxWidth: false },
     themeVariables: {
-      fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+      fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+      fontSize: '15px',
       primaryColor: '#e0f2fe',
       primaryBorderColor: '#0284c7',
       primaryTextColor: '#0c4a6e',

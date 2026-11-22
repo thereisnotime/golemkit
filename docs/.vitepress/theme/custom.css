@@ -51,3 +51,12 @@
 .diagram-stage { flex: 1; overflow: hidden; position: relative; cursor: grab; touch-action: none; }
 .diagram-stage.dragging { cursor: grabbing; }
 .diagram-stage > svg { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+
+/* Mermaid: natural size with horizontal scroll instead of shrinking wide charts to unreadable text;
+   labels may overflow their measured box rather than being clipped */
+.vp-doc .mermaid { overflow-x: auto; padding: 8px 0 4px; text-align: center; }
+.vp-doc .mermaid svg { max-width: none; height: auto; }
+.vp-doc .mermaid foreignObject { overflow: visible; }
+.vp-doc .mermaid .nodeLabel, .vp-doc .mermaid .edgeLabel, .vp-doc .mermaid .label { overflow: visible; }
+/* the expand button sits above the chart instead of on top of a node */
+.vp-doc .zoomable-diagram { padding-top: 38px; }
