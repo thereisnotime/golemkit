@@ -18,7 +18,8 @@ import { canPlace } from '../runtime.ts'
 import { hostilesNear } from './util.ts'
 import { escorting } from '../../../skills/bodyguard.ts'
 import { rangedSituation } from '../../../skills/ranged.ts'
-import { GOOD_ARMOR, RANGED_OUTNUMBERED } from '../../../skills/ranged-plan.ts'
+import { gearScore, gearNeeded, RANGED_OUTNUMBERED } from '../../../skills/ranged-plan.ts'
+import { hasRanged, bestMeleeDamage } from '../../../skills/weapons.ts'
 
 /** Health at or below which an escorting bodyguard treats a crowd around it as surrounded. */
 const ESCORT_SURROUNDED_HEALTH = 12
@@ -30,14 +31,20 @@ export const RANGED_COVER_HEALTH = 12
 
 /**
  * Whether shooters around call for cover now (pure): one with a line to the bot (or that just
- * shot it) and the bot hurt, or a patrol / several shooters without good gear. An escorting
- * bodyguard only at 8 health or less (protect fights archers for its player). Exported for tests.
+ * shot it) and the bot hurt, or a patrol / several shooters and a gear score (gearScore: armour,
+ * shield, weapon, bow and arrows, health) under what that many need (gearNeeded). An escorting
+ * bodyguard only at 8 health or less (protect fights archers for its player). Without
+ * `weaponDamage` an iron sword is assumed; without `bow` none. Exported for tests (and for
+ * keep_fed, which reads it).
  */
-export function rangedDanger (s: { active: number, patrol: number, health: number, armor: number, shield: boolean, escorting: boolean }): boolean {
+export function rangedDanger (s: { active: number, patrol: number, health: number, armor: number, shield: boolean, escorting: boolean, weaponDamage?: number, bow?: boolean, arrows?: number }): boolean {
   if (!s.active) return false
   if (s.escorting) return s.health <= 8
   if (s.health <= RANGED_COVER_HEALTH) return true
-  return Math.max(s.active, s.patrol) >= RANGED_OUTNUMBERED && !(s.armor >= GOOD_ARMOR && s.shield)
+  const many = Math.max(s.active, s.patrol)
+  if (many < RANGED_OUTNUMBERED) return false
+  const score = gearScore({ armor: s.armor, shield: s.shield, weaponDamage: s.weaponDamage ?? 6, bow: !!s.bow, arrows: s.bow ? (s.arrows ?? 16) : 0, health: s.health })
+  return score < gearNeeded(many)
 }
 
 /** After a failed go_home, how long before stay_safe tries it again (doubles per failure, capped). */
@@ -129,8 +136,20 @@ export function assessDanger (ctx: Pick<NpcContext, 'agent' | 'bot' | 'bb'> & { 
   if (o.ranged && agent.getAction?.('ranged_defense')) {
     try {
       const r = rangedSituation(bot)
-      const shield = bot.inventory?.slots?.[45]?.name === 'shield' || !!bot.inventory?.items?.().some(i => i.name === 'shield')
-      if (rangedDanger({ active: r.active.length, patrol: r.patrol, health, armor: bot.inventory?.slots ? wornArmorPoints(bot) : 0, shield, escorting: !!escorting(agent) })) return 'ranged'
+      const items = bot.inventory?.items?.() ?? []
+      const shield = bot.inventory?.slots?.[45]?.name === 'shield' || items.some(i => i.name === 'shield')
+      const arrows = items.filter(i => /arrow$/.test(i.name)).reduce((n, i) => n + i.count, 0)
+      if (rangedDanger({
+        active: r.active.length,
+        patrol: r.patrol,
+        health,
+        armor: bot.inventory?.slots ? wornArmorPoints(bot) : 0,
+        shield,
+        escorting: !!escorting(agent),
+        weaponDamage: bestMeleeDamage(items.map(i => i.name)),
+        bow: !!hasRanged(bot),
+        arrows
+      })) return 'ranged'
     } catch {}
   }
   const near = hostilesNear(bot, pos, running ? Math.max(20, o.mobRadius) : o.mobRadius)

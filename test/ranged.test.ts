@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   isShooter, incoming, patrolCount, rangedResponse, activeShooters, canEatUnderFire, lineBlocked, findCover, retreatPoint,
+  gearScore, gearNeeded, hideMs, stillHiding, leaveCover, coverHoldMs, cappedRetreat, planWall,
   type RangedState, type ShooterView
 } from '../src/skills/ranged-plan.ts'
 import { rangedDanger } from '../src/brains/behaviors/library/safety.ts'
@@ -201,4 +202,128 @@ test('pull aggro: two mobs on the player, hit the untagged one, then step off th
   assert.equal(pullPlan(mobs, player, bot, new Set([1]))!.id, 2)
   assert.equal(pullPlan(mobs, player, bot, new Set([1, 2])), null, 'all tagged')
   assert.equal(pullPlan(mobs.slice(0, 1), player, bot, new Set()), null, 'one mob: just fight it')
+})
+
+// ---- follow-ups: graded gear, build cover, hide time, retreat cap ----
+
+test('gear score: armour, shield, weapon, bow and arrows, health', () => {
+  const g = { armor: 0, shield: false, weaponDamage: 1, bow: false, arrows: 0, health: 20 }
+  assert.equal(gearScore(g), 16.9, 'bare hands at full health')
+  const iron = { ...g, armor: 15, shield: true, weaponDamage: 6 }
+  assert.equal(gearScore(iron), 72.5, 'iron armour, shield, iron sword')
+  assert.equal(gearScore({ ...iron, bow: true, arrows: 32 }), 87.5, 'and a bow')
+  assert.equal(gearScore({ ...iron, bow: true, arrows: 0 }), 72.5, 'a bow without arrows is worth nothing')
+  assert.equal(gearScore({ ...iron, bow: true, arrows: 8 }), 80, 'half the arrows, half the points')
+  assert.ok(gearScore({ ...iron, health: 10 }) < gearScore(iron), 'hurt scores lower')
+  assert.equal(gearScore({ armor: 20, shield: true, weaponDamage: 8, bow: true, arrows: 64, health: 20 }), 100)
+  assert.equal(gearNeeded(2), 0, 'one or two shooters: no gear check')
+  assert.equal(gearNeeded(3), 65)
+  assert.equal(gearNeeded(5), 75)
+})
+
+test('response: graded gear decides how many shooters it takes on', () => {
+  const n = (k: number) => Array.from({ length: k }, (_, i) => sh({ name: 'pillager', id: i + 1, dist: 8 + i }))
+  const iron = { armor: 15, shield: true, melee: true, weaponDamage: 6 }
+  assert.equal(rangedResponse(st({ ...iron, shooters: n(4) }))!.act, 'shield_close', 'iron, shield and a sword take on 4')
+  assert.equal(rangedResponse(st({ ...iron, shooters: n(5) }))!.act, 'cover', '5 is too many without a bow')
+  assert.equal(rangedResponse(st({ ...iron, bow: true, arrows: 32, shooters: n(5) }))!.act, 'shoot', 'with a bow, 5 is fine')
+  assert.equal(rangedResponse(st({ ...iron, health: 14, shooters: n(4) }))!.act, 'cover', 'hurt, the same gear only takes 3')
+  assert.equal(rangedResponse(st({ ...iron, health: 14, shooters: n(3) }))!.act, 'shield_close')
+  assert.match(rangedResponse(st({ shooters: n(3), shield: true }))!.why, /gear \d+ of 65/)
+  assert.equal(rangedResponse(st({ ...iron, bow: true, arrows: 0, shooters: n(5) }))!.act, 'cover', 'no arrows')
+})
+
+test('response: no cover nearby, build some, else back off; at the cap stand with the shield', () => {
+  const three = [sh({ name: 'skeleton', dist: 10 }), sh({ name: 'skeleton', dist: 12 }), sh({ name: 'pillager', dist: 9 })]
+  assert.equal(rangedResponse(st({ shooters: three, coverNear: false, canBuild: true }))!.act, 'build')
+  assert.equal(rangedResponse(st({ shooters: three, coverNear: true, canBuild: true }))!.act, 'cover', 'walking to cover beats building')
+  assert.equal(rangedResponse(st({ shooters: three, coverNear: false }))!.act, 'retreat')
+  const capped = rangedResponse(st({ shooters: three, coverNear: false, canRetreat: false, shield: true }))!
+  assert.equal(capped.act, 'shield_close')
+  assert.match(capped.why, /nowhere left to back off/)
+  assert.equal(rangedResponse(st({ shooters: three, coverNear: false, canRetreat: false, melee: false }))!.act, 'retreat', 'nothing to fight with')
+})
+
+test('hide time: short when healthy, long when hurt, over early when out of sight', () => {
+  assert.equal(hideMs(20), 3000)
+  assert.equal(hideMs(12), 6000)
+  assert.equal(hideMs(10), 10_000)
+  assert.equal(hideMs(6), 15_000)
+  assert.ok(stillHiding({ until: 10_000, now: 1000, health: 10, seen: false }))
+  assert.ok(!stillHiding({ until: 10_000, now: 1000, health: 18, seen: false }), 'healthy and nobody sees it: over')
+  assert.ok(stillHiding({ until: 10_000, now: 1000, health: 18, seen: true }))
+  assert.ok(!stillHiding({ until: 10_000, now: 10_000, health: 4, seen: true }))
+  const base = { health: 10, heldMs: 1000, seen: false, shooters: 2, underFire: true }
+  assert.ok(!leaveCover(base))
+  assert.ok(!leaveCover({ ...base, seen: true, heldMs: 60_000 }), 'seen: look for other cover, not leave')
+  assert.ok(leaveCover({ ...base, shooters: 0 }), 'the shooters are gone')
+  assert.ok(leaveCover({ ...base, health: 18, underFire: false }), 'healthy and out of sight')
+  assert.ok(!leaveCover({ ...base, health: 18 }), 'healthy but still under fire')
+  assert.ok(leaveCover({ ...base, health: 18, heldMs: coverHoldMs(18) }), '4 s at most when healthy')
+  assert.ok(!leaveCover({ ...base, heldMs: 10_000 }))
+  assert.ok(leaveCover({ ...base, heldMs: 15_000 }), '15 s at most when hurt')
+})
+
+test('retreat cap: at most 24 blocks from where the shooting started', () => {
+  const origin = { x: 0, y: 64, z: 0 }
+  const p = cappedRetreat(origin, origin, [{ x: 10, y: 64, z: 0 }], 20)!
+  assert.ok(p.x < -18, 'a first retreat goes the full way')
+  const far = cappedRetreat(origin, { x: -15, y: 64, z: 0 }, [{ x: 0, y: 64, z: 0 }], 20)!
+  assert.ok(Math.hypot(far.x, far.z) <= 24.01, `capped, got ${far.x}`)
+  assert.equal(cappedRetreat(origin, { x: -23.5, y: 64, z: 0 }, [{ x: -5, y: 64, z: 0 }], 20), null, 'at the cap: nowhere to go')
+  assert.ok(cappedRetreat(origin, { x: -23.5, y: 64, z: 0 }, [{ x: -5, y: 64, z: 0 }], 20, 40), 'a bigger cap lets it go on')
+})
+
+test('build cover: a 1x2 wall towards one shooter covers head and chest', () => {
+  const { solid } = world([])
+  const placeable = (x: number, y: number, z: number) => !solid(x, y, z)
+  const bot = { x: 0.5, y: 64, z: 0.5 }
+  const shooter = { x: 12.5, y: 65.5, z: 0.5 }
+  const plan = planWall({ bot, shooters: [shooter], solid, placeable })!
+  assert.ok(plan)
+  assert.equal(plan.pillar, 0)
+  assert.equal(plan.blocks.length, 2)
+  assert.deepEqual(plan.blocks, [{ x: 1, y: 64, z: 0 }, { x: 1, y: 65, z: 0 }], 'the lower block first, east of the bot')
+  const after = world(plan.blocks.map(b => [b.x, b.y, b.z] as [number, number, number]))
+  for (const dy of [1.0, 1.62]) assert.ok(lineBlocked({ x: 0.5, y: 64 + dy, z: 0.5 }, shooter, after.solid))
+})
+
+test('build cover: shooters on both sides, never in the cells its body overlaps, protected cells skipped', () => {
+  const { solid } = world([])
+  const free = (x: number, y: number, z: number) => !solid(x, y, z)
+  const shooters = [{ x: 12.5, y: 65.5, z: 0.5 }, { x: -11.5, y: 65.5, z: 2.5 }]
+  const two = planWall({ bot: { x: 0.5, y: 64, z: 0.5 }, shooters, solid, placeable: free })!
+  assert.equal(two.blocks.length, 4)
+  const after = world(two.blocks.map(b => [b.x, b.y, b.z] as [number, number, number]))
+  for (const s of shooters) for (const dy of [1.0, 1.62]) assert.ok(lineBlocked({ x: 0.5, y: 64 + dy, z: 0.5 }, s, after.solid))
+  // standing at the east edge of its cell: the body pokes into x = 1, so the wall goes one further out
+  const edge = planWall({ bot: { x: 0.85, y: 64, z: 0.5 }, shooters: [{ x: 12.5, y: 65.5, z: 0.5 }], solid, placeable: free })!
+  assert.ok(edge.blocks.every(b => b.x !== 1 || b.z !== 0), 'not in the cell the body overlaps')
+  // x = 1 and 2 protected: no wall to the east (a pillar can't help: the shooter still sees over the wall cells it may use)
+  const prot = (x: number, y: number, z: number) => free(x, y, z) && x < 1
+  const p = planWall({ bot: { x: 0.5, y: 64, z: 0.5 }, shooters: [{ x: 12.5, y: 65.5, z: 0.5 }], solid, placeable: prot })
+  assert.ok(!p || p.blocks.every(b => b.x < 1), 'never a protected cell')
+  assert.equal(planWall({ bot: { x: 0.5, y: 64, z: 0.5 }, shooters: [{ x: 12.5, y: 65.5, z: 0.5 }], solid, placeable: () => false }), null, 'nowhere to place')
+  assert.equal(planWall({ bot: { x: 0.5, y: 64, z: 0.5 }, shooters: [{ x: 12.5, y: 65.5, z: 0.5 }], solid, placeable: free, maxBlocks: 1 }), null, 'one block is not enough')
+})
+
+test('build cover: pillar up when the ground around will not take blocks', () => {
+  // the bot stands on a 1x1 column over a drop: nothing to place against at its feet level except its own column
+  const solid = (x: number, y: number, z: number) => (x === 0 && z === 0 && y <= 63) || (y <= 50)
+  const placeable = (x: number, y: number, z: number) => !solid(x, y, z) && (y >= 64)
+  const plan = planWall({ bot: { x: 0.5, y: 64, z: 0.5 }, shooters: [{ x: 12.5, y: 65.5, z: 0.5 }], solid, placeable })
+  assert.ok(plan, 'found a plan')
+  assert.ok(plan!.pillar >= 1, `pillared ${plan!.pillar}`)
+  assert.deepEqual(plan!.blocks[0], { x: 0, y: 64, z: 0 }, 'the pillar goes first')
+  const set = new Set(plan!.blocks.map(b => `${b.x},${b.y},${b.z}`))
+  const after = (x: number, y: number, z: number) => solid(x, y, z) || set.has(`${x},${y},${z}`)
+  for (const dy of [1.0, 1.62]) assert.ok(lineBlocked({ x: 0.5, y: plan!.stand.y + dy, z: 0.5 }, { x: 12.5, y: 65.5, z: 0.5 }, after))
+})
+
+test('stay_safe ranged danger: graded by gear and health', () => {
+  const base = { active: 3, patrol: 0, health: 20, armor: 15, shield: true, escorting: false }
+  assert.ok(!rangedDanger(base), 'iron, shield and a sword against 3')
+  assert.ok(rangedDanger({ ...base, active: 5 }), 'but not 5')
+  assert.ok(!rangedDanger({ ...base, active: 5, bow: true, arrows: 32 }), 'unless it has a bow')
+  assert.ok(rangedDanger({ ...base, weaponDamage: 1 }), 'no weapon')
 })

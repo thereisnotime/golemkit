@@ -93,7 +93,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           patrol: s.patrol,
           coverNear: true
         })
-        const mustHide = hide?.act === 'cover' || hide?.act === 'retreat'
+        const mustHide = hide?.act === 'cover' || hide?.act === 'build' || hide?.act === 'retreat'
         // a fight already running (defend, attack) goes for archers itself; only take over to hide
         if ((cur === 'defend' || cur === 'attack') && !mustHide) return
         // a melee mob on us: defend deals with it first (it ranks archers with a shot right after)

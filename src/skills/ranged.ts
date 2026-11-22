@@ -5,16 +5,25 @@
 //   - rangedSituation() lists the shooters around (line of sight within 24), the patrol size and
 //     whether the bot is under fire;
 //   - ranged_defense (reflexes and stay_safe run it) answers by health and gear: shoot back, shield
-//     up and close in, take cover behind a block (and eat there), or back out of range.
+//     up and close in, take cover behind a block (and eat there), build cover on open ground, or
+//     back out of range (at most RETREAT_CAP blocks from where the shooting started);
+//   - every shooter and patrol it deals with is remembered as a danger zone (core/danger.ts) for a
+//     few minutes, so scouting and chopping don't walk back into it.
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
-import { defineAction, z, ok, fail, goals, isHostile, sleep, checkAborted } from '../core/index.ts'
+import { defineAction, z, ok, fail, goals, isHostile, sleep, checkAborted, dangerMemory, fmtPos, type Agent } from '../core/index.ts'
 import { fightTarget, lineOfSight, eatNow, fightFood } from './fight.ts'
 import { combatRefusal } from './combat.ts'
-import { weaponFlags, hasRanged, readyShield } from './weapons.ts'
+import { weaponFlags, hasRanged, readyShield, bestMeleeDamage } from './weapons.ts'
 import { wornArmorPoints } from './gear.ts'
 import { facingTowards } from './guard-plan.ts'
-import { isShooter, incoming, patrolCount, rangedResponse, activeShooters, findCover, retreatPoint, canEatUnderFire, shooterRange, PROJECTILES, type ShooterView, type RangedDecision, type V3 } from './ranged-plan.ts'
+import { fillerBlock, pillarUp } from './survival.ts'
+import { placeAt, isReplaceable } from './world.ts'
+import {
+  isShooter, incoming, patrolCount, rangedResponse, activeShooters, findCover, cappedRetreat, canEatUnderFire, shooterRange,
+  hideMs, stillHiding, leaveCover, planWall, ILLAGERS, PROJECTILES, RETREAT_CAP,
+  type ShooterView, type RangedDecision, type V3, type WallPlan
+} from './ranged-plan.ts'
 
 const EYE = 1.62
 /** How long a projectile hit or an incoming arrow keeps the bot "under fire". */
@@ -36,11 +45,15 @@ interface Watch {
   /** Projectile id -> last position sample, to get a velocity when the packets don't carry one. */
   samples: Map<number, { x: number, y: number, z: number, at: number }>
   listeners: Set<() => void>
+  /** Where the bot was when the current spell of shooting started (the retreat cap is measured from here). */
+  origin: V3 | null
+  /** When ranged_defense last ended. */
+  lastEnd: number
 }
 const watches = new WeakMap<Bot, Watch>()
 function watchOf (bot: Bot): Watch {
   let w = watches.get(bot)
-  if (!w) watches.set(bot, w = { owners: new Map(), shotBy: new Map(), incomingAt: 0, hurtAt: 0, judged: new Set(), samples: new Map(), listeners: new Set() })
+  if (!w) watches.set(bot, w = { owners: new Map(), shotBy: new Map(), incomingAt: 0, hurtAt: 0, judged: new Set(), samples: new Map(), listeners: new Set(), origin: null, lastEnd: 0 })
   return w
 }
 
@@ -161,6 +174,8 @@ export interface RangedSituation {
   active: ShooterEntry[]
   /** Pillager-patrol mobs within RANGED_RADIUS. */
   patrol: number
+  /** The middle of those patrol mobs, or null when there are none. */
+  patrolAt: V3 | null
   /** A projectile was on course for the bot in the last few seconds. */
   incoming: boolean
   /** Hurt from range in the last few seconds. */
@@ -176,7 +191,7 @@ export function rangedSituation (bot: Bot, radius = RANGED_RADIUS): RangedSituat
   const w = watchOf(bot)
   const now = Date.now()
   const me = bot.entity?.position
-  const empty: RangedSituation = { shooters: [], active: [], patrol: 0, incoming: false, hurt: false, underFire: false, aimed: false }
+  const empty: RangedSituation = { shooters: [], active: [], patrol: 0, patrolAt: null, incoming: false, hurt: false, underFire: false, aimed: false }
   if (!me) return empty
   const shooters: ShooterEntry[] = []
   const mobs: { name: string, pos: V3 }[] = []
@@ -195,10 +210,12 @@ export function rangedSituation (bot: Bot, radius = RANGED_RADIUS): RangedSituat
   const active = activeShooters(shooters, radius)
   const inc = now - w.incomingAt < FIRE_MS
   const hurt = now - w.hurtAt < FIRE_MS
+  const ill = mobs.filter(m => ILLAGERS.has(m.name))
   return {
     shooters,
     active,
     patrol: patrolCount(mobs, me, radius),
+    patrolAt: ill.length ? { x: ill.reduce((n, m) => n + m.pos.x, 0) / ill.length, y: ill.reduce((n, m) => n + m.pos.y, 0) / ill.length, z: ill.reduce((n, m) => n + m.pos.z, 0) / ill.length } : null,
     incoming: inc,
     hurt,
     underFire: inc || hurt || shooters.some(s => s.hurtMe),
@@ -231,6 +248,64 @@ export function coverFor (bot: Bot, shooters: readonly Entity[], radius = 8, ski
   })
 }
 
+// ---- building cover ----
+
+const shooterEyes = (shooters: readonly Entity[]) => shooters.map(s => ({ x: s.position.x, y: s.position.y + (s.height ?? 1.8) * 0.85, z: s.position.z }))
+
+/**
+ * Where to put blocks for cover where the bot stands (planWall), or null: needs block placing
+ * allowed (settings.canPlace), a filler block in the inventory (dirt, cobblestone, planks...) and
+ * cells outside protected areas.
+ */
+export function coverWallFor (bot: Bot, agent: Agent, shooters: readonly Entity[]): (WallPlan & { block: string }) | null {
+  if ((agent.settings as { canPlace?: boolean } | undefined)?.canPlace === false) return null
+  const block = fillerBlock(bot)
+  if (!block) return null
+  const me = bot.entity.position
+  const at = (x: number, y: number, z: number) => bot.blockAt(me.clone().set(x, y, z))
+  const solid = (x: number, y: number, z: number) => at(x, y, z)?.boundingBox === 'block'
+  const placeable = (x: number, y: number, z: number) => {
+    const b = at(x, y, z)
+    return !!b && isReplaceable(b.name) && b.name !== 'lava' && !agent.protectedAreas?.isProtected({ x, y, z })
+  }
+  const count = bot.inventory.items().filter(i => i.name === block).reduce((n, i) => n + i.count, 0)
+  const plan = planWall({ bot: me, shooters: shooterEyes(shooters), solid, placeable, maxBlocks: Math.min(6, count) })
+  return plan ? { ...plan, block } : null
+}
+
+/** Places a wall plan's blocks (pillar first). Returns how many went in. */
+async function buildWall (bot: Bot, plan: WallPlan & { block: string }, signal: AbortSignal): Promise<number> {
+  bot.pathfinder.setGoal(null)
+  bot.clearControlStates()
+  let placed = 0
+  if (plan.pillar) {
+    const up = await pillarUp(bot, signal, plan.block, plan.pillar)
+    placed += up
+    if (up < plan.pillar) return placed
+  }
+  for (const c of plan.blocks.slice(plan.pillar)) {
+    checkAborted(signal)
+    try {
+      await placeAt(bot, plan.block, bot.entity.position.clone().set(c.x, c.y, c.z), signal)
+      placed++
+    } catch (e) {
+      checkAborted(signal)
+      break
+    }
+  }
+  return placed
+}
+
+/** Notes the shooters (and the patrol) around as danger zones for the bot's other jobs. */
+function rememberShooters (agent: Agent, s: RangedSituation): void {
+  const mem = dangerMemory(agent)
+  for (const x of s.active) {
+    const p = x.e.position
+    mem.remember({ x: p.x, y: p.y, z: p.z, kind: x.name, radius: shooterRange(x.name) + 8 })
+  }
+  if (s.patrol >= 3 && s.patrolAt) mem.remember({ ...s.patrolAt, kind: 'patrol', radius: 32, count: s.patrol })
+}
+
 // ---- the action ----
 
 /** Pathfinder walk that can be watched: resolves on arrival, timeout or `stop()` turning true. */
@@ -255,22 +330,56 @@ export const rangedDefense = defineAction({
     'depending on health, gear and how many there are. Used by the reflexes and stay_safe.',
   params: z.object({
     cover: z.boolean().default(false).describe('hide or back off instead of fighting, whatever the gear'),
+    build: z.boolean().default(true).describe('on open ground, place a few blocks (dirt, cobblestone, planks) for cover when there is none to walk to'),
     maxSeconds: z.number().min(5).max(120).default(45).describe('give up after this long')
   }),
   internal: true,
   async run ({ bot, agent, signal, log }, p) {
     const flags = weaponFlags(agent)
+    const w = watchOf(bot)
     const until = Date.now() + p.maxSeconds * 1000
+    // the retreat cap counts from where this spell of shooting started (a run that ended a minute ago counts as the same)
+    if (!w.origin || Date.now() - w.lastEnd > 60_000) w.origin = { x: bot.entity.position.x, y: bot.entity.position.y, z: bot.entity.position.z }
+    const origin = w.origin
     const done: string[] = []
     let kills = 0
     let ate = 0
+    let built = 0
     let quietSince = 0
-    let hideUntil = 0 // after a failed charge or a heal stop, hide for a while
+    let hideUntil = 0 // after a failed charge or a heal stop, hide for a while (hideMs by health)
     const badCover = new Set<string>() // spots that turned out to be in sight after all
+    let buildFailed = 0 // a wall that didn't cover (or couldn't be placed): don't try again at once
     let last = ''
     const note = (d: RangedDecision) => {
       const k = `${d.act}:${d.why}`
       if (k !== last) { last = k; log.info(`ranged: ${d.act} (${d.why})`); if (!done.includes(d.act)) done.push(d.act) }
+    }
+    // behind cover (found or built): eat, fight what walks up, leave when healthy and out of sight
+    const holdCover = async (spotKey: string): Promise<'left' | 'exposed' | 'fought'> => {
+      const t0 = Date.now()
+      let held = 0
+      while (true) {
+        checkAborted(signal)
+        const h = rangedSituation(bot)
+        const close = h.shooters.find(x => x.dist <= 4)
+        if (close) { await fightTarget(bot, close.e, signal, { maxMs: 6000, flags: { ...flags, maxChase: 4 } }); return 'fought' }
+        const seen = h.active.some(x => x.los)
+        if (seen) {
+          // seen at once: the block doesn't cover us after all (the sight lines differ a little); never this spot again
+          if (held === 0) badCover.add(spotKey)
+          return 'exposed'
+        }
+        held++
+        if (h.active.length) rememberShooters(agent, h)
+        if (canEatUnderFire({ health: bot.health, food: bot.food, hasFood: !!fightFood(bot), exposed: seen, incoming: h.incoming })) {
+          if (await eatNow(bot, signal)) { ate++; continue }
+        }
+        if (leaveCover({ health: bot.health, heldMs: Date.now() - t0, seen, shooters: h.shooters.length, underFire: h.underFire })) {
+          log.debug(`ranged: leaving cover after ${Math.round((Date.now() - t0) / 1000)}s at health ${Math.ceil(bot.health)}`)
+          return 'left'
+        }
+        await sleep(300, signal)
+      }
     }
     try {
       while (Date.now() < until) {
@@ -291,23 +400,37 @@ export const rangedDefense = defineAction({
           continue
         }
         quietSince = 0
+        rememberShooters(agent, s)
         // a melee mob in our face goes first (a vindicator with the patrol, a zombie)
         const face = bot.nearestEntity(e => isHostile(e) && !isShooter(e.name, (e as any).heldItem?.name) && e.position.distanceTo(bot.entity.position) <= 3 && !combatRefusal(bot, e))
         if (face) { await fightTarget(bot, face, signal, { maxMs: 6000, flags: { ...flags, maxChase: 4 } }); continue }
-        const shield = !!bot.inventory.items().find(i => i.name === 'shield') || bot.inventory.slots[45]?.name === 'shield'
-        const melee = bot.inventory.items().some(i => /_(sword|axe)$/.test(i.name))
-        const hide = p.cover ? 'asked to take cover' : Date.now() < hideUntil ? 'the last fight went badly' : undefined
-        const cover = coverFor(bot, s.active.map(x => x.e), 8, badCover)
+        const items = bot.inventory.items()
+        const shield = !!items.find(i => i.name === 'shield') || bot.inventory.slots[45]?.name === 'shield'
+        const melee = items.some(i => /_(sword|axe)$/.test(i.name))
+        const arrows = items.filter(i => /arrow$/.test(i.name)).reduce((n, i) => n + i.count, 0)
+        const seen = s.active.some(x => x.los)
+        const hide = p.cover ? 'asked to take cover' : stillHiding({ until: hideUntil, now: Date.now(), health: bot.health, seen }) ? 'the last fight went badly' : undefined
+        const ents = s.active.map(x => x.e)
+        // cover over distance: the near spots first, then further ones before running off
+        let cover = coverFor(bot, ents, 8, badCover)
+        const here = bot.entity.position
+        const away = cappedRetreat(origin, here, ents.map(e => e.position), Math.min(28, Math.max(...s.active.map(x => shooterRange(x.name))) + 6))
+        const wall = !cover && p.build && Date.now() > buildFailed ? coverWallFor(bot, agent, ents) : null
+        if (!cover && !wall) cover = coverFor(bot, ents, 14, badCover)
         const d = rangedResponse({
           health: bot.health,
           hide,
           armor: wornArmorPoints(bot),
           bow: !!hasRanged(bot),
+          arrows,
           shield,
           melee,
+          weaponDamage: bestMeleeDamage(items.map(i => i.name)),
           shooters: s.active,
           patrol: s.patrol,
           coverNear: !!cover,
+          canBuild: !!wall,
+          canRetreat: !!away,
           useBow: flags.ranged,
           useShield: flags.shield
         })
@@ -318,47 +441,41 @@ export const rangedDefense = defineAction({
         if (d.act === 'shoot' || d.act === 'shield_close' || d.act === 'charge') {
           if (d.act === 'shield_close') await readyShield(bot)
           const r = await fightTarget(bot, target, signal, { maxMs: 12_000, flags: { ...flags, ranged: d.act === 'shoot' ? flags.ranged : false } })
-          if (r.killed) { kills++; continue }
-          if (r.end === 'heal' || r.end === 'outnumbered' || r.end === 'gave_up') hideUntil = Date.now() + 15_000
+          if (r.killed) {
+            kills++
+            // the only one there: its zone goes with it
+            if (!rangedSituation(bot).active.length) dangerMemory(agent).clearNear(target.position, 8, target.name)
+            continue
+          }
+          if (r.end === 'heal' || r.end === 'outnumbered' || r.end === 'gave_up') hideUntil = Date.now() + hideMs(bot.health)
           continue
         }
 
         if (d.act === 'cover' && cover) {
           const goal = new goals.GoalBlock(Math.floor(cover.x), cover.y, Math.floor(cover.z))
           const got = await walk(bot, goal, signal, 8000, () => bot.health <= 0)
-          if (!got) { hideUntil = Date.now() + 5000; continue }
-          // behind cover: eat, raise the shield if one of them comes round, fight what walks up
-          const hold = Date.now() + 15_000
-          const spotKey = `${Math.floor(cover.x)},${cover.y},${Math.floor(cover.z)}`
-          let held = 0
-          while (Date.now() < hold) {
-            checkAborted(signal)
-            const h = rangedSituation(bot)
-            const close = h.shooters.find(x => x.dist <= 4)
-            if (close) { await fightTarget(bot, close.e, signal, { maxMs: 6000, flags: { ...flags, maxChase: 4 } }); break }
-            const exposed = h.active.some(x => x.los)
-            if (exposed) {
-              // seen at once: the block doesn't cover us after all (the sight lines differ a little); never this spot again
-              if (held === 0) badCover.add(spotKey)
-              break
-            }
-            held++
-            if (canEatUnderFire({ health: bot.health, food: bot.food, hasFood: !!fightFood(bot), exposed, incoming: h.incoming })) {
-              if (await eatNow(bot, signal)) { ate++; continue }
-            }
-            // healthy again and they lost sight of us: done hiding
-            if (!h.underFire && bot.health >= 16 && !p.cover) break
-            if (!h.shooters.length) break
-            await sleep(300, signal)
-          }
+          if (!got) { hideUntil = Date.now() + hideMs(bot.health); continue }
+          await holdCover(`${Math.floor(cover.x)},${cover.y},${Math.floor(cover.z)}`)
           continue
         }
 
-        // back off: straight away from them, out of range
-        const pts = s.active.map(x => x.e.position)
-        const far = Math.max(...s.active.map(x => shooterRange(x.name))) + 6
-        const away = retreatPoint(bot.entity.position, pts, Math.min(28, far))
-        const goal = new goals.GoalNear(away.x, away.y, away.z, 3)
+        if (d.act === 'build' && wall) {
+          const names = [...new Set(s.active.map(x => x.name))].join(' and ')
+          log.info(`ranged: building cover at ${fmtPos(bot.entity.position)}: ${wall.blocks.length - wall.pillar} ${wall.block}${wall.pillar ? ` on a ${wall.pillar}-block pillar` : ''} against the ${names}`)
+          const n = await buildWall(bot, wall, signal)
+          built += n
+          if (n < wall.blocks.length) { log.info(`ranged: placed ${n} of ${wall.blocks.length} blocks, giving up on building here`); buildFailed = Date.now() + 10_000; continue }
+          const f = bot.entity.position.floored()
+          const r = await holdCover(`${f.x},${f.y},${f.z}`)
+          if (r === 'exposed') buildFailed = Date.now() + 10_000
+          continue
+        }
+
+        // back off: straight away from them, out of range, but not past the cap (with nothing to fight
+        // or hide with, a few more blocks beyond it rather than standing in the open)
+        const run = away ?? cappedRetreat(origin, here, ents.map(e => e.position), 8, RETREAT_CAP + 16)
+        if (!run) { await sleep(300, signal); continue }
+        const goal = new goals.GoalNear(run.x, run.y, run.z, 3)
         const mv = (bot.pathfinder as any).movements
         if (mv) mv.allowSprinting = true
         await walk(bot, goal, signal, 10_000, () => {
@@ -368,10 +485,11 @@ export const rangedDefense = defineAction({
         done.includes('retreat') || done.push('retreat')
       }
     } finally {
+      w.lastEnd = Date.now()
       bot.pathfinder.setGoal(null)
       try { bot.deactivateItem() } catch {}
     }
-    const what = [kills ? `killed ${kills}` : '', ...done.map(a => a === 'shoot' ? 'shot back' : a === 'shield_close' ? 'closed in behind the shield' : a === 'charge' ? 'charged' : a === 'cover' ? 'took cover' : 'backed out of range'), ate ? `ate ${ate}x` : ''].filter(Boolean)
+    const what = [kills ? `killed ${kills}` : '', ...done.map(a => a === 'shoot' ? 'shot back' : a === 'shield_close' ? 'closed in behind the shield' : a === 'charge' ? 'charged' : a === 'cover' ? 'took cover' : a === 'build' ? `built cover (${built} blocks)` : 'backed out of range'), ate ? `ate ${ate}x` : ''].filter(Boolean)
     if (!what.length) return ok('nothing shooting at me')
     return ok(what.join(', '))
   }

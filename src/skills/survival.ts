@@ -71,43 +71,52 @@ const pillar = defineAction({
     const block = item ?? fillerBlock(bot)
     if (!block || !findItem(bot, block)) return fail(item ? `no ${item}` : 'no dirt, cobblestone or planks to pillar with')
     if (agent.protectedAreas.isProtected(bot.entity.position)) return fail('can\'t build here (protected area)')
-    const at = (dy: number) => bot.blockAt(bot.entity.position.floored().offset(0, dy, 0))
-    const up = bot.entity.position.floored().scaled(0).offset(0, 1, 0)
-    let placed = 0
-    try {
-      await bot.look(bot.entity.yaw, -Math.PI / 2, true)
-      for (let i = 0; i < height; i++) {
-        checkAborted(signal)
-        if (at(2)?.boundingBox !== 'empty') break // ceiling
-        const it = findItem(bot, block)
-        if (!it) break
-        await bot.equip(it, 'hand')
-        const ground = at(-1)
-        if (!ground || ground.boundingBox !== 'block') break
-        const floorY = Math.floor(bot.entity.position.y)
-        bot.setControlState('jump', true)
-        const until = Date.now() + 1500
-        while (bot.entity.position.y < floorY + 1.05 && Date.now() < until) await sleep(50, signal)
-        try {
-          await bot.placeBlock(ground, up)
-          placed++
-        } catch {
-          await sleep(200, signal)
-          if (bot.blockAt(ground.position.offset(0, 1, 0))?.boundingBox === 'block') placed++
-          else break
-        } finally {
-          bot.setControlState('jump', false)
-        }
-        await sleep(250, signal)
-      }
-    } finally {
-      bot.setControlState('jump', false)
-    }
+    const placed = await pillarUp(bot, signal, block, height)
     return placed
       ? ok(`pillared up ${placed} block${placed === 1 ? '' : 's'} with ${block}, at ${fmtPos(bot.entity.position)}`)
       : fail('could not build a pillar here')
   }
 })
+
+/**
+ * Jumps and places `block` underneath, `height` times (stops at a ceiling or when out of blocks).
+ * Returns how many blocks it rose. The pillar action's body, also used to build cover.
+ */
+export async function pillarUp (bot: Bot, signal: AbortSignal, block: string, height: number): Promise<number> {
+  const at = (dy: number) => bot.blockAt(bot.entity.position.floored().offset(0, dy, 0))
+  const up = bot.entity.position.floored().scaled(0).offset(0, 1, 0)
+  let placed = 0
+  try {
+    await bot.look(bot.entity.yaw, -Math.PI / 2, true)
+    for (let i = 0; i < height; i++) {
+      checkAborted(signal)
+      if (at(2)?.boundingBox !== 'empty') break // ceiling
+      const it = findItem(bot, block)
+      if (!it) break
+      await bot.equip(it, 'hand')
+      const ground = at(-1)
+      if (!ground || ground.boundingBox !== 'block') break
+      const floorY = Math.floor(bot.entity.position.y)
+      bot.setControlState('jump', true)
+      const until = Date.now() + 1500
+      while (bot.entity.position.y < floorY + 1.05 && Date.now() < until) await sleep(50, signal)
+      try {
+        await bot.placeBlock(ground, up)
+        placed++
+      } catch {
+        await sleep(200, signal)
+        if (bot.blockAt(ground.position.offset(0, 1, 0))?.boundingBox === 'block') placed++
+        else break
+      } finally {
+        bot.setControlState('jump', false)
+      }
+      await sleep(250, signal)
+    }
+  } finally {
+    bot.setControlState('jump', false)
+  }
+  return placed
+}
 
 /** Highest solid block above the head (within `range`), or null when the sky is open. */
 export function roofAbove (bot: Bot, range = 24): number | null {

@@ -60,6 +60,19 @@ export function weaponFlags (agent: Agent): WeaponFlags {
 
 interface Candidate { name: string, damage: number, speed: number, enchants: { name: string, lvl: number }[] }
 
+/**
+ * Damage per hit of the best melee weapon among `items` (names), scaled down for slow weapons the
+ * way pickMelee ranks them (an iron axe counts a little under an iron sword). 1 for bare hands.
+ */
+export function bestMeleeDamage (items: readonly string[]): number {
+  let best = FIST.damage
+  for (const n of items) {
+    const w = MELEE[n]
+    if (w) best = Math.max(best, w.damage * Math.min(w.speed, 1.6) / 1.6)
+  }
+  return Math.round(best * 10) / 10
+}
+
 /** Damage of one hit including target-specific enchantments. */
 export function hitDamage (w: Candidate, target: string): number {
   let d = w.damage
