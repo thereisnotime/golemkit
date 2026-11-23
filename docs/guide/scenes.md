@@ -38,7 +38,8 @@ In game:
   can receive `!scene_start`; it gets routed to the coordinator.
 
 Scene actions run at `PRIORITY.scene` (25): above NPC routines (20), below LLM brains (30),
-player commands (50) and [reflexes](/concepts/world#reflexes) (60). If you tell an actor to `!follow` you mid-scene, it
+armed [behaviours](/guide/behaviors) (35), [hooks](/guide/context-pack#hooks-yaml) (40), player
+commands (50) and [reflexes](/concepts/world#reflexes) (60). If you tell an actor to `!follow` you mid-scene, it
 follows you; the scene waits a few seconds for the body and then skips that bot's movement
 beats. Its lines keep going. Reflexes (fighting back, eating) preempt scene beats the same way.
 

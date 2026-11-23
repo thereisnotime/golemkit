@@ -6,7 +6,9 @@ scope: minecraft
 
 Owners ask for things: "where's iron?", "find sheep", "bring me 16 planks", "get my stuff, I
 died". The `search` skill (in the extended skills) answers these without the LLM, so
-[plain-language commands](/guide/intents), chat commands and LLM tools all end up in the same three actions.
+[plain-language commands](/guide/intents), chat commands and LLM tools all end up in the same three
+actions. "Where's my X" is answered from [container memory](#container-memory) by `where_stored`
+(in the containers skill).
 
 - **Decisions** (`src/skills/searchPlan.ts`, pure, unit tested in `test/search.test.ts`): what a
   word means, which search phases run, village and portal recognition, where an item comes from,
@@ -32,7 +34,7 @@ died". The `search` skill (in the extended skills) answers these without the LLM
 !where_stored iron
 ```
 
-All three are long-running: they honour the stop signal, whisper milestones to whoever asked
+`find_target`, `bring_item` and `fetch_drops` are long-running: they honour the stop signal, whisper milestones to whoever asked
 (at most every 20 s; "found" and "giving up" always), and put the elapsed time in the result.
 
 ## What a word means
@@ -180,7 +182,7 @@ settings:
   inventoryMemory:
     enabled: true        # default false: in memory only, as before
     maxAgeHours: 24      # older sightings are hints, not facts
-    indexOwn: true       # check_storage looks into its own and configured chests by day
+    indexOwn: true       # check_storage looks into its own and configured chests by day (default false)
     refreshMinutes: 60   # ...ones not seen inside for this long
     radius: 48           # ...within this many blocks of home
     lowFood: 8           # tell the owners when the pantry holds fewer food items (0 = never)
@@ -245,6 +247,10 @@ the walk (3.5 blocks/s, plus 20 s to pick up) fits in the time left; otherwise i
 is and how long is left. `try_anyway=true` goes regardless: items only age while somebody keeps
 the area loaded. It picks up everything within 14 blocks, comes back and hands it all over, or
 says "nothing left at x y z" (despawned, picked up, or keepInventory).
+
+That is for players. The bot's own things after its own death are `recover_items` (recovery
+skill) and the [recover_drops](/guide/behaviors#death-drops-recover-drops) behaviour, which goes
+back on its own when the drops can still be had and the spot is safe enough.
 
 ## Live test
 

@@ -121,7 +121,7 @@ Release sprint before the jump, or the hit becomes a sprint hit and is not a cri
 again, the attacker has to start sprinting again; W-tap means releasing forward briefly and
 pressing it again after each hit ([Lunar Client guide](https://www.lunarclient.com/news/lunar-client-and-minecraft-pvp-mastering-modern-combat),
 [r/CompetitiveMinecraft melee guide](https://www.reddit.com/r/CompetitiveMinecraft/comments/ngfh12/comprehensive_melee_guide/)).
-S-tap (tap back) and sneak-tap are variants.
+S-tap (tap back) and sneak-tap are [variants](/concepts/variants-profiles).
 
 **Mechanic:**
 
@@ -465,7 +465,7 @@ same simulator as arrows. Low priority for a PvE bot.
 
 - Hostiles spawn in darkness (light level 0, e.g. [Spider](https://minecraft.wiki/w/Spider)) and
   phantoms add a fourth threat after 3 days without sleep. Without armour and food, avoiding the
-  night (home, bunker) beats fighting it.
+  night (home, [bunker](/concepts/world#phantoms-bunker)) beats fighting it.
 - **Pull singles:** shoot one mob from range so it alone comes to you; zombies notice players from
   about 40 blocks ([Tutorial:Combat](https://minecraft.wiki/w/Tutorial:Combat)), so engage at
   the edge of the group, never in the middle.
@@ -663,7 +663,7 @@ Server rules vary, but these patterns are common
   who hurt it or its owner, stops when the attacker leaves, and doesn't chase.
 - **No spawn killing:** protected spawn areas are near universal, and attacking or luring players
   at their edge counts as spawn killing. `combat.spareProtected` (default on) leaves players in
-  protected areas alone.
+  [protected areas](/concepts/world#protected-areas) alone.
 - **No combat logging:** logging out within a short window after PvP damage is the most commonly
   banned behaviour. A bot that disconnects mid-fight (crash, reconnect logic) can trigger it; delay
   voluntary disconnects until out of combat.
@@ -677,25 +677,25 @@ Server rules vary, but these patterns are common
 |---|---|---|---|
 | Attack cooldown timing | `T = 20/speed`; `0.2 + 0.8c^2`; sword 12 ticks, axes 20 to 25 | yes | high (done, verify tick counting) |
 | Critical hits | 1.5x base; falling, `c > 0.9`, no sprint, not in water/climbable/riding, no Blindness | yes | high (done) |
-| Sprint hit / W-tap | extra KB, vertical 0.5; ends sprint; not a crit | yes | high |
-| Sweep | sword, ground, no sprint, `c > 0.9`; `1 + n/(n+1) * base` | yes | medium |
+| Sprint hit / W-tap | extra KB, vertical 0.5; ends sprint; not a crit | yes | high (done) |
+| Sweep | sword, ground, no sprint, `c > 0.9`; `1 + n/(n+1) * base` | yes | medium (done) |
 | Spacing / reach | 3 blocks eyes to hitbox vs zombie about 1.4 | yes | high (done) |
 | Strafing | lateral steps, keep aim | yes | medium (done) |
 | Hit-and-run | mob speed 0.25 vs player walk 4.3 m/s | yes | high |
 | Hurt immunity | 10 ticks; only stronger hits land, for the difference | yes | medium |
 | Axe vs sword | netherite 10 dmg/1.0 vs 8/1.6; axe disables shields 5 s | yes | medium (done) |
-| Shield | 180-degree front arc, 5-tick delay, 100-tick disable by axes | yes | high |
+| Shield | 180-degree front arc, 5-tick delay, 100-tick disable by axes | yes | high (done) |
 | Armour / toughness | `min(20, max(a/5, a - 4d/(t+8)))/25`, cap 80% | yes | high (done) |
 | Protection vs Blast | EPF 1 vs 2 per level, cap 20 (80%) | yes | low |
-| Totem | hand only; 1 HP, Regen II 45 s, Abs II 5 s, Fire Res 40 s | yes | high |
+| Totem | hand only; 1 HP, Regen II 45 s, Abs II 5 s, Fire Res 40 s | yes | high (done) |
 | Golden apple | 32 ticks; Abs I 2 min, Regen II 5 s | yes | high (done) |
-| Healing behind cover | break line of sight, then eat/drink | yes | medium |
+| Healing behind cover | break line of sight, then eat/drink | yes | medium (done against shooters) |
 | Bow | 20 ticks, 3 b/t, gravity 0.05, drag 0.99 | yes | high (done) |
 | Crossbow | 25 ticks (-5 per Quick Charge), 3.15 b/t, stays loaded | partial | low |
-| Water bucket clutch | fall dmg `floor(d - 3)`; water resets fall | partial | low |
+| Water bucket clutch | fall dmg `floor(d - 3)`; water resets fall | partial | low (done) |
 | Pillaring / cover | 2 blocks vs zombies, 3 vs endermen | yes | medium (done) |
 | Ender pearl | 5 HP, 20-tick cooldown, 1.5 b/t, gravity 0.03 | partial | low |
-| Chokepoints / doorways | 1-wide gap, spiders 1.4 wide can't enter | partial | medium |
+| Chokepoints / doorways | 1-wide gap, spiders 1.4 wide can't enter | partial | medium (done) |
 | Pull one at a time | bow pull at the group edge | yes | medium |
 | Creeper | fuse 30 ticks, ignite 3, cancel 7, power 3 | yes | high (done) |
 | Skeleton | 15-block range, shot every 3 s (2 Hard) | yes | high (done) |
@@ -705,7 +705,7 @@ Server rules vary, but these patterns are common
 | Spider / cave spider | climbs; cave spider poison to 1 HP | yes | medium |
 | Slime | splits 2 to 4; small deals 0 | yes | low |
 | Raid mobs | vindicator disables shield; fangs ignore armour and shields | partial | low |
-| Warden | boom ignores armour/shield; sneak avoids vibrations | yes (avoid only) | medium (avoidance) |
+| Warden | boom ignores armour/shield; sneak avoids vibrations | yes (avoid only) | medium (never fought, backs off when hit) |
 | Blaze / drowned | 5 s volley gap; trident 8 HP to 20 blocks | yes | low |
 | PvP etiquette | consent, no spawn kill, no combat log | n/a | high (policy, done: owner-only modes, `spareProtected`) |
 
@@ -722,16 +722,17 @@ under [Skilled-player techniques](./world.md#skilled-player-techniques), toggles
 | Sweep hits when mobs bunch around the target | fight loop | `combat.sweep` |
 | Shield between slow swings against melee; disabled-shield tracking after an axe hit | fight loop | `combat.shieldMelee` |
 | Shield against a creeper blast that can't be outrun | fight loop | `combat.shieldMelee` |
-| Totem into the offhand at 8 health or in a lethal fall | reflexes | `combat.totem` |
+| Totem into the offhand at 8 health (10 while burning) or in a lethal fall | [reflexes](/concepts/world#reflexes) | `combat.totem` |
 | Golden apple mid-fight at 8 health (12 when surrounded) | fight loop | `combat.goldenApple` |
 | Water bucket clutch, water against fire | reflexes, `water_bucket` | `combat.waterClutch` |
 | Enderman gaze guard on every look; no arrows at endermen or breezes | combat skill | `combat.endermanGaze` |
 | Fight from a 1-wide corridor against 3+ melee mobs | `defend` | `combat.chokepoints` |
 | No low-health back-off from mobs that outrun the bot | reflexes | `combat.fightFastMobs` |
 | Bow lead with arrow physics, shield against archers | fight loop | `combat.ranged`, `combat.shield` |
-| Cover, cover walls, backing off and danger zones against shooters | reflexes, `ranged_defense`, `stay_safe` | `reflexes.rangedDefense` (profile, variant or `!config_set`), `stay_safe` option `ranged` |
+| Cover, cover walls, backing off and danger zones against shooters | reflexes, `ranged_defense`, `stay_safe` | `reflexes.rangedDefense` ([profile](/guide/profiles), variant or `!config_set`), `stay_safe` option `ranged` |
 | Pillaring when outnumbered, bunker against phantoms | `defend`, reflexes | none |
-| PvP modes (off, defend, revenge, targets, all), grudges, target list, hunts, kill switch; never owners, friends, creative players or protected areas | reflexes, `defend_player`, `pvp_engage`, `hunt_player`, `pvp`, `attack_player`, `spare_player` (`pvp.ts`, `pvp-actions.ts`) | `combat.pvp`, `combat.friends`, `combat.targets`, `combat.revengeMinutes`, `combat.revengeKills`, `combat.spareProtected`, `combat.taunts` |
+| One reflex at a time: a referee keeps a reflex from taking the body from another mid-move (1.5 s hold, escapes not cut short by archers) | reflexes (`reflexPlan.ts`) | none |
+| PvP modes (off, defend, revenge, targets, all), grudges, target list, hunts, kill switch; never owners, friends, creative players or protected areas | reflexes, `defend_player`, `pvp_engage`, `hunt_player`, `pvp`, `attack_player`, `spare_player` (`pvp.ts`, `pvp-actions.ts`) | `combat.pvp`, `combat.friends`, `combat.targets`, `combat.revengeMinutes`, `combat.revengeKills`, `combat.spareProtected`, `combat.taunts`, `combat.pvpEngage`, `combat.pvpChase`, `combat.pvpLostSec`, `combat.huntMinutes` |
 | Gear check before a fight: duel odds from health, armour formula, weapon, shield, totem, golden apples | reflexes (`pvp.ts` `duelOdds`) | `combat.pvpMinOdds`, `combat.revengeIgnoresOdds` |
 
 PvP tactics (`pvp-tactics.ts`, pure; `pvp-fight.ts` applies them; toggle `combat.pvpTactics`), mapped
@@ -752,5 +753,7 @@ to the sections above:
 | Terrain | sidestep when a drop or lava is behind the bot; knock the enemy towards one |
 
 Not implemented: ender pearls, building walls mid-fight against melee crowds, cobwebs, potions,
-Blast Protection choices (armour is scored by total protection), sleeping to reset phantoms
-(the bed is the owner's business), warden avoidance beyond never attacking it.
+Blast Protection choices (armour is scored by total protection), warden avoidance beyond never
+attacking it and backing off when hit. Phantoms aren't tracked as such; a bot that sleeps
+(`sleep_at_night`, or `keep_spawn_bed`'s night click, which puts it to bed) resets the timer as
+a side effect.

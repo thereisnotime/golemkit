@@ -9,7 +9,7 @@ its mods register network channels (any content mod does), so golemkit adds a Ne
 in `src/adapters/minecraft-java/platforms/neoforge/`, the default server platform of the
 [Minecraft Java adapter](./adapters.md). Skills and brains never see it. It also works on
 vanilla servers, since it only answers what NeoForge asks; set `MC_PLATFORM=vanilla` or `paper`
-(or `server.platform` in a profile) to leave it out. The file names below are in that
+(or `server.platform` in a [profile](/guide/profiles)) to leave it out. The file names below are in that
 directory unless a path is given.
 
 Everything here is written against NeoForge's 1.21.1 source
@@ -112,7 +112,7 @@ The result:
   up in inventories and work in actions like `drop`, `deposit` and `equip`;
 - modded entities have names and a type: `hostile` if they match a hostile pattern, `object`
   for projectiles/contraptions/effects, `mob` otherwise. Combat and guard only attack
-  `hostile` ones.
+  `hostile` ones (fighting players is the separate [PvP](./world#pvp) setting, `combat.pvp`, off by default).
 
 Hostile patterns: `ars_nouveau:wilden_*` is built in. Add more per bot with
 `settings: { moddedHostile: ['somemod:*_zombie'] }` or for everything with

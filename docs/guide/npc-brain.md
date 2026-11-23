@@ -34,7 +34,8 @@ Every `tickMs` (1.5 s) the brain:
 3. checks `agent.currentAction`: if a player, LLM, reflex or system caller holds the body at
    npc priority or above, it aborts its own behaviour and **backs off** (player/brain 20 s,
    reflex 3 s, system 10 s, configurable via `backoffMs`). The back-off is extended every
-   tick while they hold it, so the NPC waits until they are done plus the back-off.
+   tick while they hold it, so the NPC waits until they are done plus the back-off. The back-off
+   is per level: behaviours with their own `priority` above the holder's keep going.
 4. **scores** every behaviour, then `decide()` picks:
    - nothing running: start the best positive score
    - running behaviour now scores 0: switch to the best, or stop
@@ -125,10 +126,18 @@ const fishAtDawn: Behavior = {
   and `ctx.signal`. When another caller takes the body, `ctx.act` throws and the brain backs
   off; you don't need to handle it. Return an action result, a string, nothing (success) or
   `false` (failure).
+- `retryKey(ctx)` (optional): a short summary of what the last failure depended on (the wood
+  it holds, say). While the failure back-off runs, a different value ends it early, at least
+  10 s after the failure, so the behaviour [retries](/guide/profiles#retries) once the cause is gone instead of waiting
+  out a long back-off. `keep_tools_upgraded` uses it with the wood it carries.
+- `priority` (optional): the level it acts at instead of the brain's (`PRIORITY.npc`). A
+  behaviour above whoever holds the body keeps running instead of backing off; an armed
+  `keep_fed` at `PRIORITY.behavior` (35) still runs while an LLM (30) holds the body.
 - `goal` and `help(ctx, failure)` (optional): what it is trying to do in a few words, and
   what would help when it keeps failing the same way. With `settings.askHelp` on, the
-  controller whispers the owners once after repeated failures of one kind; see
-  [asking for help](./behaviors#asking-for-help).
+  controller reports failures to the agent's help desk (`src/brains/npc/help.ts`, one per
+  agent, shared by every controller), which whispers the owners once after repeated failures
+  of one kind; see [asking for help](./behaviors#asking-for-help).
 - Prefer bounded actions over long-running ones (`goto_player` in a loop rather than
   `follow`), so the brain gets the slot back.
 
@@ -169,4 +178,8 @@ All are exported from `src/brains/npc/index.ts`. `wander`, `goHome`, `sleepAtNig
 - `!npc_status`: current behaviour, top scores, needs, back-off. Its `data` has the full
   JSON (cooldowns, last outcome per behaviour).
 - `MC_LOG_LEVEL=debug` logs every start, switch, stop, back-off and failure cooldown under
-  `<bot>/npc`.
+  `<bot>/npc`, and an early retry when a `retryKey` changed (`retrying early (old -> new)`).
+- When nothing has run for 2 minutes, the controller logs why once every 2 minutes (debug):
+  `idle 125s` with who holds the body and at what priority, how long it is paused, the
+  behaviours scoring above 0 and the ones cooling down with the seconds left. A bot that
+  stands around shows there whether a stale holder or failure back-offs keep it idle.

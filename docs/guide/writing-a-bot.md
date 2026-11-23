@@ -47,13 +47,13 @@ just run guard
 | `persona` | personality/role text; LLM brains put it in their prompt |
 | `owners` | players allowed to command it (empty = everyone, or `MC_OWNERS`) |
 | `canDig` | let the pathfinder break blocks |
-| `settings` | anything you want; read it with `agent.settings` |
+| `settings` | anything you want; read it with `agent.settings` (a [profile](./profiles) loaded on top warns about unknown keys in `settings.combat`, `mining`, `trips` and `inventoryMemory`) |
 | `onSpawn(agent, bot)` | runs after every spawn |
 | `adapter` | the game to play (an `AdapterFactory`); Minecraft Java by default |
 
 ## Picking skills
 
-`standardSkills()` gives status, config, movement, combat, survival, inventory, gather, journal
+`standardSkills()` gives status, config, movement, combat, survival, inventory, gather, [journal](/guide/journal)
 and bodyguard; `extendedSkills()` adds crafting, farming, food, building and the rest (see
 [Skills](/skills)). Mix your own:
 
@@ -70,7 +70,7 @@ prints what a specific bot ends up with.
 | brain | for |
 |---|---|
 | `commandBrain()` | player assistant: every action becomes a `!command` |
-| `reflexes()` | fight back when hit (melee and ranged), eat when hungry |
+| `reflexes()` | fight back when hit (melee and ranged), eat when hungry, get away from danger; one referee keeps the reflexes from taking the body from each other |
 | `behaviorsBrain()` | [armed behaviours](/guide/behaviors) such as keep_fed and stay_safe |
 | `intentsBrain()` | plain-language owner commands without an LLM ([Intents](/guide/intents)) |
 

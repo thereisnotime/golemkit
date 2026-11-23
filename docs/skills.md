@@ -14,15 +14,19 @@ Two bundles live in `src/skills/index.ts`:
 - `standardSkills()`: status, config, movement, combat, survival, inventory, gather,
   [journal](/guide/journal), bodyguard.
 - `extendedSkills()`: crafting, containers, farming, food, search, woodcutting, building, construction,
-  roads, blueprint library, materials, progression, pickup, worldedit, spawn bed, lighting.
+  roads, [blueprint library](/guide/blueprints), materials, progression, pickup, worldedit, spawn bed, lighting, recovery.
 
-`navigation()`, `modsSkill()` and `config()` are exported on their own (the villager bot uses
-`navigation()`).
+`navigation()` and `modsSkill()` are exported on their own (the villager bot uses
+`navigation()`); `config()` is exported too, and is already part of `standardSkills()`.
 
 ```ts
 import { standardSkills, extendedSkills } from '../src/skills/index.ts'
 export default defineVariant({ name: 'farmer', skills: [...standardSkills(), ...extendedSkills()], brains: [...] })
 ```
+
+The behaviours brain adds its own actions (`behavior_list`, `behavior_status`, `behavior_arm`,
+`behavior_disarm`, `behavior_configure`, `behavior_reset`); they are in the
+[action reference](./reference/actions.md) and [behaviours](/guide/behaviors), not here.
 
 Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actions marked
 *dig* need digging enabled (`canDig`, `--dig`, `MC_CAN_DIG=true`) and fail politely otherwise.
@@ -77,8 +81,9 @@ golden apples, chokepoints, enderman gaze), each behind a `combat.*` toggle you 
 with `config_set`; see [Skilled-player techniques](/concepts/world#skilled-player-techniques),
 [PvP](/concepts/world#pvp) and the
 [combat research](/concepts/combat-research) page. The decisions are pure and unit-tested
-(`tactics.ts`, `techniques.ts`, `pvp.ts`, `pvp-tactics.ts`, `ranged-plan.ts`); `fight.ts`, `pvp-fight.ts`,
-`ranged.ts`, `clutch.ts`, `defense.ts` and `pvp-actions.ts` apply them.
+(`tactics.ts`, `techniques.ts`, `pvp.ts`, `pvp-tactics.ts`, `ranged-plan.ts`, and `reflexPlan.ts`, the
+referee that decides which reflex gets the body); `fight.ts`, `pvp-fight.ts`, `ranged.ts`,
+`clutch.ts`, `defense.ts` and `pvp-actions.ts` apply them. `combat.pvp` defaults to `off`.
 
 ### bodyguard
 | action | |
@@ -118,7 +123,7 @@ Feature toggles changed in game without a restart; see [Live config](/guide/live
 | `config_list` *ne* | Settings that can be changed in game, with current values. |
 | `config_get` *ne* | One setting, what it does and whether it was changed in game. |
 | `config_set` *ne* | Change a setting live (owners only), e.g. `config_set combat.pvp defend`. |
-| `config_reset` *ne* | Back to the profile values, one key or all (owners only). |
+| `config_reset` *ne* | Back to the [profile](/guide/profiles) values, one key or all (owners only). |
 
 ### journal
 See [Event journal](./guide/journal.md).
@@ -135,12 +140,13 @@ See [Event journal](./guide/journal.md).
 |---|---|
 | `wander` | Short walk to a random spot near home (or a given center, or where the bot stands). |
 | `set_home` *ne* | Remember a home position (default: here). |
-| `go_home` | Walk back home. |
+| `go_home` | Walk back home. More than 40 blocks out (after a respawn at the world spawn, say) it walks in legs through loaded chunks first, for up to 5 minutes; it only reports success when it is within `range` (default 2, plus a block of slack) of home. |
 | `remember_place` *ne* | Remember a named place to walk back to later. |
 | `forget_place` *ne* | Forget a named place. |
 | `places` *ne* | List home and remembered places. |
 | `goto_place` | Walk to a remembered place. |
 | `flee` | Run from the nearest hostile mob until it is far enough away. |
+| `prepare_trip` | Get ready to leave home: take food from its pantry and own chests up to `trips.food`, hold its best weapon, check health. Fails with what is missing; a food trip while starving goes anyway. Behaviours call it before a [trip](/guide/behaviors#trips). |
 
 ## Extended
 
@@ -161,9 +167,12 @@ ingredients; `gather_materials` does the whole chain for wooden things.
 | `withdraw` | Take N of an item (or `all`) out of a container. Stops when the inventory is full. |
 | `list_container` *ne* | What's inside. Opens it only when it is within reach and the bot is idle; otherwise answers from what the bot saw last time it opened it, with how long ago ([container memory](/guide/search#container-memory)). |
 | `check_chests` | Look inside its own and configured chests near home that it has not seen inside lately: notes items taken or added, chests moved or broken, and says when the pantry runs low. Never opens anyone else's chest. |
-| `where_stored` *ne* | Where an item is stored, from container memory: position and how long ago it looked. |
+| `where_stored` *ne* | Where an item is stored, from container memory: position and how long ago it looked. "where's my iron" in [plain language](/guide/intents) lands here. |
 
-Observe hook: `containersNearby` (within 16 blocks).
+Observe hook: `containersNearby` (within 16 blocks). Configured chests (`settings.storage.chests`)
+count as its own: they are the pantry `keep_fed` and `prepare_trip` take food from. The
+[check_storage](/guide/behaviors#container-memory-check-storage) behaviour runs `check_chests`
+by day.
 
 ### farming
 | action | |
@@ -190,7 +199,7 @@ re-till and grow) and `reachPlan.ts` (when `hunt` may bridge, pillar or dig). Th
 | `find_food` | Scout for animals or a village farm beyond what is in sight: known spots first, then an expanding spiral around home out to `radius` (default 200; `minRadius` skips rings an earlier search covered), by day, skipping water, lava and protected areas, giving up when stuck, at night, at low health or after `maxMinutes` (default 8). Remembers what it finds; doesn't hunt. |
 | `start_farm` *dig* | Start a farm of its own: first a site, shore water near home or a place with at least 8 grass/dirt cells at the water's height (or under a one-block bank it digs off), outside protected areas, the spawn and away from builds or fields (or water poured from a bucket); then seeds from breaking grass (or carrots, potatoes, beetroot seeds), a hoe (crafted, chopping logs first if needed), a plot of up to 9x9 tilled and planted around the water, a fence and torches if it has the materials. Saved as `farm:<n>`. |
 | `tend_farm` | Look after its own farm: put the water back, plant bare farmland, till trampled dirt again, and grow the plot a ring at a time towards `size` (up to 9x9) with the seeds beyond `seedReserve`. Tilling needs digging. |
-| `gather_seeds` *dig* | Break grass and ferns patch by patch out to `radius` until it has `count` seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. |
+| `gather_seeds` *dig* | Break grass and ferns patch by patch out to `radius` until it has `count` seeds, the time is up or the grass runs out. Surface grass only (within 12 blocks above or below the bot, nothing solid above it), so it never follows grass into a lush cave. Skips protected areas and the world spawn. |
 | `forage` | Stopgap food: ripe sweet berries, kelp at the shore, and with `apples=true` oak leaves for apples. Never on protected land. |
 | `breed` | Feed two adults of a kind (cows/sheep: wheat, pigs: carrots/potatoes/beetroot, chickens: seeds, rabbits: carrots), leading them to its farm first. Same animal filter as `hunt`; keeps seeds for replanting and stops at `maxHerd`. |
 
@@ -208,19 +217,19 @@ places `found:<target>` and as `found` journal events.
 |---|---|
 | `find_target` | Find a block family (iron, diamonds, logs, sand, water), a mob, a structure (village, nether portal, chest), a biome or a modded name: what is loaded first, remembered spots, then a surface spiral scout by day (and the strip mine for ores with `prospect`). Reports coordinates, distance and direction from the owner, and comes back (or stays with `go`). `bring` fetches `count` of it and hands it over. |
 | `bring_item` | Get an item from the inventory, its own chests (placed by it or in `settings.storage.chests`), crafting, gathering or a search for its source, then walk to the player, toss it and say how many they picked up. |
-| `fetch_drops` | Go to where a player died and bring their items back, when it can get there before they despawn. |
+| `fetch_drops` | Go to where a player died and bring their items back, when it can get there before they despawn. For the bot's own drops see [recovery](#recovery). |
 
 Observe hook: `found`.
 
 ### woodcutting
 | action | |
 |---|---|
-| `chop_tree` *dig* | Fell the nearest natural tree of any wood type: cut its logs bottom-up with the best axe, skip logs out of reach, pick up drops and plant a matching sapling on the stump's soil. Crafts a wooden axe first when there is none and the inventory has the wood (`make_axe`). |
+| `chop_tree` *dig* | Fell the nearest natural tree of any wood type: cut its logs bottom-up with the best axe, climb for logs out of reach, pick up drops and plant a matching sapling on the stump's soil. Crafts a wooden axe first when there is none and the inventory has the wood (`make_axe`). With `rings` it searches wider: remembered tree spots, then ring by ring, rings past 64 blocks as a scouting trip out and back ([the wood ladder](/guide/progression#the-wood-ladder)). |
 
 A "natural tree" is a connected group of logs with at least three non-persistent leaves
 attached. Player-placed leaves are persistent, so log walls, cabins and log piles are left
-alone. Very tall trees (big spruce, jungle) leave their upper logs standing; the result says
-how many were out of reach.
+alone. Logs out of reach from the ground are cut by pillaring up the trunk; the result says how
+many logs reached the inventory and why any didn't.
 
 ### building
 
@@ -279,7 +288,8 @@ For servers that run [WorldEdit](/guide/worldedit) (mod, plugin or FAWE) and let
 | `we_status` *ne* | Is WorldEdit there for me (settings, announced channels, then a `/we version` probe), my selection, clipboard and limit. |
 | `we_select` *ne* | `//pos1` / `//pos2` from two corners, or a box around the asking player. |
 | `we_set`, `we_replace`, `we_walls`, `we_outline`, `we_hollow` *ne* | Region edits on the selection, refused over the limit or in protected areas. |
-| `we_copy`, `we_cut`, `we_paste`, `we_rotate`, `we_flip` | Clipboard; `we_paste` checks the clipboard size (`//size -c`) first and can walk to x y z. |
+| `we_copy`, `we_cut`, `we_rotate`, `we_flip` *ne* | Clipboard. |
+| `we_paste` | Paste the clipboard; checks its size (`//size -c`) first and can walk to x y z. |
 | `we_undo`, `we_redo` *ne* | History. |
 | `we_schem_list`, `we_schem_load`, `we_schem_save` *ne* | [Schematics](/guide/blueprints#import) in the server's WorldEdit folder. |
 | `we_raw` *ne* | One whitelisted `//` command (expand, stack, smooth...). |
@@ -290,7 +300,7 @@ Observe hook: `worldedit` (only when it is available).
 ### progression
 | action | |
 |---|---|
-| `upgrade_tools` | Climb the tool tiers as far as it can now: stone tools, a furnace, iron (smelted with coal or charcoal), diamond if it has diamonds; armour optionally. Says what is missing. |
+| `upgrade_tools` | Climb the tool tiers as far as it can now: stone tools, a furnace, iron (smelted with coal or charcoal), diamond if it has diamonds; armour optionally. The sword comes right after the pickaxe at each tier. Safe mining (`settings.mining`) keeps it out of deep ore and caves until it has a weapon, food and the gear asked for; going for ore is a trip. Says what is missing. |
 
 See [Tool progression](./guide/progression.md).
 
@@ -307,9 +317,17 @@ Observe hook: `respawnPoint` (once known). The behaviour that uses them is
 ### lighting
 | action | |
 |---|---|
-| `light_up` | Spawn-proof an area (home, farm:1, x y z or here): the fewest torches that bring every spot a mob could spawn on to a light target, crafted from coal or charcoal (charcoal smelted from logs), placed without breaking anything; never on farmland, paths, by doors, in water or protected areas. Remembers its own torches; `dry_run` only reports. |
+| `light_up` | Spawn-proof an area (home, farm:1, x y z or here): the fewest torches that bring every spot a mob could spawn on to a light target, crafted from coal or charcoal (charcoal smelted from logs), placed without breaking anything; never on farmland, crops, paths, by doors, in water, near the world spawn or in protected areas. Around its own farms it stays off the field and lights only the ground the field is on (`surface`). Remembers its own torches; `dry_run` only reports. |
 
 The behaviour that uses it is [light_home](./guide/behaviors#spawn-proofing-light-home).
+
+### recovery
+| action | |
+|---|---|
+| `recover_items` | After its own death: walk back to the death spot, pick up its drops before they despawn (5 minutes), put armour and weapon back on, and say what came back. Refuses when the drops are lost (lava, void, another dimension, too far for the time left) or the spot looks too dangerous; `force=true` goes anyway. Long-running. |
+
+The decision (worth a trip or not) is the pure `recoverDecision` in `src/skills/recoverPlan.ts`.
+The behaviour that uses it is [recover_drops](./guide/behaviors#death-drops-recover-drops).
 
 ### mods
 Not in a bundle; add `modsSkill()`.

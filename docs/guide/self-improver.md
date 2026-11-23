@@ -164,7 +164,7 @@ nearest player), `{bot}`, `{var.<name>}`.
 Facts: `health`, `food`, `timeOfDay`, `isNight`, `isDay`, `sleeping`, `busy`,
 `homeDistance`, `playersNearby`, `hostilesNearby`, `nearestPlayer.name`,
 `nearestPlayer.distance`, `nearestHostile.name`, `nearestHostile.distance`,
-`need.<name>` (blackboard needs), `inventory.<item>`, `place.<name>` (distance to a
+`need.<name>` ([blackboard](/concepts/architecture#fleets-and-multiple-servers) needs), `inventory.<item>`, `place.<name>` (distance to a
 remembered place), `var.<name>`, `timer.<name>`. Missing distances read -1.
 
 ### Triggers

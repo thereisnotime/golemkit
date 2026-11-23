@@ -607,7 +607,7 @@ are five or more logs to chop, a pickaxe when there is cobblestone to mine. Then
 2. crafts planks from whatever logs it has (keeping the logs the build places as blocks), then
    sticks;
 3. mines what the plan needs: cobblestone (from stone, with a pickaxe made first), dirt, sand,
-   gravel;
+   gravel (through `collect`, so the [safe mining](/guide/progression#safe-mining) rules apply);
 4. goes for the extras: **torches** from coal ore in sight, else charcoal smelted from a log
    (`smelt`); **glass** from sand within the radius, smelted; **wool** from sheep nearby (never
    pets, named, penned or protected ones) for a bed. Stone for a furnace, coal ore and sand are

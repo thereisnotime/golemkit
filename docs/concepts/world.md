@@ -301,7 +301,7 @@ Safety rails, in every mode:
   spawn protection or claims, or `world.spawnProtection` around the world spawn) are left alone
   while `combat.spareProtected` is on (default);
 - only owners change the mode or the lists (`!pvp`, `!attack_player`, `!hunt_player`,
-  `!config_set`); an LLM or NPC brain can't start PvP. Anyone may make it more peaceful
+  `!config_set`); an LLM or [NPC brain](/guide/npc-brain) can't start PvP. Anyone may make it more peaceful
   (`!pvp off`, `!spare_player`);
 - the kill switch: `!pvp off`, or "pax stop" / `!stop` from an owner, ends every fight with a
   player and every hunt at once; `stop` also drops an attacking mode to `off` (`defend` stays,
@@ -396,7 +396,7 @@ Every bot with the combat skill now keeps a ranged watch (`skills/ranged.ts`):
 - **Patrols**: pillagers, vindicators, evokers and ravagers within 24 are counted.
 
 The `ranged_defense` action (reflex priority, so it preempts whatever job runs: find_food,
-find_target, chop_wood_loop; they resume afterwards) answers with `rangedResponse` in
+[find_target](/guide/search), chop_wood_loop; they resume afterwards) answers with `rangedResponse` in
 `ranged-plan.ts`:
 
 ```mermaid
@@ -462,6 +462,14 @@ flowchart TB
   as the same spell). At the cap it stands its ground with a bow, shield or weapon; with none of
   those, or at 8 health or less, it may go 16 blocks further. Before backing off at all it looks for cover up to 14 blocks
   out, so cover wins over distance.
+- **Heavy fire** (`heavyFire`: outnumbered for its gear score, or 8 health or less) changes the
+  order in the chart: every second in sight is a hit from each shooter, so cover only counts when
+  it is quick to reach (`quickCover`) and a wall only when it is quick to build (`quickWall`),
+  both at about one expected hit. Otherwise it gets out of sight, up to 48 blocks (`FLEE_CAP`)
+  from where the shooting started, towards home when home lies roughly away from the shooters,
+  blocking an arrow with a shield on the way when it has one. A slow cover or wall is the
+  fallback only when it can't back off any further. The numbers and the benchmark are under
+  [Ranged safety](../guide/behaviors#ranged-safety).
 - **Danger zones** (`core/danger.ts`): every shooter it deals with is remembered where it was seen,
   with a radius of its range + 8 (24 for a skeleton), for 5 minutes after the last sighting; a
   patrol of 3+ is remembered at its middle with a radius of 32 for 10 minutes. Killing the only
@@ -477,7 +485,7 @@ flowchart TB
 - **Ghasts** without a bow, and **blazes** without a bow or shield: cover.
 - A melee mob within 3 blocks is fought first; a `defend` already running is only taken over to
   hide, and a bodyguard's `protect` only at 6 health or less.
-- `stay_safe` adds a `ranged` danger (score 91, above a starving keep_fed's 90) when a shooter
+- `stay_safe` adds a `ranged` danger (score 91, above a starving [keep_fed](/guide/behaviors)'s 90) when a shooter
   has a line to the bot and it is at 12 health or less, or outnumbered for its gear score: it runs
   `ranged_defense` in cover mode. Option `ranged` (default on); reflexes have `rangedDefense`.
   `ranged_defense` takes `build: false` to never place blocks.
@@ -536,12 +544,23 @@ Besides this loop the reflexes also:
   attacking modes (see [PvP](#pvp)).
 
 The reflexes all run at the same priority, and an equal priority replaces the running action, so
-a referee (`reflexPlan.ts`, pure and tested) decides whether a new reflex may take the body from
-the one running: a reflex keeps it for 1.5 s unless health drops by 4 or more; `climb_out` and
-`retreat` aren't interrupted by `ranged_defense`, nor by a fight unless a melee mob is within 2
-blocks; `ranged_defense` isn't interrupted by `defend` for a mob more than 3 blocks away; the water
-bucket always goes. Without it, a bot underground with skeletons and a spider switched between
-`ranged_defense`, `climb_out` and `defend` every 0.2 to 2 s and died without finishing any.
+a referee (`mayReplace` in `src/skills/reflexPlan.ts`, pure, tested in `test/reflex-plan.test.ts`)
+decides whether a new reflex may take the body from a running one that a reflex started
+(`climb_out`, `retreat`, `ranged_defense`, `defend`, `bunker`, `eat`, `pvp_engage`,
+`defend_player`, `water_bucket`; a player's or a behaviour's action isn't its business):
+
+- the same reflex isn't started again while it runs;
+- `water_bucket` always goes (a lethal fall or fire);
+- a reflex keeps the body for 1.5 s (`HOLD_MS`) unless health drops by 4 or more (`SHARP_DROP`)
+  since it started;
+- `climb_out` and `retreat` aren't interrupted by `ranged_defense`, nor by `defend` or
+  `pvp_engage` unless a melee mob is within 2 blocks;
+- `ranged_defense` isn't interrupted by `defend` for a melee mob more than 3 blocks away.
+
+Flyers and shooters don't count as melee mobs here. A reflex held back is logged at debug level
+(`reflex defend held back: ranged_defense: no melee mob within 3`). Without the referee, a bot
+underground with skeletons and a spider switched between `ranged_defense`, `climb_out` and
+`defend` every 0.2 to 2 s and died without finishing any.
 
 `reflexes.selfDefense` off turns off all the fighting parts, PvP defence included. In creative
 and spectator the mob, hunger and fall reflexes are off.
@@ -602,8 +621,10 @@ Bots climb the tool tiers on their own: stone tools as soon as there is a wooden
 three cobblestone, then a furnace, iron (smelted with coal, planks or charcoal) and diamond
 tools when diamonds turn up. Stone comes from a safe staircase and strip mine instead of
 pathing to buried blocks (never straight down, never next to lava or water), and tall trees are
-climbed so no logs stay up there. The upgrade path, the safety checks and how speed is measured
-are in [Tool progression and gathering](../guide/progression).
+climbed so no logs stay up there. Going deeper than `mining.safeDepth` (8) needs a weapon, food
+and, depending on `mining.gear`, armour or a shield, and a bot losing underground abandons the dig and
+climbs out ([safe mining](../guide/progression#safe-mining)). The upgrade path, the safety checks
+and how speed is measured are in [Tool progression and gathering](../guide/progression).
 
 ## Whose blocks
 
@@ -631,8 +652,15 @@ blocks. A fight pauses the climb instead of cancelling it.
 
 The pathfinder never plans drops over 4 blocks, also not into water (mineflayer allows any
 height into water by default; off here). Scouting legs aim at the open-sky ground and climb out
-with `climb_out` when a leg ends up in a cave or ravine. Death whispers say how many items
-dropped (or that there were none); `goto_death` refuses traps where it died twice in 10 minutes.
+with `climb_out` when a leg ends up in a cave or ravine.
+
+After a death the adapter works out the real cause (the server's death message, else the last
+damage) and the agent keeps it as `lastDeath` in `observe()` for 10 minutes; hooks get it as
+`{cause}` and `{deathDetail}` (Pax whispers its owners "I died at {pos}: {cause}. {drops}"), see
+the [journal](../guide/journal#what-is-recorded). `recover_drops` goes back for the items when
+they can still be had and the spot is safe enough for its gear
+([Death drops](../guide/behaviors#death-drops-recover-drops)); `goto_death` refuses traps where
+it died twice in 10 minutes.
 
 ## Game modes
 

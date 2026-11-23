@@ -48,13 +48,17 @@ started, [reflexes](/concepts/world#reflexes) can interrupt it, and other brains
 | `npc` | 20 | NPC routines |
 | `scene` | 25 | Scene choreography (sceneBrain), above NPC routines |
 | `llm` | 30 | LLM decisions |
-| `behavior` | 35 | armed survival behaviours (keep_fed, stay_safe) |
+| `behavior` | 35 | armed survival behaviours ([keep_fed](/guide/behaviors), stay_safe) |
+| `hook` | 40 | context-pack [hooks](/guide/context-pack#hooks-yaml) (hooksBrain) |
 | `player` | 50 | chat commands |
-| `reflex` | 60 | self-defence, eating |
+| `reflex` | 60 | self-defence, eating, getting out of danger |
 | `system` | 100 | boot scripts, admin |
 
 - Higher priority preempts. A preempted `longRunning` action is resumed afterwards.
-- Equal priority replaces the current action.
+- Equal priority replaces the current action. All reflexes share priority 60, so the reflexes
+  brain referees them (`src/skills/reflexPlan.ts`): a reflex that just started keeps the body for
+  1.5 s unless health drops sharply, and escapes (`climb_out`, `retreat`) aren't cut short by a
+  fight unless a melee mob is adjacent. See [reflexes](/concepts/world#reflexes).
 - Lower priority gets `{ ok: false, message: 'busy: ...' }`. Back off and try later rather
   than retrying in a tight loop.
 - `agent.currentAction` tells you what's running and who started it.
@@ -67,7 +71,7 @@ started, [reflexes](/concepts/world#reflexes) can interrupt it, and other brains
 | `agent.on('serverMessage', text)` | joins, deaths, advancements, system text |
 | `agent.on('actionStart' \| 'actionEnd', ...)` | what the body is doing |
 | `agent.on('session' \| 'sessionEnd', ...)` | connection lifecycle |
-| `agent.adapter.on(...)` | game events any adapter emits: `playerJoined`, `hurt`, `death`, `kicked`, ... (game-agnostic) |
+| `agent.adapter.on(...)` | game events any adapter emits: `playerJoined`, `hurt`, `death`, `deathCause` (why it died, a moment later; `onDeathReport` from core wraps it), `kicked`, ... (game-agnostic) |
 | `bot.on(...)` | anything mineflayer emits (register in `session`, remove in the cleanup; Minecraft only) |
 | `agent.fleet.subscribe(agent, fn)` | messages from other bots on the same server |
 

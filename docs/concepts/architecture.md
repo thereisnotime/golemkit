@@ -5,16 +5,15 @@ scopeNote: "The action lock, brains, chat queue and fleets are game-agnostic; th
 
 # Architecture
 
-```
-variants/<name>.ts      what kind of bot: skills + brains + default persona/settings
-profiles/<name>.yaml    a saved instance: variant + username, owners, server, LLM, settings
-fleets/<name>.yaml      profiles/variants run together, possibly on several servers
-src/brains/             who decides: command (chat), npc, llm, intents, behaviours, scenes, ...
-src/skills/             what it can do: actions grouped by topic (Minecraft)
-src/core/               agent lifecycle, action lock, chat, storage, the GameAdapter interface
-src/adapters/           games: minecraft-java (Mineflayer, reflexes, behaviour library,
-                        server platforms in platforms/: neoforge, vanilla, paper)
-```
+| Path | What it holds |
+|---|---|
+| `variants/<name>.ts` | what kind of bot: skills, brains, default persona and settings |
+| `profiles/<name>.yaml` | a saved instance: variant, username, owners, server, LLM, settings |
+| `fleets/<name>.yaml` | profiles or variants run together, possibly on several servers |
+| `src/brains/` | who decides: command (chat), npc, llm, intents, behaviours, scenes, ... |
+| `src/skills/` | what it can do: actions grouped by topic (Minecraft) |
+| `src/core/` | agent lifecycle, action lock, chat, storage, the GameAdapter interface |
+| `src/adapters/` | games: `minecraft-java` (Mineflayer, reflexes, behaviour library, server platforms in `platforms/`: neoforge, vanilla, paper) |
 
 ## The big picture
 
@@ -89,7 +88,13 @@ get the bot as `ctx.bot`. The agent owns:
 - the [event journal](../guide/journal) (`agent.journal`, JSONL under `data/bots/<username>/journal/`): typed facts about what happened, with rollups
 - learned [protected areas](./world#protected-areas) (`agent.protectedAreas`) per server
 - `observe()`: a JSON snapshot of the bot and surroundings, extended by skills and brains
-- events: `session`, `sessionEnd`, `chat`, `serverMessage`, `actionStart`, `actionEnd`, `llmUsage`, `chatOut`, `protectedArea`, `stopped`, `settingsChanged`, `gameModeChanged`
+- events: `session`, `sessionEnd`, `chat`, `serverMessage`, `actionStart`, `actionEnd`, `llmUsage`, `chatOut`, `protectedArea`, `stopped`, `settingsChanged`, `askHelp`, `helpSorted`, `gameModeChanged`
+  (`AgentEvents` in agent.ts). `askHelp` and `helpSorted` come from the help desk
+  (`src/brains/npc/help.ts`, one per agent) when a behaviour keeps failing the same way and when it
+  works again, see [Asking for help](../guide/behaviors#asking-for-help)
+- `lastDeathReport`: the cause of the last death, from the adapter's `deathCause` event (the
+  server's death message, recent damage, hostiles close by, what it was doing); `observe()` shows it
+  as `lastDeath` for 10 minutes. See the [journal](../guide/journal#what-is-recorded)
 
 The negotiating step is the NeoForge platform's handshake; on vanilla and Paper the bot goes
 straight from login to configuration.
@@ -178,9 +183,18 @@ sequenceDiagram
   N->>L: act wander
   L-->>N: busy: follow<br/>(player)
 ```
- `cancelActions(match)` aborts
-and drops only the actions matching a predicate (a scene uses it to stop exactly what it
-started).
+
+`cancelActions(match)` aborts and drops only the actions matching a predicate (a scene uses it
+to stop exactly what it started).
+
+Every reflex runs at 60, so one reflex would replace another on every check. The reflexes brain
+asks a referee first (`mayReplace` in `src/skills/reflexPlan.ts`): a reflex keeps the body for
+1.5 s unless health drops sharply, and escapes such as `climb_out` aren't cut short by a fight
+that can't reach the bot yet. Details under [Reflexes](./world#reflexes).
+
+A behaviour on the NPC controller can act at its own priority instead of its brain's (armed
+behaviours take `priority: idle | npc | behavior`), so an armed `keep_fed` (35) keeps running
+while an LLM (30) holds the body. See [Priorities and back-off](../guide/behaviors#priorities-and-back-off).
 
 ## Skills
 
@@ -214,11 +228,13 @@ Several brains run at once and negotiate through priorities. Shipped:
 - `commandBrain()` maps chat to actions: every action is a command; positional args in schema
   order, `key=value` works, last string param takes the rest of the line.
 - `reflexes()` (`src/adapters/minecraft-java/brains/reflexes.ts`) handles self-defence, ranged
-  defence, auto-eat, armour and totem swaps and the water clutch at reflex priority.
-- `hooksBrain()` runs the context pack's [hooks.yaml](/guide/context-pack#hooks-yaml):
+  defence, auto-eat, armour and totem swaps, the water clutch and, when `combat.pvp` allows it,
+  PvP (`defend_player`, `pvp_engage`) at reflex priority, with a referee so the reflexes don't take
+  the body from each other.
+- `hooksBrain()` runs the [context pack](/guide/context-pack)'s [hooks.yaml](/guide/context-pack#hooks-yaml):
   event-to-action rules without an LLM, at priority 40.
 - `intentsBrain()` turns plain-language owner commands into actions without an LLM; next to an
-  LLM brain it fills in while the model can't think or takes the simple requests itself. See
+  [LLM brain](/guide/llm-brain) it fills in while the model can't think or takes the simple requests itself. See
   [Intents](../guide/intents.md).
 - `behaviorsBrain()` runs [armed behaviours](/guide/behaviors) (keep_fed, stay_safe, follow_owner...) that owners,
   LLMs and hooks switch on at runtime. See [Behaviours](../guide/behaviors.md).

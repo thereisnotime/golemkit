@@ -214,8 +214,8 @@ executed.
 
 Deterministic event -> action rules run by the hooks brain, without the LLM, so they work
 while the model is slow, paused or out of budget. Actions go through `agent.act()` with caller
-`brain:hooks` at priority **40**: above the LLM (30), [scenes](/guide/scenes) (25) and NPC loops (20), below
-player commands (50) and [reflexes](/concepts/world#reflexes) (60). So a hook can interrupt the model's `goto` to eat (the
+`brain:hooks` at priority **40**: above [armed behaviours](/guide/behaviors) (35), the LLM (30), [scenes](/guide/scenes) (25)
+and NPC loops (20), below player commands (50) and [reflexes](/concepts/world#reflexes) (60). So a hook can interrupt the model's `goto` to eat (the
 `goto` resumes, it's long-running), but never a player's `!follow` or a reflex. Chat goes
 through `agent.say/whisper`.
 
@@ -269,11 +269,12 @@ Hook keys:
 | `cooldown` | minimum time between firings |
 | `once` | `true` / `session` (again after a reconnect) or `forever` (until restart) |
 | `enabled` | `false` to keep a hook in the file but off |
-| `do` | steps in order: `act` (+ `params`, optional `priority`: `npc`/`llm`/`player`/number), `say`, `whisper: { to, text }` (`to`: `player`, `owners` (online owners), or a name), `remember` (text or `{ text, about }`) |
+| `do` | steps in order: `act` (+ `params`, optional `priority`: `npc`/`llm`/`player`/number), `say`, `whisper: { to, text }` (`to`: `player`, `owners` or `owner` (online owners), or a name), `remember` (text or `{ text, about }`) |
 
 A failed `act` stops the remaining steps of that hook. Templates are plain `{name}`
 substitutions: `{bot} {owner} {player} {message} {action} {error} {reason} {health} {food}
-{pos}` and chat groups. A param that is exactly one placeholder keeps its type. The file is
+{pos}`, chat groups, and on `death` also `{deathPos} {cause} {killer} {deathMessage} {deathDetail}
+{drops}`. A param that is exactly one placeholder keeps its type. The file is
 validated with a strict schema: unknown events or step types reject the file (logged), bad
 regexes or too-short timers disable that hook, unknown actions are warned about.
 

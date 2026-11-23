@@ -205,7 +205,10 @@ flowchart TB
 ### Reflexes and stay_safe
 
 `reflexes()` reacts to being hit: fight back, retreat at 8 health or less (not from mobs that
-outrun the bot, see `combat.fightFastMobs`; always from a warden), eat when food is carried. `stay_safe` acts earlier and on what reflexes don't cover: backing off at 10 health
+outrun the bot, see `combat.fightFastMobs`; always from a warden), eat when food is carried.
+The reflexes share one priority (60), so a [referee](/concepts/world#reflexes) keeps one from
+taking the body from another mid-move (a reflex holds it at least 1.5 s; climbing out isn't cut
+short by archers). `stay_safe` acts earlier and on what reflexes don't cover: backing off at 10 health
 before the next hit, pillaring up when surrounded (only if it can place blocks and carries
 dirt/cobblestone/planks), leaving water when mobs are near, going home at night. Both use
 the same `retreat`/`flee` actions and the reflex always outranks the behaviour, so they
@@ -265,8 +268,9 @@ pillagers, witches, blazes, ghasts, drowned with tridents); the details are unde
 
 Going home at night has some slack so it doesn't flap at the edge of `homeRange`:
 
-- "Home" is measured horizontally from the home block, and a height difference only counts
-  beyond 3 blocks, so a floor up, a cellar or the inside of the walls is home. `go_home`
+- "Home" is the straight-line distance from the middle of the home block, where only the part
+  of the height difference beyond 3 blocks counts, so a floor up, a cellar or the inside of
+  the walls is home. `go_home`
   returns at once ("already home") when the bot is within its range by that measure.
 - It starts when the bot is farther than `homeRange` and, once on its way, keeps going until
   it is within go_home's range (4) instead of stopping at `homeRange`. For 3 minutes after
@@ -577,8 +581,8 @@ How to read it:
 ## PvP
 
 PvP is a [setting](../concepts/world#pvp), not a behaviour: `combat.pvp` is `off` by default and
-only owners change it, live, with `!pvp <mode>`, `!config_set combat.pvp <mode>` or "pax pvp
-<mode>". The reflexes do the rest: `defend_player` when a player hits the bot or its guarded
+only owners change it, live, with `!pvp <mode>`, `!config_set combat.pvp <mode>` or "pax pvp all"
+(any mode name). The reflexes do the rest: `defend_player` when a player hits the bot or its guarded
 player (any mode but `off`), `pvp_engage` when an allowed player comes within 16 blocks in the
 attacking modes.
 
@@ -670,7 +674,7 @@ decision is logged at debug level, so the climb is visible in the bot's log:
 
 ```
 keep_fed ladder: rung=search step=scout (nothing within 48 blocks, widening to 120)
-keep_fed ladder: rung=farm step=seeds (no proper food source (every ring out to 250 came up empty in the last 20 min); 2 seeds, breaking grass for more)
+keep_fed ladder: rung=farm step=seeds (no proper food source (every ring out to 250 came up empty in the last 180 min); 2 seeds, breaking grass for more)
 keep_fed ladder: still hungry, next try in 180s (nothing to do, 14 crops growing)
 keep_fed chore: tend_farm (5 cells to plant, re-till or grow (3x3 of 9x9))
 ```
@@ -684,7 +688,7 @@ flowchart TB
   R2 -- yes --> KNOWN["withdraw · harvest ·<br/>go there · hunt"]
   R2 -- no --> R2B{"food ≥ 14 and<br/>farm work or<br/>seeds for a farm?"}
   R2B -- yes --> GROW["tend_farm: replant ·<br/>re-till · grow a ring ·<br/>or start_farm"]
-  R2B -- no --> R3{"3 · a ring not<br/>searched empty<br/>in the last 20 min?<br/>(by day, no danger)"}
+  R2B -- no --> R3{"3 · a ring not<br/>searched empty<br/>in the last 3 h?<br/>(by day, no danger)"}
   R3 -- "48 → 120 → 250" --> SC["find_food on that ring<br/>4 · on the way: seeds from<br/>grass, note animals + water"]
   SC -- "found animals<br/>or crops" --> R2
   SC -- "empty: remember<br/>the ring" --> R3
@@ -924,7 +928,7 @@ and back for the rings past 64, skipping protected areas and remembered danger z
 [tool progression](/guide/progression#the-wood-ladder).
 
 `keep_tools_upgraded` takes wood from the bot's own chests when the next tool needs some. When
-there is none there and no tree within 32 blocks, it sets the `wood` need on the blackboard:
+there is none there and no tree within 32 blocks, it sets the `wood` need on the [blackboard](/concepts/architecture#fleets-and-multiple-servers):
 `chop_wood_loop` then scores 38 instead of 30 (and runs even with `keep` logs in stock) until it
 brings wood back, which clears the need. A behaviour can give the NPC controller a `retryKey`; a
 failed behaviour whose key changes ends its failure back-off early (at least 10 s after the
@@ -944,7 +948,7 @@ The planner is pure and game-agnostic (`src/core/trip.ts`); the Minecraft side i
 **Before leaving** (`prepare_trip`, also an action an LLM can call): it takes food out of its
 pantry and own chests (`settings.storage.chests` and chests it placed, within 160 blocks, best
 food first) until it carries `trips.food` items (8), puts its best sword or axe in hand, and
-checks it. With no weapon, fewer than `trips.minFood` items (4) or under `trips.minHealth`
+checks it. With no weapon (`trips.needWeapon`, on by default), fewer than `trips.minFood` items (4) or under `trips.minHealth`
 health (12) it stays and the behaviour backs off with the reason, e.g. `not ready for a trip
 (looking for sheep 120 blocks out): no weapon, food 1 of 4 items`. Food trips don't need food
 along (getting some is the point), nor does any trip with a food bar of 16 or more when there is
@@ -1424,7 +1428,8 @@ reached), which is the next thing the bench points at.
 **Ice baseline** (the `ice` scenario, the default before the forest one; mc02, 23 Nov 2026, start 1607 62 782, kit none, Pax's behaviours without the LLM,
 1 in-game day = 20 real minutes, one run each). The start has no tree within 32 blocks and water
 and ice nearby. "Pre-merge" ran before trips, asking for help and `light_home` were merged;
-"baseline" with them, on the code this page describes.
+"baseline" with them; "fedtrip" after a well-fed bot was allowed to leave without food to take
+along (see [Trips](#trips)), with the bench arming what NPC mode arms.
 
 | tag | started at | deaths (causes) | food min | health min | tool tier | logs / cobble / food | distance | failures | help asks |
 |---|---|---|---|---|---|---|---|---|---|
@@ -1437,22 +1442,23 @@ natural tree within ~137 blocks, which is why the default moved to the forest.
 
 How to read it:
 
-- Neither run got a single log: with no tree within 32 blocks, `upgrade_tools` fails ("no natural
+- None of the three runs got a single log. In the first two, with no tree within 32 blocks, `upgrade_tools` fails ("no natural
   tree within 32 blocks") and nothing else fetches wood while `chop_wood_loop` is off, so the bot
   ends the day with no tools, no food and no bed. That was a gap in the bench, not in Pax: the
   real bot gets `chop_wood_loop` from NPC mode while its owner is away, the bench kept a test owner
   online. The bench now arms what NPC mode arms (`npcMode.arm`, by default `chop_wood_loop` and
-  `deposit_when_full`), so runs from then on are not comparable with these two.
+  `deposit_when_full`), so runs from then on (fedtrip included) are not comparable with the first two.
 - Pre-merge it walked 900 blocks looking for food (sheep, crops) with nothing in hand and died
   three times: drowned twice while scouting by water, shot once by a skeleton at dusk. A 52 s
   event-loop stall in the first minutes cost it one disconnect.
-- With trips it never left: `prepare_trip` refused every food trip ("no weapon, no food to take
-  along"), so it stood at home all day. Safe, but stuck: it can't get a weapon or food without
+- In the baseline run, with trips, it never left: `prepare_trip` refused every food trip ("no
+  weapon, no food to take along"), so it stood at home all day. Safe, but stuck: it can't get a weapon or food without
   wood, and can't get wood without a trip. After 15 minutes it asked its owner for logs, the one
   help ask. The two runs also started at different times of day (noon against night), which
   alone changes a lot; read them as two stories, not as a measured change.
-- Next steps these point at: let a bot with nothing go out for wood by day (a short, close trip
-  without the weapon and food requirement), or let `upgrade_tools` search further than 32 blocks.
+- What came of it: a trip with a food bar of 16 or more and no food in reach to take along may
+  now leave (see [Trips](#trips)). Fedtrip shows it working: it went 137 blocks out looking for
+  trees. The spot just has none near, hence the forest scenario.
 
 ## Capabilities
 

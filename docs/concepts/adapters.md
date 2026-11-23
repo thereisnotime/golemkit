@@ -6,7 +6,7 @@ scope: core
 
 The agent doesn't talk to Minecraft directly. It holds one **game adapter**, and everything that
 is about a particular game (the network client, its connection, what the bot sees, how it moves)
-lives behind it. The action lock, chat queue, storage, journal, brains, the LLM runtime and
+lives behind it. The [action lock](/concepts/architecture#the-action-lock-and-priorities), chat queue, storage, [journal](/guide/journal), brains, the LLM runtime and
 intents only use the adapter's interface. Minecraft Java is the first adapter and the default;
 the [proposal](https://github.com/thereisnotime/golemkit/blob/main/openspec/changes/game-adapters/proposal.md)
 has the plan for a second game.
@@ -45,10 +45,10 @@ flowchart TB
 | `attach(agent)` | once, from the Agent constructor |
 | `connect({ username })`, `endSession()`, `disconnect()` | start a session; the agent calls `endSession()` after skills and brains cleaned up; `disconnect()` on stop |
 | `connected`, `client` | in the world; the game's own client (Minecraft: the Mineflayer bot) |
-| `self()` | username, position, health, food, held item, and a `game` section (dimension, game mode, ...) |
+| `self()` | username, position, health, food, held item, and a `game` section (dimension, [game mode](/concepts/world#game-modes), ...) |
 | `observe()` | the snapshot behind `agent.observe()`: self, time, players, nearest entities, inventory |
-| `chat(text, to?)`, `command(line)` | send now; the agent's queue does the rate limiting and humanize styling |
-| `on(event)`, `off(event)` | `spawn`, `end`, `chat`, `serverMessage`, `hurt`, `health`, `death`, `respawn`, `playerJoined`, `playerLeft`, `gameMode`, `kicked`, `error` |
+| `chat(text, to?)`, `command(line)` | send now; the agent's queue does the rate limiting and [humanize](/guide/profiles#humanize-player-like-timing) styling |
+| `on(event)`, `off(event)` | `spawn`, `end`, `chat`, `serverMessage`, `hurt`, `health`, `death`, `deathCause` (why it died, once known: the server's death message and recent damage, a moment after `death`), `respawn`, `playerJoined`, `playerLeft`, `gameMode`, `kicked`, `error` |
 
 Optional primitives the core and the brain frameworks use when the game has them:
 `start()` (once per agent start), `entities()`, `inventory()`, `time()`, `players()`, `playerPosition()`, `inDanger()`,
@@ -73,7 +73,7 @@ export const woodcutting = () => defineSkill({
 ```
 
 An agent whose adapter lacks one leaves the action out (`agent.unsupported` lists it), so it's
-no chat command, no LLM tool and not in `!help`; the behaviours brain hides behaviours the game
+no chat command, no LLM tool and not in `!help`; the [behaviours brain](/guide/behaviors) hides behaviours the game
 can't run. The Minecraft Java adapter supports all of them (`mods` comes from the NeoForge
 platform).
 
@@ -84,7 +84,7 @@ server software. `neoforge` (the default) negotiates mod channels, syncs registr
 modded blocks as solid and skips packets vanilla definitions can't parse (see
 [NeoForge support](./neoforge.md)), and also works on vanilla servers since it only answers
 what NeoForge asks; `vanilla` and `paper` add nothing. Pick one with `MC_PLATFORM` or
-`server.platform` in a profile or fleet file; `platforms/index.ts` (`platformFor`) maps the
+`server.platform` in a [profile](/guide/profiles) or [fleet file](/guide/running#a-fleet); `platforms/index.ts` (`platformFor`) maps the
 name to a platform.
 
 A platform has a `name`, the `capabilities` it adds (NeoForge: `mods`) and optional hooks:

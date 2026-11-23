@@ -53,7 +53,9 @@ flowchart TD
   it in-process; CLI agents reach it through the **MCP bridge** (`src/llm/mcp.ts`), a
   streamable-HTTP MCP server on `127.0.0.1` with a random port and a bearer token.
 - Actions run with `caller: { kind: 'brain', name: 'llm' }` at `PRIORITY.llm` (30): above NPC
-  loops, below player commands (50) and [reflexes](/concepts/world#reflexes) (60). A `busy: ...` result goes back to the
+  loops (20) and [scenes](/guide/scenes) (25), below armed [behaviours](/guide/behaviors) (35, so `keep_fed` still runs when
+  the model forgets to eat), [hooks](/guide/context-pack#hooks-yaml) (40), player commands (50) and
+  [reflexes](/concepts/world#reflexes) (60). A `busy: ...` result goes back to the
   model as the tool result.
 - **Long-running actions** (`follow`, `guard`) start in the background: the tool waits 1.5 s
   for an immediate failure, then reports `started follow`. Short actions are awaited up to 30 s,
@@ -348,7 +350,7 @@ Totals are kept for this run, today and all time, per bot and per provider, in
 
 ## Driving a bot from your own agent CLI
 
-`llmBrain({ mcp: { expose: true, port: 7801 } })` (or `MC_LLM_MCP_EXPOSE=true`) starts the
+`llmBrain({ mcp: { expose: true, port: 7801 } })` (the `companion` variant sets it from `MC_LLM_MCP_EXPOSE=true`) starts the
 bridge for any provider and logs its URL and bearer token. Point any MCP client at it, e.g.:
 
 ```bash

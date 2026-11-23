@@ -60,7 +60,7 @@ for every stone tool still to come.
 
 ### Short of wood
 
-Recipes take planks of one kind: two spruce planks make sticks, one oak and one spruce plank
+**Planks per kind.** Recipes take planks of one kind: two spruce planks make sticks, one oak and one spruce plank
 make nothing. The planner counts wood that way (`usablePlankUnits`: a lone plank of a kind no
 log in the inventory turns into counts for nothing), and `ensureSticks` / `ensureTool` top up
 one kind from the logs (`plankTopUp`). Before that fix Pax looped for hours on "could not make
@@ -71,8 +71,8 @@ When the next step needs logs, `upgrade_tools` first takes logs (then planks of 
 the bot's own chests within 48 blocks (the ones it placed and `storage.chests` from the profile,
 those known to hold wood first), then fells a tree within 32 blocks. If neither works the step
 fails with "needs wood: ..." and `data.need = 'wood'`. `keep_tools_upgraded` then sets the `wood`
-need on the blackboard, which makes `chop_wood_loop` run at a higher score (38) and search
-further out (see [the wood ladder](#the-wood-ladder)). Its failure back-off has a retry key, the
+need on the [blackboard](/concepts/architecture#fleets-and-multiple-servers), which makes `chop_wood_loop` run at a higher score (38 instead of 30)
+and search further out (see [the wood ladder](#the-wood-ladder)). Its failure back-off has a retry key, the
 usable wood it holds: as soon as that changes (a tree felled, the owner hands over logs) the
 back-off ends and the upgrade runs again, instead of waiting out 60, 120, 240... seconds.
 
@@ -127,13 +127,15 @@ every block: losing underground, it stops and runs `climb_out`. A live test bot 
 (shield, bread, stone tools) went for iron ore in a cave, ended up in water at y 33 and drowned
 at 4 health without a mob in sight; that is why air and health count without a hostile near.
 
-**Underground fights** (reflexes): the same test runs when the bot is hit or a hostile is
+**Underground fights** ([reflexes](/concepts/world#reflexes)): the same test runs when the bot is hit or a hostile is
 within 6 blocks, or while health is still dropping (drowning, lava, a fall). Underground (3+
 solid blocks overhead and little sky light) and losing, it runs
 `climb_out` instead of `defend`, whatever `reflexes.retreatBelow` says (Pax keeps 0 there and
 still climbs out underground). A melee mob right on it at its level still gets fought
-(`keepClimbing`), and the climb is retried 15 seconds later. Once no hostile is within 6 blocks,
-the reflexes eat to heal below 14 health as before.
+(`keepClimbing`), and the climb is retried 15 seconds later. Once started, the climb isn't taken
+over by another reflex (`ranged_defense` never, a fight only for a melee mob right next to it);
+that is the [reflex referee](/concepts/world#reflexes). Once no hostile is within 6 blocks, the
+reflexes eat to heal below 14 health as before.
 
 All of it is live config (`!config_set mining.gear armour`, see [live config](./live-config)),
 and `upgrade_tools safe=false` or `keep_tools_upgraded { safeMining: false }` skip it for one
@@ -204,12 +206,16 @@ started after felling a tree more than 48 blocks away. The decision is the pure
 - Natural trees only (at least 3 natural leaves), never in protected areas, never in or across
   a remembered danger zone (core `dangerMemory`); saplings are replanted as before.
 - Trees seen around every felled tree and on scouting trips are remembered in storage
-  (`woodcutting.treeSpots`, a spot per 24 blocks, at most 24) and journalled as `found` events.
-  A spot found without a tree is left alone for 30 minutes.
+  (`woodcutting.treeSpots`, a spot per 24 blocks, at most 24, forgotten after 3 days) and
+  journalled as `found` events. A spot found without a tree is left alone for 30 minutes.
 - An empty ring is remembered for 20 minutes (`woodcutting.searches`), so the next run starts one
   ring further out instead of failing at 32 blocks every 15 minutes. A scouting trip cut short
   (night, low health, stuck three legs in a row, the 10 minute limit) is not counted as empty.
 - When every ring came up empty it fails with when it will look again.
+- Rings past 64 blocks (`trips.minDistance`) are a [trip](./behaviors#trips) when a behaviour
+  asks (not an owner's `!chop_tree`, unless `trips.ownerOrders`): food from the pantry and a
+  weapon first, home again when food or daylight runs short. A bot with less than 3 planks' worth
+  of wood skips the weapon check, since the wood is what makes the weapon.
 
 Set the rings per bot in the profile, e.g. Pax:
 
@@ -251,11 +257,14 @@ behind, and the strip mine sweeps its tunnel before it stops.
 **Seeds and food.** Wheat seeds come from breaking grass (about 1 in 8 drops). The crafting
 junk cleaner keeps 16 wheat seeds and 8 beetroot seeds, so seeds picked up while `keep_fed`
 searches for food survive until the bot starts a farm. `gather_seeds` breaks grass on purpose,
+surface grass only (within 12 blocks above or below the bot, nothing solid over it: a seed run
+once led Pax 75 blocks down into a lush cave),
 `forage` picks sweet berries, cuts kelp (smelted into dried kelp) and, when desperate, breaks
 leaves for apples, `tend_farm` keeps a farm planted and grows it towards 9x9 with seeds beyond a
-small reserve, and the whole food ladder (search rings of 48, 120 and 250 blocks, a trip to a
-known farm or village, the far rings by day, then a farm near home, with farm work between
-meals) is in [behaviours](/guide/behaviors#food-keep-fed-the-food-ladder-and-farm-setup).
+small reserve. The whole food ladder (search rings of 48, 120, 250, 400 and 600 blocks, rings
+past 48 only with good enough gear or real hunger, trips to known food places, a pantry chest,
+then a farm near home, with farm work between meals) is in
+[behaviours](/guide/behaviors#food-keep-fed-the-food-ladder-and-farm-setup).
 
 ## Speed
 

@@ -321,6 +321,7 @@ the LLM in `first` mode.
 | wood | chop some wood, get wood, chop a tree, chop down three trees, get 20 logs, gather a stack of wood, get 16 oak logs | `chop_tree` (up to 5 trees), or `gather_materials` for counts |
 | collect / mine | get 64 cobblestone, get a stack of cobble, mine ten iron, dig some dirt, collect a few sand | `collect` (64 at a time; default 8), `gather_materials` for wood and bigger counts |
 | find | find iron, find a village, look for water, where is the nearest village?, find diamonds and bring them back, locate X within 500 blocks | `find_target {target, radius, bring}` when the bot has it |
+| where is my X | where's my iron, where are my diamonds | `where_stored {item}`: answered from [container memory](/guide/search#container-memory), adding that "bring me X" fetches it when the chest is its own; without `where_stored` it searches like find |
 | bring | bring me bread, bring me bread 5, bring me some iron, get me some bread | `bring_item {item, count, player}` when present; otherwise walks over and drops it if it carries the item |
 | give | give me your bread, give me 3 of your apples, gimme your logs | walks over and `drop`s it from the inventory (generic names match: logs, food) |
 | drop | drop your dirt, drop 5 cobble, drop everything | `drop` |
@@ -331,10 +332,10 @@ the LLM in `first` mode.
 | set home | set home, set home here, this is your home | `set_home` (bot's or speaker's position) |
 | remember | remember this place as the mine, save this spot as wheat field | `remember_place` at the speaker's position |
 | build | build a house (here), build me a log cabin, put up a shelter | `build` with the [blueprint](/guide/goals-and-building#blueprint-format) (house = small_house, big house = cottage, log cabin = cabin); "here" = the speaker's position |
-| PvP mode | pvp off, pvp defend, set pvp to revenge, pvp targets, pvp all; stop attacking, stop pvp, ceasefire (= off) | `pvp {mode}`; off is the kill switch (ends every fight and hunt). Owners only, see [PvP](/concepts/world#pvp) |
-| attack a player | attack bob, fight bob, go after bob, kill bob on sight | `attack_player {player}`: only a player online by that name (never "attack zombies", "kill everything", "attack me") |
-| hunt a player | hunt bob, hunt bob down, track down bob, find and kill bob | `hunt_player {player}`: goes where they were last seen and fights them |
-| spare a player | stop attacking bob, leave bob alone, don't attack bob, forgive bob | `spare_player {player}`: off the list, grudge forgiven, fight ended |
+| PvP mode | pvp off, pvp defend, set pvp to revenge, switch pvp to targets, pvp mode all; stop attacking, stop fighting, stop pvp, ceasefire, peace (= off; with a name it is "spare") | `pvp {mode}`; off is the kill switch (ends every fight and hunt). Owners only, see [PvP](/concepts/world#pvp) |
+| attack a player | attack bob, fight bob, go after bob, take out bob, kill bob on sight | `attack_player {player}`: only a player online by that name (never "attack zombies", "kill everything", "attack me"); a name nobody online has gets "no player called bob online" |
+| hunt a player | hunt bob, hunt bob down, track down bob, find and kill bob | `hunt_player {player}`: goes where they were last seen and fights them; same online check |
+| spare a player | stop attacking bob, stop hunting bob, leave bob alone, don't attack bob, never attack bob, spare bob, forgive bob | `spare_player {player}`: off the list, grudge forgiven, fight ended |
 | behaviours | start farming, keep chopping, go exploring, stop chopping, turn on keep_fed, disarm farm_loop | `behavior_arm` / `behavior_disarm` (farming = farm_loop, chopping = chop_wood_loop, following = follow_owner, exploring = wander, ...) |
 | help | help, what can you do? | lists the phrases |
 

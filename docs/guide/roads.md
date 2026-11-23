@@ -83,21 +83,20 @@ block is at `f - 1`. Between two cells `f` changes by at most one. For every one
 road block of the **higher** cell is a stair facing the way up, on every lane of that row. Walking
 up, you step from a full block onto the low half of the stair and stand one block higher.
 
-```
-side view, walking east (uphill), one lane
+Side view, walking east (uphill), one lane. Each column is a cell, each row a block height:
 
-            cell:   0    1    2    3    4    5    6    7
- walking height f:  65   65   66   66   67   68   68   68
+| y | cell 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | |
+|---|---|---|---|---|---|---|---|---|---|
+| walking height `f` | 65 | 65 | 66 | 66 | 67 | 68 | 68 | 68 | |
+| 67 | | | | | | S | # | # | stair on cell 5, then floor at walking height 68 |
+| 66 | | | | | S | c | c | c | stair on cell 4: two rises in a row |
+| 65 | | | S | # | c | c | c | c | stair on cell 2, floor on cell 3 |
+| 64 | # | # | c | c | c | c | c | c | floor at walking height 65 |
+| 63 | ~ | ~ | ~ | ~ | ~ | ~ | ~ | ~ | natural ground |
 
-   y 67                                      S    #    #      ← stair on cell 5, then floor at walking height 68
-   y 66                                 S    c    c    c      ← stair on cell 4: two rises in a row
-   y 65                       S    #    c    c    c    c      ← stair on cell 2, floor on cell 3
-   y 64             #    #    c    c    c    c    c    c      ← floor at walking height 65
-   y 63             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  natural ground
-
-   S = stone_brick_stairs[facing=east]  # = stone_bricks  c = cobblestone base
-   (a cut works the same way upside down: ground above f..f+2 is dug away instead of filled)
-```
+`S` = `stone_brick_stairs[facing=east]`, `#` = `stone_bricks`, `c` = cobblestone base, `~` =
+natural ground. A cut works the same way upside down: ground above `f..f+2` is dug away instead
+of filled.
 
 Rules that keep it looking built rather than generated:
 
