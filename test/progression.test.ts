@@ -30,6 +30,18 @@ test('nextToolUpgrade: wooden pickaxe -> mine cobblestone for every stone tool, 
   assert.equal((nextToolUpgrade({ wooden_pickaxe: 1, stick: 4, cobbled_deepslate: 3 }, {}, S) as any).item, 'stone_pickaxe')
 })
 
+test('nextToolUpgrade: a wooden sword early when there is wood to spare and no cobblestone', () => {
+  // 1 stick for the sword + 7 for stone tools = 8 sticks (4 planks), 2 for the blade, 4 for a table
+  const s = nextToolUpgrade({ wooden_pickaxe: 1, oak_log: 3 }, { stone: true }, S)!
+  assert.deepEqual([s.do, (s as any).item], ['craft', 'wooden_sword'])
+  // not enough to spare: cobblestone first, the stone sword comes right after the pickaxe
+  assert.equal(nextToolUpgrade({ wooden_pickaxe: 1, oak_planks: 8 }, { stone: true }, S)?.do, 'gather')
+  const c = nextToolUpgrade({ wooden_pickaxe: 1, stone_pickaxe: 1, oak_planks: 8, cobblestone: 5 }, { stone: true }, S)!
+  assert.equal((c as any).item, 'stone_sword')
+  // has a sword already: nothing early
+  assert.equal(nextToolUpgrade({ wooden_pickaxe: 1, wooden_sword: 1, oak_log: 3 }, { stone: true }, S)?.do, 'gather')
+})
+
 test('nextToolUpgrade: stone -> iron needs ore, a furnace and fuel', () => {
   const stone = { stone_pickaxe: 1, stone_axe: 1, stone_shovel: 1, stone_sword: 1, oak_planks: 10 }
   assert.equal(nextToolUpgrade(stone, { ironOre: false }, S), null, 'no iron known: stops at stone')

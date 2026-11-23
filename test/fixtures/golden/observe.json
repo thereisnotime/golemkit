@@ -89,7 +89,7 @@
     "places": {},
     "containersNearby": 0,
     "ripeCropsNearby": 0,
-    "tools": "stone pickaxe, none axe, none shovel, none sword",
+    "tools": "stone pickaxe, none sword, none axe, none shovel",
     "droppedItemsNearby": 1,
     "intents": {
       "mode": "fallback"
@@ -183,7 +183,7 @@
     "places": {},
     "containersNearby": 0,
     "ripeCropsNearby": 0,
-    "tools": "stone pickaxe, none axe, none shovel, none sword",
+    "tools": "stone pickaxe, none sword, none axe, none shovel",
     "droppedItemsNearby": 1,
     "intents": {
       "mode": "fallback"
@@ -252,7 +252,7 @@
     "places": {},
     "containersNearby": 0,
     "ripeCropsNearby": 0,
-    "tools": "none pickaxe, none axe, none shovel, none sword",
+    "tools": "none pickaxe, none sword, none axe, none shovel",
     "droppedItemsNearby": 0,
     "intents": {
       "mode": "fallback"
@@ -322,7 +322,7 @@
     "places": {},
     "containersNearby": 0,
     "ripeCropsNearby": 0,
-    "tools": "none pickaxe, none axe, none shovel, none sword",
+    "tools": "none pickaxe, none sword, none axe, none shovel",
     "droppedItemsNearby": 0,
     "intents": {
       "mode": "fallback"

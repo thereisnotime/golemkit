@@ -6,10 +6,11 @@
 // cheap steps (stone tools cost 3 cobblestone and 2 sticks once a wooden pickaxe exists).
 import type { ActionContext, ActionResult } from '../core/index.ts'
 import { defineSkill, defineAction, z, ok, fail, checkAborted, needsSurvival } from '../core/index.ts'
-import { TOOL_SHAPE, toolTier, inventoryCounts, plankUnits, ensureTool, ensurePlanks, type ToolKind, type Tier } from './toolkit.ts'
+import { TOOL_SHAPE, toolTier, inventoryCounts, plankUnits, usablePlankUnits, ensureTool, ensurePlanks, type ToolKind, type Tier } from './toolkit.ts'
 import { craftItem, smeltItem } from './crafting.ts'
 import { collectBlocks } from './gather.ts'
 import { fellTree } from './woodcutting.ts'
+import { takeWoodFromOwnChests, fmtTally } from './containers.ts'
 import { mineStone } from './mining.ts'
 import { creativeGet } from './mods.ts'
 import { plankFuel } from './materials.ts'
@@ -50,7 +51,7 @@ export type UpgradeStep =
 export interface UpgradeOptions {
   /** Highest tier to aim for. Default iron. */
   upTo?: UpTo
-  /** Tool kinds to keep upgraded, in order. Default pickaxe, axe, shovel, sword. */
+  /** Tool kinds to keep upgraded, in order. Default pickaxe, sword, axe, shovel. */
   kinds?: ToolKind[]
   /** Also make iron armour once iron tools are done. Default false. */
   armour?: boolean
@@ -58,7 +59,8 @@ export interface UpgradeOptions {
   prospect?: boolean
 }
 
-const DEFAULT_KINDS: ToolKind[] = ['pickaxe', 'axe', 'shovel', 'sword']
+// the sword right after the pickaxe: combat (techniques, defend, bodyguard) assumes one
+const DEFAULT_KINDS: ToolKind[] = ['pickaxe', 'sword', 'axe', 'shovel']
 /** Up to this many raw iron are smelted with planks; more is worth making charcoal first. */
 export const SMALL_BATCH = 3
 
@@ -103,9 +105,20 @@ export function nextToolUpgrade (inv: Record<string, number>, nearby: Nearby, ga
   if (pick === 0) {
     const table = inv.crafting_table || nearby.craftingTable ? 0 : 4
     const need = TOOL_SHAPE.pickaxe.head + stickPlanks(inv, 2) + table
-    if (plankUnits(inv) >= need) return { do: 'craft', item: 'wooden_pickaxe', kind: 'pickaxe', tier: 'wooden', why: 'no pickaxe' }
+    const wood = usablePlankUnits(inv)
+    if (wood >= need) return { do: 'craft', item: 'wooden_pickaxe', kind: 'pickaxe', tier: 'wooden', why: 'no pickaxe' }
     if (!trees) return null
-    return { do: 'gather', item: 'logs', count: Math.ceil((need - plankUnits(inv)) / 4), why: 'wood for a wooden pickaxe' }
+    return { do: 'gather', item: 'logs', count: Math.ceil((need - wood) / 4), why: 'wood for a wooden pickaxe' }
+  }
+
+  // 0b. no sword at all and no cobblestone for a stone one yet: a wooden sword, if the wood
+  // also leaves sticks for the stone pickaxe (fighting with fists is what the bot did live)
+  if (kinds.includes('sword') && heldTier(inv, 'sword') === 'none' && count(inv, STONE_HEADS) < TOOL_SHAPE.sword.head) {
+    const table = inv.crafting_table || nearby.craftingTable ? 0 : 4
+    // sticks for this sword and for every stone tool still to come
+    const sticks = TOOL_SHAPE.sword.sticks + kinds.filter(k => TIER_RANK[heldTier(inv, k)]! < 2).reduce((n, k) => n + TOOL_SHAPE[k].sticks, 0)
+    const need = TOOL_SHAPE.sword.head + stickPlanks(inv, sticks) + table
+    if (usablePlankUnits(inv) >= need) return { do: 'craft', item: 'wooden_sword', kind: 'sword', tier: 'wooden', why: 'no sword' }
   }
 
   // 1. stone, for every kind below stone
@@ -114,7 +127,7 @@ export function nextToolUpgrade (inv: Record<string, number>, nearby: Nearby, ga
     const cobble = count(inv, STONE_HEADS)
     const k = belowStone.find(k => TOOL_SHAPE[k].head <= cobble)
     if (k) {
-      if (plankUnits(inv) >= stickPlanks(inv, TOOL_SHAPE[k].sticks)) return { do: 'craft', item: `stone_${k}`, kind: k, tier: 'stone', why: `${HEAD_ITEM.stone} for a stone ${k}` }
+      if (usablePlankUnits(inv) >= stickPlanks(inv, TOOL_SHAPE[k].sticks)) return { do: 'craft', item: `stone_${k}`, kind: k, tier: 'stone', why: `${HEAD_ITEM.stone} for a stone ${k}` }
       if (trees) return { do: 'gather', item: 'logs', count: 1, why: `sticks for a stone ${k}` }
     } else if (stoneNear) {
       const heads = belowStone.reduce((n, k) => n + TOOL_SHAPE[k].head, 0)
@@ -254,13 +267,30 @@ export async function runUpgradeStep (ctx: Ctx, s: UpgradeStep): Promise<ActionR
       return smeltItem(bot, signal, ctx.log, s.input, s.count, fuel)
     }
     case 'gather': {
-      if (s.item === 'logs') return fellTree(ctx, { radius: 32, replant: true, makeAxe: true })
+      if (s.item === 'logs') return getWood(ctx, s.count)
       if (s.item === 'cobblestone') return mineStone(ctx, Math.max(1, s.count))
       if (s.item === 'raw_iron') return collectOre(ctx, ['iron_ore', 'deepslate_iron_ore'], s.count, 'raw_iron')
       if (s.item === 'coal') return collectOre(ctx, ['coal_ore', 'deepslate_coal_ore'], s.count, 'coal')
       return collectOre(ctx, ['diamond_ore', 'deepslate_diamond_ore'], s.count, 'diamond')
     }
   }
+}
+
+/**
+ * Wood for the next tool: logs or planks from the bot's own chests nearby first, then a tree
+ * within 32 blocks. When neither works it fails with data.need = 'wood', so a wood behaviour
+ * (chop_wood_loop, which searches wider rings) can pick it up instead of the same step failing
+ * over and over.
+ */
+async function getWood (ctx: Ctx, logs: number): Promise<ActionResult> {
+  const want = Math.max(2, logs * 4)
+  const chest = await takeWoodFromOwnChests(ctx, want).catch(e => { checkAborted(ctx.signal); return { took: {}, units: 0, notes: [(e as Error).message] } })
+  if (chest.units >= want) return ok(`took ${fmtTally(chest.took)} from my chest`)
+  const r = await fellTree(ctx, { radius: 32, replant: true, makeAxe: true })
+  const fromChest = chest.units ? `took ${fmtTally(chest.took)} from my chest, ` : ''
+  if (r.ok) return ok(`${fromChest}${r.message}`)
+  if (chest.units) return ok(`${fromChest}but ${r.message}`)
+  return fail(`needs wood: ${r.message}, and no wood in my chests nearby${chest.notes.length ? ` (${chest.notes.join('; ')})` : ''}`, { need: 'wood' })
 }
 
 async function collectOre (ctx: Ctx, blocks: string[], n: number, item: string): Promise<ActionResult> {
@@ -292,6 +322,7 @@ export async function upgradeTools (ctx: Ctx, opts: UpgradeRun = {}): Promise<Ac
   const { bot, log, agent } = ctx
   const done: string[] = []
   const notes: string[] = []
+  let need: string | undefined
   const tiersBefore = toolSummary(inventoryCounts(bot), opts.kinds ?? DEFAULT_KINDS)
   let lastKey = ''
   for (let i = 0; i < (opts.maxSteps ?? 12); i++) {
@@ -306,14 +337,18 @@ export async function upgradeTools (ctx: Ctx, opts: UpgradeRun = {}): Promise<Ac
     lastKey = key
     log.debug('upgrade step', { step: describe(step) })
     const r = await runUpgradeStep(ctx, step).catch(e => { checkAborted(ctx.signal); return fail((e as Error).message) })
-    if (!r.ok) { notes.push(`${describe(step)} failed: ${r.message}`); break }
+    if (!r.ok) {
+      notes.push(`${describe(step)} failed: ${r.message}`)
+      need = (r.data as { need?: string } | undefined)?.need
+      break
+    }
     done.push(r.message)
   }
   const tiersAfter = toolSummary(inventoryCounts(bot), opts.kinds ?? DEFAULT_KINDS)
   const changed = tiersAfter !== tiersBefore
   const msg = `${done.length ? done.join('; ') : 'nothing to upgrade right now'}${notes.length ? ` (${notes.join('; ')})` : ''}; tools: ${tiersAfter}`
   if (!needsSurvival(bot) && !done.length) return ok(msg)
-  return done.length || !notes.some(n => /failed/.test(n)) ? ok(msg, { changed, tools: tiersAfter }) : fail(msg, { changed, tools: tiersAfter })
+  return done.length || !notes.some(n => /failed/.test(n)) ? ok(msg, { changed, tools: tiersAfter, ...(need ? { need } : {}) }) : fail(msg, { changed, tools: tiersAfter, ...(need ? { need } : {}) })
 }
 
 export function toolSummary (inv: Record<string, number>, kinds: ToolKind[] = DEFAULT_KINDS): string {

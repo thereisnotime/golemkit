@@ -5,9 +5,12 @@ import type { Bot } from 'mineflayer'
 import { z, needsSurvival, itemName } from '../../../core/index.ts'
 import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import { nextToolUpgrade, senseNearby, type Nearby } from '../../../skills/progression.ts'
-import { inventoryCounts, toolTier, type ToolKind } from '../../../skills/toolkit.ts'
+import { inventoryCounts, toolTier, usablePlankUnits, type ToolKind } from '../../../skills/toolkit.ts'
 
-const KINDS: ToolKind[] = ['pickaxe', 'axe', 'shovel', 'sword']
+/** Blackboard need set while upgrade_tools is stuck for wood; chop_wood_loop scores higher for it. */
+export const WOOD_NEED = 'wood'
+
+const KINDS: ToolKind[] = ['pickaxe', 'sword', 'axe', 'shovel']
 
 /** Tools whose remaining durability share is below `min` and that have no spare of the same tier or better. Pure-ish (reads the inventory). */
 export function wornTools (bot: Bot, min: number): string[] {
@@ -32,7 +35,8 @@ export const keepToolsUpgraded = defineBehavior({
   category: 'work',
   description: 'Keeps tools usable and moving up the tiers when the bot is idle: re-crafts a worn or broken pickaxe/axe/shovel/sword, ' +
     'makes stone tools as soon as it can mine 3 cobblestone, then a furnace, iron (smelted with coal or charcoal) and diamond tools, up to `upTo`. ' +
-    'Gathering steps need digging enabled.',
+    'A sword comes right after the pickaxe (wooden while there is no cobblestone). Short of wood it takes logs or planks from its own chests nearby, ' +
+    'otherwise it raises a wood need that chop_wood_loop picks up, and retries as soon as the wood is there. Gathering steps need digging enabled.',
   options: z.object({
     upTo: z.enum(['stone', 'iron', 'diamond']).default('iron').describe('highest tier to work towards'),
     minDurability: z.number().min(0).max(0.9).default(0.1).describe('replace a tool when less than this share of its durability is left'),
@@ -44,6 +48,7 @@ export const keepToolsUpgraded = defineBehavior({
   priority: 'npc',
   create (o, { agent }) {
     let sensed: { at: number, nearby: Nearby } | null = null
+    let lastNeed: string | undefined
     const nearby = (bot: Bot, now: number): Nearby => {
       if (!sensed || now - sensed.at > o.senseSeconds * 1000) {
         sensed = { at: now, nearby: senseNearby({ bot, agent, signal: new AbortController().signal, log: agent.log }) }
@@ -63,12 +68,17 @@ export const keepToolsUpgraded = defineBehavior({
       failureCooldownMs: 60_000,
       maxFailureCooldownMs: 900_000,
       score: ({ bot, now, current }) => current === 'keep_tools_upgraded' || want(bot, now) ? 28 : 0,
+      // stuck for wood: the back-off ends as soon as the usable wood changes (chopped, or put in its inventory)
+      retryKey: ({ bot }) => lastNeed === 'wood' && bot.inventory ? `wood ${usablePlankUnits(inventoryCounts(bot))}` : 'same',
       async run (ctx) {
         const w = want(ctx.bot, ctx.now)
         if (!w) return { ok: true, message: 'tools are fine' }
         if ('worn' in w) return ctx.act('craft', { item: w.worn, count: 1 })
         sensed = null // look again after the work
-        return ctx.act('upgrade_tools', { up_to: o.upTo, armour: o.armour })
+        const r = await ctx.act('upgrade_tools', { up_to: o.upTo, armour: o.armour })
+        lastNeed = (r.data as { need?: string } | undefined)?.need
+        ctx.bb.setNeed(WOOD_NEED, lastNeed === 'wood' ? 1 : 0)
+        return r
       }
     }
   }

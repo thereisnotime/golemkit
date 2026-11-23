@@ -7,6 +7,8 @@ import { droppedItemName } from '../../../skills/pickup.ts'
 import { CROPS, isMature } from '../../../skills/farming.ts'
 import { isPlaceFace, vec } from '../../../skills/world.ts'
 import { resolveCenter, isDay, countWhere, dist, flatDist } from './util.ts'
+import { WOOD_NEED } from './tools.ts'
+import { DEFAULT_TREE_RINGS } from '../../../skills/treePlan.ts'
 
 // ------------------------------------------------------------------ collect_drops
 
@@ -102,11 +104,14 @@ export const chopWoodLoop = defineBehavior({
   name: 'chop_wood_loop',
   capabilities: ['move', 'dig'],
   category: 'work',
-  description: 'Keeps a stock of wood: by day, while it has fewer than `keep` logs (4 planks count as one), it fells trees nearby, ' +
-    'away from spawn and protected areas, and replants. Needs digging enabled.',
+  description: 'Keeps a stock of wood: by day, while it has fewer than `keep` logs (4 planks count as one), it fells trees, ' +
+    'away from spawn, protected areas and remembered danger zones, and replants. With no tree close it goes to trees it remembers, ' +
+    'then searches wider rings (a trip out and back). It also runs, at a higher score, when keep_tools_upgraded is stuck for wood. Needs digging enabled.',
   options: z.object({
     keep: z.number().int().min(1).max(512).default(16).describe('logs to keep in stock'),
-    radius: z.number().min(4).max(64).default(32).describe('how far to look for trees'),
+    radius: z.number().min(4).max(64).default(32).describe('how far to look for trees when rings is empty'),
+    rings: z.array(z.number().int().min(8).max(512)).max(8).default([...DEFAULT_TREE_RINGS])
+      .describe('search rings when no tree is close, smallest first; rings past 64 blocks are scouting trips; [] = only radius'),
     spawnClearance: z.number().min(0).max(256).default(48).describe('never chop within this distance of the world spawn'),
     replant: z.boolean().default(true).describe('plant saplings afterwards')
   }),
@@ -118,13 +123,19 @@ export const chopWoodLoop = defineBehavior({
       cooldownMs: 5000,
       failureCooldownMs: 60_000,
       maxFailureCooldownMs: 900_000,
-      score ({ bot }) {
-        if (!isDay(bot) || woodStock(bot) >= o.keep || bot.inventory?.emptySlotCount?.() === 0) return 0
+      score ({ bot, bb }) {
+        const needed = bb.need(WOOD_NEED) > 0
+        if (!isDay(bot) || (woodStock(bot) >= o.keep && !needed) || bot.inventory?.emptySlotCount?.() === 0) return 0
         const spawn = (bot as any).spawnPoint
         if (spawn && o.spawnClearance && flatDist(spawn, bot.entity.position) < o.spawnClearance) return 0
-        return 30
+        return needed ? 38 : 30
       },
-      run: (ctx) => ctx.act('chop_tree', { radius: o.radius, replant: o.replant })
+      async run (ctx) {
+        const before = woodStock(ctx.bot)
+        const r = await ctx.act('chop_tree', { radius: o.radius, replant: o.replant, ...(o.rings.length ? { rings: o.rings } : {}) })
+        if (r.ok && woodStock(ctx.bot) > before) ctx.bb.setNeed(WOOD_NEED, 0)
+        return r
+      }
     }
   }
 })

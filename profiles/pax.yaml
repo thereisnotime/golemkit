@@ -67,7 +67,10 @@ behaviors:
                                                  # then stays by ${MC_OWNER:-Robin}, kills what threatens them, warns, feeds, stays out at night
   idle_antics: { everySeconds: [40, 120], chat: 0.15 }   # funny/strange stuff now and then when idle
   collect_drops: { radius: 16 }   # pick up dropped items nearby (including its own after dying)
-  keep_tools_upgraded: { upTo: iron, armour: true }   # stone tools asap, then furnace + iron tools and iron armour; re-craft worn ones when idle
+  keep_tools_upgraded: { upTo: iron, armour: true }   # stone tools asap (sword right after the pickaxe), then furnace + iron tools and iron armour;
+                                                      # short of wood: its own chests, else a wood need for chop_wood_loop
+  chop_wood_loop: { enabled: false, rings: [32, 64, 128, 250] }   # armed by npc mode / at runtime; no tree close: remembered trees,
+                                                                  # then rings out to 250 blocks with a trip there and back
   anti_afk: { afterSeconds: 45 }   # small look/swing/hop so idle-kick servers don't drop it
 # Plain-language commands without the LLM (docs/guide/intents.md): "pax follow me", "pax chop some
 # wood". first = simple requests are handled directly (no tokens), everything else goes to the LLM.
