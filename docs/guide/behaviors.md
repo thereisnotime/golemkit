@@ -1286,18 +1286,21 @@ the most useful signal for fixing things: they point at the behaviour and the me
 **Forest baseline** (the `forest` scenario, the default since 23 Nov 2026; mc02, start 1818 64
 1318, kit none, Pax's behaviours without the LLM, 1 in-game day = 20 real minutes). Terrain at the
 start: forest, 67 trees within 32, water 4 blocks away, chickens, pigs and a sheep in sight.
-Repeat 2 (`--spread 200`, starting about 200 blocks away) was still running when this was written.
+Repeat 2 used `--spread 200` (1943 67 1472: forest, 63 trees within 32, water 21 away, chickens and pigs).
 
 | tag | started at | deaths (causes) | food min | health min | tool tier | logs / cobble / food | distance | failures | help asks |
 |---|---|---|---|---|---|---|---|---|---|
 | forest-baseline-2026-11-23 #1 | 11235 (dusk) | 3 (slain by Zombie, shot by Skeleton x2) | 11 | 0.8 | stone | 22 / 20 / 6 | 1522 | 66 | 0 |
+| forest-baseline-2026-11-23 #2 | 14835 (night) | 0 | 11 | 12.7 | stone | 16 / 17 / 0 | 1557 | 22 | 0 |
 
 How to read it: in the forest the bot gets the early game going within minutes (wooden tools by
 minute 3, stone by minute 10, food from animals) but it started at dusk under a dense canopy and
 died three times in the first 6 minutes to a zombie and skeletons while defending itself with
 wooden tools. It never made a bed (`spawnSet` false), so night deaths respawned it at the start.
 The "stuck loops" are all `replaced` (one behaviour pre-empting another: go_home, hunt, defend),
-not real loops. One 54 s event-loop stall cost it a disconnect.
+not real loops. One 54 s event-loop stall cost it a disconnect. Repeat 2 started at night too and had no deaths: stone tools again, food never below 11,
+a trip for sheep turned back at dusk with 78 s of daylight left. Neither run set a bed (no sheep
+reached), which is the next thing the bench points at.
 
 
 **Ice baseline** (the `ice` scenario, the default before the forest one; mc02, 23 Nov 2026, start 1607 62 782, kit none, Pax's behaviours without the LLM,
