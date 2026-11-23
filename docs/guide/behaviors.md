@@ -1013,6 +1013,15 @@ Without the behaviour, `!recover_items` (or the LLM) does the same trip on reque
 `force=true` goes even when it looks too dangerous or too far, never for drops that are gone.
 observe shows `myDrops` (items, where, seconds left) until the trip is done.
 
+Live test: `node scripts/recover-test.ts <x> <z> [basic,far,danger]` (a separate bot, an op
+director for /give, /kill and /summon in short bursts). On mc02 (2026-11-23): killed 60 blocks
+from home by day with iron armour and 31 items, it walked back right after the respawn, got all
+31 back, put the armour on and went home (about 55 s for the trip); with `maxDistance 40` it said
+"lost 31 items where I died: I died 59 blocks away (more than 40)"; killed next to 3 skeletons it
+waited ("3 skeleton by my things and my gear scores 16.9 (69 needed)") until the director
+removed them, then went and got the armour and tools back; drops that had drifted out of the pit
+it died in were partly missed and reported as missing.
+
 Item ages only advance while a player keeps the chunk loaded, so the 5 minutes are the worst
 case; the decision assumes them.
 
