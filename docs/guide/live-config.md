@@ -40,6 +40,16 @@ can't change their own.
 | `combat.disengageToHeal` | on/off | at 4 health or less with food, back off briefly to eat and fight on; works with `retreatBelow 0` (default on) |
 | `combat.autoArmor` | on/off | wear the best armour in the inventory, shield or totem in the offhand (default on) |
 | `combat.maxChase` | 2–64 | stop chasing a mob this many blocks from where the fight started (default 16) |
+| `combat.sprintReset` | on/off | W-tap: sprint into ground hits for knockback when a crit isn't possible or knockback is worth more (default on) |
+| `combat.sweep` | on/off | with a sword, plain ground hits when mobs bunch around the target, so the sweep hits them all (default on) |
+| `combat.shieldMelee` | on/off | shield up against melee mobs between slow swings, and against a lit creeper it can't outrun; never against axes (default on) |
+| `combat.totem` | on/off | totem of undying into the offhand at 8 health or less, or in a fall that could kill (default on) |
+| `combat.goldenApple` | on/off | eat a golden apple mid-fight at 8 health or less, 12 when surrounded (default on) |
+| `combat.waterClutch` | on/off | water bucket against fall damage and to put out fire, scooped back up (default on) |
+| `combat.endermanGaze` | on/off | never look an enderman in the eyes unless fighting it (default on) |
+| `combat.chokepoints` | on/off | against 3+ melee mobs with half health or more, fight from a 1-wide gap nearby (default on) |
+| `combat.pvp` | off / defend | `defend`: fight back a player who attacks the bot or the player it guards, stop when they stop or run; never owners or friends (default off) |
+| `combat.friends` | names | players never fought back, even with `combat.pvp defend` (comma separated) |
 | `humanize.enabled` | on/off | player-like reaction and typing delays |
 | `humanize.typoRate` | 0–1 | chance of a typo per message |
 | `humanize.lowercase` | on/off | write chat in lower case |

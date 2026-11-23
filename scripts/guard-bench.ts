@@ -4,7 +4,7 @@
 //        [--seed 1] [--sword stone|iron] [--armour] [--tester-food 8] [--interval 30] [--cap 8]
 //        [--time day|night] [--phantoms] [--waves mixed|ranged] [--bow] [--blocks 0] [--no-intercept] [--no-pull] [--variants a,b]
 //        [--tag run] [--scout] [--cleanup] [--force]
-//        [--duel zombie,skeleton,creeper,vindicator] [--duel-count 2]
+//        [--duel zombie,skeleton,creeper,vindicator] [--duel-count 2] [--clutch 5] [--clutch-height 22]
 // DIRECTOR (default ClaudeTest, an op) runs everything with commands: before every phase it sets
 // the time, kills leftover tagged mobs, fills explosion holes in the arena floor, resets both
 // players to full health and hunger, gives the same gear (GUARD_BOT: a sword, a shield, 16 bread,
@@ -29,6 +29,9 @@
 // 2) kept alive 8-12 blocks around the spot, refilled 3 s after one dies, for --minutes per kind and
 // --repeats rounds. It counts the bot's deaths, health lost, kills, kills per minute and health
 // lost per kill. The bot runs on its reflexes alone (defend, ranged_defense, stay_safe).
+// --clutch N tests the water bucket reflex alone: N drops from --clutch-height (default 22, 19 damage without water) blocks
+// above the arena floor with a water bucket, then N stands on a fire block; counts health lost and
+// what the water_bucket action reported. Water and fire left in the arena are removed afterwards.
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { Agent, defineVariant, serverFromEnv, PRIORITY, fmtPos, type ActionResult } from '../src/core/index.ts'
 import { standardSkills, extendedSkills, navigation, pickup } from '../src/skills/index.ts'
@@ -67,6 +70,8 @@ const tactics = (v: Variant) => ({ intercept: v === 'all' || v === 'no-pull', pu
 const RUN_TAG = opt('tag', 'run')
 const DUEL = opt('duel', '') ? opt('duel', '').split(',').map(s => s.trim()).filter(Boolean) : []
 const DUEL_COUNT = Number(opt('duel-count', '2'))
+const CLUTCH = Number(opt('clutch', '0'))
+const CLUTCH_HEIGHT = Number(opt('clutch-height', '22'))
 
 type Phase = 'guard' | 'follow' | 'none'
 const BOT = process.env.GUARD_BOT || 'GuardTest'
@@ -396,10 +401,11 @@ async function main (): Promise<void> {
     for (const name of ['bodyguard', 'follow_owner']) await step(bot, 'behavior_disarm', { name }).catch(() => null)
   }
 
-  if (!DUEL.length) await connect(tester)
+  const solo = DUEL.length > 0 || CLUTCH > 0
+  if (!solo) await connect(tester)
   await connect(bot)
   await waitLive(bot)
-  if (!DUEL.length) await waitLive(tester)
+  if (!solo) await waitLive(tester)
   spotV = bot.bot.entity.position.clone().set(spot.x, spot.y, spot.z)
   // respawn next to the arena, not at world spawn where real players come through; put back at the end
   const worldSpawn = (dir.bot as any).spawnPoint as { x: number, y: number, z: number } | undefined
@@ -515,7 +521,57 @@ async function main (): Promise<void> {
     }
     printDuelSummary(results)
   }
+  async function runClutch (): Promise<void> {
+    await disarmAll()
+    await cmd(`/gamemode survival ${BOT}`)
+    await setSpawns(true)
+    const rows: any[] = []
+    const reports: string[] = []
+    bot.on('actionEnd', (info: any, r: ActionResult) => { if (info.name === 'water_bucket') reports.push(`${r.ok ? 'ok' : 'fail'}: ${r.message}`) })
+    const clearWater = async () => {
+      await cmd(`/fill ${X - 6} ${G + 1} ${Z - 6} ${X + 6} ${G + 3} ${Z + 6} minecraft:air replace minecraft:water`)
+      await cmd(`/fill ${X - 6} ${G + 1} ${Z - 6} ${X + 6} ${G + 3} ${Z + 6} minecraft:air replace minecraft:fire`)
+    }
+    for (const kind of ['fall', 'fire'] as const) {
+      for (let i = 0; i < CLUTCH; i++) {
+        await checkOwnerFar()
+        if (!live(bot)) { await waitLive(bot) }
+        await clearWater()
+        await cmd(`/clear ${BOT}`)
+        await cmd(`/give ${BOT} minecraft:water_bucket 1`)
+        await cmd(`/give ${BOT} minecraft:iron_sword 1`)
+        await heal(BOT)
+        await cmd(`/tp ${BOT} ${spot.x} ${spot.y} ${spot.z} 0 0`)
+        await pause(2500)
+        reports.length = 0
+        botDied = false
+        const hp0 = bot.bot.health
+        if (kind === 'fall') {
+          await cmd(`/tp ${BOT} ${spot.x} ${spot.y + CLUTCH_HEIGHT} ${spot.z} 0 0`)
+        } else {
+          await cmd(`/setblock ${X} ${G + 1} ${Z} minecraft:fire`)
+          await cmd(`/tp ${BOT} ${spot.x} ${spot.y} ${spot.z} 0 0`)
+        }
+        await pause(kind === 'fall' ? 7000 : 6000)
+        const died = botDied
+        const hp = live(bot) ? bot.bot.health : 0
+        const wb = live(bot) ? bot.bot.inventory.items().some((it: any) => it.name === 'water_bucket') : false
+        const row = { tag: RUN_TAG, mode: 'clutch', kind, trial: i + 1, height: kind === 'fall' ? CLUTCH_HEIGHT : 0, healthLost: died ? 20 : Math.round((hp0 - hp) * 10) / 10, died, bucketBack: wb, report: reports.join(' | ') || '-' }
+        log(`RESULT ${JSON.stringify(row)}`)
+        appendFileSync(`${DATA}/results.jsonl`, JSON.stringify(row) + '\n')
+        rows.push(row)
+        if (died) { await waitLive(bot); await pause(1000) }
+      }
+    }
+    await clearWater()
+    console.log('\nkind  trial  healthLost  died  bucketBack  report')
+    for (const r of rows) console.log(`${r.kind.padEnd(5)} ${String(r.trial).padStart(5)} ${String(r.healthLost).padStart(11)} ${String(r.died).padStart(5)} ${String(r.bucketBack).padStart(11)}  ${r.report}`)
+  }
   if (flag('cleanup')) { await cleanUp(); return }
+  if (CLUTCH > 0) {
+    try { await runClutch() } finally { await cleanUp().catch(e => log(`clean-up: ${(e as Error).message}`)) }
+    return
+  }
   if (DUEL.length) {
     try { await runDuels() } finally { await cleanUp().catch(e => log(`clean-up: ${(e as Error).message}`)) }
     return

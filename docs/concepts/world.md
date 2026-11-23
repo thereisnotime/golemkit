@@ -110,7 +110,9 @@ flyers that hit and climbed away, and never try to outrun them.
 - **adaptive melee** (`combat.adaptiveWeapon`): scores swords, axes, tridents, maces and tools by
   damage × attack speed with enchantments that apply to this target (Sharpness everywhere,
   Smite vs undead, Bane of Arthropods vs spiders); switches to the hardest single hit when one
-  hit kills, and to an axe against shield users. Off: the old fixed sword > axe order.
+  hit kills, and to an axe against a player carrying a shield (an axe hit on a raised shield
+  disables it for 5 s). No mob blocks with a shield; vindicators and piglin brutes swing axes,
+  which disable the bot's own shield instead. Off: the old fixed sword > axe order.
 - **ranged** (`combat.ranged`): with a bow or crossbow and arrows, shoots flyers (phantoms,
   ghasts) and targets more than 6 blocks away, leading moving targets.
 - **ranged aim**: arrows are aimed with real arrow physics (gravity 0.05, drag 0.99 per tick)
@@ -213,6 +215,81 @@ flowchart TB
 - **Night**: `stay_safe` heads home at night with higher priority when the bot has no armour,
   weapon or food; without a home it digs in with `bunker` until morning (needs digging, not
   under a roof already).
+
+### Skilled-player techniques
+
+What strong players do in the 1.9+ combat system, and what the bot does with it. The mechanics,
+numbers and sources are on [Combat research](./combat-research); the decisions are pure functions
+in `src/skills/techniques.ts` (unit-tested in `test/techniques.test.ts`), wired into the fight
+loop, `defend` and the reflexes. Each one has a live toggle, on by default except PvP:
+
+- **Hit styles** (`combat.sprintReset`, `combat.sweep`): before every charged hit the loop picks
+  one of crit (jump, hit falling, x1.5), sprint hit (a knockback level more, no crit), sweep
+  (sword, on the ground, not moving: every mob within a block of the target takes
+  1 + damage x level / (level + 1)) or plain. A sweep wins when the extra mobs' damage beats a
+  crit's +50% on the target (3+ bunched without Sweeping Edge, 1+ with Sweeping Edge III).
+  Knockback wins against creepers, at 8 health or less and with 3+ melee mobs close, and
+  whenever a crit isn't possible (water, low ceiling). The sprint hit is a **W-tap**: sprint goes
+  off right after the hit (the server ends it anyway) and on again 150 ms before the next charge
+  completes, so every such hit carries the sprint knockback, not only the first one.
+- **Shield timing** (`combat.shieldMelee`): between swings, when the next one is more than 350 ms
+  away, the shield goes up against the melee mob it fights (a shield needs 5 ticks to start
+  blocking) and comes down 60 ms before the charge completes. Never against axe users
+  (vindicators, piglin brutes, players with an axe), never while the shield is disabled (the
+  bot watches `set_cooldown` for the shield item), and a totem that went into the offhand for low
+  health is not swapped out for it.
+- **Creeper behind the shield**: a lit fuse the bot can't outrun (distance + 4.3 blocks/s x the
+  rest of the 1.5 s fuse < 6 blocks) is faced with the shield up while backing off; a blocked
+  explosion does no damage. Otherwise it runs as before.
+- **Totem** (`combat.totem`): at 8 health or less, or in a fall that would kill, a totem of undying
+  goes into the offhand at once (on the health event, not on the 10 s gear check). It stays
+  there until health is back above 14.
+- **Golden apples** (`combat.goldenApple`): at 8 health or less (12 with three or more melee mobs
+  within 4), not with a lit creeper close, it eats a golden apple on the spot while backing off
+  (1.6 s; absorption and regeneration II), instead of waiting for a lull or for 4 health.
+- **Water bucket** (`combat.waterClutch`): during a fall that would do 3+ damage (or kill), the
+  reflexes start `water_bucket`: it holds the bucket and looks down, places water when the ground
+  comes within bucket reach of its eyes (4.2 blocks), lands in it and scoops it back up. Burning
+  on solid ground, it puts water at its feet and takes it back. Never in the Nether. Very fast
+  falls (50+ blocks, close to 4 blocks per tick) can skip the placing window; Feather Falling
+  is counted.
+- **Enderman gaze** (`combat.endermanGaze`): every `bot.look` (pathfinder, fights, idle looking
+  around) is checked against the vanilla rule (view vector vs the enderman's eyes, dot product
+  above 1 - 0.025 / distance, within 64 blocks); when it would meet an enderman's eyes the
+  pitch is lowered until it doesn't. Endermen already fighting the bot are exempt, and so is a
+  carved pumpkin on its head. Arrows aren't wasted on endermen (they teleport away) or breezes.
+- **Chokepoints** (`combat.chokepoints`): three or more melee mobs coming and health at half or
+  more, `defend` looks for a cell within 6 blocks walled on both sides whose neighbour towards
+  the mobs is walled on both sides too (a 1-wide corridor or doorway), walks there and fights
+  without strafing, so the mobs reach it one at a time. Under half health the outnumbered rules
+  (pillar, home, back off) apply as before.
+- Kept from before: weapon-cooldown timing, crit jumps, the sprinted first hit, spacing and
+  strafing, hit-and-step-back, bow lead with arrow physics, shield against archers, pillaring
+  when outnumbered, bunkering from phantoms, healing breaks.
+
+Not done, and why: ender pearls (aiming a pearl to a safe spot needs landing prediction and
+costs 5 HP; little use against mobs), building cover walls mid-fight against crowds (the
+`ranged_defense` reflex already builds cover against archers), cobwebs against spiders, potions.
+
+### PvP: defend only
+
+Bots never start fights with players. `combat.pvp` (default `off`) can be set to `defend`:
+
+- the bot fights back a player who hits it, or who hits the player it guards while the bodyguard
+  is armed, with the same fight loop and techniques (no bow: a player out of reach has backed off);
+- it stops as soon as that player hasn't hit for 5 s, or is more than 10 blocks away;
+- it never fights an owner, a name in `combat.friends`, or a player in creative or spectator.
+  With no owners configured, nobody counts as an owner here, so set `combat.friends` for the
+  people it should always spare.
+
+```sh
+!config_set combat.pvp defend
+!config_set combat.friends Alice,Bob
+!config_reset combat.pvp
+```
+
+Server rules come first: plenty of servers ban bots or PvP outside arenas. Leave it `off` unless
+the server allows it.
 
 Two live benchmarks: `scripts/fight-test.ts` stands the bot outside for a night and counts kills,
 deaths and damage taken; `scripts/arena-test.ts` uses an op account to hand out the same gear

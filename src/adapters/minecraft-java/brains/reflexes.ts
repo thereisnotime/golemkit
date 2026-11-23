@@ -15,7 +15,7 @@ import { escorting } from '../../../skills/bodyguard.ts'
 import { rangedSituation, onRangedAlarm, noteUnexplainedHit } from '../../../skills/ranged.ts'
 import { isShooter, rangedResponse } from '../../../skills/ranged-plan.ts'
 import { wornArmorPoints } from '../../../skills/gear.ts'
-import { clutchInputs, extinguishInputs, hasWaterBucket } from '../../../skills/clutch.ts'
+import { clutchInputs, extinguishInputs, hasWaterBucket, burning } from '../../../skills/clutch.ts'
 import { totemSwap } from '../../../skills/techniques.ts'
 import { pvpAllowed } from '../../../skills/defense.ts'
 
@@ -90,7 +90,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
             // a fall that kills without water: a totem in the offhand at least
             if (d.damage >= bot.health || (!hasWaterBucket(bot) && clutchInputs(bot, fallStartY, true).damage >= bot.health)) totemCheck(true)
           }
-          if (enabled && Date.now() - fireTriedAt > 3000 && extinguishInputs(bot, true)) { fireTriedAt = Date.now(); water({ reason: 'fire' }) }
+          if (enabled && Date.now() - fireTriedAt > 3000 && burning(bot) && extinguishInputs(bot, true)) { fireTriedAt = Date.now(); water({ reason: 'fire' }) }
         } catch {}
       }
       bot.on('physicsTick', onTick)

@@ -129,6 +129,7 @@ export default withMermaid(defineConfig({
           { text: 'Architecture', link: '/concepts/architecture' },
           { text: 'Variants, profiles, fleets', link: '/concepts/variants-profiles' },
           { text: 'Movement, protection, combat', link: '/concepts/world' },
+          { text: 'Combat research', link: '/concepts/combat-research' },
           { text: 'NeoForge support', link: '/concepts/neoforge' },
           { text: 'What is game-specific', link: '/concepts/scope' },
           { text: 'Game adapters', link: '/concepts/adapters' }
