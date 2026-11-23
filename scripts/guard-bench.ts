@@ -4,6 +4,7 @@
 //        [--seed 1] [--sword stone|iron] [--armour] [--tester-food 8] [--interval 30] [--cap 8]
 //        [--time day|night] [--phantoms] [--waves mixed|ranged] [--bow] [--blocks 0] [--no-intercept] [--no-pull] [--variants a,b]
 //        [--tag run] [--scout] [--cleanup] [--force]
+//        [--duel zombie,skeleton,creeper,vindicator] [--duel-count 2]
 // DIRECTOR (default ClaudeTest, an op) runs everything with commands: before every phase it sets
 // the time, kills leftover tagged mobs, fills explosion holes in the arena floor, resets both
 // players to full health and hunger, gives the same gear (GUARD_BOT: a sword, a shield, 16 bread,
@@ -24,6 +25,10 @@
 // --scout only checks the spot (flat, dry, solid) and Robin's distance; --cleanup only kills the
 // tagged mobs and clears both players (also done at the end of a run, even a failed one). Results append to
 // data/guard-bench/results.jsonl; a summary table goes to stdout.
+// --duel runs the bot alone (no tester) against one mob kind at a time: --duel-count of them (default
+// 2) kept alive 8-12 blocks around the spot, refilled 3 s after one dies, for --minutes per kind and
+// --repeats rounds. It counts the bot's deaths, health lost, kills, kills per minute and health
+// lost per kill. The bot runs on its reflexes alone (defend, ranged_defense, stay_safe).
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { Agent, defineVariant, serverFromEnv, PRIORITY, fmtPos, type ActionResult } from '../src/core/index.ts'
 import { standardSkills, extendedSkills, navigation, pickup } from '../src/skills/index.ts'
@@ -60,6 +65,8 @@ const VARIANTS: Variant[] = opt('variants', '') ? opt('variants', '').split(',')
   : [!flag('no-intercept') && !flag('no-pull') ? 'all' : flag('no-intercept') && flag('no-pull') ? 'neither' : flag('no-intercept') ? 'no-intercept' : 'no-pull']
 const tactics = (v: Variant) => ({ intercept: v === 'all' || v === 'no-pull', pullAggro: v === 'all' || v === 'no-intercept' })
 const RUN_TAG = opt('tag', 'run')
+const DUEL = opt('duel', '') ? opt('duel', '').split(',').map(s => s.trim()).filter(Boolean) : []
+const DUEL_COUNT = Number(opt('duel-count', '2'))
 
 type Phase = 'guard' | 'follow' | 'none'
 const BOT = process.env.GUARD_BOT || 'GuardTest'
@@ -67,7 +74,7 @@ const TESTER = process.env.GUARD_TESTER || 'GuardTester'
 const DIRECTOR = process.env.DIRECTOR || 'ClaudeTest'
 const DATA = process.env.GUARD_BENCH_DIR || 'data/guard-bench'
 const TAG = 'guardbench'
-const WAVE_MOBS = new Set(['zombie', 'skeleton', 'spider', 'creeper', 'phantom', 'pillager'])
+const WAVE_MOBS = new Set(['zombie', 'skeleton', 'spider', 'creeper', 'phantom', 'pillager', 'vindicator', 'husk', 'stray', 'witch', 'cave_spider', 'enderman', 'drowned'])
 const KEEP_AWAY: [string, number, number][] = [['spawn', 545, 45], ['village', -2770, 1090], ['fortress', 560, -43]]
 const server = serverFromEnv()
 const t0 = Date.now()
@@ -108,6 +115,7 @@ function summonNbt (mob: string): string {
   if (mob === 'zombie') return `{Tags:["${TAG}"],PersistenceRequired:1b,ArmorItems:[${helmet}]}`
   if (mob === 'skeleton') return `{Tags:["${TAG}"],PersistenceRequired:1b,ArmorItems:[${helmet}],HandItems:[{id:"minecraft:bow",count:1},{}]}`
   if (mob === 'pillager') return `{Tags:["${TAG}"],PersistenceRequired:1b,HandItems:[{id:"minecraft:crossbow",count:1},{}]}`
+  if (mob === 'vindicator') return `{Tags:["${TAG}"],PersistenceRequired:1b,HandItems:[{id:"minecraft:iron_axe",count:1},{}]}`
   return `{Tags:["${TAG}"],PersistenceRequired:1b}`
 }
 
@@ -324,6 +332,11 @@ async function main (): Promise<void> {
         if (measuring && t && Date.now() - t < 4000 && e !== b.entity && e.type !== 'player') { st.kills[e.name] = (st.kills[e.name] ?? 0) + 1; log(`KILL ${e.name}`) }
       })
       b.on('death', () => { if (measuring) { st.botDeaths++; botDied = true } log(`BOT DIED (${state(a)})`) })
+      ;(b as any)._client.on('explosion', (p: any) => {
+        if (!measuring || !b.entity || !DUEL.length) return
+        st.explosions++
+        if (Math.hypot(p.x - b.entity.position.x, p.y - b.entity.position.y, p.z - b.entity.position.z) <= 6) st.explosionsNear++
+      })
       // the bot's own hits taken (any drop in health while measuring; hunger can't hurt it, it carries bread)
       let lastHp = b.health
       b.on('health', () => {
@@ -383,11 +396,11 @@ async function main (): Promise<void> {
     for (const name of ['bodyguard', 'follow_owner']) await step(bot, 'behavior_disarm', { name }).catch(() => null)
   }
 
-  await connect(tester)
+  if (!DUEL.length) await connect(tester)
   await connect(bot)
   await waitLive(bot)
-  await waitLive(tester)
-  spotV = tester.bot.entity.position.clone().set(spot.x, spot.y, spot.z)
+  if (!DUEL.length) await waitLive(tester)
+  spotV = bot.bot.entity.position.clone().set(spot.x, spot.y, spot.z)
   // respawn next to the arena, not at world spawn where real players come through; put back at the end
   const worldSpawn = (dir.bot as any).spawnPoint as { x: number, y: number, z: number } | undefined
   const parkY = (park?.y ?? G) + 1
@@ -414,7 +427,99 @@ async function main (): Promise<void> {
     await tester.stop().catch(() => {})
     await dir.stop().catch(() => {})
   }
+  async function runDuels (): Promise<void> {
+    await disarmAll()
+    await cmd(`/gamemode survival ${BOT}`)
+    await setSpawns(true)
+    const rnd = mulberry32(SEED)
+    const results: any[] = []
+    const placeBotCentre = () => cmd(`/tp ${BOT} ${spot.x} ${spot.y} ${spot.z} 180 0`)
+    for (let rep = 0; rep < REPEATS; rep++) {
+      const order = rep % 2 === 0 ? DUEL : [...DUEL].reverse()
+      for (const mob of order) {
+        await checkOwnerFar()
+        log(`== repeat ${rep + 1}, duel ${mob}: resetting`)
+        measuring = false
+        await cmd(`/time set ${TIME === 'night' ? 14000 : 1000}`)
+        await killTagged()
+        await parkPlayers()
+        await pause(1000)
+        await repairFloor()
+        if (!live(bot)) {
+          bot = newBot()
+          watchBot(bot)
+          await connect(bot)
+          await waitLive(bot)
+          await cmd(`/gamemode survival ${BOT}`)
+        }
+        await gearBot()
+        await placeBotCentre()
+        await pause(4000)
+        await killTagged()
+        await heal(BOT)
+        await pause(1500)
+        st = fresh()
+        botDied = false
+        measuring = true
+        const start = Date.now()
+        const until = start + MINUTES * 60_000
+        let nextAt = start + 2000
+        let lastLog = 0
+        log(`measuring duel ${mob} x${DUEL_COUNT} for ${MINUTES} min | bot ${state(bot)}`)
+        while (Date.now() < until) {
+          try {
+            await pause(1000)
+            if (!live(dir)) continue
+            if (botDied) {
+              botDied = false
+              await cmd(`/kill @e[tag=${TAG}]`)
+              await waitLive(bot)
+              await pause(500)
+              await placeBotCentre()
+              await gearBot()
+              await placeBotCentre()
+              nextAt = Date.now() + 3000
+              continue
+            }
+            if (!live(bot)) continue
+            const alive = Object.values(bot.bot.entities).filter((e: any) => e.name === mob && e.position && e.position.distanceTo(spotV) < 40).length
+            if (alive < DUEL_COUNT && Date.now() >= nextAt) {
+              for (let i = alive; i < DUEL_COUNT; i++) {
+                const a = rnd() * Math.PI * 2
+                const r = 8 + rnd() * 4
+                await cmd(`/summon minecraft:${mob} ${(spot.x + Math.cos(a) * r).toFixed(1)} ${spot.y} ${(spot.z + Math.sin(a) * r).toFixed(1)} ${summonNbt(mob)}`)
+                st.summoned++
+              }
+              nextAt = Date.now() + 3000
+            } else if (alive >= DUEL_COUNT) nextAt = Math.max(nextAt, Date.now() + 3000)
+            if (Date.now() - lastLog > 15_000) {
+              lastLog = Date.now()
+              log(`status: kills ${Object.values(st.kills).reduce((x, y) => x + y, 0)} deaths ${st.botDeaths} damage ${Math.round(st.botDamage)} alive ${alive} | bot ${state(bot)}`)
+            }
+          } catch (e) { log(`loop: ${(e as Error).message}`) }
+        }
+        measuring = false
+        const kills = st.kills[mob] ?? 0
+        const result = {
+          tag: RUN_TAG, mode: 'duel', mob, count: DUEL_COUNT, repeat: rep + 1, at: new Date().toISOString(), spot: [X, G + 1, Z],
+          minutes: MINUTES, seed: SEED, sword: SWORD, armour: ARMOUR, bow: BOW, summoned: st.summoned,
+          kills, killsPerMin: Math.round(kills / MINUTES * 10) / 10, botDeaths: st.botDeaths, botHits: st.botHits,
+          botDamage: Math.round(st.botDamage), damagePerKill: kills ? Math.round(st.botDamage / kills * 10) / 10 : null,
+          explosions: st.explosions, explosionsNearBot: st.explosionsNear
+        }
+        log(`RESULT ${JSON.stringify(result)}`)
+        appendFileSync(`${DATA}/results.jsonl`, JSON.stringify(result) + '\n')
+        results.push(result)
+        await killTagged()
+      }
+    }
+    printDuelSummary(results)
+  }
   if (flag('cleanup')) { await cleanUp(); return }
+  if (DUEL.length) {
+    try { await runDuels() } finally { await cleanUp().catch(e => log(`clean-up: ${(e as Error).message}`)) }
+    return
+  }
   try {
     await disarmAll()
     await cmd(`/gamemode survival ${BOT}`)
@@ -590,6 +695,18 @@ export function printSummary (results: any[]): void {
     const m = (k: string) => rs.reduce((a, r) => a + r[k], 0) / rs.length
     const sd = (k: string) => { const mu = m(k); return Math.sqrt(rs.reduce((a, r) => a + (r[k] - mu) ** 2, 0) / Math.max(1, rs.length - 1)) }
     console.log(row([p, 'mean', m('summoned').toFixed(1), `${m('testerHits').toFixed(1)}±${sd('testerHits').toFixed(1)}`, `${m('testerDamage').toFixed(0)}±${sd('testerDamage').toFixed(0)}`, m('testerDeaths').toFixed(1), (rs.reduce((a, r) => a + r.testerHits, 0) / Math.max(1, rs.reduce((a, r) => a + r.summoned, 0)) * 10).toFixed(1), '', m('botDeaths').toFixed(1), m('botHits').toFixed(1), m('killCount').toFixed(1), m('explosionsNearTester').toFixed(1), m('warnings').toFixed(1), m('feeds').toFixed(1)]))
+  }
+}
+
+export function printDuelSummary (results: any[]): void {
+  const row = (cells: (string | number)[]) => cells.map((c, i) => String(c).padStart(i === 0 ? 11 : 9)).join(' ')
+  console.log('\n' + row(['duel', 'run', 'summoned', 'kills', 'kills/min', 'deaths', 'damage', 'dmg/kill', 'booms@6']))
+  for (const mob of [...new Set(results.map(r => r.mob))]) {
+    const rs = results.filter(r => r.mob === mob)
+    for (const r of rs) console.log(row([mob, r.repeat, r.summoned, r.kills, r.killsPerMin, r.botDeaths, r.botDamage, r.damagePerKill ?? '-', r.explosionsNearBot]))
+    const sum = (k: string) => rs.reduce((a, r) => a + (r[k] ?? 0), 0)
+    const minutes = sum('minutes')
+    console.log(row([mob, 'total', sum('summoned'), sum('kills'), (sum('kills') / minutes).toFixed(1), sum('botDeaths'), sum('botDamage'), sum('kills') ? (sum('botDamage') / sum('kills')).toFixed(1) : '-', sum('explosionsNearBot')]))
   }
 }
 
