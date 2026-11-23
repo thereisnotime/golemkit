@@ -457,6 +457,66 @@ How to read it:
   before it and had no freeze.
 
 
+**Combat techniques** (mc02, 23 Nov 2026, same spot and seed, iron sword, shield and 16 bread, no
+armour). "Before" is the code above, "after" adds the [skilled-player
+techniques](/concepts/world#skilled-player-techniques) (W-tap and sweep hit styles, shield
+timing against melee and creepers, totem and golden-apple reflexes, water bucket, enderman gaze,
+chokepoints, no running from fast mobs), all with their defaults. 3 runs per row, 3 minutes each
+for the guard and ranged rows (27 mobs per run), 2 minutes each for the duels.
+
+| waves, phase | set | tester hits (each run) | tester deaths | bot deaths | bot damage taken (mean) | bot kills (mean) |
+|---|---|---|---|---|---|---|
+| mixed, guard | before | 31, 18, 32 | 3, 3, 3 | 1, 3, 1 | 98 | 12.0 |
+| mixed, guard | after | 13, 26, 16 | 1, 2, 1 | 1, 2, 1 | 79 | 16.0 |
+| ranged, follow | before | 33, 32, 43 | 3, 3, 4 | 0, 1, 1 | 61 | 8.7 |
+| ranged, follow | after | 35, 36, 41 | 3, 3, 4 | 0, 0, 0 | 58 | 11.7 |
+
+Duels: `just guard-bench --duel zombie,skeleton,creeper,vindicator --minutes 2 --repeats 3`, the
+bot alone on its reflexes against two of one kind at a time, refilled 3 s after each kill. Totals
+over the three runs (6 minutes per kind):
+
+| mob | set | kills | kills/min | bot deaths | damage taken | damage per kill | blasts within 6 |
+|---|---|---|---|---|---|---|---|
+| zombie | before | 57 | 9.5 | 1 | 139 | 2.4 | - |
+| zombie | after | 41 | 6.8 | 2 | 117 | 2.9 | - |
+| skeleton | before | 13 | 2.2 | 1 | 108 | 8.3 | - |
+| skeleton | after | 20 | 3.3 | 1 | 150 | 7.5 | - |
+| creeper | before | 8 | 1.3 | 4 | 156 | 19.5 | 20 |
+| creeper | after | 9 | 1.5 | 0 | 6 | 0.7 | 9 |
+| vindicator | before | 3 | 0.5 | 16 | 452 | 151 | - |
+| vindicator | after | 13 | 2.2 | 18 | 429 | 33 | - |
+
+`--clutch 5`: five drops from 22 blocks (19 damage without water) with a water bucket, and five
+stands on a fire block: every drop landed in placed water with no damage and the bucket back,
+every fire went out (the first three left the water behind; scooping by looking at the water
+block fixed that for the last two).
+
+How to read it:
+
+- Creepers are the clear win: the shield goes up when backing off can't clear the blast, so the
+  bot went from 4 deaths and 156 damage to none and 6 (11 blasts blocked). The creeper row comes
+  from a second run after that rule was tuned; the first "after" run, with a narrower shield rule,
+  was no better than before (4 deaths, 166 damage).
+- Guarding mixed waves, the tester took a third fewer hits (18 against 27) and died 4 times in
+  three runs instead of 9; the bot killed more and took a fifth less damage. The run-to-run spread
+  (13 to 26) overlaps the "before" runs, so read it as better, not as an exact third.
+- Under archer fire the bot didn't die once in three runs (2 before) and killed more; damage taken
+  is the same within noise. The tester's hits don't change: it stands in the open and the bot
+  fights for itself in the follow phase.
+- Vindicators: four times the kills, the same deaths. Two axe vindicators kill an unarmoured bot
+  in two or three hits whatever it does; the shield absorbs one hit per 5 s and it no longer
+  turns its back to run at low health (that was how most of the "before" deaths happened). The
+  vindicator row is from a rerun with `combat.fightFastMobs`; the run before it (shield only) had
+  2 kills and 15 deaths.
+- Zombies: fewer kills per minute, about the same damage per kill. In the "after" runs the two
+  zombies died one at a time, so they came back one at a time (the refill is per kill) and the bot
+  waited for each to walk up, which caps kills per minute; the first run, where they still came in
+  pairs, matched "before" (18 against 17). Damage per kill (2.4 against 2.9) is within noise. The
+  shield goes up between nearly every swing against zombies; blocking slows walking, which may
+  cost a little speed. `combat.shieldMelee off` turns it off.
+- Skeletons: more kills for less damage each. Kill counts here depend on the ranged reflex hiding
+  rather than fighting, so they swing a lot between runs (2 to 9 per run).
+
 ## Food: keep_fed, the food ladder and farm_setup
 
 `keep_fed` climbs a ladder when the bot is hungry: what it carries, then sources it knows,
