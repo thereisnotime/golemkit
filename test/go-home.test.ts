@@ -63,7 +63,8 @@ test('go_home retries a path stopped at the start, then reports the real reason'
   const stopped = () => Promise.reject(new Error('Path was stopped before it could be completed! Thus, the desired goal was not reached.'))
   // stopped once (the previous action's stop landing late), then the walk works
   let n = 0
-  const a = homeBot({ x: 580, y: 68, z: -46 }, () => (n++ === 0 ? stopped() : Promise.resolve()))
+  const pos = { x: 580, y: 68, z: -46 }
+  const a = homeBot(pos, () => (n++ === 0 ? stopped() : (Object.assign(pos, { x: 560.5, z: -45.5 }), Promise.resolve())))
   const r1 = await goHomeAction().run({ agent: a.agent, bot: a.bot, signal: new AbortController().signal } as any, { range: 4 }) as ActionResult
   assert.equal(r1.ok, true, r1.message)
   assert.equal(a.gotos.length, 2)
@@ -178,4 +179,12 @@ test('controller: a behaviour that keeps flipping on and off is held back unless
   safe.v = 70; await step(2000)
   assert.equal(c.current, 'stay_safe', 'the running one keeps its score')
   c.stop()
+})
+
+test('go_home fails when the walk settles without getting home', async () => {
+  const { bot, agent, gotos } = homeBot({ x: 547, y: 76, z: 33 }, () => Promise.resolve())
+  const r = await goHomeAction().run({ agent, bot, signal: new AbortController().signal } as any, { range: 4 }) as ActionResult
+  assert.equal(r.ok, false)
+  assert.match(r.message, /ended short of home/)
+  assert.equal(gotos.length, 1)
 })
