@@ -171,12 +171,13 @@ export interface ActionCatalog {
 /**
  * Actions a program may never call by default: fighting (a target id could be a player),
  * breaking/placing blocks, dropping items, stopping other callers, and anything that
- * changes the program itself. Long-running actions are refused too (they never end on
+ * changes the program itself. Internal actions (npc_interrupt and the like) are refused by
+ * their `internal` flag. Long-running actions are refused too (they never end on
  * their own, so a routine would hang).
  */
 export const DEFAULT_DENY = [
   'attack', 'guard', 'defend', 'chop_tree', 'till', 'place_block', 'drop', 'stop', 'say',
-  'craft', 'smelt', 'deposit', 'withdraw', 'llm_usage', 'npc_status', 'npc_interrupt', 'hunt', 'pillar'
+  'craft', 'smelt', 'deposit', 'withdraw', 'llm_usage', 'npc_status', 'hunt', 'pillar'
 ]
 
 export interface CatalogPolicy {

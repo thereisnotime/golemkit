@@ -16,8 +16,8 @@ import { z } from 'zod'
 import type { ActionResult, Logger } from '../core/index.ts'
 import { PRIORITY } from '../core/index.ts'
 
-/** Hooks act above the LLM (30) and NPC loops, below player commands (50) and reflexes (60). */
-export const HOOK_PRIORITY = 40
+/** Hooks act above the LLM (30) and NPC loops, below player commands (50) and reflexes (60): PRIORITY.hook. */
+export const HOOK_PRIORITY = PRIORITY.hook
 
 export const HOOK_EVENTS = ['spawn', 'death', 'playerJoined', 'playerLeft', 'chat', 'hurt', 'lowHealth', 'actionFailed', 'timer', 'llmBudgetExhausted'] as const
 export type HookEventType = typeof HOOK_EVENTS[number]

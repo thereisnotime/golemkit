@@ -148,7 +148,7 @@ Only one exclusive action runs at a time. Callers have priorities (`PRIORITY` in
 | [scene](/guide/scenes) | 25 |
 | llm | 30 |
 | behavior (armed survival behaviours) | 35 |
-| hooks (`HOOK_PRIORITY` in src/context/hooks.ts) | 40 |
+| hook ([context-pack hooks](/guide/context-pack#hooks-yaml), `HOOK_PRIORITY`) | 40 |
 | player | 50 |
 | reflex | 60 |
 | system | 100 |

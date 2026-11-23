@@ -106,3 +106,16 @@ test('the spec lists allowed actions only, with params', () => {
   assert.doesNotMatch(spec, /- follow:/)
   assert.match(spec, /while.*max/)
 })
+
+test('internal actions are refused by their flag, not by name', async () => {
+  const { makeCatalog, DEFAULT_DENY } = await import('../src/brains/self/format.ts')
+  const { defineAction, ok, noParams } = await import('../src/core/index.ts')
+  const { testActions } = await import('./self-helpers.ts')
+  assert.ok(!DEFAULT_DENY.includes('npc_interrupt'))
+  const interrupt = defineAction({ name: 'npc_interrupt', description: 'Ends the NPC brain\'s current action.', params: noParams, internal: true, run: () => ok('') })
+  const c = makeCatalog([...testActions(), interrupt])
+  assert.match(c.denied('npc_interrupt') ?? '', /internal/)
+  assert.ok(!c.allowed().some(a => a.name === 'npc_interrupt'))
+  // a replaced deny list doesn't let it through either
+  assert.match(makeCatalog([interrupt], { deny: [] }).denied('npc_interrupt') ?? '', /internal/)
+})

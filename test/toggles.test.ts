@@ -27,6 +27,7 @@ test('overrides merge over the profile, persist and reset', () => {
   assert.equal(a.setToggle('canDig', 'true').ok, true)
   assert.equal(a.setToggle('retry.actions.goto', '3').ok, true)
   assert.deepEqual((a.settings as any).reflexes, { retreatBelow: 0, eatBelow: 15 })
+  assert.deepEqual(a.selfSummary().settings && (a.selfSummary().settings as any).reflexes, { retreatBelow: 0, eatBelow: 15 }, 'self summary shows eatBelow too')
   assert.equal(a.canDig, true)
   assert.equal(a.retry.actions.goto, 3)
   a.storage.flush()

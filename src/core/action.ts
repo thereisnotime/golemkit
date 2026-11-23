@@ -27,9 +27,11 @@ export const PRIORITY = {
   /**
    * Armed behaviours that look after the bot's own needs (keep_fed, stay_safe; see
    * src/brains/behaviors). Above the LLM so a model that forgets to eat still gets fed,
-   * below hooks (40), players and reflexes.
+   * below hooks, players and reflexes.
    */
   behavior: 35,
+  /** Context-pack hooks (src/context/hooks.ts): above the LLM and behaviours, below players and reflexes. */
+  hook: 40,
   player: 50,
   reflex: 60,
   system: 100

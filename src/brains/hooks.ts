@@ -3,7 +3,7 @@
 //
 //   brains: [commandBrain(), reflexes(), hooksBrain(), llmBrain()]
 //
-// Actions run through agent.act() with caller brain:hooks at HOOK_PRIORITY (40): above the
+// Actions run through agent.act() with caller brain:hooks at HOOK_PRIORITY (PRIORITY.hook, 40): above the
 // LLM (30) and NPC loops (20), below player commands (50) and reflexes (60). A hook step can
 // set its own priority (npc | llm | player | number). Chat goes through agent.say/whisper.
 import type { Agent } from '../core/index.ts'
