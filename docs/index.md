@@ -3,7 +3,7 @@ layout: home
 hero:
   name: golemkit
   text: '<span class="slot" data-words="Minecraft:now|Luanti:soon|Bedrock:soon|Terraria:idea|Factorio:idea|Vintage Story:idea">Minecraft</span><br/>bots that pull their weight'
-  tagline: 'A TypeScript framework for companions, bodyguards, NPCs and LLM agents, useful with or without an LLM. Runs on <span class="slot" data-period="2200" data-words="NeoForge:now|Paper:try|vanilla:try|Spigot:try|Fabric:try|Forge:idea">NeoForge</span> servers.'
+  tagline: 'A TypeScript framework for companions, bodyguards, NPCs and LLM agents, useful with or without an LLM. The core is game-agnostic; today it runs on <span class="slot" data-period="2200" data-words="NeoForge:now|Paper:try|vanilla:try|Spigot:try|Fabric:try|Forge:idea">NeoForge</span> Minecraft servers.'
   image:
     src: /golem.svg
     alt: golemkit

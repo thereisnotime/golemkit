@@ -1,6 +1,6 @@
 # golemkit
 
-Framework for Minecraft bots built on Mineflayer, tested on NeoForge (vanilla and Paper work too, picked with `MC_PLATFORM`). The game sits behind an adapter interface, so the core is game-agnostic. TypeScript run directly by Node (see `.tool-versions`), no build step. Read `docs/concepts/architecture.md` before changing core, skills or brains.
+Framework for game bots with a game-agnostic core; each game sits behind an adapter interface. The one adapter today is Minecraft Java on Mineflayer, tested on NeoForge (vanilla and Paper work too, picked with `MC_PLATFORM`). TypeScript run directly by Node (see `.tool-versions`), no build step. Read `docs/concepts/architecture.md` before changing core, skills or brains.
 
 ## Layout
 

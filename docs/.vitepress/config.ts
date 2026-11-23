@@ -4,7 +4,7 @@ import { withMermaid } from 'vitepress-plugin-mermaid'
 // Local docs site: `just docs` (dev server) or `just docs-build` (static HTML in docs/.vitepress/dist).
 export default withMermaid(defineConfig({
   title: 'golemkit',
-  description: 'Minecraft bot framework on Mineflayer, for NeoForge, Paper and vanilla servers',
+  description: 'Game bot framework with a game-agnostic core; Minecraft Java on Mineflayer (NeoForge, Paper, vanilla) today',
   cleanUrls: true,
   // '/' locally; the GitHub Pages workflow sets DOCS_BASE=/golemkit/ (the site lives under the repo name)
   base: process.env.DOCS_BASE || '/',
@@ -15,8 +15,8 @@ export default withMermaid(defineConfig({
     // link previews (GitHub, Slack, Discord, X): absolute URLs, since crawlers don't resolve the base
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: 'golemkit' }],
-    ['meta', { property: 'og:title', content: 'golemkit: Minecraft bots that pull their weight' }],
-    ['meta', { property: 'og:description', content: 'A TypeScript framework for companions, bodyguards, NPCs and LLM agents on Mineflayer, with first-class NeoForge support. Useful with or without an LLM.' }],
+    ['meta', { property: 'og:title', content: 'golemkit: game bots that pull their weight' }],
+    ['meta', { property: 'og:description', content: 'A TypeScript framework for companions, bodyguards, NPCs and LLM agents on a game-agnostic core. Minecraft Java today, more games next. Useful with or without an LLM.' }],
     ['meta', { property: 'og:image', content: 'https://thereisnotime.github.io/golemkit/og.png' }],
     ['meta', { property: 'og:image:width', content: '1200' }],
     ['meta', { property: 'og:image:height', content: '630' }],

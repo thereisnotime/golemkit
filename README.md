@@ -5,9 +5,9 @@
 <h1 align="center">golemkit</h1>
 
 <p align="center">
-  <b>Minecraft bots that pull their weight.</b><br>
-  A TypeScript framework for companions, bodyguards, NPCs and LLM agents,<br>
-  built on Mineflayer with first-class NeoForge support. Useful with or without an LLM.
+  <b>Game bots that pull their weight.</b><br>
+  A TypeScript framework for companions, bodyguards, NPCs and LLM agents on a game-agnostic core.<br>
+  The first adapter is Minecraft Java on Mineflayer (NeoForge, Paper, vanilla). Useful with or without an LLM.
 </p>
 
 <p align="center">

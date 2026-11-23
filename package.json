@@ -2,7 +2,7 @@
   "name": "golemkit",
   "version": "0.1.0",
   "private": true,
-  "description": "Framework for Minecraft bots (assistants, NPCs, LLM agents) on NeoForge servers, built on Mineflayer",
+  "description": "Framework for game bots (companions, bodyguards, NPCs, LLM agents) with a game-agnostic core; Minecraft Java adapter on Mineflayer",
   "type": "module",
   "main": "src/cli.ts",
   "engines": {
@@ -34,5 +34,15 @@
   },
   "optionalDependencies": {
     "@huggingface/transformers": "^4.3.2"
-  }
+  },
+  "keywords": [
+    "game-bot",
+    "bot-framework",
+    "npc",
+    "llm-agents",
+    "game-agnostic",
+    "minecraft",
+    "mineflayer",
+    "neoforge"
+  ]
 }
