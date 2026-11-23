@@ -1186,7 +1186,9 @@ where its behaviours got stuck. Run it before and after a change to a behaviour 
 How a run goes. ClaudeTest (an op) is the director, but only for the setup and the clean-up; it
 logs out in between, and waits while another script has the account online. It checks that the
 start is 300+ blocks from the world spawn, the fortress, the village and every online player
-(`--force` skips the player check), finds a dry open surface block near `--start`, and, with the
+(`--force` skips the player check), finds a dry open surface block near the start, measures the
+terrain there (biome, natural trees within 32 blocks, grass blocks, nearest open water, animals in
+sight; stored with the run as `terrain` and `terrainNote`) and, with the
 bot online but brainless: survival mode, clears its inventory, full health and food, teleports
 it there, sets its spawnpoint there (a death respawns it at the start, not at world spawn) and
 gives the `--kit`. Then the bot starts with a fresh data directory (no remembered places, trees
@@ -1202,28 +1204,45 @@ players to sleep and `idle_antics` doesn't chat, and no context pack is loaded (
 Pax's MEMORY.md and hooks). `--llm` keeps the profile's LLM brain (its own variant and login).
 
 ```sh
-just survival-bench                                   # 1 day at 1600 800, Pax's behaviours, no kit
+just survival-bench                                   # 1 day in the forest scenario, Pax's behaviours, no kit
+just survival-bench --scenario ice --tag ice-check    # the old default start, no trees
 just survival-bench --days 2 --kit stone --tag stone-kit
 just survival-bench --start 1700,900 --repeats 3 --spread 200 --tag fix-a
 just survival-bench --profile apprentice --terrain-note "dense forest"
+just survival-bench --survey "1818,1318 2242,1742"    # read-only look at candidate starts
 just survival-bench --compare baseline-2026-11-23 fix-a   # before/after table from results.jsonl
 just survival-bench --summary fix-a                   # the runs of one tag
 just survival-bench --cleanup                         # finish the clean-up of a run that broke
 ```
 
-Options: `--days N` (1), `--minutes M` (overrides the length, for a quick check), `--start x,z`
-(1600,800), `--kit none|stone|iron` (none; stone: stone pickaxe, axe, sword, shovel and 8
+Starts come from a scenario (`--scenario`, default `forest`) or from `--start x,z`, which
+overrides it (the result's `scenario` is then `custom`):
+
+| scenario | start | what is there |
+|---|---|---|
+| `forest` (default) | 1818 1318 | forest biome (oak, birch), about 67 natural trees within 32 blocks, grass, water a few blocks away, chickens, pigs and sheep in sight. Measures the early game: wood, tools, food, bed |
+| `ice` | 1600 800 | ice and packed ice, no natural tree within ~137 blocks; the default until 23 Nov 2026. A hard start: it measures whether the bot goes out to find wood at all |
+
+Both are 300+ blocks from the world spawn, the fortress, the village and the other test areas
+(the guard-bench arena at 1250 445, 1250 800, 1600 445). `--survey "x,z x,z ..."` is how the
+forest spot was picked: the director, in spectator mode, flies to each candidate, finds the
+surface and prints its terrain, skipping candidates near those places or an online player, and
+goes back where it was. It changes nothing in the world.
+
+Options: `--days N` (1), `--minutes M` (overrides the length, for a quick check), `--scenario
+forest|ice` (forest), `--start x,z`, `--kit none|stone|iron` (none; stone: stone pickaxe, axe, sword, shovel and 8
 bread; iron: iron tools, shield, iron armour and 16 bread), `--repeats N` (1), `--spread R`
 (0: every repeat starts at the same spot; R > 0: repeats after the first start at a point R
 blocks away picked by `--seed`), `--seed` (1), `--profile name` (pax), `--llm`, `--tag`,
-`--terrain-note "text"` (free text stored with the run), `--stuck N` (5: a failure seen more
+`--terrain-note "text"` (replaces the measured terrain note), `--stuck N` (5: a failure seen more
 than N times is a stuck loop). Accounts come from `SURVIVAL_BOT`, `SURVIVAL_OWNER` and `DIRECTOR`, the data
 directory from `SURVIVAL_BENCH_DIR` (`data/survival-bench`). Ctrl-C ends the run early and
 still cleans up.
 
 Clean-up, after every run and also after a failed one: the bench notes the exact position of
 every block the bot places (a block that appears within 6 blocks of it right after it placed
-or used something), and the director removes those, only where the same block is still there.
+or used something), and the director removes those, only where the same block is still there
+(placed dirt that has since grown grass counts as the same).
 It kills dropped items and experience at the start, the death spots and those blocks, clears
 the bot's inventory and effects, puts its spawnpoint back to world spawn and disconnects it.
 What it can't undo is printed: blocks the bot broke (felled trees, dug ground, from its
@@ -1250,6 +1269,7 @@ store stay in `data/survival-bench/runs/<time>-<tag>-<n>/`). What the columns me
 | whispers, chatLines, said | whispers and public lines it sent, the first 20 of them |
 | disconnects, maxLagS | sessions lost during the run (kicks, timeouts), and the longest event-loop stall |
 | playersNear | other players it saw within 200 blocks (a run with company isn't a clean run) |
+| scenario, terrain, terrainNote | the scenario (`custom` for `--start`), and the terrain measured at the start: biome, natural trees within 32 (touching logs with natural leaves), grass blocks within 32, nearest open water, animals within 160 |
 | placed, removed, notRemoved, broken | the clean-up: positions noted, removed, changed since; blocks it broke |
 | series | food, health and tool tier once a minute |
 
@@ -1263,7 +1283,24 @@ second run finds fewer trees); `--spread 200` moves them to fresh ground at the 
 different terrain, so keep the same `--seed` on both sides. Stuck loops and failure counts are
 the most useful signal for fixing things: they point at the behaviour and the message.
 
-**Baseline** (mc02, 23 Nov 2026, start 1607 62 782, kit none, Pax's behaviours without the LLM,
+**Forest baseline** (the `forest` scenario, the default since 23 Nov 2026; mc02, start 1818 64
+1318, kit none, Pax's behaviours without the LLM, 1 in-game day = 20 real minutes). Terrain at the
+start: forest, 67 trees within 32, water 4 blocks away, chickens, pigs and a sheep in sight.
+Repeat 2 (`--spread 200`, starting about 200 blocks away) was still running when this was written.
+
+| tag | started at | deaths (causes) | food min | health min | tool tier | logs / cobble / food | distance | failures | help asks |
+|---|---|---|---|---|---|---|---|---|---|
+| forest-baseline-2026-11-23 #1 | 11235 (dusk) | 3 (slain by Zombie, shot by Skeleton x2) | 11 | 0.8 | stone | 22 / 20 / 6 | 1522 | 66 | 0 |
+
+How to read it: in the forest the bot gets the early game going within minutes (wooden tools by
+minute 3, stone by minute 10, food from animals) but it started at dusk under a dense canopy and
+died three times in the first 6 minutes to a zombie and skeletons while defending itself with
+wooden tools. It never made a bed (`spawnSet` false), so night deaths respawned it at the start.
+The "stuck loops" are all `replaced` (one behaviour pre-empting another: go_home, hunt, defend),
+not real loops. One 54 s event-loop stall cost it a disconnect.
+
+
+**Ice baseline** (the `ice` scenario, the default before the forest one; mc02, 23 Nov 2026, start 1607 62 782, kit none, Pax's behaviours without the LLM,
 1 in-game day = 20 real minutes, one run each). The start has no tree within 32 blocks and water
 and ice nearby. "Pre-merge" ran before trips, asking for help and `light_home` were merged;
 "baseline" with them, on the code this page describes.
@@ -1272,6 +1309,10 @@ and ice nearby. "Pre-merge" ran before trips, asking for help and `light_home` w
 |---|---|---|---|---|---|---|---|---|---|
 | pre-merge-2026-11-23 | 7695 (noon) | 3 (drowned, shot by Skeleton, drowned) | 12 | 0.3 | none | 0 / 0 / 0 | 899 | 29 | - |
 | baseline-2026-11-23 | 15295 (night) | 0 | 20 | 20 | none | 0 / 0 / 0 | 3 | 12 | 1 |
+| fedtrip-2026-11-23 | 3755 (morning) | 0 | 19 | 20 | none | 0 / 0 / 0 | 903 | 6 | 0 |
+
+Fedtrip went out looking for trees (137 blocks out at most) and found none: the ice spot has no
+natural tree within ~137 blocks, which is why the default moved to the forest.
 
 How to read it:
 
