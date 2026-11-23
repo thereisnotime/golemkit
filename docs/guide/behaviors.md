@@ -635,6 +635,12 @@ flowchart TB
   (default 8) or it is starving. Until then it bakes, tends or starts its farm, forages and waits
   for crops (the next try is 3 minutes later), and the log says why (`food 12/20 is not urgent and
   gear 25 is under 40: not scouting 120 blocks out yet`). `scoutGear: 0` turns the rule off.
+  **Starving at night** (food 6 or less): its own farm, a food chest, a remembered spot within
+  twice `riskyRingsFrom` (96 blocks) and the near ring are worth the dark; wider rings still wait
+  for day. Between ladder runs a starving bot holds the body (score 45: above `chop_wood_loop` and
+  stay_safe's hold after a failed trip, below stay_safe's night trip home), walks home by day when
+  it is more than 16 blocks out, and otherwise waits there, so chores and stay_safe don't take
+  turns while it starves.
 - **3b · trip to a known food place** (`trips`, on by default): before the far rings, and when
   every ring came up empty, it walks to the best known food place by day, any distance (it
   travels on the surface, so 3000+ blocks is fine, up to `tripRange`, default 4000). Known
