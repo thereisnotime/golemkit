@@ -161,7 +161,7 @@ The bodyguard SHALL warn the player in chat about threats, with directions relat
 - **THEN** the later one is not sent
 
 ### Requirement: Feeding
-When the player's health is visible and low, the bodyguard SHALL toss them its best food, keeping its own reserve, and say so; when the server sends neither health nor hunger for the player it SHALL not feed.
+When the player's health (10 or less) or hunger (6 or less) is visible and low, nothing threatens them, they are within 5 blocks and it has not fed them in the last 30 s, the bodyguard SHALL toss them up to two of its best food, keeping its own reserve, and say so; when the server sends neither health nor hunger for the player it SHALL not feed.
 
 #### Scenario: Hurt player
 - **WHEN** the player is at 6 health within 5 blocks, nothing threatens them and the bot carries 7 food items with a reserve of 4
