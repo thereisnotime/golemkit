@@ -2346,6 +2346,7 @@
       "set_spawn",
       "shear",
       "light_up",
+      "recover_items",
       "mods",
       "mod_items",
       "creative_get"
@@ -5773,6 +5774,43 @@
         "longRunning": false
       },
       {
+        "name": "recover_items",
+        "description": "After your own death: walk back to where you died, pick up your dropped things before they despawn (5 minutes), put the armour and weapon back on, and say what came back (\"got back 23 of 31 items: stone sword, ...\"). Refuses when the drops are lost (lava, void, another dimension, too far for the time left) or the spot is too dangerous; force=true goes anyway.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "force": {
+              "default": false,
+              "description": "go even when it looks too dangerous or too far",
+              "type": "boolean"
+            },
+            "give_up_health": {
+              "default": 8,
+              "description": "turn back at or below this health",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 19
+            },
+            "radius": {
+              "default": 10,
+              "description": "pick up drops this close to the spot",
+              "type": "number",
+              "minimum": 2,
+              "maximum": 24
+            },
+            "max_distance": {
+              "description": "farthest death spot worth a trip (default 400)",
+              "type": "number",
+              "minimum": 16,
+              "maximum": 2000
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
         "name": "mods",
         "description": "List the mods this server runs (with versions when known) and how many items/blocks/mobs each adds. Use it before explaining or teaching a mod, so you talk about what is actually installed.",
         "inputSchema": {
@@ -5847,7 +5885,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !mods !mod_items !creative_get (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get (!help <command> for details)"
   },
   "variant:villager": {
     "actions": [
@@ -5949,7 +5987,8 @@
       "place_bed",
       "set_spawn",
       "shear",
-      "light_up"
+      "light_up",
+      "recover_items"
     ],
     "catalog": [
       {
@@ -9112,9 +9151,46 @@
         },
         "exclusive": true,
         "longRunning": false
+      },
+      {
+        "name": "recover_items",
+        "description": "After your own death: walk back to where you died, pick up your dropped things before they despawn (5 minutes), put the armour and weapon back on, and say what came back (\"got back 23 of 31 items: stone sword, ...\"). Refuses when the drops are lost (lava, void, another dimension, too far for the time left) or the spot is too dangerous; force=true goes anyway.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "force": {
+              "default": false,
+              "description": "go even when it looks too dangerous or too far",
+              "type": "boolean"
+            },
+            "give_up_health": {
+              "default": 8,
+              "description": "turn back at or below this health",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 19
+            },
+            "radius": {
+              "default": 10,
+              "description": "pick up drops this close to the spot",
+              "type": "number",
+              "minimum": 2,
+              "maximum": 24
+            },
+            "max_distance": {
+              "description": "farthest death spot worth a trip (default 400)",
+              "type": "number",
+              "minimum": 16,
+              "maximum": 2000
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": true
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items (!help <command> for details)"
   },
   "profile:apprentice": {
     "actions": [
@@ -10661,6 +10737,7 @@
       "set_spawn",
       "shear",
       "light_up",
+      "recover_items",
       "mods",
       "mod_items",
       "creative_get"
@@ -14088,6 +14165,43 @@
         "longRunning": false
       },
       {
+        "name": "recover_items",
+        "description": "After your own death: walk back to where you died, pick up your dropped things before they despawn (5 minutes), put the armour and weapon back on, and say what came back (\"got back 23 of 31 items: stone sword, ...\"). Refuses when the drops are lost (lava, void, another dimension, too far for the time left) or the spot is too dangerous; force=true goes anyway.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "force": {
+              "default": false,
+              "description": "go even when it looks too dangerous or too far",
+              "type": "boolean"
+            },
+            "give_up_health": {
+              "default": 8,
+              "description": "turn back at or below this health",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 19
+            },
+            "radius": {
+              "default": 10,
+              "description": "pick up drops this close to the spot",
+              "type": "number",
+              "minimum": 2,
+              "maximum": 24
+            },
+            "max_distance": {
+              "description": "farthest death spot worth a trip (default 400)",
+              "type": "number",
+              "minimum": 16,
+              "maximum": 2000
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
         "name": "mods",
         "description": "List the mods this server runs (with versions when known) and how many items/blocks/mobs each adds. Use it before explaining or teaching a mod, so you talk about what is actually installed.",
         "inputSchema": {
@@ -14162,6 +14276,6 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !mods !mod_items !creative_get (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get (!help <command> for details)"
   }
 }

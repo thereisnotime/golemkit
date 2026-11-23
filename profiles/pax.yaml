@@ -79,6 +79,9 @@ behaviors:
         { name: village, x: -2770, z: 1090, crops: [wheat, carrots, potatoes] },   # the village farms, ~3500 blocks west
         { name: own farm, place: "farm:1", crops: [wheat] }                        # its own farm by the fortress
       ] }
+  recover_drops: { maxDistance: 400, giveUpHealth: 8 }   # after a death: back for its things before they despawn (5 min) when they can
+                              # still be had (no lava/void/other dimension, close enough) and the spot is safe for its gear,
+                              # then armour back on, home, and "got back 23 of 31 items: ..." to ${MC_OWNER:-Robin}
   farm_setup: { tendRange: 128 }   # starts its own wheat farm near home (or where it is), tends it, bakes bread, breeds animals
   stay_safe: { retreatBelow: 0, avoidWater: false }   # stands its ground like the reflexes above;
                                                       # still pillars up when surrounded, goes home at night
