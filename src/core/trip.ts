@@ -96,6 +96,9 @@ export interface TripPrep {
   starving?: boolean
 }
 
+/** Food bar at or above which a trip may leave without food items when there are none to take along. */
+export const FED_ENOUGH_BAR = 16
+
 /** Food bar at or below which a food trip goes whatever is missing (nothing at home helps). */
 export const STARVING_BAR = 6
 
@@ -111,8 +114,12 @@ export function planTripPrep (kit: TripKit, s: TripSettings, kind: TripKind, wai
   const after = kit.foodItems + topUp
   const missing: string[] = []
   if (s.needWeapon && !kit.weapon && !waive.includes('weapon')) missing.push('no weapon')
-  // a food trip is how it gets food: it can't take along what it hasn't got (the pantry top-up still runs)
-  if (after < s.minFood && kind !== 'food' && !waive.includes('food')) missing.push(after ? `food ${after} of ${s.minFood} items` : 'no food to take along')
+  // a food trip is how it gets food: it can't take along what it hasn't got (the pantry top-up still runs).
+  // Well fed with nothing to take along (no pantry, a bot starting from nothing): the bar is the
+  // food it brings, and the budget turns it back at half of it. Seen in the survival bench: a
+  // full bar and no food items kept it from ever fetching wood, so it never got tools or food.
+  const fedEnough = kit.bar >= FED_ENOUGH_BAR && kit.pantryItems === 0
+  if (after < s.minFood && kind !== 'food' && !fedEnough && !waive.includes('food')) missing.push(after ? `food ${after} of ${s.minFood} items` : 'no food to take along')
   if (kit.health < s.minHealth && !waive.includes('health')) missing.push(`health ${Math.round(kit.health)}/20 (needs ${s.minHealth})`)
   const starving = kind === 'food' && kit.bar <= STARVING_BAR
   return {

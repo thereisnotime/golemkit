@@ -864,7 +864,9 @@ food first) until it carries `trips.food` items (8), puts its best sword or axe 
 checks it. With no weapon, fewer than `trips.minFood` items (4) or under `trips.minHealth`
 health (12) it stays and the behaviour backs off with the reason, e.g. `not ready for a trip
 (looking for sheep 120 blocks out): no weapon, food 1 of 4 items`. Food trips don't need food
-along (getting some is the point), and a food trip while starving (food bar 6 or less) goes
+along (getting some is the point), nor does any trip with a food bar of 16 or more when there is
+no food in reach to take (the bar is what it brings; a bot starting from nothing would otherwise
+never fetch the wood for its first tools), and a food trip while starving (food bar 6 or less) goes
 whatever is missing. A wood trip with no weapon and no wood waives the weapon: the wood is what
 makes one.
 

@@ -315,10 +315,17 @@ export class HelpDesk {
 
 /** "Stuck on upgrade my tools: could not make sticks (5 tries over 23 min). A few logs or planks in my chest would help." */
 export function helpMessage (p: { goal: string, reason: string, tried?: string, help?: string | null }): string {
-  const reason = p.reason.length > 120 ? p.reason.slice(0, 119) + '…' : p.reason
   const help = p.help ? ` ${p.help.charAt(0).toUpperCase()}${p.help.slice(1)} would help.` : ' Any idea?'
-  return `Stuck trying to ${p.goal}: ${reason}${p.tried ? ` (${p.tried})` : ''}.${help}`
+  const tried = p.tried ? ` (${p.tried})` : ''
+  // one chat line: a whisper is split past ~240 characters (with the /msg prefix), and the tail
+  // ("... would help.") arrived as a line of its own; the reason gives way, the ask stays whole
+  const room = Math.max(40, Math.min(120, HELP_MAX_CHARS - `Stuck trying to ${p.goal}: .`.length - tried.length - help.length))
+  const reason = p.reason.length > room ? p.reason.slice(0, room - 1).trimEnd() + '…' : p.reason
+  return `Stuck trying to ${p.goal}: ${reason}${tried}.${help}`
 }
+
+/** Longest help message, so a whisper ("/msg <name> " + text) stays one chat line. */
+export const HELP_MAX_CHARS = 210
 
 const desks = new WeakMap<object, HelpDesk>()
 

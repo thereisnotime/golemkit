@@ -256,3 +256,15 @@ test('journal: help events format and recall by type', () => {
   assert.match(fmtEvent({ ...e, data: { status: 'sorted', behavior: 'chop_wood_loop', minutes: 12 } }), /chop_wood_loop works again/)
   assert.deepEqual(resolveTypes('stuck'), ['help'])
 })
+
+test('helpMessage: a long reason is cut so the ask stays one chat line', async () => {
+  const { helpMessage, HELP_MAX_CHARS } = await import('../src/brains/npc/help.ts')
+  const m = helpMessage({
+    goal: 'keep a stock of wood',
+    reason: 'no natural tree I may cut within 250 blocks (not ready for a trip (looking for trees): no food to take along); looking again in 1 min',
+    tried: '5 tries over 20 min',
+    help: 'a few logs in my chest, or a forest I may cut (remember_place)'
+  })
+  assert.ok(m.length <= HELP_MAX_CHARS, `${m.length} chars: ${m}`)
+  assert.match(m, /\(remember_place\) would help\.$/)
+})

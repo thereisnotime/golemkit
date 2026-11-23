@@ -13,7 +13,7 @@ A trip SHALL be a walk away from home started by a behaviour or by an action not
 - **THEN** chop_tree walks out as before, without preparation or budget
 
 ### Requirement: Preparation
-Before a trip the bot SHALL take food out of its own and configured chests (`settings.storage.chests`) within 160 blocks, best food first, until it carries `trips.food` items (default 8), and hold its best sword or axe. It SHALL NOT leave, and SHALL say what is missing, when it then has no weapon (`trips.needWeapon`), fewer than `trips.minFood` food items (default 4) or less than `trips.minHealth` health (default 12). Food trips SHALL NOT need food items along; a food trip with the food bar at 6 or less SHALL go whatever is missing. A wood trip with no weapon and fewer than 3 planks' worth of wood SHALL waive the weapon.
+Before a trip the bot SHALL take food out of its own and configured chests (`settings.storage.chests`) within 160 blocks, best food first, until it carries `trips.food` items (default 8), and hold its best sword or axe. It SHALL NOT leave, and SHALL say what is missing, when it then has no weapon (`trips.needWeapon`), fewer than `trips.minFood` food items (default 4) or less than `trips.minHealth` health (default 12). Food trips SHALL NOT need food items along, nor SHALL any trip when the food bar is 16 or more and there is no food in reach to take along (the bar is the food it brings; the budget turns it back at half of it); a food trip with the food bar at 6 or less SHALL go whatever is missing. A wood trip with no weapon and fewer than 3 planks' worth of wood SHALL waive the weapon.
 
 #### Scenario: Pantry top-up
 - **WHEN** Pax carries 2 bread, its pantry chest holds 20 bread, and keep_spawn_bed wants to scout 120 blocks for sheep

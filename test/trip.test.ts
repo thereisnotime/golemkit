@@ -212,3 +212,14 @@ test('tripRun: a turn-back walks home and reports it', async () => {
   assert.equal(f.said.length, 0, 'no owner online: the turn-back is only logged, not said in public chat')
   assert.equal(activeTrip(f.bot), null, 'trip ended')
 })
+
+test('planTripPrep: well fed with nothing to take along may leave; with food in the pantry it takes some', async () => {
+  const { planTripPrep, tripSettings } = await import('../src/core/trip.ts')
+  const S2 = tripSettings({})
+  const kit = { foodItems: 0, pantryItems: 0, weapon: true, health: 20, bar: 20 }
+  assert.equal(planTripPrep(kit, S2, 'wood').go, true, 'full bar, no pantry: the bar is the food it brings')
+  assert.equal(planTripPrep({ ...kit, bar: 12 }, S2, 'wood').go, false, 'half a bar and nothing along: stays')
+  const withPantry = planTripPrep({ ...kit, pantryItems: 16 }, S2, 'wood')
+  assert.equal(withPantry.go, true)
+  assert.equal(withPantry.topUp, S2.food)
+})
