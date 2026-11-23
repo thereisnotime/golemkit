@@ -186,7 +186,7 @@ export function depthOk (bot: Bot, m: MiningState, p: P): boolean {
 }
 
 /** Underground (real cover overhead, little sky light) and the hostiles close by, for undergroundRetreat. */
-export function undergroundNow (bot: Bot, radius: number): { underground: boolean, hostiles: number } {
+export function undergroundNow (bot: Bot, radius: number): { underground: boolean, hostiles: number, air?: number } {
   const feet = bot.entity.position.floored()
   let cover = 0
   for (let dy = 2; dy <= 24; dy++) {
@@ -197,7 +197,9 @@ export function undergroundNow (bot: Bot, radius: number): { underground: boolea
   const head = bot.blockAt(feet.offset(0, 1, 0)) as any
   const me = bot.entity.position
   const hostiles = Object.values(bot.entities).filter(e => e !== bot.entity && isHostile(e) && e.position.distanceTo(me) <= radius && Math.abs(e.position.y - me.y) < 8).length
-  return { underground: isUnderground(cover, typeof head?.skyLight === 'number' ? head.skyLight : undefined), hostiles }
+  // air only counts with the head in water: the value is whatever metadata last said, and can be stale
+  const air = /water|bubble_column/.test(head?.name ?? '') ? (bot as any).oxygenLevel : undefined
+  return { underground: isUnderground(cover, typeof head?.skyLight === 'number' ? head.skyLight : undefined), hostiles, ...(typeof air === 'number' ? { air } : {}) }
 }
 
 /** Has (or crafts) a torch and puts it on the tunnel floor at `spot` (an air block with a solid floor). */
@@ -323,9 +325,9 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
 
   try {
     // safe mining: depth cap when not ready, cave checks, torches, retreat
-    const ms = miningState(bot, agent.settings)
-    const safety = opts.safe !== false && ms.s.safe
-    const cap = safety && !ms.readiness.ready ? ms.surface - ms.s.safeDepth : -Infinity
+    const mine = miningState(bot, agent.settings)
+    const safety = opts.safe !== false && mine.s.safe
+    const cap = safety && !mine.readiness.ready ? mine.surface - mine.s.safeDepth : -Infinity
     // 1. stone already in reach (never the column under our own feet), then exposed stone close by
     const feet0 = bot.entity.position.floored()
     const ids = [...sources].map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
@@ -362,7 +364,7 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
     const startY = feet.y
     const minY = Math.max(startY - 20, typeof (bot.game as any)?.minY === 'number' ? (bot.game as any).minY + 6 : -58)
     const tunnel = new Set<string>()
-    const caves = safety ? { belowY: ms.surface - 1, tunnel } : undefined
+    const caves = safety ? { belowY: mine.surface - 1, tunnel } : undefined
     let sinceTorch = 0
     let noTorches = false
     let torchesPlaced = 0
@@ -384,15 +386,15 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
       if (bot.inventory.emptySlotCount() === 0) await makeRoom(bot, 2, new Set([item]))
       if (bot.inventory.emptySlotCount() === 0) { stopped = 'inventory full'; break }
       if (safety) {
-        const u = undergroundNow(bot, ms.s.hostileRadius)
-        const why = undergroundRetreat({ underground: u.underground || feet.y < ms.surface - 3, health: bot.health, hostiles: u.hostiles }, ms.s)
+        const u = undergroundNow(bot, mine.s.hostileRadius)
+        const why = undergroundRetreat({ ...u, underground: u.underground || feet.y < mine.surface - 3, health: bot.health }, mine.s)
         if (why) { retreat = why; stopped = `abandoned the dig and headed back up: ${why}`; break }
       }
       reachedStone ||= inStoneLayer(at, feet, dir)
       const wantDown = (!reachedStone || feet.y > startY - (opts.minDepth ?? 0)) && feet.y > minY
       if (wantDown && feet.y <= cap) {
         notReady = true
-        stopped = `${notReadyText(ms.readiness)} (staying within ${ms.s.safeDepth} blocks of the surface)`
+        stopped = `${notReadyText(mine.readiness)} (staying within ${mine.s.safeDepth} blocks of the surface)`
         break
       }
       const down = wantDown
@@ -438,7 +440,7 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
       for (const p of [...plan.dig, feet, add(feet, 0, 1, 0)]) tunnel.add(key(p))
       // light the tunnel behind us: mobs don't spawn in it and the way back is visible
       sinceTorch++
-      if (safety && !noTorches && feet.y < ms.surface - 2 && torchDue(sinceTorch, ms.s, (bot.blockAt(vec(bot, feet.x, feet.y, feet.z)) as any)?.light)) {
+      if (safety && !noTorches && feet.y < mine.surface - 2 && torchDue(sinceTorch, mine.s, (bot.blockAt(vec(bot, feet.x, feet.y, feet.z)) as any)?.light)) {
         if (await placeTorch(bot, signal, prev)) { sinceTorch = 0; torchesPlaced++ } else noTorches = !bot.inventory.items().some(i => i.name === 'torch') && torchCrafts(inventoryCounts(bot)) < 1
       }
       for (const p of plan.side) {

@@ -117,6 +117,9 @@ test('undergroundRetreat: low health or a crowd underground, never on the surfac
   assert.match(undergroundRetreat({ underground: true, health: 8, hostiles: 1 }, pax)!, /health 8/)
   assert.match(undergroundRetreat({ underground: true, health: 20, hostiles: 2 }, D)!, /2 hostiles/)
   assert.equal(undergroundRetreat({ underground: false, health: 4, hostiles: 3 }, D), null)
+  // the live MineTest run: drowned at y 33 after collecting iron in a flooded cave
+  assert.match(undergroundRetreat({ underground: true, health: 18, hostiles: 0, air: 4 }, D)!, /air/)
+  assert.equal(undergroundRetreat({ underground: true, health: 18, hostiles: 0, air: 20 }, D), null)
   assert.equal(undergroundRetreat({ underground: true, health: 16, hostiles: 1 }, D), null)
   assert.equal(undergroundRetreat({ underground: true, health: 4, hostiles: 3 }, miningSettings({ safe: false })), null)
   assert.equal(undergroundRetreat({ underground: true, health: 4, hostiles: 3 }, miningSettings({ retreatBelow: 0, retreatHostiles: 0 })), null)

@@ -156,7 +156,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         const s = miningSettings(agent.settings.mining)
         if (!s.safe) return false
         const u = undergroundNow(bot, s.hostileRadius)
-        const why = undergroundRetreat({ underground: u.underground, health: bot.health, hostiles: u.hostiles }, s)
+        const why = undergroundRetreat({ ...u, health: bot.health }, s)
         if (!why) return false
         climbTriedAt = Date.now()
         escaping = true
@@ -248,8 +248,10 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       // Health going down is a hit too. entityHurt for our own entity was seen missing after a
       // respawn (the bot stood idle for 5 s while two mobs hit it), so this is the backstop.
       let lastHealth = bot.health
+      let lastDropAt = 0
       const onHealth = () => {
         const dropped = bot.health < lastHealth && bot.health > 0
+        if (dropped) lastDropAt = Date.now()
         if (dropped) totemCheck()
         lastHealth = bot.health
         if (!dropped || !cfg().selfDefense || !needsSurvival(bot)) return
@@ -270,7 +272,8 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         const { selfDefense, autoEat, eatBelow, retreatBelow } = cfg()
         // Low health with a hostile close by: get away even before the next hit.
         const mob = selfDefense ? nearestHostile(bot, bot.entity.position, 6) : null
-        if (mob && undergroundEscape()) return
+        // underground and losing: to mobs, or to drowning, lava, a fall (health still dropping, no mob needed)
+        if ((mob || Date.now() - lastDropAt < 5000) && undergroundEscape()) return
         const climbing = climbingAway(mob)
         if (mob && !climbing && !FLYING.has(mob.name ?? '') && !fastMob(mob) && bot.health > 0 && bot.health <= retreatBelow && agent.currentAction?.name !== 'retreat' && agent.getAction('retreat')) {
           void reflex('retreat')

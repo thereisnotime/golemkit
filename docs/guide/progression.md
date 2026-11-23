@@ -119,10 +119,17 @@ pickaxe, which closes the gap.
   from coal or charcoal and a stick when it has none (`torches: false` turns it off);
 - every step checks health and hostiles: underground at `retreatBelow` (10) health or with
   `retreatHostiles` (2) hostiles within `hostileRadius` (8), it abandons the dig, skips the drop
-  sweep and walks back up the staircase it came down.
+  sweep and walks back up the staircase it came down. Running out of air (6 of 20 or less)
+  counts too.
+
+**Collecting** (`collect`, and the ore trips in `upgrade_tools`) runs the same check before
+every block: losing underground, it stops and runs `climb_out`. A live test bot that was ready
+(shield, bread, stone tools) went for iron ore in a cave, ended up in water at y 33 and drowned
+at 4 health without a mob in sight; that is why air and health count without a hostile near.
 
 **Underground fights** (reflexes): the same test runs when the bot is hit or a hostile is
-within 6 blocks. Underground (3+ solid blocks overhead and little sky light) and losing, it runs
+within 6 blocks, or while health is still dropping (drowning, lava, a fall). Underground (3+
+solid blocks overhead and little sky light) and losing, it runs
 `climb_out` instead of `defend`, whatever `reflexes.retreatBelow` says (Pax keeps 0 there and
 still climbs out underground). A melee mob right on it at its level still gets fought
 (`keepClimbing`), and the climb is retried 15 seconds later. Once no hostile is within 6 blocks,

@@ -45,7 +45,11 @@ With `mining.torches` on (default), the miner SHALL place a torch on the tunnel 
 - **THEN** it crafts torches and places one behind it
 
 ### Requirement: Underground retreat
-Underground, at or below `mining.retreatBelow` health (default 10) or with `mining.retreatHostiles` (default 2) hostiles within `hostileRadius` (8), the miner SHALL abandon the dig and walk back up the way it came, and the reflexes SHALL run climb_out instead of defend, whatever reflexes.retreatBelow says. A melee mob right on the bot at its level MAY still be fought (keepClimbing). On the surface these rules SHALL NOT apply.
+Underground, at or below `mining.retreatBelow` health (default 10), with `mining.retreatHostiles` (default 2) hostiles within `hostileRadius` (8), or with 6 air or less, the miner SHALL abandon the dig and walk back up the way it came, collect SHALL stop and climb out, and the reflexes SHALL run climb_out instead of defend (also with no mob near while health keeps dropping), whatever reflexes.retreatBelow says. A melee mob right on the bot at its level MAY still be fought (keepClimbing). On the surface these rules SHALL NOT apply.
+
+#### Scenario: Flooded cave
+- **WHEN** the bot collecting iron ore at y 33 is under water with 4 air left
+- **THEN** it stops collecting and climbs out
 
 #### Scenario: Creeper and zombie in a cave
 - **WHEN** the bot is at y 10 under 50 blocks of rock with 8 health and a creeper and a zombie 5 blocks away

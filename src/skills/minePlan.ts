@@ -196,11 +196,14 @@ export interface RetreatInput {
   health: number
   /** Hostiles within the radius. */
   hostiles: number
+  /** Air left (0-20) when known: under water and running out drowns it (a live test bot did, at y 33). */
+  air?: number
 }
 
 /** Underground and losing: why the bot should abandon the dig and head back up, or null to carry on. */
 export function undergroundRetreat (i: RetreatInput, s: MiningSettings): string | null {
   if (!s.safe || !i.underground || i.health <= 0) return null
+  if (i.air !== undefined && i.air <= 6) return 'running out of air underground'
   if (s.retreatBelow > 0 && i.health <= s.retreatBelow) return `health ${Math.round(i.health)}/20 underground`
   if (s.retreatHostiles > 0 && i.hostiles >= s.retreatHostiles) return `${i.hostiles} hostiles close underground`
   return null

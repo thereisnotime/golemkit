@@ -3,8 +3,9 @@ import { defineSkill, defineAction, z, ok, fail, goals, goto, travel, checkAbort
 import { digBlock, DigRefusedError, gotoWithin } from './world.ts'
 import { ensureTool, equipFor, minTierFor, needsTool, toolKindFor, harvestProblem, dropWatch } from './toolkit.ts'
 import { pickupNearby } from './pickup.ts'
-import { mineStone, miningState, depthOk } from './mining.ts'
-import { notReadyText } from './minePlan.ts'
+import { mineStone, miningState, depthOk, undergroundNow } from './mining.ts'
+import { notReadyText, undergroundRetreat } from './minePlan.ts'
+import { climbOut } from './survival.ts'
 import { autoUpgrade } from './progression.ts'
 import { perMinute } from './efficiency.ts'
 
@@ -68,8 +69,14 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
   let misses = 0
   let leftZone = false
   const t0 = Date.now()
+  let retreat = ''
   while (got < count && misses < 3) {
     checkAborted(signal)
+    // safe mining: losing underground (health, hostiles, air) ends the job and the bot climbs out
+    if (mining.s.safe) {
+      const why = undergroundRetreat({ ...undergroundNow(bot, mining.s.hostileRadius), health: bot.health }, mining.s)
+      if (why) { retreat = why; break }
+    }
     const found = bot.findBlocks({ matching: matchIds, maxDistance: 48, count: 256 })
     // Cheapest first: blocks already in reach at or above our feet (no pathing at all), then exposed ones (air next to them: reachable without long dig-paths), then buried.
     const near = found.map(p => bot.blockAt(p)).filter((b): b is NonNullable<typeof b> => !!b && allowed(b.position))
@@ -116,6 +123,11 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
       skip.add(key(target.position))
       misses++
     }
+  }
+  if (retreat) {
+    log.info('collect: abandoned underground', { why: retreat, at: `${Math.floor(bot.entity.position.x)} ${Math.floor(bot.entity.position.y)} ${Math.floor(bot.entity.position.z)}` })
+    const up = await (climbOut as any).run({ bot, agent, signal, log }, { maxBlocks: 64 }).catch((e: Error) => { checkAborted(signal); return fail(e.message) }) as ActionResult
+    return fail(`abandoned collecting ${block} (${got} got): ${retreat}; ${up.ok ? up.message : `climbing out failed: ${up.message}`}`, { retreat, got })
   }
   // every drop, not just the nearest one: blocks dug from a distance leave their item behind
   const picked = got ? await pickupNearby(bot, signal, { radius: 10, maxMs: 12_000 }).catch(e => { checkAborted(signal); return 0 }) : 0
