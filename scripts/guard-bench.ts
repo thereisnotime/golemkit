@@ -458,12 +458,21 @@ async function main (): Promise<void> {
           await waitLive(bot)
           await cmd(`/gamemode survival ${BOT}`)
         }
-        await gearBot()
-        await placeBotCentre()
-        await pause(4000)
-        await killTagged()
-        await heal(BOT)
-        await pause(1500)
+        // reset until the bot stands on the spot alive with its gear (it can die to something left from before)
+        for (let tries = 0; tries < 4; tries++) {
+          botDied = false
+          await waitLive(bot)
+          await gearBot()
+          await placeBotCentre()
+          await pause(4000)
+          await killTagged()
+          await heal(BOT)
+          await pause(1500)
+          const b = bot.bot
+          const ok = live(bot) && !botDied && b.entity.position.distanceTo(spotV) < 4 && b.inventory.items().some((i: any) => i.name.endsWith('_sword'))
+          if (ok) break
+          log(`reset again: ${state(bot)}`)
+        }
         st = fresh()
         botDied = false
         measuring = true
