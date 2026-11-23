@@ -629,7 +629,33 @@ just pvp-bench 1259 438 --radius 8 --rounds 8    # new vs old, sides swapped eve
 just pvp-bench 1259 438 --radius 8 --rounds 4 --match mirror
 ```
 
-<!-- pvp-bench:results -->
+Numbers (2026-11-23, iron kit with bow and 2 golden apples, arena at 1259 438 with `--radius 8`,
+daytime only). "Dealt" is health the side took off the other; with golden apples healing it
+passes 20 per round.
+
+| Run | Match | Rounds | Wins (new / old) | Health dealt (new / old) | Hits (new / old) | Crits (new / old) | Median time to kill, s (new / old) |
+|---|---|---|---|---|---|---|---|
+| final code | new-old | 8 | 6 / 2 | 351 / 249 | 96 / 72 | 78 / 63 | 24.7 / 19.8 |
+| before the reflex referee | new-old | 8 | 7 / 1 | 363 / 292 | 98 / 79 | 73 / 67 | 22.8 / 21 |
+| before the stall fix | new-old | 7 (+1 dropped) | 5 / 1, 1 draw | 294 / 207 | 66 / 55 | 53 / 49 | 19.4 / 12.3 |
+| mirror | new-new | 4 | PvpA 3 / PvpB 1 | 187 / 154 | 50 / 46 | 41 / 35 | 26 / 16.5 |
+
+Over the last two new-old runs the PvP loop won 13 of 16 duels against the old loop. The rounds
+are short and swingy (a duel is decided by two or three axe crits), so read single runs as noise:
+an earlier version that took the sword first and only swapped to the axe against a raised shield
+lost 2 of its first 3 rounds to the old loop, which always uses the axe against shield users. The
+golden apple moved from 6 to 12 health after bots died at 7 to 9 health with apples left; the
+"no progress" rule (path round, then shoot, then give up) came from a 2-minute stand-off at the
+lake shore. The mirror match shows a side bias of the same size as the noise.
+Things the benchmark found besides tactics: night creepers blew holes in the first arena (the
+bench now waits for the day and kills hostile mobs around the arena every 8 s), the server
+dropped every connection twice (rounds are replayed), and `/data get` answers were confused with
+the "No entity was found" of the mob clean-up.
+
+`--commands` checks the owner commands over whispers instead of fighting: `!pvp`,
+`!attack_player` on an owner (refused) and on the other bot, `!pvp_list`, `!stop` (PvP off),
+`!pvp revenge`, `!spare_player`, `!pvp off`; all passed, each mode change whispered to the owner.
+
 
 ## Food: keep_fed, the food ladder and farm_setup
 
