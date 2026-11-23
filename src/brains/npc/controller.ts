@@ -80,6 +80,9 @@ interface Holder {
   priority: number
 }
 
+/** How long nothing may run before the controller logs why (and how often). */
+const IDLE_REPORT_MS = 120_000
+
 export class NpcController {
   readonly bb: Blackboard
   readonly name: string
@@ -298,6 +301,7 @@ export class NpcController {
       const lowest = list.reduce((m, b) => Math.min(m, this.prio(b)), this.priority)
       const highest = list.reduce((m, b) => Math.max(m, this.prio(b)), this.priority)
       const holder = this.foreignHolder(lowest)
+      this.idleReport(now, holder)
       if (holder) this.yieldTo(holder.label, now, holder.priority)
       if (holder && holder.priority >= highest) return
       if (!holder && now < this.pausedUntil && this.pausedLevel >= highest) return
@@ -329,6 +333,29 @@ export class NpcController {
     } finally {
       this.ticking = false
     }
+  }
+
+  private idleSince = 0
+  private idleReportedAt = 0
+
+  /**
+   * Nothing running for a while: once every IDLE_REPORT_MS, log what holds the body and the
+   * scores, so a bot that stands around says why (a stale holder, every behaviour cooling down).
+   */
+  private idleReport (now: number, holder: { label: string, priority: number } | null): void {
+    if (this.running) { this.idleSince = 0; return }
+    if (!this.idleSince) { this.idleSince = now; return }
+    if (now - this.idleSince < IDLE_REPORT_MS || now - this.idleReportedAt < IDLE_REPORT_MS) return
+    this.idleReportedAt = now
+    const cooling = [...this.stats.entries()].filter(([, st]) => now < st.cooldownUntil)
+      .map(([n, st]) => `${n} ${Math.round((st.cooldownUntil - now) / 1000)}s`)
+    const scored = this.lastScores.filter(x => x.score > 0).map(x => `${x.name}=${Math.round(x.score)}`)
+    this.log.debug(`idle ${Math.round((now - this.idleSince) / 1000)}s`, {
+      holder: holder ? `${holder.label}@${holder.priority}` : 'none',
+      paused: now < this.pausedUntil ? `${Math.round((this.pausedUntil - now) / 1000)}s` : 'no',
+      scores: scored.join(' ') || 'none',
+      cooling: cooling.join(', ') || 'none'
+    })
   }
 
   private start (name: string, score: number, now: number): void {
