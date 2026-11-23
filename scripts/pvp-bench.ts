@@ -251,7 +251,7 @@ async function main (): Promise<void> {
         heard.length = 0
         dir.whisper(A, line)
         for (let i = 0; i < 40 && !heard.length; i++) await pause(250)
-        await pause(800)
+        await pause(3000) // the reply and the owner whisper about a mode change go through the chat rate limit
         const got = heard.join(' | ')
         log(`${expect.test(got) ? 'PASS' : 'FAIL'} ${line} -> ${got || '(nothing)'}`)
       }
