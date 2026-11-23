@@ -47,6 +47,7 @@ can't change their own.
 | `combat.goldenApple` | on/off | eat a golden apple mid-fight at 8 health or less, 12 when surrounded (default on) |
 | `combat.waterClutch` | on/off | water bucket against fall damage and to put out fire, scooped back up (default on) |
 | `combat.endermanGaze` | on/off | never look an enderman in the eyes unless fighting it (default on) |
+| `combat.fightFastMobs` | on/off | at low health keep fighting mobs faster than the bot (vindicators, spiders, ravagers, wolves) instead of backing off (default on) |
 | `combat.chokepoints` | on/off | against 3+ melee mobs with half health or more, fight from a 1-wide gap nearby (default on) |
 | `combat.pvp` | off / defend | `defend`: fight back a player who attacks the bot or the player it guards, stop when they stop or run; never owners or friends (default off) |
 | `combat.friends` | names | players never fought back, even with `combat.pvp defend` (comma separated) |

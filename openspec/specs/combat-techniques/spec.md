@@ -128,6 +128,13 @@ Bots SHALL never start a fight with a player. With `combat.pvp` set to `defend`,
 - **WHEN** the bodyguard is armed for Alice and a player hits Alice, with `combat.pvp` `defend`
 - **THEN** the bot fights that player until they stop or run
 
+### Requirement: No running from faster mobs
+With `combat.fightFastMobs` on, the low-health back-off (`reflexes.retreatBelow`) SHALL NOT apply to mobs that outrun the bot (vindicators, ravagers, spiders, cave spiders, wolves, piglin brutes, hoglins, zoglins); the bot keeps fighting them.
+
+#### Scenario: Vindicator at 7 health
+- **WHEN** the bot is at 7 health with `retreatBelow` 8 and a vindicator hits it
+- **THEN** it fights the vindicator instead of turning to run
+
 ### Requirement: Never fight the warden
 The bot SHALL NOT attack a warden, and SHALL back off when one hurts it.
 

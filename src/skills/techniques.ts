@@ -10,6 +10,7 @@
 //   waterClutch  water bucket against a damaging fall, and to put out fire
 //   endermanGaze never look an enderman in the eyes unless fighting it
 //   chokepoints  outnumbered with health left: fight from a 1-wide gap so mobs come one at a time
+//   fightFastMobs  no low-health back-off from mobs that outrun the bot (vindicators, spiders...)
 
 export interface V3 { x: number, y: number, z: number }
 
@@ -213,6 +214,20 @@ export function avertGaze (eye: V3, yaw: number, pitch: number, endermen: V3[]):
 /** Mobs arrows don't work on: endermen teleport away from projectiles, breezes deflect them. */
 export function rangedUseless (name: string | undefined): boolean {
   return name === 'enderman' || name === 'breeze'
+}
+
+// ---- who not to run from ----
+
+/** Mobs that run down a walking (even a sprinting) player: backing off from them only turns the bot's back. */
+export const FASTER_THAN_US = new Set(['vindicator', 'ravager', 'spider', 'cave_spider', 'wolf', 'piglin_brute', 'hoglin', 'zoglin'])
+
+/**
+ * combat.fightFastMobs: at low health the reflexes back off from melee mobs (retreatBelow), which
+ * against a mob faster than the bot means dying from behind (seen in the vindicator duel). Keep
+ * fighting those instead; the golden apple and disengage-to-heal rules still apply.
+ */
+export function retreatPointless (s: { enabled: boolean, mob: string | undefined }): boolean {
+  return s.enabled && FASTER_THAN_US.has(s.mob ?? '')
 }
 
 // ---- chokepoints ----

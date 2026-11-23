@@ -16,7 +16,7 @@ import { rangedSituation, onRangedAlarm, noteUnexplainedHit } from '../../../ski
 import { isShooter, rangedResponse } from '../../../skills/ranged-plan.ts'
 import { wornArmorPoints } from '../../../skills/gear.ts'
 import { clutchInputs, extinguishInputs, hasWaterBucket, burning } from '../../../skills/clutch.ts'
-import { totemSwap } from '../../../skills/techniques.ts'
+import { totemSwap, retreatPointless } from '../../../skills/techniques.ts'
 import { pvpAllowed } from '../../../skills/defense.ts'
 
 export interface ReflexOptions {
@@ -119,7 +119,9 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         return b?.name === 'water' || e.name === 'drowned' || e.name === 'guardian'
       }
       // Running from flyers is pointless (they're faster); fight them even when low.
-      const shouldRetreat = (mob: any) => !FLYING.has(mob.name ?? '') &&
+      // Neither from mobs that outrun it (combat.fightFastMobs): it would die from behind.
+      const fastMob = (mob: any) => retreatPointless({ enabled: (agent.settings.combat as { fightFastMobs?: boolean } | undefined)?.fightFastMobs !== false, mob: mob?.name })
+      const shouldRetreat = (mob: any) => !FLYING.has(mob.name ?? '') && !fastMob(mob) &&
         ((bot.health > 0 && bot.health <= cfg().retreatBelow) || (inWater(mob) && bot.health < cfg().waterFightAbove))
 
       // Climbing out of a cave (climb_out, or goto starting underground): going on up beats
@@ -237,7 +239,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         // Low health with a hostile close by: get away even before the next hit.
         const mob = selfDefense ? nearestHostile(bot, bot.entity.position, 6) : null
         const climbing = climbingAway(mob)
-        if (mob && !climbing && !FLYING.has(mob.name ?? '') && bot.health > 0 && bot.health <= retreatBelow && agent.currentAction?.name !== 'retreat' && agent.getAction('retreat')) {
+        if (mob && !climbing && !FLYING.has(mob.name ?? '') && !fastMob(mob) && bot.health > 0 && bot.health <= retreatBelow && agent.currentAction?.name !== 'retreat' && agent.getAction('retreat')) {
           void reflex('retreat')
           return
         }

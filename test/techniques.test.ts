@@ -169,7 +169,7 @@ test('pvp: off by default, defend only against attackers, never owners or friend
 })
 
 test('combat toggles parse', () => {
-  for (const k of ['sprintReset', 'sweep', 'shieldMelee', 'totem', 'goldenApple', 'waterClutch', 'endermanGaze', 'chokepoints']) {
+  for (const k of ['sprintReset', 'sweep', 'shieldMelee', 'totem', 'goldenApple', 'waterClutch', 'endermanGaze', 'chokepoints', 'fightFastMobs']) {
     const d = findToggle(`combat.${k}`)
     assert.ok(d, k)
     assert.deepEqual(parseToggleValue(d!, 'off'), { ok: true, value: false })
@@ -183,6 +183,13 @@ test('no mob counts as shielded; weapon damage lookup', () => {
   assert.equal(SHIELDED.has('vindicator'), false)
   assert.equal(meleeDamage('iron_sword'), 6)
   assert.equal(meleeDamage(null), 1)
+})
+
+test('no running from mobs that outrun the bot', async () => {
+  const { retreatPointless } = await import('../src/skills/techniques.ts')
+  assert.equal(retreatPointless({ enabled: true, mob: 'vindicator' }), true)
+  assert.equal(retreatPointless({ enabled: true, mob: 'zombie' }), false)
+  assert.equal(retreatPointless({ enabled: false, mob: 'vindicator' }), false)
 })
 
 test('the warden is never fought', async () => {

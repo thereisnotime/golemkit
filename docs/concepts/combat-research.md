@@ -725,6 +725,7 @@ under [Skilled-player techniques](./world.md#skilled-player-techniques), toggles
 | Water bucket clutch, water against fire | reflexes, `water_bucket` | `combat.waterClutch` |
 | Enderman gaze guard on every look; no arrows at endermen or breezes | combat skill | `combat.endermanGaze` |
 | Fight from a 1-wide corridor against 3+ melee mobs | `defend` | `combat.chokepoints` |
+| No low-health back-off from mobs that outrun the bot | reflexes | `combat.fightFastMobs` |
 | Bow lead with arrow physics, shield against archers, cover, pillaring, bunker | existing | `combat.ranged`, `combat.shield` |
 | Defend-only PvP, never owners or friends | reflexes, `defend_player` | `combat.pvp`, `combat.friends` |
 

@@ -40,6 +40,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'combat.goldenApple', description: 'eat a golden apple mid-fight at 8 health or less (12 when surrounded) instead of waiting for a lull', schema: bool },
   { key: 'combat.waterClutch', description: 'water bucket against fall damage (placed just before landing, then scooped up) and to put out fire', schema: bool },
   { key: 'combat.endermanGaze', description: 'never look an enderman in the eyes unless fighting it', schema: bool },
+  { key: 'combat.fightFastMobs', description: 'at low health keep fighting mobs faster than the bot (vindicators, spiders, ravagers, wolves) instead of backing off and getting hit from behind', schema: bool },
   { key: 'combat.chokepoints', description: 'against 3+ melee mobs with health to spare, fight from a nearby 1-wide gap so they come one at a time', schema: bool },
   { key: 'combat.pvp', description: 'off (never fight players) | defend (fight back against a player who attacks the bot or the player it guards; stops when they stop or run; never owners or friends)', schema: z.enum(['off', 'defend']) },
   { key: 'combat.friends', description: 'players never fought back, even with combat.pvp defend (comma separated; owners are always spared)', schema: z.array(z.string().min(1)) },
