@@ -53,6 +53,9 @@ settings:
   # surface ore becomes a shield), and underground it climbs out at 12 health or with 2 hostiles
   # close, whatever reflexes.retreatBelow says.
   mining: { gear: shield_or_armour, minFood: 4, retreatBelow: 12, retreatHostiles: 2 }
+  # Pantry in the room by home (placed by the owner's OK on 2026-11-23): keep_fed walks over and
+  # looks inside when it has no food, so it works after a restart too.
+  storage: { chests: [[559, 69, -47]] }
 # Behaviours that run on their own between LLM turns (docs/guide/behaviors.md). Pax or ${MC_OWNER:-Robin}
 # can arm more at runtime (behavior_arm / !behavior_arm follow_owner); those changes persist.
 behaviors:

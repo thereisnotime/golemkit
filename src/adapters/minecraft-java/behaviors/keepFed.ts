@@ -29,7 +29,7 @@ import { wornArmorPoints } from '../../../skills/gear.ts'
 import { escorting } from '../../../skills/bodyguard.ts'
 import { rangedDanger } from './safety.ts'
 import { pickFuel } from '../../../skills/crafting.ts'
-import { knownContainers } from '../../../skills/containers.ts'
+import { knownContainers, configuredChests } from '../../../skills/containers.ts'
 import { getPlaces, sameDimension } from '../../../skills/navigation.ts'
 import { dist, hostilesNear, ownerTarget } from './util.ts'
 
@@ -82,6 +82,33 @@ function foodChests (bot: Bot, agent: Agent): { x: number, y: number, z: number,
     .map(c => ({ ...c, item: Object.keys(c.contents).filter(n => isFood(bot, n)).sort((a, b) => (c.contents[b] ?? 0) - (c.contents[a] ?? 0))[0] }))
     .filter((c): c is typeof c & { item: string } => !!c.item)
     .sort((a, b) => dist(a, pos) - dist(b, pos))
+}
+
+/** A configured pantry (settings.storage.chests) looked into and found without food is left alone this long. */
+const PANTRY_RECHECK_MS = 20 * 60_000
+/** Configured chests further than this are not walked to for food. */
+const PANTRY_RANGE = 160
+const pantryChecked = new WeakMap<Agent, Map<string, number>>()
+
+/**
+ * A configured chest (settings.storage.chests) worth walking to for food: what the bot saw in
+ * chests is only kept in memory, so after a restart it would not know its pantry holds food.
+ * Known food chests come first (foodChests); this is for chests not looked into lately.
+ */
+function pantryToCheck (bot: Bot, agent: Agent, now = Date.now()): { x: number, y: number, z: number } | null {
+  const pos = bot.entity.position
+  const checked = pantryChecked.get(agent)
+  const seen = knownContainers(agent)
+  return configuredChests(agent)
+    .filter(c => dist(c, pos) <= PANTRY_RANGE && now - (checked?.get(`${c.x} ${c.y} ${c.z}`) ?? 0) > PANTRY_RECHECK_MS)
+    .filter(c => !seen.some(k => k.x === c.x && k.y === c.y && k.z === c.z && now - k.at < PANTRY_RECHECK_MS))
+    .sort((a, b) => dist(a, pos) - dist(b, pos))[0] ?? null
+}
+
+function markPantryChecked (agent: Agent, c: { x: number, y: number, z: number }, now = Date.now()): void {
+  let m = pantryChecked.get(agent)
+  if (!m) pantryChecked.set(agent, m = new Map())
+  m.set(`${c.x} ${c.y} ${c.z}`, now)
 }
 
 const options = z.object({
@@ -310,7 +337,7 @@ export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
     safeRaw: raw.some(r => SAFE_RAW.has(r)),
     canCook: !!agent.getAction('smelt') && furnace && fuel,
     canBake: has('wheat') >= 3 && !!agent.getAction('craft'),
-    foodChest: !!agent.getAction('withdraw') && (foodChests(bot, agent).length > 0 || (!!o.chestPlace && !!getPlaces(agent)[o.chestPlace.toLowerCase()])),
+    foodChest: !!agent.getAction('withdraw') && (foodChests(bot, agent).length > 0 || !!pantryToCheck(bot, agent) || (!!o.chestPlace && !!getPlaces(agent)[o.chestPlace.toLowerCase()])),
     ripeCrops: ripe,
     animals,
     herd,
@@ -489,7 +516,19 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
         const there = await ctx.act('goto_place', { name: o.chestPlace })
         if (there.ok && agent.getAction('list_container')) await ctx.act('list_container', {})
       }
-      const chest = foodChests(bot, agent)[0]
+      let chest = foodChests(bot, agent)[0]
+      const pantry = chest ? null : pantryToCheck(bot, agent)
+      if (pantry) {
+        // a configured pantry it hasn't looked into lately: walk over and look inside
+        markPantryChecked(agent, pantry)
+        if (dist(pantry, bot.entity.position) > 4 && agent.getAction('goto')) {
+          const walk = await ctx.act('goto', { x: pantry.x, y: pantry.y, z: pantry.z })
+          if (!walk.ok) return walk
+        }
+        if (agent.getAction('list_container')) await ctx.act('list_container', { x: pantry.x, y: pantry.y, z: pantry.z })
+        chest = foodChests(bot, agent)[0]
+        if (!chest) return { ok: false, message: `no food in the chest at ${fmtPos(pantry)}` }
+      }
       if (!chest) return { ok: false, message: 'no chest with food that I know of' }
       if (dist(chest, bot.entity.position) > 24 && agent.getAction('goto')) {
         const walk = await ctx.act('goto', { x: chest.x, y: chest.y, z: chest.z })
