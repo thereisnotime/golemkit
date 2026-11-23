@@ -5,7 +5,7 @@ import {
   planFood, nextRing, recordSearch, dryWaypoint, scoutWaypoints, riskyRing, RING_MEMORY_MS, STEP_PAUSE_MS,
   type FoodWorld, type FoodStepOptions, type SearchRecord
 } from '../src/skills/foodPlan.ts'
-import { ringsFor } from '../src/adapters/minecraft-java/behaviors/keepFed.ts'
+import { ringsFor, starvingHold, STARVING_HOLD_SCORE } from '../src/adapters/minecraft-java/behaviors/keepFed.ts'
 
 const NOW = 1_000_000_000
 const MIN = 60_000
@@ -131,7 +131,7 @@ test('breeders are kept unless starving or keepBreeders is off', () => {
 })
 
 test('critical food: report once (rate limited), then stay put', () => {
-  const stuck: FoodWorld = { ...bare, food: 5, night: true, canStartFarm: false }
+  const stuck: FoodWorld = { ...bare, food: 5, night: true, canStartFarm: false, searches: [empty(48, 1)] }
   const d = planFood(stuck, opts)
   assert.equal(d.step, 'report')
   assert.equal(d.rung, 'critical')
@@ -248,4 +248,26 @@ test('risky rings: the rule on its own', () => {
   assert.equal(riskyRing(120, { gear: 40, food: 14 }), null)
   assert.equal(riskyRing(120, { food: 14 }), null)
   assert.equal(riskyRing(250, { gear: 39, food: 9 }, { scoutGear: 40, scoutHungerAt: 8 }) !== null, true)
+})
+
+// Seen live (another test bot): food 0 at night, keep_fed waited for day while stay_safe and chop_wood_loop took turns, and it starved.
+test('starving at night: the near ring, its farm and spots close to home are worth the dark', () => {
+  const night: FoodWorld = { ...bare, food: 2, starving: true, night: true, canStartFarm: false }
+  const d = planFood(night, opts)
+  assert.equal(d.step, 'scout')
+  assert.equal(d.radius, 48)
+  assert.equal(planFood({ ...night, searches: [empty(48, 1)] }, opts).step, 'report', 'not the 120 ring in the dark')
+  assert.equal(planFood({ ...night, hasFarm: true, farmDistance: 80 }, opts).step, 'farm', 'its farm 80 blocks off')
+  assert.notEqual(planFood({ ...night, hasFarm: true, farmDistance: 200, searches: [empty(48, 1)] }, opts).step, 'farm', 'not 200 blocks off')
+  // not starving: waits for day as before
+  assert.notEqual(planFood({ ...night, food: 12, starving: false }, opts).step, 'scout')
+})
+
+test('starving between ladder runs: keep_fed holds the body over chores, under the night trip home', () => {
+  const o = { below: 14, healBelow: 14 }
+  assert.ok(starvingHold(0, 10, o))
+  assert.ok(starvingHold(6, 20, o))
+  assert.ok(!starvingHold(7, 20, o), 'hungry but not starving: chores may run while it waits')
+  assert.ok(STARVING_HOLD_SCORE > 38 && STARVING_HOLD_SCORE > 40, 'above chop_wood_loop (38) and stay_safe hold (40)')
+  assert.ok(STARVING_HOLD_SCORE < 48, "below stay_safe's night trip home (48)")
 })

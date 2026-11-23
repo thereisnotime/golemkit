@@ -53,6 +53,14 @@ const BAD = new Set(['rotten_flesh', 'spider_eye', 'poisonous_potato', 'pufferfi
 
 export { planFood, nextFoodStep, type FoodStep, type FoodWorld, type FoodStepOptions, type FoodDecision } from '../../../skills/foodPlan.ts'
 
+/** keep_fed's score while starving between ladder runs: above chores (chop_wood_loop 38, stay_safe's hold 40), below stay_safe's night trip home (48+). */
+export const STARVING_HOLD_SCORE = 45
+
+/** Starving (food at or below 6): keep_fed holds the body between ladder runs instead of chores. */
+export function starvingHold (food: number, health: number, o: { below: number, healBelow: number }): boolean {
+  return food <= 6 && isHungry(food, health, o)
+}
+
 /** Whether keep_fed wants to run at this food/health level. */
 export function isHungry (food: number, health: number, o: { below: number, healBelow: number }): boolean {
   return food < o.below || (health < o.healBelow && food < 18)
@@ -667,6 +675,7 @@ export const keepFed = defineBehavior({
     let choreCheckedAt = 0
     let idleLoggedAt = 0
     let choreRunning = false
+    let holding = false
     const checkChore = (bot: Bot) => {
       if (Date.now() - choreCheckedAt < 30_000) return chore
       choreCheckedAt = Date.now()
@@ -687,6 +696,7 @@ export const keepFed = defineBehavior({
         const food = typeof bot.food === 'number' ? bot.food : 20
         const health = typeof bot.health === 'number' ? bot.health : 20
         const hungry = isHungry(food, health, o)
+        if (current === 'keep_fed' && holding) return STARVING_HOLD_SCORE // waiting it out: stay_safe may still take it home
         if (current === 'keep_fed' && choreRunning && !hungry) return 22 // a chore keeps its low score; hunger takes over below
         if (current === 'keep_fed' && food < o.until && !choreRunning) return 60 + bb.needs.hunger * 30
         if (!hungry) {
@@ -694,11 +704,29 @@ export const keepFed = defineBehavior({
           const c = checkChore(bot)
           return c ? (c.chore === 'tend_farm' || c.chore === 'start_farm' ? 22 : 21) : 0
         }
-        if (Date.now() < retryAt && foodStock(bot) === stockAtFail) return 0
+        if (Date.now() < retryAt && foodStock(bot) === stockAtFail) {
+          // starving and waiting for a source (day, crops): hold the body near home instead of letting chores
+          // take turns with stay_safe (chop_wood_loop 30-38, stay_safe's hold 40; its night trip home, 48+, still wins)
+          return starvingHold(food, health, o) ? STARVING_HOLD_SCORE : 0
+        }
         return 55 + bb.needs.hunger * 35
       },
       async run (ctx) {
         const m = memory(agent)
+        if (Date.now() < retryAt && foodStock(ctx.bot) === stockAtFail && starvingHold(ctx.bot.food, ctx.bot.health, o)) {
+          // waiting it out at home, where its farm and chests are; the ladder runs again when the wait is over
+          holding = true
+          try {
+            const home = getHome(agent)
+            const pos = ctx.bot.entity.position
+            if (home && sameDimension(ctx.bot, home) && Math.hypot(home.x - pos.x, home.z - pos.z) > 16 && agent.getAction('go_home') && !isNightTime(ctx.bot)) {
+              const r = await ctx.act('go_home', { range: 4 })
+              return { ok: true, message: `starving (food ${ctx.bot.food}/20), back home to wait for food: ${r.message}` }
+            }
+            await ctx.wait(Math.min(15_000, Math.max(1000, retryAt - Date.now())))
+            return { ok: true, message: `starving (food ${ctx.bot.food}/20), waiting for food near home` }
+          } finally { holding = false }
+        }
         if (!isHungry(ctx.bot.food, ctx.bot.health, o)) {
           choreCheckedAt = 0
           const c = checkChore(ctx.bot)

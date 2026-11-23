@@ -618,10 +618,12 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   const ok = (s: FoodStep) => !tried.has(s) && !((w.paused?.[s] ?? 0) > now)
   const far = (d: number) => o.radius !== undefined && d > o.radius
   const dayOrBold = !w.night || !!o.scoutAtNight
-  const mayGo = (d: number) => (!far(d) || dayOrBold) && (!far(d) || !w.danger)
+  const critical = (w.food ?? 20) <= (o.critical ?? 6)
+  // starving at night: its own farm, a chest or a spot close to home is worth the dark (starving is certain harm, the dark only likely)
+  const nearRing = o.riskyRingsFrom ?? RISKY_RINGS_FROM
+  const mayGo = (d: number) => (!far(d) || dayOrBold || (critical && d <= nearRing * 2)) && (!far(d) || !w.danger)
   const huntable = w.animals > 0 || (!!w.starving && (w.herd ?? 0) > 0)
   const keep = w.starving ? 0 : (o.keepAtLeast ?? 0)
-  const critical = (w.food ?? 20) <= (o.critical ?? 6)
   const seeds = w.seeds ?? 0
   const minSeeds = o.minSeeds ?? 8
   const fallback = !!o.startFarm
@@ -665,7 +667,7 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   const trip = () => d('trip', 'trip', `${ring ? `before searching ${ring.radius} blocks out` : 'every ring came up empty'}: known food place ${place!.name} ${Math.round(place!.distance)} blocks away`)
   let searchBlocked = ''
   if (!o.scout || !w.canScout) searchBlocked = 'scouting is off'
-  else if (!dayOrBold || (farRing && w.night)) searchBlocked = farRing && dayOrBold ? `night: the ${ring!.radius} ring is searched by day only` : 'night or a storm'
+  else if ((!dayOrBold && !(critical && ring && ring.radius <= nearRing)) || (farRing && w.night)) searchBlocked = farRing && dayOrBold ? `night: the ${ring!.radius} ring is searched by day only` : 'night or a storm'
   else if (w.danger) searchBlocked = 'hostiles near'
   else if (!ring) searchBlocked = `every ring out to ${Math.max(...rings)} came up empty in the last ${Math.round((o.ringMemoryMs ?? RING_MEMORY_MS) / 60_000)} min`
   else if (!ok('scout')) searchBlocked = 'already scouted this run'
