@@ -5,6 +5,7 @@ import pf from 'mineflayer-pathfinder'
 import { ActionAbortedError, checkAborted } from '../../core/action.ts'
 import { fmtPos } from '../../core/format.ts'
 import { activeTrip, TripTurnBackError } from '../../core/trip.ts'
+import { getAir, type AirResult } from './air.ts'
 
 export const { goals, Movements } = pf
 export type Goal = InstanceType<typeof pf.goals.GoalBlock> | any
@@ -175,20 +176,13 @@ async function travelSurfacing (bot: Bot, target: { x: number, y?: number, z: nu
 /** Air (of 20) below which travel stops and swims up. */
 const LOW_AIR = 12
 
-/** Swims straight up until the bot has its air back (15 s at most). */
-export async function swimUp (bot: Bot, signal: AbortSignal): Promise<void> {
-  try { bot.pathfinder.setGoal(null) } catch {}
-  bot.setControlState('jump', true)
-  try {
-    const until = Date.now() + 15_000
-    while (Date.now() < until && ((bot as { oxygenLevel?: number }).oxygenLevel ?? 20) < 20) {
-      checkAborted(signal)
-      await new Promise(resolve => setTimeout(resolve, 250))
-    }
-    await new Promise(resolve => setTimeout(resolve, 800))
-  } finally {
-    bot.setControlState('jump', false)
-  }
+/**
+ * Gets air back: straight up when the water above is open, breaking ice or a roof above the
+ * head, or swimming to the nearest opening (air.ts, planned by skills/airPlan.ts). It used to
+ * jump straight up only, which does nothing under ice.
+ */
+export function swimUp (bot: Bot, signal: AbortSignal): Promise<AirResult> {
+  return getAir(bot, signal, { maxMs: 20_000 })
 }
 
 async function travelLegs (bot: Bot, target: { x: number, y?: number, z: number }, signal: AbortSignal, opts: TravelOptions): Promise<void> {

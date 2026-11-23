@@ -33,6 +33,8 @@ can't change their own.
 | `reflexes.retreatBelow` | 0–20 | back off at or below this health (0 = stand ground; default 8) |
 | `reflexes.waterFightAbove` | 0–20 | don't fight mobs in water below this health (0 = always fight; default 14) |
 | `reflexes.rangedDefense` | on/off | react to mobs shooting at it: shoot back, shield, cover or back off (default on) |
+| `reflexes.air` | on/off | when drowning, stop and get air: swim up, break ice or a roof above, or swim to an opening, then to dry land (default on; [air](/concepts/world#air)) |
+| `reflexes.airBelow` | 0–20 | go for air at or below this much air of 20, 3 earlier at 12 health or less and 6 earlier at 6 or less (default 10) |
 | `combat.adaptiveWeapon` | on/off | best weapon per target (damage × speed, enchantments, one-hit finishers, axe vs shields; default on) |
 | `combat.ranged` | on/off | bow/crossbow for flyers and targets out of reach, if it has arrows (default on) |
 | `combat.shield` | on/off | raise a shield against ranged mobs between swings (default on) |

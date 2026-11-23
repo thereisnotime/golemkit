@@ -213,7 +213,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
         canDig: this.canDig,
         respectBuilds: s.respectBuilds === true,
         ...(s.building ? { building: s.building } : {}),
-        ...(s.reflexes ? { reflexes: pick(s.reflexes, ['selfDefense', 'autoEat', 'eatBelow', 'retreatBelow', 'waterFightAbove', 'rangedDefense']) } : {}),
+        ...(s.reflexes ? { reflexes: pick(s.reflexes, ['selfDefense', 'autoEat', 'eatBelow', 'retreatBelow', 'waterFightAbove', 'rangedDefense', 'air', 'airBelow']) } : {}),
         ...(s.combat ? { combat: s.combat } : {}),
         ...(s.mining ? { mining: s.mining } : {}),
         ...(s.humanize?.enabled !== undefined ? { humanize: s.humanize.enabled } : {})

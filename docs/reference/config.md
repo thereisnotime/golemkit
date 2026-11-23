@@ -98,7 +98,7 @@ All optional except `variant`; see [Profiles](../guide/profiles).
 | `llm` | provider, model, effort, login, token source, proxy, listen, immersive, aliases, budget | [LLM brain](../guide/llm-brain) |
 | `context` | [context pack](/guide/context-pack) directory (default `profiles/<name>/`) | [Context pack](../guide/context-pack) |
 | `humanize` | reaction/typing delays, stand still while typing, typos, fidgeting | [Profiles](../guide/profiles#humanize-player-like-timing) |
-| `reflexes` | `selfDefense` (on), `autoEat` (on), `eatBelow` (15), `retreatBelow` (8, 0 = never), `waterFightAbove` (14), `rangedDefense` (on); a variant's own reflex defaults sit under the profile's | [Movement, protection, combat](../concepts/world#reflexes) |
+| `reflexes` | `selfDefense` (on), `autoEat` (on), `eatBelow` (15), `retreatBelow` (8, 0 = never), `waterFightAbove` (14), `rangedDefense` (on), `air` (on), `airBelow` (10); a variant's own reflex defaults sit under the profile's | [Movement, protection, combat](../concepts/world#reflexes) |
 | `retry` | action, LLM and reconnect retries | [Profiles](../guide/profiles#retries) |
 | `journal` | journal on/off, types, retention, summaries | [Journal](../guide/journal) |
 | `settings` | free-form values for skills and brains; the common ones are listed below | [Writing a variant](../guide/writing-a-bot) |

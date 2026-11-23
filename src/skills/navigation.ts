@@ -114,7 +114,9 @@ export function findStandable (bot: Bot, x: number, y: number, z: number, span =
 
 function inWater (bot: Bot): boolean {
   const p = bot.entity.position
-  return bot.blockAt(p)?.name === 'water' || bot.blockAt(p.offset(0, 1, 0))?.name === 'water'
+  if (bot.blockAt(p)?.name === 'water' || bot.blockAt(p.offset(0, 1, 0))?.name === 'water') return true
+  // bobbing at the surface (a jump out of a hole in the ice): it sinks back once it stops swimming
+  return !bot.entity.onGround && bot.blockAt(p.offset(0, -1, 0))?.name === 'water'
 }
 
 /**
@@ -131,8 +133,9 @@ export async function reachDryLand (bot: Bot, signal: AbortSignal): Promise<bool
       if (!spot || bot.blockAt(at(bot, spot.x, spot.y, spot.z))?.name === 'water') continue
       // under water and short of air: up for a breath before the next try (the pathfinder walks lake beds)
       if (((bot as { oxygenLevel?: number }).oxygenLevel ?? 20) < 12) await swimUp(bot, signal)
-      const there = await gotoWithin(bot, new goals.GoalNear(spot.x, spot.y, spot.z, 1), signal, 20000).catch(() => { checkAborted(signal); return false })
-      if (there || !inWater(bot)) return true
+      // the exact spot: within 1 of a spot on the ice is still in the hole
+      await gotoWithin(bot, new goals.GoalBlock(spot.x, spot.y, spot.z), signal, 20000).catch(() => { checkAborted(signal); return false })
+      if (!inWater(bot)) return true
     }
   }
   return !inWater(bot)

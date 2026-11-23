@@ -2,6 +2,7 @@ import type { Bot } from 'mineflayer'
 import type { ActionContext, ActionResult } from '../core/index.ts'
 import { defineSkill, defineAction, z, noParams, ok, fail, goals, goto, fmtPos, sleep, checkAborted, itemName } from '../core/index.ts'
 import { findItem, placeAt, digBlock, DigRefusedError } from './world.ts'
+import { air } from './air.ts'
 
 /** Cheap full blocks that don't fall, for pillars and emergency shelters. */
 const FILLER = /^(dirt|coarse_dirt|grass_block|rooted_dirt|mud|clay|cobblestone|cobbled_deepslate|mossy_cobblestone|netherrack|stone|deepslate|andesite|diorite|granite|calcite|tuff|blackstone|basalt|end_stone|sandstone|red_sandstone|terracotta|.*_terracotta|.*_planks|.*_log|snow_block)$/
@@ -344,7 +345,7 @@ const bunker = defineAction({
 
 export const survival = () => defineSkill({
   name: 'survival',
-  description: 'Eating, sleeping and emergency pillars.',
-  actions: [eat, sleepInBed, wake, pillar, climbOut, bunker],
+  description: 'Eating, sleeping, emergency pillars and getting air.',
+  actions: [eat, sleepInBed, wake, pillar, climbOut, bunker, air],
   observe: (_agent, bot) => ({ hasFood: !!bestFood(bot), sleeping: bot.isSleeping })
 })

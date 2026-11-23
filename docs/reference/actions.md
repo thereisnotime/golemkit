@@ -10,7 +10,7 @@ scopeNote: "Generated from the skills: most are Minecraft; the journal and confi
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-28 skills, 122 actions.
+28 skills, 123 actions.
 
 ## blueprint-library
 
@@ -1263,7 +1263,7 @@ Say something in public chat.
 
 ## survival
 
-Eating, sleeping and emergency pillars.
+Eating, sleeping, emergency pillars and getting air.
 
 ### `eat`
 
@@ -1311,6 +1311,16 @@ Hide from phantoms and other mobs: dig straight down 3 blocks, seal the hole abo
 | `depth` | integer (2..4) |  | `3` |  |
 | `maxMinutes` | number (0.5..15) |  | `8` | give up waiting after this long |
 | `untilDay` | boolean |  | `true` | stay until morning instead of until mobs leave |
+
+### `air`
+
+Get air when drowning: swim up, break ice or a roof above the head, or swim to the nearest opening, then get to dry land (used by reflexes).
+
+*internal*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `land` | boolean |  | `true` | swim to dry land afterwards |
 
 ## woodcutting
 

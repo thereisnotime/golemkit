@@ -42,8 +42,13 @@ flowchart TD
   follow-up with the real outcome; `!goto` in chat replies when it ends.
 - It only reports arrival when the bot actually stands at the target.
 - It watches the bot's air: the pathfinder walks along lake beds and a sinking bot drowns, so
-  below 12 of 20 air the walk stops, the bot swims straight up, and the trip carries on (after the
-  third time it gives up with "kept running out of air under water").
+  below 12 of 20 air the walk stops, the bot gets air the way the [air reflex](#air) does (up,
+  through ice or a roof, or to the nearest opening), and the trip carries on (after the third
+  time it gives up with "kept running out of air under water").
+- The pathfinder prefers dry ground: water costs 3 per block instead of 1, a block of water with
+  water above it 2 more, one under a roof within 4 blocks 10 more, and one under ice 30 more
+  (`waterStepCost` in `src/skills/airPlan.ts`, set up in the adapter for every movement:
+  `goto`, `travel`, `go_home`, `reachMovements`). `travel`'s `avoidWater` raises water to 12.
 - [Retries](/guide/profiles#retries) (`retry.actions.goto`) re-run it after "stuck" failures.
 
 ```ts
@@ -541,6 +546,7 @@ Besides this loop the reflexes also:
 - back off from a warden instead of fighting it, and `bunker` from phantoms at night (below);
 - move a totem into the offhand at 8 health or less, and start `water_bucket` during a damaging
   fall or while burning (`combat.totem`, `combat.waterClutch`);
+- start `air` when the head is under water and the air is low ([below](#air), `reflexes.air`);
 - start `defend_player` against a player who hits the bot or its guarded player, with
   `combat.pvp` anything but `off`, and `pvp_engage` against an allowed player in range in the
   attacking modes (see [PvP](#pvp)).
@@ -549,10 +555,11 @@ The reflexes all run at the same priority, and an equal priority replaces the ru
 a referee (`mayReplace` in `src/skills/reflexPlan.ts`, pure, tested in `test/reflex-plan.test.ts`)
 decides whether a new reflex may take the body from a running one that a reflex started
 (`climb_out`, `retreat`, `ranged_defense`, `defend`, `bunker`, `eat`, `pvp_engage`,
-`defend_player`, `water_bucket`; a player's or a behaviour's action isn't its business):
+`defend_player`, `water_bucket`, `air`; a player's or a behaviour's action isn't its business):
 
 - the same reflex isn't started again while it runs;
-- `water_bucket` always goes (a lethal fall or fire);
+- `water_bucket` (a lethal fall or fire) and `air` (drowning) always go;
+- nothing but `water_bucket` takes the body from `air` until it has its air back;
 - a reflex keeps the body for 1.5 s (`HOLD_MS`) unless health drops by 4 or more (`SHARP_DROP`)
   since it started;
 - `climb_out` and `retreat` aren't interrupted by `ranged_defense`, nor by `defend` or
@@ -577,7 +584,49 @@ reflexes:
   retreatBelow: 8       # back off at or below this health; 0 = stand your ground
   waterFightAbove: 14   # don't fight mobs in water below this health; 0 = always fight
   rangedDefense: true   # shoot back, shield, cover or back off when mobs shoot at it
+  air: true             # get air when drowning
+  airBelow: 10          # ...at or below this much air (of 20), earlier at low health
 ```
+
+### Air
+
+Every 250 ms the reflexes check the bot's air. With the eyes in water (or a bubble column) and the
+air at or below `reflexes.airBelow` (default 10 of 20; 13 at 12 health or less, 16 at 6 or less,
+since drowning takes 2 health a second) they stop whatever runs and start `air`. On 23 Nov 2026
+Pax drowned in the frozen lake by its home: the eat reflex and `prepare_trip` (walking to its
+pantry) took turns while the air ran out, and the old swim-up only jumped straight up, which does
+nothing under ice.
+
+`air` re-plans every tick with `airPlan` (`src/skills/airPlan.ts`, pure, tested in
+`test/air-plan.test.ts`) and takes the cheapest way to a breath, in estimated time:
+
+- **up**: the water above the head is open up to air: swim up, looking up;
+- **break**: ice or another breakable block within 4 blocks above the head (2 in a row at most):
+  centre under it and break it with the best tool, from the floor when the floor is close and
+  the block stays in reach (digging off the ground in water is 25 times slower), otherwise
+  pinned against it. Ice over water turns into water, so it goes on up through the hole; any
+  other block leaves an air pocket for the head, unless water beside it would flow in. Blocks
+  in a [protected area](#protected-areas) are never broken, and nothing is broken with
+  `canDig` off;
+- **swim**: the nearest water cell with air above it (a hole, the edge of the ice) or an air
+  pocket within 8 blocks, breadth-first through water with room for the body;
+- **none** (sealed in, chunks not loaded): swim up anyway.
+
+Digging sideways into a wall doesn't help under water (the water flows into the hole), so the
+pocket is always dug upwards. It stops at 18 of 20 air (16 with the head out of water), then
+climbs onto a ledge right beside it (the edge of the hole in the ice: swimming into it with jump
+held gives the jump out of water, which the pathfinder doesn't plan), or else swims to dry land
+within 12 blocks, so the bot doesn't sink again; it goes back for air if it runs low on the way.
+A shaft whose rim is more than a block above the water can't be climbed that way; the bot then
+treads water there and the reflex starts again if the air runs low.
+
+Live test: `node --env-file=.env scripts/air-test.ts <x> <z> [ice,roof]` builds a 4-deep tank in
+the air with an ice ceiling, then one with a stone roof and an opening 4 blocks to the side,
+puts a test bot without tools at the bottom and removes everything afterwards. On mc02 (23 Nov
+2026) the bot broke the ice above it by hand from the tank floor (lowest air 5 of 20, no
+drowning damage) and climbed onto the ice; under the roof it swam to the opening (lowest air 8). The result says what it did (`out of air under ice: broke 1 ice above, got
+air; on dry land at ...`) and lands in the [journal](/guide/journal) with the action. Nothing
+but `water_bucket` interrupts it; `travel`'s low-air stop uses the same code.
 
 `rangedDefense` can also be set in the variant, `reflexes({ rangedDefense: false })`; the profile
 and `!config_set reflexes.rangedDefense` override it.

@@ -23,6 +23,8 @@ import { totemSwap, retreatPointless, retreatReason } from '../../../skills/tech
 import { pvpAllowed } from '../../../skills/defense.ts'
 import { pvpCandidate, PVP_ACTIONS } from '../../../skills/pvp-actions.ts'
 import { mayReplace } from '../../../skills/reflexPlan.ts'
+import { airTrigger, airSettings } from '../../../skills/airPlan.ts'
+import { headInWater, oxygen } from '../air.ts'
 import { undergroundNow } from '../../../skills/mining.ts'
 import { miningSettings, undergroundRetreat } from '../../../skills/minePlan.ts'
 
@@ -37,10 +39,14 @@ export interface ReflexOptions {
   waterFightAbove?: number
   /** React to mobs shooting at the bot (ranged_defense). Default true. */
   rangedDefense?: boolean
+  /** Get air when drowning (the `air` action). Default true. */
+  air?: boolean
+  /** ...at or below this much air (of 20), earlier at low health. Default 10. */
+  airBelow?: number
 }
 
 /** Actions the ranged reflex never interrupts. */
-const RANGED_KEEP = new Set(['ranged_defense', 'retreat', 'bunker', 'pillar', 'climb_out', 'eat', 'water_bucket', 'defend_player', 'pvp_engage', 'hunt_player'])
+const RANGED_KEEP = new Set(['ranged_defense', 'retreat', 'bunker', 'pillar', 'climb_out', 'eat', 'water_bucket', 'air', 'defend_player', 'pvp_engage', 'hunt_player'])
 
 export const reflexes = (defaults: ReflexOptions = {}) => {
   const caller = { kind: 'reflex', name: 'reflexes' } as const
@@ -52,7 +58,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       // use, so in-game changes (config_set reflexes.*) apply immediately.
       const cfg = () => {
         const o: ReflexOptions = { ...defaults, ...(agent.settings.reflexes as ReflexOptions | undefined) }
-        return { selfDefense: o.selfDefense ?? true, autoEat: o.autoEat ?? true, eatBelow: o.eatBelow ?? 15, retreatBelow: o.retreatBelow ?? 8, waterFightAbove: o.waterFightAbove ?? 14, rangedDefense: o.rangedDefense ?? true }
+        return { selfDefense: o.selfDefense ?? true, autoEat: o.autoEat ?? true, eatBelow: o.eatBelow ?? 15, retreatBelow: o.retreatBelow ?? 8, waterFightAbove: o.waterFightAbove ?? 14, rangedDefense: o.rangedDefense ?? true, air: airSettings(o) }
       }
       let busy = false
       let bunkerFailedAt = 0
@@ -128,6 +134,20 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       }
       bot.on('physicsTick', onTick)
 
+      // ---- air: head under water and the air running low (airPlan.ts). Before anything else:
+      // Pax drowned under the frozen lake by its home while eat and prepare_trip took turns. ----
+      let airBusy = false
+      const airCheck = () => {
+        if (airBusy || !bot.entity || bot.health <= 0 || !needsSurvival(bot) || !agent.getAction('air')) return
+        if (agent.currentAction?.name === 'air') return
+        const why = airTrigger({ settings: cfg().air, headInWater: headInWater(bot), oxygen: oxygen(bot), health: bot.health })
+        if (!why || !arbitrate('air')) return
+        airBusy = true
+        agent.log.info(`out of air: ${why}, stopping ${agent.currentAction?.name ?? 'nothing'} to get air`)
+        void agent.act('air', {}, { caller, priority: PRIORITY.reflex }).finally(() => { airBusy = false })
+      }
+      const airTimer = setInterval(() => { try { airCheck() } catch {} }, 250)
+
       // ---- PvP (combat.pvp defend or above): fight back a player who hits the bot or the player it guards ----
       let pvpBusy = false
       const onPlayerHit = (entity: any, source: any) => {
@@ -149,7 +169,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
 
       // ---- PvP (combat.pvp revenge/targets/all): engage an allowed player in range (policy in pvp.ts) ----
       let engaging = false
-      const pvpBusyActions = new Set([...PVP_ACTIONS, 'retreat', 'bunker', 'pillar', 'climb_out', 'eat', 'water_bucket', 'ranged_defense'])
+      const pvpBusyActions = new Set([...PVP_ACTIONS, 'retreat', 'bunker', 'pillar', 'climb_out', 'eat', 'water_bucket', 'air', 'ranged_defense'])
       const pvpTimer = setInterval(() => {
         try {
           if (engaging || pvpBusy || !bot.entity || bot.health <= 0 || !needsSurvival(bot) || !agent.getAction('pvp_engage')) return
@@ -252,7 +272,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           bot.nearestEntity((e: any) => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20)
         if (!mob) return
         const cur = agent.currentAction?.name
-        if (cur === 'bunker' || PVP_ACTIONS.has(cur ?? '') || cur === 'water_bucket') return
+        if (cur === 'bunker' || PVP_ACTIONS.has(cur ?? '') || cur === 'water_bucket' || cur === 'air') return
         // Phantoms at night with no weapon (or hurt): dig in instead of punching the sky.
         const unarmed = !bot.inventory.items().some(i => /_(sword|axe)$/.test(i.name))
         const night = bot.time.timeOfDay >= 12_500 && bot.time.timeOfDay <= 23_500
@@ -357,6 +377,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         clearInterval(timer)
         clearInterval(rangedTimer)
         clearInterval(pvpTimer)
+        clearInterval(airTimer)
         unalarm()
       }
     }

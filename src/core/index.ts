@@ -19,6 +19,7 @@ export { Storage } from './storage.ts'
 export { distance } from './format.ts'
 export { Fleet, Blackboard, type FleetMessage, type FleetEvents } from './fleet.ts'
 export { goals, Movements, goto, gotoTimed, travel, reachMovements, type ReachMoves, surfaceY, roofed, TravelUndergroundError, TravelUnderwaterError, swimUp, holdGoal, playerEntity, isHostile, FLYING, nearestHostile, itemName, fmtPos, needsSurvival, gameModeNote } from '../adapters/minecraft-java/helpers.ts'
+export { getAir, headInWater, oxygen, planAir, climbOntoLedge, type AirResult } from '../adapters/minecraft-java/air.ts'
 export { isModdedBlock, MODDED_BLOCK } from '../adapters/minecraft-java/modded.ts'
 export {
   DangerMemory, dangerMemory, rememberDanger, activeZones, isInDanger, avoidZones, crossesDanger, clearDanger, describeZone,

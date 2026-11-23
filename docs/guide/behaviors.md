@@ -755,7 +755,7 @@ flowchart TB
   23 Nov 2026 Pax went from food 12 to 0 in six minutes of scouting, then was shot at 1 health,
   and on the next run (food 0, a 250 ring) drowned. `find_food` walks instead of sprinting
   (sprinting burns food about ten times faster) and paths around water where it can; when it
-  still runs out of air it swims up before heading for dry land. Berry bushes (and kelp, with a
+  still runs out of air it gets air (up, through ice or to an opening, see [air](/concepts/world#air)) before heading for dry land. Berry bushes (and kelp, with a
   furnace) count as food up to 64 blocks out.
   **Starving at night** (food 6 or less): its own farm, a food chest, a remembered spot within
   twice `riskyRingsFrom` (96 blocks) and the near ring are worth the dark; wider rings are not

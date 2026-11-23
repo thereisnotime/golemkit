@@ -46,7 +46,7 @@ are done: the Minecraft side moved into `src/adapters/minecraft-java` (see
 |---|---|---|---|---|---|
 | `src/core/` (top level) | 20 | 0 | 0 | core | Agent lifecycle, action lock, chat queue, storage, toggles, danger zones, logging, fleets, [profiles](/guide/profiles), the trip planner (`trip.ts`), and `adapter.ts` (the GameAdapter interface and capabilities). `index.ts` still re-exports the Minecraft helpers (`goto`, `goals`, `isHostile`, ...) so [variants](/concepts/variants-profiles) and scripts keep their imports. |
 | `src/core/journal/` | 14 | 0 | 0 | core | Storage, aggregation, rollups, queries and death reports (death message parsing, cause tracking); the capture of game events moved to the adapter. |
-| `src/adapters/minecraft-java/` | 42 | 24 | 28 | minecraft | `adapter.ts` (Mineflayer, pathfinder, session events), helpers, modded blocks, refusal watch, journal capture, [reflexes](/concepts/world#reflexes), the behaviour library, the stock NPC behaviours, the [scene](/guide/scenes) actions, and the server platforms (`platforms/neoforge`, `vanilla`, `paper`). |
+| `src/adapters/minecraft-java/` | 43 | 25 | 29 | minecraft | `adapter.ts` (Mineflayer, pathfinder, session events), helpers, modded blocks, refusal watch, journal capture, getting air (`air.ts`), [reflexes](/concepts/world#reflexes), the behaviour library, the stock NPC behaviours, the [scene](/guide/scenes) actions, and the server platforms (`platforms/neoforge`, `vanilla`, `paper`). |
 | `src/llm/` (with `providers/`, `eval/`) | 25 | 0 | 0 | core | Providers, prompts, goals, budgets, quota pause, pricing, usage, MCP bridge. The online check and the danger check go through the adapter. |
 | `src/context/` | 6 | 0 | 0 | core | [Context packs](/guide/context-pack), memory files, procedures and hooks are markdown and YAML. |
 | `src/brains/` (top level) | 4 | 0 | 0 | core | `command`, `llm`, `hooks` (game events through `agent.adapter`), `index`. Reflexes moved to the adapter. |
@@ -55,11 +55,11 @@ are done: the Minecraft side moved into `src/adapters/minecraft-java` (see
 | `src/brains/behaviors/` | 8 | 0 | 0 | core | Arming, registry (with capability gating), runtime, config and the behaviour actions. |
 | `src/brains/scene/` | 9 | 0 | 0 | core | Casting, beats, lines, the director protocol and scheduling; positions and hits through the adapter. |
 | `src/brains/self/` | 9 | 0 | 0 | core | Program format, gate, interpreter, learner and store; conditions read the adapter's world view. |
-| `src/skills/` | 69 | 35 | 42 | minecraft | Actions for movement, combat, food, mining, crafting, building, roads, [WorldEdit](/guide/worldedit), each with the capabilities it needs, plus pure planners (`foodPlan`, `farmPlan`, `searchPlan`, `reachPlan`, `ranged-plan`, `techniques`, `pvp`, ...) that touch no bot. `config` is game-agnostic and `journal` nearly so. |
+| `src/skills/` | 71 | 35 | 43 | minecraft | Actions for movement, combat, food, mining, crafting, building, roads, [WorldEdit](/guide/worldedit), each with the capabilities it needs, plus pure planners (`foodPlan`, `farmPlan`, `searchPlan`, `reachPlan`, `ranged-plan`, `techniques`, `pvp`, ...) that touch no bot. `config` is game-agnostic and `journal` nearly so. |
 | `src/cli.ts` | 1 | 0 | 0 | core | Argument parsing, run, fleet, list. |
 | `variants/` | 5 | 0 | 0 | minecraft | No direct imports, but every variant picks Minecraft skills, reflexes and settings. |
 | `profiles/` | YAML | | | mixed | The keys are generic (brains, LLM, listen modes); values name Minecraft items, blocks and behaviours. |
-| `scripts/` | 36 | 1 | 21 | mixed | Live tests and benchmarks (`guard-bench`, `pvp-bench`, `survival-bench`, `smoke-test`, `fight-test`, ...) drive a real bot on a Minecraft server (`pvp-bench` also imports `minecraft-protocol`); `gen-docs`, `parity`, `adapter-lint`, `scope-check` and `llm-*` are generic. |
+| `scripts/` | 37 | 1 | 22 | mixed | Live tests and benchmarks (`guard-bench`, `pvp-bench`, `survival-bench`, `smoke-test`, `fight-test`, `air-test`, ...) drive a real bot on a Minecraft server (`pvp-bench` also imports `minecraft-protocol`); `gen-docs`, `parity`, `adapter-lint`, `scope-check` and `llm-*` are generic. |
 | `blueprints/` | YAML | | | minecraft | Block palettes and [schematics](/guide/blueprints#import) imported from Minecraft formats. |
 
 Before the split (v0.1.0), 13 of 37 files in `src/core/` and 24 of 66 in `src/brains/`

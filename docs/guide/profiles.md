@@ -91,7 +91,7 @@ journal:                      # optional, event journal settings (on by default)
 | `server` | per-bot server override: `host`, `port`, `auth`, `version`, `platform` (`neoforge`, `vanilla`, `paper`; same as `MC_PLATFORM`) |
 | `intents` | [plain-language commands](/guide/intents) without the LLM: `mode`, `threshold`, `layers`, ... Lands in `settings.intents` |
 | `llm` | [LLM brain](/guide/llm-brain) settings: provider, model, effort, login, token source, `listen`, `immersive`, aliases, budget, [goals](/guide/goals-and-building) |
-| `reflexes` | eat/retreat thresholds and `rangedDefense`, e.g. `retreatBelow: 0` to stand its ground ([details](../concepts/world#reflexes)) |
+| `reflexes` | eat/retreat thresholds, `rangedDefense` and the air reflex (`air`, `airBelow`), e.g. `retreatBelow: 0` to stand its ground ([details](../concepts/world#reflexes)) |
 | `retry`, `humanize`, `journal`, `context` | see the sections below and the linked guides |
 | `settings` | anything the variant's skills/brains read, e.g. `combat`, `mining`, `trips`, `storage.chests` (the pantry), `inventoryMemory`; see [Settings the skills read](../reference/config#settings-the-skills-read) |
 | `logging` | applied when the profile is run on its own |

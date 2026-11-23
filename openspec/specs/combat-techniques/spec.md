@@ -1,7 +1,7 @@
 # combat-techniques Specification
 
 ## Purpose
-How the fight loop, `defend` and the reflexes use skilled-player techniques from the 1.9+ combat system (hit styles, shield timing, totem, golden apples, water bucket, enderman gaze, chokepoints), and the opt-in PvP (modes and PvP tactics are in the pvp spec). Each technique has a `combat.*` live toggle.
+How the fight loop, `defend` and the reflexes use skilled-player techniques from the 1.9+ combat system (hit styles, shield timing, totem, golden apples, water bucket, getting air when drowning, enderman gaze, chokepoints), and the opt-in PvP (modes and PvP tactics are in the pvp spec). Each technique has a `combat.*` live toggle.
 
 ## Requirements
 
@@ -86,6 +86,32 @@ With `combat.waterClutch` on and a water bucket, the bot SHALL place water just 
 #### Scenario: Nether
 - **WHEN** the same fall happens in the Nether
 - **THEN** it does not try the bucket
+
+### Requirement: Air when drowning
+With `reflexes.air` on (default), when the bot's eyes are in water or a bubble column and its air is at or below `reflexes.airBelow` (default 10 of 20; 3 earlier at 12 health or less, 6 earlier at 6 or less), the reflexes SHALL stop the current action and start `air`, which takes the cheapest way to a breath, re-planned every tick: straight up when the water above is open; breaking ice or another breakable block within 4 blocks above the head (never in a protected area, never with `canDig` off); swimming to the nearest opening or air pocket within 8 blocks; swimming up when nothing else is found. It SHALL stop at 18 of 20 air, then swim to dry land within 12 blocks. The reflex referee SHALL let `air` take the body from any reflex, and SHALL let nothing but `water_bucket` take it from `air`. `travel`'s low-air stop SHALL use the same planner.
+
+#### Scenario: Under ice
+- **WHEN** the bot is 3 blocks under a frozen lake with 10 of 20 air and no hole nearby
+- **THEN** it breaks the ice above its head, surfaces through the hole and reports "out of air under ice: broke 1 ice above"
+
+#### Scenario: Opening to the side
+- **WHEN** a stone roof covers the water but there is an opening 4 blocks away
+- **THEN** it swims to the opening instead of digging through stone
+
+#### Scenario: Protected ice
+- **WHEN** the ice above is in a protected area
+- **THEN** it does not break it and swims to another opening
+
+#### Scenario: Eating while drowning
+- **WHEN** the eat reflex wants the body while `air` runs
+- **THEN** it is held back until the air is back
+
+### Requirement: Paths keep out of water
+The pathfinder movements used by `goto`, `travel`, `go_home` and the reach movements SHALL prefer a dry path: water costs 3 per block instead of 1, more with water above it, more again under a roof within 4 blocks, and much more (30) under ice.
+
+#### Scenario: Frozen lake between the bot and its chest
+- **WHEN** the straight path to a chest goes along the bed of an ice-covered lake and a dry path around it exists
+- **THEN** the bot walks around (or over the ice) rather than under it
 
 ### Requirement: Enderman gaze
 With `combat.endermanGaze` on, every look the bot makes SHALL avoid an enderman's eyes (vanilla cone, within 64 blocks), unless that enderman is already fighting the bot or the bot wears a carved pumpkin.

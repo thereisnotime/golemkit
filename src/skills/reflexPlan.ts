@@ -8,11 +8,13 @@
 //     adjacent, and not by ranged_defense at all
 //   - ranged_defense is not interrupted by defend for a mob more than 3 blocks away
 //   - water_bucket (a lethal fall or fire) always goes first, even during the hold
+//   - air (drowning) goes first too, and nothing but water_bucket takes the body from it until
+//     it has its air back: Pax drowned while the eat reflex and prepare_trip took turns
 //   - bunker and the PvP actions follow the same hold as the rest
 // Nothing here is about which reflex to pick; the brain still decides that.
 
 /** Reflex actions the arbiter referees (others, e.g. a player's command, are not its business). */
-export const REFEREED = new Set(['climb_out', 'retreat', 'ranged_defense', 'defend', 'bunker', 'eat', 'pvp_engage', 'defend_player', 'water_bucket'])
+export const REFEREED = new Set(['climb_out', 'retreat', 'ranged_defense', 'defend', 'bunker', 'eat', 'pvp_engage', 'defend_player', 'water_bucket', 'air'])
 
 /** A reflex keeps the body at least this long once started. */
 export const HOLD_MS = 1500
@@ -39,7 +41,8 @@ export interface ArbiterState {
 export function mayReplace (s: ArbiterState): string | null {
   if (!s.current || !s.currentIsReflex || !REFEREED.has(s.current)) return null
   if (s.current === s.next) return 'already running'
-  if (s.next === 'water_bucket') return null // a lethal fall or fire: always
+  if (s.next === 'water_bucket' || s.next === 'air') return null // a lethal fall, fire or drowning: always
+  if (s.current === 'air') return 'air: getting air first'
   const sharp = s.healthDrop >= SHARP_DROP
   if (s.sinceStartMs < HOLD_MS && !sharp) return `${s.current} just started`
   if (ESCAPES.has(s.current)) {
