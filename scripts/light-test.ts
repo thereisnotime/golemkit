@@ -1,0 +1,199 @@
+// Live test of light_up / light_home on a real server.
+//   node --env-file=.env scripts/light-test.ts [x z]     default 1600 445
+// DIRECTOR (default ClaudeTest, an op) is only used for teleports (/execute ... positioned over
+// motion_blocking_no_leaves run tp puts a player on the surface), /give and cleanup. It checks the spot is 300+ blocks from spawn, the fortress,
+// the village and every other online player. LIGHT_BOT (default LightTest) then:
+//   1. light_up dry_run around the spot (radius 10, target 8): the dark spots, the plan, whether
+//      the chunks carry real light data
+//   2. light_up with nothing to make torches from: fails with the reason
+//   3. with 12 oak logs and 8 cobblestone (no coal): charcoal path, places up to 6 torches, then the rest
+//   5. one of its torches broken (by the test bot itself): the next dry run leaves that spot alone
+//   6. light_home armed (home here, by day only): runs on its own and checks the area
+// Every block that appears near the spot while it runs (torches, crafting table, furnace) is
+// removed at the end with /setblock air; inventories are cleared and drops killed.
+import { rmSync } from 'node:fs'
+import { Agent, defineVariant, serverFromEnv, PRIORITY, fmtPos, type ActionResult } from '../src/core/index.ts'
+import { standardSkills, extendedSkills, navigation } from '../src/skills/index.ts'
+import { behaviorsBrain } from '../src/brains/index.ts'
+import { ownTorches } from '../src/skills/lighting.ts'
+
+const argv = process.argv.slice(2)
+const X = Number(argv[0] ?? 1600)
+const Z = Number(argv[1] ?? 445)
+const BOT = process.env.LIGHT_BOT || 'LightTest'
+const DIRECTOR = process.env.DIRECTOR || 'ClaudeTest'
+const DATA = 'data/light-test'
+const KEEP_AWAY: [string, number, number][] = [['spawn', 545, 45], ['village', -2770, 1090], ['fortress', 560, -43]]
+const t0 = Date.now()
+const log = (m: string) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s] ${m}`)
+const pause = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+async function connect (agent: Agent, minutes = 3): Promise<void> {
+  const ready = new Promise<boolean>(resolve => {
+    const to = setTimeout(() => resolve(false), minutes * 60_000)
+    agent.once('session', () => { clearTimeout(to); setTimeout(() => resolve(true), 4000) })
+  })
+  void agent.start().catch(() => {})
+  if (!await ready) { await agent.stop().catch(() => {}); throw new Error(`${agent.username} could not connect`) }
+}
+
+async function main (): Promise<void> {
+  for (const [name, x, z] of KEEP_AWAY) if (Math.hypot(X - x, Z - z) < 300) throw new Error(`${X} ${Z} is within 300 blocks of the ${name}`)
+  rmSync(`${DATA}/agents`, { recursive: true, force: true })
+  const variant = defineVariant({ name: 'light-test', skills: [...standardSkills(), navigation(), ...extendedSkills()], brains: [behaviorsBrain({ defaults: {} })] })
+  const a = new Agent(variant, serverFromEnv(), { username: BOT, dataDir: DATA, canDig: true, owners: [] }) // canDig only for the test's own break_block; light_up never digs
+  a.on('actionEnd', (info: any, r: ActionResult) => { if (info.caller?.name !== 'light-test') log(`${r.ok ? 'done' : 'FAIL'} ${info.name} (${info.caller.kind}:${info.caller.name}): ${r.message}`) })
+  await connect(a)
+
+  // The director account is shared with other tests: only log it in while nobody else uses it
+  // (a second login kicks the first), and only for short bursts of commands.
+  const withDirector = async (fn: (cmd: (c: string) => Promise<void>, replies: string[]) => Promise<void>) => {
+    for (let i = 0; i < 120 && a.bot.players[DIRECTOR]; i++) {
+      if (i % 6 === 0) log(`${DIRECTOR} is online (another test); waiting`)
+      await pause(5000)
+    }
+    if (a.bot.players[DIRECTOR]) throw new Error(`${DIRECTOR} stayed online; try later`)
+    const dir = new Agent(defineVariant({ name: 'director', skills: [], brains: [] }), serverFromEnv(), { username: DIRECTOR, dataDir: `${DATA}/director` })
+    const replies: string[] = []
+    dir.on('serverMessage', m => { replies.push(m); if (replies.length > 80) replies.shift() })
+    await connect(dir)
+    // a refused command (kicked by another login of the same account): once more after its reconnect
+    const cmd = async (c: string) => {
+      let ok = await dir.command(c)
+      if (!ok) { log(`command refused, retrying: ${c}`); await pause(15_000); ok = await dir.command(c) }
+      if (!ok) log(`command refused: ${c}`)
+      await pause(400)
+    }
+    try { await fn(cmd, replies) } finally { await dir.stop().catch(() => {}) }
+  }
+
+  // by day only (the behaviour runs by day, and a test bot without armour at night is a meal)
+  while (a.bot.time.timeOfDay > 12000 && a.bot.time.timeOfDay < 23500) { log(`night (${a.bot.time.timeOfDay}); waiting for the morning`); await pause(30_000) }
+
+  await withDirector(async (cmd, replies) => {
+    // every other online player must be 300+ away
+    for (const p of Object.keys(a.bot.players).filter(n => n !== DIRECTOR && n !== BOT)) {
+      replies.length = 0
+      await cmd(`/data get entity ${p} Pos`)
+      let d: number | null = null
+      for (let i = 0; i < 20; i++) {
+        const line = replies.find(r => /has the following entity data|No entity was found/i.test(r))
+        if (line) { const m = /\[(-?[\d.]+)d, (-?[\d.]+)d, (-?[\d.]+)d\]/.exec(line); d = m ? Math.hypot(Number(m[1]) - X, Number(m[3]) - Z) : null; break }
+        await pause(250)
+      }
+      log(`${p}: ${d === null ? 'unknown' : `${Math.round(d)} blocks away`}`)
+      if (d !== null && d < 300) throw new Error(`${p} is ${Math.round(d)} blocks from the spot`)
+    }
+    await cmd(`/clear ${BOT}`)
+    // tp high up first so the chunk loads, then down to the surface before it lands (a teleport resets the fall)
+    await cmd(`/tp ${BOT} ${X + 0.5} 200 ${Z + 0.5}`)
+    await pause(600)
+    replies.length = 0
+    await cmd(`/execute positioned ${X} 0 ${Z} positioned over motion_blocking_no_leaves run tp ${BOT} ~0.5 ~ ~0.5`)
+    await pause(1000)
+    log(`server: ${replies.join(' | ')}`)
+  })
+  await pause(6000)
+  const step = async (name: string, params: Record<string, unknown> = {}): Promise<ActionResult> => {
+    const t = Date.now()
+    const r = await a.act(name, params, { caller: { kind: 'system', name: 'light-test' }, priority: PRIORITY.player })
+    log(`${r.ok ? 'OK  ' : 'FAIL'} ${name} ${JSON.stringify(params)} (${((Date.now() - t) / 1000).toFixed(1)}s): ${r.message}`)
+    return r
+  }
+  // X Z may be water: the nearest dry, open patch (11 x 11 of solid ground, nothing above) within the loaded chunks
+  const land = (): { x: number, z: number } | null => {
+    const me = a.bot.entity.position.floored()
+    const at = (x: number, y: number, z: number) => a.bot.blockAt(me.clone().set(x, y, z))
+    const top = (x: number, z: number): string | null => {
+      for (let y = 120; y > 40; y--) { const b = at(x, y, z); if (!b) return null; if (b.name !== 'air' && b.name !== 'cave_air' && b.name !== 'short_grass') return b.name }
+      return null
+    }
+    const dry = (x: number, z: number) => { const t = top(x, z); return !!t && /^(grass_block|dirt|sand|stone|gravel|podzol|coarse_dirt|snow_block|red_sand|terracotta)$/.test(t) }
+    for (let r = 0; r <= 80; r += 4) {
+      for (let dx = -r; dx <= r; dx += 4) {
+        for (const dz of [-r, r]) {
+          const x = me.x + dx, z = me.z + dz
+          let ok = true
+          for (let i = -5; i <= 5 && ok; i += 5) for (let j = -5; j <= 5 && ok; j += 5) ok = dry(x + i, z + j)
+          if (ok) return { x, z }
+        }
+      }
+    }
+    return null
+  }
+  const dryAt = land()
+  if (!dryAt) { await a.stop(); throw new Error('no dry land within 80 blocks') }
+  // everything that appears near the spot, for cleanup
+  const placed = new Map<string, { x: number, y: number, z: number, name: string }>()
+  a.bot.on('blockUpdate', (old: any, now: any) => {
+    if (!now || !/(torch|crafting_table|furnace)$/.test(now.name) || (old && old.name === now.name)) return
+    if (Math.hypot(now.position.x - dryAt.x, now.position.z - dryAt.z) > 40) return
+    placed.set(`${now.position.x},${now.position.y},${now.position.z}`, { x: now.position.x, y: now.position.y, z: now.position.z, name: now.name })
+  })
+  // one short director session: onto the dry patch, the checks that need an empty inventory, then the wood
+  let spot = a.bot.entity.position.floored()
+  let base = { x: spot.x, y: spot.y, z: spot.z, radius: 10, y_range: 4, target: 8 }
+  await withDirector(async cmd => {
+    await cmd(`/execute positioned ${dryAt.x} 0 ${dryAt.z} positioned over motion_blocking_no_leaves run tp ${BOT} ~0.5 ~ ~0.5`)
+    await pause(4000)
+    spot = a.bot.entity.position.floored()
+    log(`spot ${fmtPos(spot)}, time ${a.bot.time.timeOfDay}`)
+    for (const [name, x, z] of KEEP_AWAY) if (Math.hypot(spot.x - x, spot.z - z) < 300) throw new Error(`landed within 300 of the ${name}`)
+    base = { x: spot.x, y: spot.y, z: spot.z, radius: 10, y_range: 4, target: 8 }
+    const dry = await step('light_up', { ...base, dry_run: true })
+    log(`dry run data: ${JSON.stringify({ ...(dry.data as object), torches: undefined })}`)
+    await step('light_up', { ...base, max_torches: 6 })
+    await cmd(`/give ${BOT} minecraft:oak_log 12`)
+    await cmd(`/give ${BOT} minecraft:cobblestone 8`)
+  })
+  await pause(1500)
+
+  try {
+    const r3 = await step('light_up', { ...base, max_torches: 6 })
+    log(`inventory: ${a.bot.inventory.items().map(i => `${i.count} ${i.name}`).join(', ')}`)
+    log(`own torches: ${ownTorches(a).length}; ${(r3.data as any)?.placed?.length ?? 0} from charcoal`)
+    await step('light_up', { ...base, max_torches: 16 })
+    const own = ownTorches(a)
+    log(`own torches: ${own.length}; inventory: ${a.bot.inventory.items().map(i => `${i.count} ${i.name}`).join(', ')}`)
+    const after = await step('light_up', { ...base, dry_run: true })
+    log(`after: ${JSON.stringify({ ...(after.data as object), torches: undefined })}`)
+    if (own[0]) {
+      // the "owner" takes one away (the test bot breaks it; light_up itself never breaks anything)
+      await step('break_block', { x: own[0].x, y: own[0].y, z: own[0].z })
+      await pause(1000)
+      const gone = await step('light_up', { ...base, dry_run: true })
+      const planned = ((gone.data as any)?.torches ?? []) as { x: number, y: number, z: number }[]
+      log(`after taking ${fmtPos(own[0])} away: gone ${(gone.data as any)?.gone}, planned there again: ${planned.some(t => t.x === own[0]!.x && t.y === own[0]!.y && t.z === own[0]!.z)}`)
+    }
+    // the behaviour on its own (by day only)
+    await step('set_home')
+    await step('behavior_arm', { name: 'light_home', options: { radius: 14, farms: false, target: 8, maxTorches: 8, everyMinutes: 5 } })
+    const until = Date.now() + 3 * 60_000
+    while (Date.now() < until) {
+      await pause(15_000)
+      const cur = a.currentAction ? a.currentAction.name : 'idle'
+      log(`${cur}; checked ${JSON.stringify(a.storage.get('lighting.checked', {}))}; own torches ${ownTorches(a).length}`)
+      if (Object.keys(a.storage.get('lighting.checked', {})).length) break
+    }
+    await step('behavior_disarm', { name: 'light_home' })
+  } finally {
+    log(`removing ${placed.size} blocks: ${[...placed.values()].map(p => `${p.name} ${p.x} ${p.y} ${p.z}`).join(', ')}`)
+    for (const p of ownTorches(a)) placed.set(`${p.x},${p.y},${p.z}`, { ...p, name: 'torch' })
+    await withDirector(async cmd => {
+      for (const p of placed.values()) await cmd(`/setblock ${p.x} ${p.y} ${p.z} minecraft:air`)
+      await cmd(`/kill @e[type=minecraft:item,x=${spot.x},y=${spot.y},z=${spot.z},distance=..48]`)
+      await cmd(`/clear ${BOT}`)
+    })
+    await pause(1500)
+    let left = 0
+    for (const p of placed.values()) {
+      const b = a.bot.blockAt(a.bot.entity.position.clone().set(p.x, p.y, p.z))
+      if (b && b.name !== 'air') { left++; log(`still there: ${b.name} at ${p.x} ${p.y} ${p.z}`) }
+    }
+    log(`cleanup: ${placed.size - left} removed, ${left} left`)
+    a.storage.flush()
+    await a.stop()
+  }
+}
+
+main().then(() => process.exit(0), e => { console.error(e); process.exit(1) })
