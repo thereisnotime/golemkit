@@ -319,7 +319,8 @@ test('keep_fed: after the 250 ring it walks to a known village (foodPlaces) befo
     canDig: true,
     getAction: (n: string) => actions.includes(n) ? { name: n } : undefined,
     protectedAreas: { isProtected: () => false },
-    storage: { get: (_k: string, fb: unknown) => fb, set: () => {} }
+    storage: { get: (_k: string, fb: unknown) => fb, set: () => {} },
+    say: () => {}
   }
   const act = async (name: string, p: any = {}): Promise<ActionResult> => {
     calls.push(name)

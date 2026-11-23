@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  planFood, nextRing, recordSearch, dryWaypoint, scoutWaypoints, riskyRing, RING_MEMORY_MS, STEP_PAUSE_MS,
+  planFood, nextRing, recordSearch, dryWaypoint, scoutWaypoints, riskyRing, foodReportText, RING_MEMORY_MS, STEP_PAUSE_MS,
   type FoodWorld, type FoodStepOptions, type SearchRecord
 } from '../src/skills/foodPlan.ts'
 import { ringsFor, starvingHold, STARVING_HOLD_SCORE } from '../src/adapters/minecraft-java/behaviors/keepFed.ts'
@@ -65,10 +65,11 @@ test('search widens only after the smaller ring came up empty', () => {
 })
 
 test('empty rings are remembered for a while, then searched again', () => {
-  const all = { ...bare, canStartFarm: false, searches: [empty(48, 30), empty(120, 15), empty(250, 5)] }
+  const all = { ...bare, canStartFarm: false, searches: [empty(48, 30), empty(120, 15), empty(250, 5)], lastReportAt: NOW - MIN }
   // 48 is older than 20 min: forgotten, but 120 and 250 still cover it
   assert.equal(nextRing(all.searches, [48, 120, 250], NOW, RING_MEMORY_MS), null)
-  assert.equal(planFood(all, opts).step, null, 'all rings empty and no farm fallback: nothing to do')
+  assert.equal(planFood(all, opts).step, null, 'all rings empty and no farm fallback: nothing to do (reported a minute ago)')
+  assert.equal(planFood({ ...all, lastReportAt: 0 }, opts).step, 'report', 'every ring empty: tell the owner, once an hour')
   assert.match(planFood(all, opts).reason, /every ring out to 250 came up empty/)
   const later = { ...all, now: NOW + 16 * MIN } // the 250 search is now 21 min old: every ring forgotten
   assert.equal(planFood(later, opts).radius, 48, 'after ringMemory the close ring is searched again')
@@ -76,7 +77,7 @@ test('empty rings are remembered for a while, then searched again', () => {
   let recs: SearchRecord[] = []
   for (let i = 0; i < 20; i++) recs = recordSearch(recs, { radius: 48, at: NOW + i * MIN, found: false })
   assert.equal(recs.length, 12)
-  assert.equal(recordSearch([empty(48, 200)], { radius: 120, at: NOW, found: false }).length, 1, 'very old records dropped')
+  assert.equal(recordSearch([empty(48, 200)], { radius: 120, at: NOW, found: false }, 60 * MIN).length, 1, 'very old records dropped')
 })
 
 test('farm fallback: only once every ring is empty; seeds first, then start, then fill the farm', () => {
@@ -86,7 +87,7 @@ test('farm fallback: only once every ring is empty; seeds first, then start, the
   assert.equal(planFood({ ...exhausted, seeds: 10 }, opts).step, 'start_farm')
   assert.equal(planFood({ ...exhausted, seeds: 2, grass: true }, opts).step, 'seeds', 'too few seeds with grass near: gather first')
   assert.equal(planFood({ ...exhausted, seeds: 2, grass: false }, opts).step, 'start_farm', 'no grass here: start_farm looks further for grass')
-  assert.equal(planFood({ ...exhausted, seeds: 10 }, { ...opts, startFarm: false }).step, null, 'farm fallback off')
+  assert.equal(planFood({ ...exhausted, seeds: 10, lastReportAt: NOW }, { ...opts, startFarm: false }).step, null, 'farm fallback off')
   // has a farm: plant its bare farmland, get seeds for it, breed, berries
   const farmed = { ...exhausted, hasFarm: true, canStartFarm: true }
   assert.equal(planFood({ ...farmed, farmEmpty: 7, seeds: 3 }, opts).step, 'plant')
@@ -99,7 +100,7 @@ test('farm fallback: only once every ring is empty; seeds first, then start, the
   // its own farm, once ripe, comes before everything out in the world
   assert.equal(planFood({ ...farmed, farmDistance: 20 }, opts).step, 'farm')
   // night: no new farm, no seed walks; planting its farm in range is fine
-  assert.equal(planFood({ ...exhausted, seeds: 10, night: true }, opts).step, null)
+  assert.equal(planFood({ ...exhausted, seeds: 10, night: true, lastReportAt: NOW }, opts).step, null)
   assert.equal(planFood({ ...farmed, farmEmpty: 7, seeds: 3, night: true }, opts).step, 'plant')
 })
 
@@ -135,9 +136,10 @@ test('critical food: report once (rate limited), then stay put', () => {
   const d = planFood(stuck, opts)
   assert.equal(d.step, 'report')
   assert.equal(d.rung, 'critical')
-  assert.match(d.reason, /food 5\/20 and nothing left to try \(night or a storm\)/)
+  assert.match(d.reason, /food 5\/20, nothing left to try: night or a storm/)
   assert.equal(planFood({ ...stuck, lastReportAt: NOW - 3 * MIN }, opts).step, null, 'reported 3 minutes ago: quiet')
-  assert.equal(planFood({ ...stuck, lastReportAt: NOW - 11 * MIN }, opts).step, 'report', 'again after 10 minutes')
+  assert.equal(planFood({ ...stuck, lastReportAt: NOW - 11 * MIN }, opts).step, null, 'not again after 10 minutes')
+  assert.equal(planFood({ ...stuck, lastReportAt: NOW - 61 * MIN }, opts).step, 'report', 'again after an hour')
   assert.equal(planFood(stuck, opts, new Set(['report'])).step, null, 'once per run')
   assert.equal(planFood({ ...stuck, food: 9 }, opts).step, null, 'not critical: no report')
   // berries come first when critical and the farm fallback is on
@@ -147,7 +149,7 @@ test('critical food: report once (rate limited), then stay put', () => {
 
 test('the wait after a failed run depends on the rung', () => {
   assert.equal(planFood({ ...bare, night: true, canStartFarm: false }, opts).retryMs, 2 * MIN, 'night: look again in 2 min')
-  const all = { ...bare, canStartFarm: false, searches: [empty(250, 1)] }
+  const all = { ...bare, canStartFarm: false, searches: [empty(250, 1)], lastReportAt: NOW }
   assert.equal(planFood(all, opts).retryMs, 5 * MIN, 'nothing at all: 5 min')
   assert.equal(planFood({ ...all, food: 5, lastReportAt: NOW }, opts).retryMs, 2 * MIN, 'critical: sooner')
   assert.equal(planFood({ ...bare, danger: true, canStartFarm: false }, opts).retryMs, 45_000, 'mobs near: they usually pass soon')
@@ -232,7 +234,7 @@ test('risky rings: poor gear and food not urgent keep it near home', () => {
   // hungry enough, geared, starving, or the rule off: it goes
   assert.equal(planFood({ ...pax, food: 8 }, opts).radius, 120)
   assert.equal(planFood({ ...pax, gear: 50 }, opts).radius, 120)
-  assert.equal(planFood({ ...pax, starving: true }, opts).radius, 120)
+  assert.notEqual(planFood({ ...pax, starving: true, food: 3 }, opts).step, 'scout', 'starving: the walk out would eat the rest (Pax went to 0 and died)')
   assert.equal(planFood({ ...pax, gear: undefined }, opts).radius, 120, 'no gear reading: the old ladder')
   assert.equal(planFood(pax, { ...opts, scoutGear: 0 }).radius, 120)
   assert.equal(planFood(pax, { ...opts, scoutHungerAt: 12 }).radius, 120)
@@ -270,4 +272,24 @@ test('starving between ladder runs: keep_fed holds the body over chores, under t
   assert.ok(!starvingHold(7, 20, o), 'hungry but not starving: chores may run while it waits')
   assert.ok(STARVING_HOLD_SCORE > 38 && STARVING_HOLD_SCORE > 40, 'above chop_wood_loop (38) and stay_safe hold (40)')
   assert.ok(STARVING_HOLD_SCORE < 48, "below stay_safe's night trip home (48)")
+})
+
+test('food floor: no far ring at or below 6 food, whatever the gear; the near ring is fine', () => {
+  assert.match(riskyRing(120, { gear: 90, food: 6 })!, /too low to walk 120 blocks out and back/)
+  assert.match(riskyRing(250, { food: 0, starving: true })!, /too low/)
+  assert.equal(riskyRing(48, { gear: 0, food: 0 }), null)
+  assert.equal(riskyRing(120, { gear: 90, food: 7 }), null)
+  assert.equal(riskyRing(120, { gear: 90, food: 3 }, { scoutFoodFloor: 2 }), null)
+  // Pax at food 0 after a 120 scout: no 250 trip
+  const w: FoodWorld = { ...bare, food: 0, starving: true, gear: 20, searches: [empty(48, 30), empty(120, 2)], lastReportAt: 0 }
+  const d = planFood(w, { ...opts, startFarm: false })
+  assert.equal(d.step, 'report', 'tells the owner instead')
+})
+
+test('the report says how far it looked and what would help', () => {
+  const t = foodReportText({ food: 3, searchedTo: 250, seeds: 0, hasFarm: true, reason: 'food 3/20, nothing left to try: food 3/20 is too low to walk 400 blocks out and back' })
+  assert.match(t, /^I'm starving \(food 3\/20\) and nothing to eat within 250 blocks of home/)
+  assert.match(t, /seeds for my farm/)
+  assert.doesNotMatch(t, /nothing left to try/)
+  assert.match(foodReportText({ food: 10, seeds: 9, hasFarm: false, reason: 'x' }), /^I'm hungry .*can't find anything to eat \(x\).*seeds to start a farm/)
 })

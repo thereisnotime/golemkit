@@ -625,7 +625,7 @@ flowchart TB
   (default 250) are far ones: they are only searched by day (even with `scoutAtNight`), and
   only after a trip to a known food place (3b), when there is one. An empty 120 search also covers the 48 ring, a
   wider search skips the rings a smaller one walked (`minRadius`), and an empty ring is
-  remembered for `ringMemoryMinutes` (default 20) in `agent.storage` key `foodLadder`, so a
+  remembered for `ringMemoryMinutes` (default 180: every scout costs food, and a snowy forest with no animals stays that way for hours) in `agent.storage` key `foodLadder`, so a
   restart doesn't rescan it. A search cut short by night or mobs is not remembered as empty.
   Within one run it moves on to the next ring right away.
   **Gear and hunger:** rings wider than `riskyRingsFrom` (default 48) are trips far from home.
@@ -635,6 +635,12 @@ flowchart TB
   (default 8) or it is starving. Until then it bakes, tends or starts its farm, forages and waits
   for crops (the next try is 3 minutes later), and the log says why (`food 12/20 is not urgent and
   gear 25 is under 40: not scouting 120 blocks out yet`). `scoutGear: 0` turns the rule off.
+  At or below `scoutFoodFloor` (default 6) no such ring is started at all, whatever the gear: on
+  23 Nov 2026 Pax went from food 12 to 0 in six minutes of scouting, then was shot at 1 health,
+  and on the next run (food 0, a 250 ring) drowned. `find_food` walks instead of sprinting
+  (sprinting burns food about ten times faster) and paths around water where it can; when it
+  still runs out of air it swims up before heading for dry land. Berry bushes (and kelp, with a
+  furnace) count as food up to 64 blocks out.
   **Starving at night** (food 6 or less): its own farm, a food chest, a remembered spot within
   twice `riskyRingsFrom` (96 blocks) and the near ring are worth the dark; wider rings still wait
   for day. Between ladder runs a starving bot holds the body (score 45: above `chop_wood_loop` and
@@ -721,9 +727,11 @@ flowchart TB
   [ranged reflex](#ranged-safety) remembers, read from the agent's core danger memory
   (`src/core/danger.ts`) through `src/skills/food-danger.ts`, whichever skills are loaded.
   `hunt`'s reach check reads them the same way.
-- **6 · critical:** at food 6 or less with nothing left to try it tells its owner once (a
-  whisper, at most every 10 minutes) and does nothing risky; `stay_safe` keeps it out of
-  trouble.
+- **6 · report:** at food 6 or less, or once every ring came up empty, with nothing left to try
+  (and no farm just started or growing) it whispers its owner how far it looked and what would
+  help (`I'm starving (food 3/20) and nothing to eat within 250 blocks of home (...). Staying
+  safe near home; food, seeds for my farm, or a pair of animals to breed would help.`), at most
+  once an hour, and does nothing risky; `stay_safe` keeps it out of trouble.
 - **Waits:** after a run that leaves it hungry, the wait depends on what is left: 20 s when
   another ring or step is open, 45 s while in danger, 3 minutes while its crops grow,
   2 minutes at night (or in a storm) or when critical, 5 minutes when nothing at all is possible. A change in the food-related inventory
@@ -959,9 +967,10 @@ Looks after food on its own, climbing a ladder when hungry (or hurt and too hung
 | `rings` | list | `[48,120,250,400,600]` | search rings around home, smallest first: close, wider, wide, then far ones (by day only, after known food places) |
 | `farRingsFrom` | number (32..1024) | `250` | rings wider than this are far: searched by day only, and only after a trip to a known food place |
 | `scoutGear` | number (0..100) | `40` | gear score (armour, shield, weapon, bow, health; stone tools and no armour score about 25) from which searching rings wider than riskyRingsFrom is fine at any food level; 0 = no gear rule |
+| `scoutFoodFloor` | number (0..20) | `6` | at or below this food no ring wider than riskyRingsFrom is started, whatever the gear: the walk would eat the rest |
 | `scoutHungerAt` | number (0..20) | `8` | with gear under scoutGear, rings wider than riskyRingsFrom are searched only when food is at or below this; until then it uses its farm, bakes, waits for crops |
 | `riskyRingsFrom` | number (16..1024) | `48` | rings wider than this count as risky trips for the gear rule |
-| `ringMemoryMinutes` | number (1..240) | `20` | remember an empty ring this long before searching it again |
+| `ringMemoryMinutes` | number (1..1440) | `180` | remember an empty ring this long before searching it again (every scout costs food) |
 | `scoutRadius` | number (32..1024) |  | old single search radius; when set it caps the rings |
 | `scoutAtNight` | boolean | `false` | also make far trips (searching, known spots, its farm) at night |
 | `startFarm` | boolean | `true` | farm fallback: with no proper food source (all rings empty), gather seeds, start a farm near home, plant and use it |
@@ -976,7 +985,7 @@ Looks after food on its own, climbing a ladder when hungry (or hurt and too hung
 | `tripRange` | number (64..10000) | `4000` | known food places further away than this are not worth a trip |
 | `foodPlaces` | list | `[]` | known farms and villages to go to for food (preferred over the far search rings) |
 | `breed` | boolean | `true` | breed animals near home between meals when it has their food (wheat: cows, sheep; seeds: chickens; carrots: pigs) |
-| `report` | boolean | `true` | when food is critical (6 or less) and nothing works, tell the owner (at most every 10 minutes) |
+| `report` | boolean | `true` | when food is critical (6 or less) or every ring came up empty and nothing works, whisper the owner how far it looked and what would help (at most once an hour) |
 
 ### `bodyguard`
 

@@ -99,7 +99,7 @@ const opts: FoodStepOptions = {
 }
 const bare: FoodWorld = {
   hasReadyFood: false, raw: [], safeRaw: false, canCook: false, canBake: false, foodChest: false, ripeCrops: 0, animals: 0,
-  herd: 0, food: 4, health: 20, canScout: true, canStartFarm: false, hasFarm: false, seeds: 0, grass: false, searches: [], now: NOW
+  herd: 0, food: 8, health: 20, canScout: true, canStartFarm: false, hasFarm: false, seeds: 0, grass: false, searches: [], now: NOW
 }
 const empty = (radius: number, minsAgo = 1): SearchRecord => ({ radius, at: NOW - minsAgo * MIN, found: false })
 const village = { name: 'village', distance: 3500 }

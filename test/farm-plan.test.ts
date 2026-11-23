@@ -154,7 +154,7 @@ test('ladder: farm work counts from planFarmWork; seeds are gathered when the fa
 })
 
 test('ladder: kelp and berries forage as stopgaps, apples only when critical', () => {
-  const exhausted = { ...bare, food: 10, searches: [{ radius: 250, at: NOW - MIN, found: false }], canStartFarm: false }
+  const exhausted = { ...bare, food: 10, searches: [{ radius: 250, at: NOW - MIN, found: false }], canStartFarm: false, lastReportAt: NOW }
   assert.equal(planFood({ ...exhausted, forage: 2 }, opts).step, 'forage')
   assert.equal(planFood({ ...exhausted, apples: 5 }, opts).step, null, 'not critical: leaves are not worth it')
   const d = planFood({ ...exhausted, food: 4, apples: 5 }, opts)

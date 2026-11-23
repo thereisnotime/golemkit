@@ -7,7 +7,7 @@ import type { Block } from 'prismarine-block'
 import type { Entity } from 'prismarine-entity'
 import type { Vec3 } from 'vec3'
 import type { Agent, ActionContext, ActionResult } from '../core/index.ts'
-import { defineSkill, defineAction, z, ok, fail, goals, travel, sleep, checkAborted, fmtPos, needsSurvival, itemName, TravelUnderwaterError } from '../core/index.ts'
+import { defineSkill, defineAction, z, ok, fail, goals, travel, sleep, checkAborted, fmtPos, needsSurvival, itemName, TravelUnderwaterError, swimUp } from '../core/index.ts'
 import { huntRefusal, inPen, herdSurplus, unreachableAnimals, HUNTABLE, type HuntCandidate } from './combat.ts'
 import { CROPS, isMature, plantOn, TILLABLE } from './farming.ts'
 import { getHome, getPlaces, setPlace, sameDimension, reachDryLand, type Place } from './navigation.ts'
@@ -479,6 +479,9 @@ const findFood = defineAction({
         await travel(bot, sky !== null ? { x: w.x, y: sky, z: w.z } : top ? { x: w.x, y: top.position.y + 1, z: w.z } : { x: w.x, z: w.z }, leg, {
           range: 8,
           stepTimeoutMs: 45_000,
+          // scouting for food: walking keeps the food bar (sprinting burns it ~10x faster), and lake beds drown
+          walk: true,
+          avoidWater: true,
           onProgress: () => {
             seen = look(agent, bot, p.animals, p.crops, p.keepAtLeast)
             // Dropped well below both where we started and the target ground, under a roof: we're in
@@ -498,6 +501,7 @@ const findFood = defineAction({
           // Sank on a lake bed: the next leg from this spot dives into the same water (it did, twice,
           // and Pax drowned there once the action ended). Get to dry land and stop scouting.
           if (e instanceof TravelUnderwaterError) {
+            await swimUp(bot, signal)
             const dry = await reachDryLand(bot, signal)
             reason = `${(e as Error).message}${dry ? '' : ' (and found no dry land close by)'}`
             break

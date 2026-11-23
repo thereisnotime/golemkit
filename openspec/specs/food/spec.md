@@ -17,7 +17,7 @@ keep_fed SHALL try, in order: eating ready food, cooking raw food (fuel and a fu
 - **THEN** keep_fed harvests the farm before searching or hunting further out
 
 ### Requirement: Widening search rings
-keep_fed SHALL search the smallest ring of `rings` (default 48, 120, 250, 400, 600 blocks around home) that no empty search covered within `ringMemoryMinutes` (default 20). Rings wider than `farRingsFrom` (default 250) SHALL only be searched by day, even with `scoutAtNight`. An empty search SHALL cover every ring up to its radius. A wider search SHALL skip the rings a smaller one walked. A search cut short by night or mobs SHALL NOT be remembered as empty. Search records SHALL persist in agent storage.
+keep_fed SHALL search the smallest ring of `rings` (default 48, 120, 250, 400, 600 blocks around home) that no empty search covered within `ringMemoryMinutes` (default 180). Rings wider than `farRingsFrom` (default 250) SHALL only be searched by day, even with `scoutAtNight`. An empty search SHALL cover every ring up to its radius. A wider search SHALL skip the rings a smaller one walked. A search cut short by night or mobs SHALL NOT be remembered as empty. Search records SHALL persist in agent storage.
 
 #### Scenario: First search
 - **WHEN** nothing is in range and no ring was searched recently
@@ -40,11 +40,15 @@ keep_fed SHALL search the smallest ring of `rings` (default 48, 120, 250, 400, 6
 - **THEN** keep_fed does not search the 400 ring and waits for day
 
 ### Requirement: Far rings need gear or hunger
-A ring wider than `riskyRingsFrom` (default 48) SHALL be searched only when the bot's gear score (the stay-safe gear score: armour, shield, weapon, bow and arrows, health) is at least `scoutGear` (default 40), or food is at or below `scoutHungerAt` (default 8), or the bot is starving. Otherwise the search SHALL count as blocked with a reason naming the food, the gear score and the ring, the ladder SHALL go on to baking, its farm, seeds, breeding and foraging, and the next try SHALL be no sooner than 3 minutes later. `scoutGear: 0` SHALL turn the rule off. The rule SHALL be the pure `riskyRing` in `src/skills/foodPlan.ts`.
+A ring wider than `riskyRingsFrom` (default 48) SHALL never be started at food at or below `scoutFoodFloor` (default 6), whatever the gear, and otherwise only when the bot's gear score (the stay-safe gear score: armour, shield, weapon, bow and arrows, health) is at least `scoutGear` (default 40) or food is at or below `scoutHungerAt` (default 8). find_food SHALL walk, not sprint, and path around water where it can; when it runs out of air it SHALL swim up before heading for dry land. Otherwise the search SHALL count as blocked with a reason naming the food, the gear score and the ring, the ladder SHALL go on to baking, its farm, seeds, breeding and foraging, and the next try SHALL be no sooner than 3 minutes later. `scoutGear: 0` SHALL turn the rule off. The rule SHALL be the pure `riskyRing` in `src/skills/foodPlan.ts`.
 
 #### Scenario: Stone tools at food 12
 - **WHEN** the bot has food 12, a stone sword, no armour or shield (gear about 25), its farm growing, and the 48 ring came up empty
 - **THEN** keep_fed does not search the 120 ring and waits for the crops, logging "not scouting 120 blocks out yet"
+
+#### Scenario: Food 0 after an empty 120 ring
+- **WHEN** food is 0 and the 48 and 120 rings came up empty
+- **THEN** keep_fed does not start the 250 ring; it reports to its owner instead
 
 #### Scenario: Hungry enough
 - **WHEN** the same bot's food drops to 8
@@ -55,7 +59,7 @@ A ring wider than `riskyRingsFrom` (default 48) SHALL be searched only when the 
 - **THEN** keep_fed searches the 120 ring
 
 ### Requirement: Starving comes first
-With food at or below 6, keep_fed SHALL go to its own farm, a food chest or a remembered food spot within 96 blocks and search the near ring (up to `riskyRingsFrom`) also at night; wider rings SHALL still wait for day. Between ladder runs a starving bot SHALL score 45 (above chop_wood_loop and stay_safe's hold after a failed trip home, below stay_safe's night trip home), walk home by day when more than 16 blocks out, and otherwise wait there, so chores do not take turns with stay_safe while it starves.
+With food at or below 6, keep_fed SHALL go to its own farm, a food chest or a remembered food spot within 96 blocks and search the near ring (up to `riskyRingsFrom`) also at night; wider rings SHALL not be started at all (see the food floor). Between ladder runs a starving bot SHALL score 45 (above chop_wood_loop and stay_safe's hold after a failed trip home, below stay_safe's night trip home), walk home by day when more than 16 blocks out, and otherwise wait there, so chores do not take turns with stay_safe while it starves.
 
 #### Scenario: Food 0 at night
 - **WHEN** the bot has food 0 at night and its farm is 80 blocks away
@@ -152,11 +156,15 @@ With `startFarm` on, when every ring came up empty, or searching is off, impossi
 - **THEN** keep_fed does not search and starts a farm near home instead
 
 ### Requirement: Critical report
-When food is at or below 6 and no step is left, keep_fed SHALL tell its owner once (a whisper when the owner is online), at most every 10 minutes, and SHALL NOT start far trips.
+When food is at or below 6, or every search ring came up empty (and no farm was just started or is growing), and no step is left, keep_fed SHALL tell its owner (a whisper when the owner is online) how far it searched and what would help (food, seeds, a pair of animals), at most once an hour, and SHALL NOT start far trips.
 
 #### Scenario: Starving at night
 - **WHEN** food is 5 at night and nothing is left to try
-- **THEN** the owner gets one message, and none again for 10 minutes
+- **THEN** the owner gets one message, and none again for an hour
+
+#### Scenario: Nothing within 250 blocks
+- **WHEN** the 48, 120 and 250 rings all came up empty and the bot has no seeds
+- **THEN** the owner hears "nothing to eat within 250 blocks of home" and that seeds or animals would help, once
 
 ### Requirement: Rung-dependent wait
 After a run that leaves the bot hungry, keep_fed SHALL wait 20 s when another ring or step is open, 45 s while hostiles are near, 3 minutes while its crops grow, 2 minutes at night or when critical, and 5 minutes when nothing is possible; a change in its food-related inventory SHALL end the wait early. Failed steps SHALL be paused on their own schedule.

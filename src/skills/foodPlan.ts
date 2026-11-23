@@ -506,6 +506,8 @@ export interface FoodStepOptions {
   scoutGear?: number
   /** Food at or below this makes risky rings worth it even with poor gear (default 8). */
   scoutHungerAt?: number
+  /** At or below this food no risky ring is started at all, whatever the gear (default 6). */
+  scoutFoodFloor?: number
   /** Trips to known food places (default true; without a knownPlace there is nothing to go to anyway). */
   trips?: boolean
   /** How long an empty ring is remembered (default 20 minutes). */
@@ -545,25 +547,32 @@ export interface FoodDecision {
 export const DEFAULT_RINGS = [48, 120, 250, 400, 600] as const
 /** Rings beyond this are far ones (day only, after known places). */
 export const FAR_RINGS_FROM = 250
-export const RING_MEMORY_MS = 20 * 60_000
+/** How long an empty ring stays empty: animals don't move into a snowy spruce forest within minutes, and every scout costs food. */
+export const RING_MEMORY_MS = 3 * 3600_000
 /** Rings wider than this take the bot far from home: with poor gear only when hungry enough. */
 export const RISKY_RINGS_FROM = 48
 /** Gear score from which a far ring is fine at any food level (stone tools and no armour score about 25; iron armour and a sword about 50; a shield adds 20). */
 export const SCOUT_GEAR = 40
 /** Food at or below this makes a far ring worth it whatever the gear. */
 export const SCOUT_HUNGER_AT = 8
+/** At or below this food a far ring is never started: the walk out and back eats what is left, and at 0 health drains (Pax, 23 Nov 2026: food 12 to 0 in 6 minutes of scouting, then shot at 1 health and drowned). */
+export const SCOUT_FOOD_FLOOR = 6
+/** At most one "can't find food" report per this long. */
+export const REPORT_EVERY_MS = 60 * 60_000
 
 /**
  * Why a search ring is too risky for now, or null: a ring wider than riskyRingsFrom, a gear score
- * under scoutGear and food above scoutHungerAt (not urgent yet). Starving bots and unknown gear
- * always may go. Seen live: Pax at food 12 with stone tools and no armour scouted 120 blocks out
+ * under scoutGear and food above scoutHungerAt (not urgent yet), or food at or below scoutFoodFloor
+ * whatever the gear (the trip itself would starve it). Unknown gear skips the gear part. Seen live: Pax at food 12 with stone tools and no armour scouted 120 blocks out
  * and died to three skeletons, with crops growing on its farm at home.
  */
-export function riskyRing (ring: number, w: Pick<FoodWorld, 'gear' | 'food' | 'starving'>, o: Pick<FoodStepOptions, 'riskyRingsFrom' | 'scoutGear' | 'scoutHungerAt'> = {}): string | null {
-  const wanted = o.scoutGear ?? SCOUT_GEAR
-  if (w.gear === undefined || wanted <= 0 || w.starving) return null
+export function riskyRing (ring: number, w: Pick<FoodWorld, 'gear' | 'food' | 'starving'>, o: Pick<FoodStepOptions, 'riskyRingsFrom' | 'scoutGear' | 'scoutHungerAt' | 'scoutFoodFloor'> = {}): string | null {
   if (ring <= (o.riskyRingsFrom ?? RISKY_RINGS_FROM)) return null
   const food = w.food ?? 20
+  const floor = o.scoutFoodFloor ?? SCOUT_FOOD_FLOOR
+  if (w.food !== undefined && food <= floor) return `food ${food}/20 is too low to walk ${ring} blocks out and back (the trip would eat the rest)`
+  const wanted = o.scoutGear ?? SCOUT_GEAR
+  if (w.gear === undefined || wanted <= 0 || w.starving) return null
   if (food <= (o.scoutHungerAt ?? SCOUT_HUNGER_AT) || w.gear >= wanted) return null
   return `food ${food}/20 is not urgent and gear ${Math.round(w.gear)} is under ${wanted}: not scouting ${ring} blocks out yet`
 }
@@ -699,9 +708,12 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
     if (forageNow && ok('forage')) return d('forage', 'farm', `${farmWhy}; ${(w.forage ?? 0) > 0 ? 'berries or kelp' : 'apples from leaves'} as a stopgap`, critical && (w.apples ?? 0) > 0 ? { apples: true } : {})
   }
 
-  // 6. critical and nothing works: say so once, stay safe
-  if (critical && ok('report') && now - (w.lastReportAt ?? 0) >= (o.reportEveryMs ?? 10 * 60_000)) {
-    return d('report', 'critical', `food ${w.food}/20 and nothing left to try (${searchBlocked})`, { retryMs: RETRY.critical })
+  // 6. critical, or every ring came up empty, and nothing works: tell the owner (once an hour), stay safe
+  const searchedTo = (w.searches ?? []).filter(s => !s.found && now - s.at < (o.ringMemoryMs ?? RING_MEMORY_MS)).reduce((m, s) => Math.max(m, s.radius), 0)
+  // (not when a farm was just started or is growing: that is food on its way)
+  const nothingFound = !ring && !tried.has('start_farm') && !(w.hasFarm && (w.farmGrowing ?? 0) > 0)
+  if ((critical || nothingFound) && ok('report') && now - (w.lastReportAt ?? 0) >= (o.reportEveryMs ?? REPORT_EVERY_MS)) {
+    return d('report', 'critical', `food ${w.food ?? '?'}/20, nothing left to try: ${searchBlocked}`, { retryMs: RETRY.critical, ...(searchedTo ? { radius: searchedTo } : {}) })
   }
 
   // nothing now: when to look again
@@ -714,6 +726,18 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   else if (risky) retryMs = RETRY.growing // food drops slowly: look again in a few minutes
   else if (critical) retryMs = RETRY.critical
   return { step: null, rung: null, reason: why, retryMs }
+}
+
+/**
+ * What keep_fed tells its owner when it can't find food: how far it looked and what would help,
+ * once an hour at most (Pax looped scouting a snowy spruce forest with no animals, no seeds and the
+ * only village 3000 blocks away).
+ */
+export function foodReportText (s: { food: number, searchedTo?: number, seeds: number, hasFarm: boolean, reason: string }): string {
+  const where = s.searchedTo ? `nothing to eat within ${s.searchedTo} blocks of home` : "can't find anything to eat"
+  const want = ['food', s.hasFarm && s.seeds < 4 ? 'seeds for my farm' : !s.hasFarm ? 'seeds to start a farm' : '', 'or a pair of animals to breed'].filter(Boolean).join(', ')
+  const reason = s.reason.replace(/^food \d+\/20, nothing left to try: /, '')
+  return `I'm ${s.food <= 6 ? 'starving' : 'hungry'} (food ${s.food}/20) and ${where} (${reason}). Staying safe near home; ${want} would help.`
 }
 
 /** The next step only (planFood's step). */

@@ -18,8 +18,8 @@ import {
   shoreKelp, appleLeaves, canSmeltKelp, farmWorkFor, breakableGrass, type Farm
 } from '../../../skills/food.ts'
 import {
-  rankSpots, seedCount, planFood, nextRing, recordSearch, breedPlan, foodDanger, farmChore, chorePause, rankFoodPlaces, placeSource,
-  BREED_FOOD, STEP_PAUSE_MS, SEEDS_RETRY_MS, TRIP_PAUSE_MS, DEFAULT_RINGS, FAR_RINGS_FROM, RISKY_RINGS_FROM, SCOUT_GEAR, SCOUT_HUNGER_AT,
+  rankSpots, seedCount, planFood, foodReportText, nextRing, recordSearch, breedPlan, foodDanger, farmChore, chorePause, rankFoodPlaces, placeSource,
+  BREED_FOOD, STEP_PAUSE_MS, SEEDS_RETRY_MS, TRIP_PAUSE_MS, DEFAULT_RINGS, FAR_RINGS_FROM, RISKY_RINGS_FROM, SCOUT_GEAR, SCOUT_HUNGER_AT, SCOUT_FOOD_FLOOR,
   type FoodStep, type FoodWorld, type FoodDecision, type SearchRecord, type FoodChore, type ChoreWorld, type FoodPlace
 } from '../../../skills/foodPlan.ts'
 import { farmWorkCount, type FarmWork } from '../../../skills/farmPlan.ts'
@@ -81,6 +81,9 @@ function anyRipeCrops (bot: Bot, radius: number): number {
   }).length
 }
 
+/** How far keep_fed looks for berry bushes and kelp: a spruce forest's berries are a real food source where there are no animals. */
+const FORAGE_RANGE = 64
+
 /** A farm counts as due a visit when its chunk is out of sight and it was last tended this long ago. */
 const FARM_DUE_MS = 20 * 60_000
 
@@ -140,9 +143,10 @@ const options = z.object({
   rings: z.array(z.number().min(32).max(1024)).max(8).default([...DEFAULT_RINGS]).describe('search rings around home, smallest first: close, wider, wide, then far ones (by day only, after known food places)'),
   farRingsFrom: z.number().min(32).max(1024).default(FAR_RINGS_FROM).describe('rings wider than this are far: searched by day only, and only after a trip to a known food place'),
   scoutGear: z.number().min(0).max(100).default(SCOUT_GEAR).describe('gear score (armour, shield, weapon, bow, health; stone tools and no armour score about 25) from which searching rings wider than riskyRingsFrom is fine at any food level; 0 = no gear rule'),
+  scoutFoodFloor: z.number().min(0).max(20).default(SCOUT_FOOD_FLOOR).describe('at or below this food no ring wider than riskyRingsFrom is started, whatever the gear: the walk would eat the rest'),
   scoutHungerAt: z.number().min(0).max(20).default(SCOUT_HUNGER_AT).describe('with gear under scoutGear, rings wider than riskyRingsFrom are searched only when food is at or below this; until then it uses its farm, bakes, waits for crops'),
   riskyRingsFrom: z.number().min(16).max(1024).default(RISKY_RINGS_FROM).describe('rings wider than this count as risky trips for the gear rule'),
-  ringMemoryMinutes: z.number().min(1).max(240).default(20).describe('remember an empty ring this long before searching it again'),
+  ringMemoryMinutes: z.number().min(1).max(1440).default(180).describe('remember an empty ring this long before searching it again (every scout costs food)'),
   scoutRadius: z.number().min(32).max(1024).optional().describe('old single search radius; when set it caps the rings'),
   scoutAtNight: z.boolean().default(false).describe('also make far trips (searching, known spots, its farm) at night'),
   startFarm: z.boolean().default(true).describe('farm fallback: with no proper food source (all rings empty), gather seeds, start a farm near home, plant and use it'),
@@ -165,7 +169,7 @@ const options = z.object({
     crops: z.array(z.string()).optional().describe('what grows there (wheat, carrots, potatoes)')
   })).default([]).describe('known farms and villages to go to for food (preferred over the far search rings)'),
   breed: z.boolean().default(true).describe('breed animals near home between meals when it has their food (wheat: cows, sheep; seeds: chickens; carrots: pigs)'),
-  report: z.boolean().default(true).describe('when food is critical (6 or less) and nothing works, tell the owner (at most every 10 minutes)')
+  report: z.boolean().default(true).describe('when food is critical (6 or less) or every ring came up empty and nothing works, whisper the owner how far it looked and what would help (at most once an hour)')
 })
 
 type O = z.infer<typeof options>
@@ -341,7 +345,7 @@ export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
   const canBreed = breedHere(agent, bot, inv, o.minSeeds)
   const m = memory(agent)
   const forageable = agent.getAction('forage')
-    ? ripeBerries(bot, pos, o.radius).length + (agent.canDig && canSmeltKelp(bot) ? shoreKelp(bot, pos, Math.min(o.radius, 24)).length : 0)
+    ? ripeBerries(bot, pos, FORAGE_RANGE).length + (agent.canDig && canSmeltKelp(bot) ? shoreKelp(bot, pos, Math.min(FORAGE_RANGE, 32)).length : 0)
     : 0
   return {
     hasReadyFood: ready && !!best,
@@ -621,11 +625,11 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
     case 'breed':
       return ctx.act('breed', { keepSeeds: o.minSeeds })
     case 'forage':
-      return ctx.act('forage', { radius: o.radius, kinds: canSmeltKelp(bot) ? ['berries', 'kelp'] : ['berries'], ...(d.apples ? { apples: true } : {}) })
+      return ctx.act('forage', { radius: FORAGE_RANGE, kinds: canSmeltKelp(bot) ? ['berries', 'kelp'] : ['berries'], ...(d.apples ? { apples: true } : {}) })
     case 'report': {
       let owner: { name: string } | null = null
       try { owner = ownerTarget(agent, bot) } catch {}
-      const text = `I'm starving (food ${bot.food}/20) and can't find anything to eat: ${d.reason}. Staying safe for now; food would help.`
+      const text = foodReportText({ food: bot.food, searchedTo: d.radius, seeds: seedCount(invOf(bot)), hasFarm: getFarms(agent).length > 0, reason: d.reason })
       if (owner && bot.players?.[owner.name]) agent.whisper(owner.name, text); else agent.say(text)
       const m = memory(agent)
       m.lastReportAt = Date.now()
@@ -761,7 +765,7 @@ export const keepFed = defineBehavior({
           if (['farm', 'spot', 'scout', 'trip', 'hunt', 'start_farm', 'seeds', 'plant', 'report'].includes(d.step) && r.message) notes.push(r.message)
           if (d.step === 'scout') {
             const why = String((r.data as { reason?: string } | undefined)?.reason ?? r.message)
-            if (r.ok || !CUT_SHORT.test(why)) m.searches = recordSearch(m.searches, { radius: d.radius ?? 0, at: Date.now(), found: r.ok })
+            if (r.ok || !CUT_SHORT.test(why)) m.searches = recordSearch(m.searches, { radius: d.radius ?? 0, at: Date.now(), found: r.ok }, so.ringMemoryMs * 2)
             saveMemory(agent, m)
           }
           if (r.ok) {

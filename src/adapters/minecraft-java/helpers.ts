@@ -115,7 +115,14 @@ export interface TravelOptions {
   /** Arrival tolerance (horizontal). Default 2. */
   range?: number
   onProgress? (info: { remaining: number, at: string }): void
+  /** Walk, don't sprint: sprinting burns food about ten times faster (scouting for food on a low bar). */
+  walk?: boolean
+  /** Path around water where it can (water blocks cost much more): lake beds are where bots drown. */
+  avoidWater?: boolean
 }
+
+/** Water cost while avoidWater is on (the default is 1 per block). */
+const AVOID_WATER_COST = 12
 
 /**
  * Walks to a far target in legs: each leg aims ~64 blocks closer, so the pathfinder only ever
@@ -126,6 +133,18 @@ export interface TravelOptions {
 export async function travel (bot: Bot, target: { x: number, y?: number, z: number }, signal: AbortSignal, opts: TravelOptions = {}): Promise<void> {
   // The pathfinder walks along lake beds and the bot sinks; bots drowned mid-trip on mc02. When
   // the air runs low the walk stops, the bot swims up, then carries on (three times at most).
+  const mv = (bot.pathfinder as unknown as { movements?: { allowSprinting: boolean, liquidCost: number } } | undefined)?.movements
+  const saved = mv ? { sprint: mv.allowSprinting, liquid: mv.liquidCost } : null
+  if (mv && opts.walk) mv.allowSprinting = false
+  if (mv && opts.avoidWater) mv.liquidCost = Math.max(mv.liquidCost, AVOID_WATER_COST)
+  try {
+    return await travelSurfacing(bot, target, signal, opts)
+  } finally {
+    if (mv && saved) { mv.allowSprinting = saved.sprint; mv.liquidCost = saved.liquid }
+  }
+}
+
+async function travelSurfacing (bot: Bot, target: { x: number, y?: number, z: number }, signal: AbortSignal, opts: TravelOptions): Promise<void> {
   for (let surfaced = 0; ; surfaced++) {
     const air = new AbortController()
     let low = false
@@ -148,7 +167,7 @@ export async function travel (bot: Bot, target: { x: number, y?: number, z: numb
 const LOW_AIR = 12
 
 /** Swims straight up until the bot has its air back (15 s at most). */
-async function swimUp (bot: Bot, signal: AbortSignal): Promise<void> {
+export async function swimUp (bot: Bot, signal: AbortSignal): Promise<void> {
   try { bot.pathfinder.setGoal(null) } catch {}
   bot.setControlState('jump', true)
   try {
