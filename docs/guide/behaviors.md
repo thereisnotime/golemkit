@@ -489,6 +489,31 @@ How to read it:
   before it and had no freeze.
 
 
+**Heavy fire** (mc02, 23 Nov 2026, same spot and seed). `just guard-bench --duel skeleton
+--duel-count 3 --minutes 2 --repeats 3 --sword stone --no-shield --blocks 16 --bread 4`: three
+skeletons kept alive around a bot geared like Pax when it died (stone sword, no armour or shield,
+gear score about 24 of the 65 needed), on the flat arena. "Before" is the code before the
+[heavy fire](#ranged-safety) rule, "after" with it. Each row is one 2-minute run.
+
+| set | run | summoned | kills | bot deaths | hits taken | damage taken |
+|---|---|---|---|---|---|---|
+| before | 1 | 17 | 5 | 3 | 33 | 119 |
+| before | 2 | 12 | 3 | 3 | 26 | 99 |
+| before | 3 | 12 | 6 | 1 | 17 | 65 |
+| after | 1 | 6 | 3 | 0 | 10 | 37 |
+| after | 2 | 4 | 0 | 0 | 1 | 4 |
+| after | 3 | 13 | 4 | 2 | 24 | 92 |
+
+Deaths went from 7 to 2 and damage from 283 to 133 over the three runs, kills from 14 to 7.
+Before, it mostly built 2-5 block walls in the open (12 times) and walked to cover (28) while
+all three shot it; after, it backed out of sight (9 times) and built only once a wall was 1-2
+blocks. Most of the gain is that it leaves: in run 2 it got out of the skeletons' range early
+and they never found it again (4 summoned, 1 hit), which is what the rule is for but makes that
+run easy. Run 3 shows what is left: it still charged a skeleton at full health when only one
+had a line to it (the charge rule counts shooters in sight, not the ones around), and one death
+came 2 s after `ranged_defense` ended at 5 health with skeletons still nearby. Three runs a side
+is little; the spread inside each set is as large as some of the differences.
+
 **Combat techniques** (mc02, 23 Nov 2026, same spot and seed, iron sword, shield and 16 bread, no
 armour). "Before" is the code above, "after" adds the [skilled-player
 techniques](/concepts/world#skilled-player-techniques) (W-tap and sweep hit styles, shield
@@ -642,8 +667,8 @@ flowchart TB
   still runs out of air it swims up before heading for dry land. Berry bushes (and kelp, with a
   furnace) count as food up to 64 blocks out.
   **Starving at night** (food 6 or less): its own farm, a food chest, a remembered spot within
-  twice `riskyRingsFrom` (96 blocks) and the near ring are worth the dark; wider rings still wait
-  for day. Between ladder runs a starving bot holds the body (score 45: above `chop_wood_loop` and
+  twice `riskyRingsFrom` (96 blocks) and the near ring are worth the dark; wider rings are not
+  started at all at that food level (the floor above). Between ladder runs a starving bot holds the body (score 45: above `chop_wood_loop` and
   stay_safe's hold after a failed trip, below stay_safe's night trip home), walks home by day when
   it is more than 16 blocks out, and otherwise waits there, so chores and stay_safe don't take
   turns while it starves.
