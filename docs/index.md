@@ -1,5 +1,7 @@
 ---
 layout: home
+scope: mixed
+scopeNote: "The landing page: the game-agnostic framework and what the Minecraft Java bots do today."
 hero:
   name: golemkit
   text: '<span class="slot" data-words="Minecraft:now|Luanti:soon|Bedrock:soon|Terraria:idea|Factorio:idea|Vintage Story:idea">Minecraft</span><br/>bots that pull their weight'
@@ -38,12 +40,17 @@ features:
     linkText: LLM brain
   - icon: "<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' ><path d='M14.531 12.469 6.619 20.38a1 1 0 1 1-3-3l7.912-7.912' /><path d='M15.686 4.314A12.5 12.5 0 0 0 5.461 2.958 1 1 0 0 0 5.58 4.71a22 22 0 0 1 6.318 3.393' /><path d='M17.7 3.7a1 1 0 0 0-1.4 0l-4.6 4.6a1 1 0 0 0 0 1.4l2.6 2.6a1 1 0 0 0 1.4 0l4.6-4.6a1 1 0 0 0 0-1.4z' /><path d='M19.686 8.314a12.501 12.501 0 0 1 1.356 10.225 1 1 0 0 1-1.751-.119 22 22 0 0 0-3.393-6.319' /></svg>"
     title: Looks after itself
-    details: Reflexes, adaptive weapons and shields, skilled-player combat techniques, cover against archers, tool upgrades, a food ladder that searches wider and grows its own farm, climbing out of caves, swimming up for air, getting home without flip-flopping.
+    details: Reflexes with one referee, adaptive weapons and shields, skilled-player combat techniques, cover against archers and getting out of sight under heavy fire, tool upgrades with a wood ladder, safe mining, a food ladder that searches wider, checks the pantry and grows its own farm, climbing out of caves, swimming up for air, getting home from far away.
     link: /guide/progression
     linkText: Tool progression
+  - icon: "<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' ><path d='M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8' /><path d='M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' /></svg>"
+    title: Gets by on its own
+    details: Takes food and a weapon on trips and turns back when food or daylight runs short, goes back for its things after a death, keeps a bed at home and torches around it, and whispers you once when it is stuck instead of looping for hours.
+    link: /guide/behaviors#trips
+    linkText: Trips and more
   - icon: "<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' ><path d='m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z' /><circle cx='12' cy='12' r='10' /></svg>"
     title: Finds and fetches
-    details: Ores, mobs, water, villages and biomes. Brings items from its own chests, crafting, smelting or gathering, and recovers your drops after a death.
+    details: Ores, mobs, water, villages and biomes. Brings items from its own chests, crafting, smelting or gathering, and recovers your drops after a death. Optionally remembers what is in its chests across restarts and notices when someone raids them.
     link: /guide/search
     linkText: Search and fetch
   - icon: "<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' ><path d='m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9' /><path d='m18 15 4-4' /><path d='m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5' /></svg>"
@@ -63,7 +70,7 @@ features:
     linkText: Live config
   - icon: "<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' ><path d='M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4' /><path d='M2 6h4' /><path d='M2 10h4' /><path d='M2 14h4' /><path d='M2 18h4' /><path d='M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z' /></svg>"
     title: Remembers what happened
-    details: A journal of deaths, items, actions and LLM tokens with daily rollups, so a bot answers "where did you die?" from facts.
+    details: A journal of deaths with their real cause, items, actions, help asks and LLM tokens with daily rollups, so a bot answers "where did you die?" from facts.
     link: /guide/journal
     linkText: Event journal
 ---

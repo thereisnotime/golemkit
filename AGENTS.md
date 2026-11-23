@@ -4,9 +4,9 @@ Framework for game bots with a game-agnostic core; each game sits behind an adap
 
 ## Layout
 
-- `src/core/` agent lifecycle, action lock and priorities, chat queue, storage, CLI helpers, and `adapter.ts` (the GameAdapter interface and capabilities). `src/core/index.ts` is the public API; skills, brains and bots import from there (it also re-exports the Minecraft helpers).
-- `src/adapters/minecraft-java/` the Minecraft Java adapter: Mineflayer, pathfinder and session events (`adapter.ts`), helpers, journal capture, reflexes, the behaviour library, stock NPC behaviours, scene actions, and the server platforms in `platforms/` (`neoforge/` with wire formats from neoforged/NeoForge branch `1.21.1`, `network/payload/`; `vanilla`, `paper`).
-- `src/skills/` Minecraft actions grouped by topic, with the pure planners next to them (`foodPlan`, `farmPlan`, `searchPlan`, `reachPlan`, `ranged-plan`, `techniques`, `pvp`, ...). `src/brains/` decision loops. `variants/` bot definitions. `scripts/` live-server tools.
+- `src/core/` agent lifecycle, action lock and priorities, chat queue, storage, profiles and fleets, live toggles, the game-agnostic trip planner (`trip.ts`), and `adapter.ts` (the GameAdapter interface and capabilities). `src/core/index.ts` is the public API; skills, brains and bots import from there (it also re-exports the Minecraft helpers).
+- `src/adapters/minecraft-java/` the Minecraft Java adapter: Mineflayer, pathfinder and session events (`adapter.ts`), helpers, journal capture, death causes, reflexes (`brains/reflexes.ts`), the behaviour library (`behaviors/`), stock NPC behaviours, scene actions, and the server platforms in `platforms/` (`neoforge/` with wire formats from neoforged/NeoForge branch `1.21.1`, `network/payload/`; `vanilla`, `paper`).
+- `src/skills/` Minecraft actions grouped by topic, with the pure planners next to them (`foodPlan`, `farmPlan`, `searchPlan`, `reachPlan`, `ranged-plan`, `techniques`, `pvp`, `reflexPlan` (the reflex referee), `minePlan`, `treePlan`, `bedPlan`, `lightPlan`, `recoverPlan`, `containerPlan`, ...). Put new decision logic in a pure planner with unit tests. `src/brains/` decision loops (the NPC help desk is `brains/npc/help.ts`). `variants/` bot definitions. `profiles/` and `fleets/` saved instances. `scripts/` live-server tests and benchmarks (`guard-bench`, `pvp-bench`, `survival-bench`, `*-test.ts`).
 
 ## Scope: game-agnostic vs game-specific
 
@@ -26,5 +26,5 @@ Game-agnostic code must not import `mineflayer`, `prismarine-*`, `minecraft-*` o
 - Chat goes through `agent.say/whisper/reply` (rate limited), never `bot.chat` directly.
 - When changing the handshake, check the payload id and codec in the NeoForge source; don't guess channel names.
 - Don't add mineflayer plugins that depend on an old mineflayer (mineflayer-pvp does).
-- `just check` (tsc + unit tests + adapter-lint) before committing; `just parity` adds the golden snapshots, packet replay and intents bench comparison. `just probe` / `just chat-test` hit the real server; keep them out of `npm test`.
+- `just check` (tsc + unit tests + adapter-lint) before committing; `just parity` adds the golden snapshots, packet replay and intents bench comparison. `just probe`, `just chat-test`, the benches and `scripts/*-test.ts` hit the real server; keep them out of `npm test`.
 - Update `openspec/` when behaviour changes.

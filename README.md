@@ -46,21 +46,29 @@ behind an adapter interface, so the core, brains and intents don't depend on Min
 - **Run on an LLM when you want one.** Claude or Codex on your subscription, or an API. Goals
   they work through on their own, budgets, quota pauses, and an NPC fallback mode when the
   quota runs out.
-- **Look after themselves and you.** Reflexes (fight back, eat, escape), adaptive weapons,
-  shields, crits and skilled-player techniques (W-tap, sweeps, shield timing, totems, golden
-  apples, water bucket clutch), cover and return fire against archers, remembered danger zones,
-  a bodyguard behaviour that protects its owner, tool upgrades, a food ladder that searches
-  wider, travels to known farms and grows its own, climbing out of caves, swimming up when low
-  on air.
+- **Look after themselves and you.** Reflexes (fight back, eat, escape) with one referee so
+  they don't take the body from each other, adaptive weapons, shields, crits and skilled-player
+  techniques (W-tap, sweeps, shield timing, totems, golden apples, water bucket clutch), cover
+  and return fire against archers (and getting out of sight under heavy fire), remembered danger
+  zones, a bodyguard behaviour that protects its owner, opt-in PvP modes (off by default), tool
+  upgrades with a wood ladder that searches wider for trees, safe mining that climbs out when
+  losing underground, a food ladder that searches wider, uses a pantry chest, travels to known
+  farms and grows its own, climbing out of caves, swimming up when low on air.
+- **Get by on their own.** Trips that take food and a weapon along and turn back when food or
+  daylight runs short, a bed at home as respawn point, torches around home and farms so mobs
+  stop spawning there, going back for their own drops after a death, and one whisper to the
+  owner when a behaviour keeps failing the same way instead of looping for hours.
 - **Find and fetch.** Search for ores, mobs, water, villages or biomes, then bring items from
   their own chests, crafting, smelting or gathering, and recover an owner's drops after a death.
-  Optionally remember what is in their chests across restarts and notice when someone raids them.
+  Optionally remember what is in their chests across restarts ("where's my iron?") and notice
+  when someone raids, moves or breaks them.
 - **Build.** YAML blueprints, imports from `.schem`/`.litematic`/`.nbt`, a blueprint library,
   creative builds by hand or by command, road and stair planning, optional WorldEdit.
 - **Stay configurable.** Variants, saved profiles, armable behaviours, live toggles
   (`!config_set`) that change behaviour without a restart, fleets of bots in one process.
-- **Keep a record.** A journal of deaths, items, actions and LLM token usage, with daily
-  rollups and analysis scripts.
+- **Keep a record.** A journal of deaths (with the real cause), items, actions, help asks and
+  LLM token usage, with daily rollups, analysis scripts and live benchmarks (guard, PvP,
+  survival).
 
 ## Support status
 
@@ -94,18 +102,26 @@ behind an adapter interface, so the core, brains and intents don't depend on Min
 | NPC mode when the LLM quota runs out | ✅ | default routine: 🚧 [daily-routine](openspec/changes/daily-routine/proposal.md) |
 | Reflexes and combat (weapons, shields, crits, creepers) | ✅ | |
 | Combat techniques (W-tap, sweeps, shield timing, totem, golden apples, water bucket, enderman gaze, chokepoints) | ✅ | `combat.*` toggles, benchmarked in [behaviours](docs/guide/behaviors.md); notes in [combat research](docs/concepts/combat-research.md) |
-| PvP modes (`combat.pvp`: off, defend, revenge, targets, all) with PvP tactics | 🧪 | off by default, owners only, kill switch; never owners, `combat.friends`, creative players or protected areas; bot-vs-bot numbers in [behaviours](docs/guide/behaviors.md#pvp-benchmark-just-pvp-bench) |
-| Ranged defence (cover, shooting back) and danger zones | ✅ | `ranged_defense` reflex and stay_safe; spots where archers or a patrol were seen are avoided for a few minutes |
+| PvP modes (`combat.pvp`: off, defend, revenge, targets, all) with PvP tactics | 🧪 | off by default, owners only, kill switch; never owners, `combat.friends`, creative players or protected areas; the fight loop and owner commands are tested bot-vs-bot ([pvp-bench](docs/guide/behaviors.md#pvp-benchmark-just-pvp-bench)), not against real players |
+| Ranged defence (cover, shooting back, heavy fire) and danger zones | ✅ | `ranged_defense` reflex and stay_safe; under heavy fire it gets out of sight ([guard-bench numbers](docs/guide/behaviors.md#benchmark-just-guard-bench)); spots where archers or a patrol were seen are avoided for a few minutes |
 | Bodyguard | ✅ | intercepts mobs and pulls aggro off its player; a third fewer hits in the [mob-wave benchmark](docs/guide/behaviors.md); 🚧 [bodyguard-coexistence](openspec/changes/bodyguard-coexistence/proposal.md), [guard-bench-modes](openspec/changes/guard-bench-modes/proposal.md) |
-| Food ladder (search rings, trips to known food places, seeds, a farm that grows to 9x9) | ✅ | `keep_fed` in [behaviours](docs/guide/behaviors.md) |
-| Farming, woodcutting, mining, tool upgrades | ✅ | |
+| Food ladder (search rings, trips to known food places, seeds, a farm that grows to 9x9) | ✅ | `keep_fed` in [behaviours](docs/guide/behaviors.md#food-keep_fed-the-food-ladder-and-farm_setup); the pantry (`settings.storage.chests`), no far rings with poor gear (`scoutGear`) and the starving hold over chores: 🧪 |
+| Farming, woodcutting (wood ladder out to 250 blocks), tool upgrades | ✅ | stone tools within minutes in the [survival benchmark](docs/guide/behaviors.md#survival-benchmark-just-survival-bench) |
+| Safe mining (`settings.mining`: gear before going deep, climb out when losing) | 🧪 | [progression](docs/guide/progression.md#safe-mining) |
+| Trips (`settings.trips`, `prepare_trip`, turn back on food or daylight) | ✅ | seen in the survival benchmark; [trips](docs/guide/behaviors.md#trips) |
+| Asking the owners for help (`askHelp`) | ✅ | [asking for help](docs/guide/behaviors.md#asking-for-help) |
+| Going back for its own drops after a death (`recover_drops`, `recover_items`) | ✅ | live test in [behaviours](docs/guide/behaviors.md#death-drops-recover_drops) |
+| Death cause reports for hooks and the LLM | ✅ | causes show up in the survival benchmark; [journal](docs/guide/journal.md#what-is-recorded) |
+| Container memory (`settings.inventoryMemory`, `check_storage`, `where_stored`) | ✅ | live run in [search](docs/guide/search.md#container-memory) |
+| Respawn bed at home (`keep_spawn_bed`, sleep asks) | 🧪 | live script `scripts/bed-test.ts`, no recorded run yet |
+| Spawn-proofing (`light_home`, `light_up`, farms included) | 🧪 | live script `scripts/light-test.ts`, no recorded run yet |
 | Search and fetch (`find_target`, `bring_item`, `fetch_drops`) | 🧪 | ores and water found live; hunting, shearing and re-runs: 🚧 [search-gaps](openspec/changes/search-gaps/proposal.md) |
 | Building from blueprints, imports (.schem, .litematic, .nbt) | ✅ | |
 | Roads and stairs between buildings | ✅ | stair tower as an action: 🚧 [stair-tower-action](openspec/changes/stair-tower-action/proposal.md) |
 | WorldEdit | 🧪 | needs WorldEdit permission for the bot |
-| Live config, profiles, fleets, journal | ✅ | |
+| Live config, profiles, fleets, journal | ✅ | unknown profile keys are logged as warnings; a fleet's server entry wins over a profile's `server` |
 | Job queue ("farm, then wood, then home") | 🚧 | [job-queue](openspec/changes/job-queue/proposal.md) |
-| Guarding an area or village | 🚧 | [area-guard](openspec/changes/area-guard/proposal.md) |
+| Guarding an area or village | 🚧 | a simple `guard_area` behaviour exists (🧪); patrols with lighting and doors: [area-guard](openspec/changes/area-guard/proposal.md) |
 | Alerts for unknown players | 🚧 | [player-alerts](openspec/changes/player-alerts/proposal.md) |
 
 ## Quick start
@@ -174,7 +190,7 @@ Guides worth starting with:
 
 - [Getting started](docs/guide/getting-started.md) and [writing a bot](docs/guide/writing-a-bot.md)
 - [Plain-language commands and the intent layers](docs/guide/intents.md)
-- [Behaviours](docs/guide/behaviors.md): keep_fed, stay_safe, follow_owner, bodyguard, NPC mode, the guard benchmark
+- [Behaviours](docs/guide/behaviors.md): keep_fed, stay_safe, follow_owner, bodyguard, PvP, trips, keep_spawn_bed, recover_drops, asking for help, light_home, NPC mode, and the guard, PvP and survival benchmarks
 - [Search and fetch](docs/guide/search.md): `find_target`, `bring_item`, `fetch_drops`
 - [LLM brain](docs/guide/llm-brain.md): providers, listen modes, budgets, quota pause
 - [Goals and building](docs/guide/goals-and-building.md), [blueprints](docs/guide/blueprints.md), [roads](docs/guide/roads.md), [WorldEdit](docs/guide/worldedit.md)
@@ -192,11 +208,16 @@ Say them in chat with `!`, or whisper without it. `!help <command>` explains one
 Positional args follow the parameter order, `key=value` works too (`!follow distance=4`).
 
 `!come` `!follow [player] [distance]` `!goto <x> [y] <z>` `!goto_player <player>` `!stop`
-`!guard [player]` `!protect [player]` `!attack` `!hunt [animal] [count]` `!gear_up` `!eat`
-`!sleep` `!wake` `!pillar` `!climb_out` `!bunker` `!inventory` `!drop [item|all] [count]`
-`!equip <item>` `!collect <block> [count]` `!feed_player [player]` `!last_death` `!goto_death`
-`!pos` `!hp` `!say <text>` `!look_at [player]` `!jump` `!config_set <key> <value>`
+`!guard [player]` `!protect [player]` `!attack` `!defend` `!retreat [distance]` `!hunt [animal] [count]`
+`!gear_up` `!eat` `!sleep` `!wake` `!pillar [height]` `!climb_out` `!bunker` `!inventory`
+`!drop [item|all] [count]` `!equip <item>` `!collect <block> [count]` `!feed_player [player]`
+`!last_death` `!goto_death` `!recall_events` `!history [period]` `!pos` `!hp` `!say <text>`
+`!look_at [player]` `!look_around` `!jump` `!config_list` `!config_get <key>`
+`!config_set <key> <value>` `!config_reset [key]`
 `!pvp [mode]` `!attack_player <player>` `!spare_player <player>` `!hunt_player <player>` `!pvp_list`
+
+Commands are taken from owners only (`MC_OWNERS` or the profile's `owners`; with none set,
+everyone counts as an owner), and `combat.pvp` stays `off` until an owner changes it.
 
 It also fights back when hit, eats when hungry, respawns and reconnects. Bots with the
 intents brain understand the same requests in plain chat ("follow me", "come here"); say
@@ -207,7 +228,9 @@ intents brain understand the same requests in plain chat ("follow me", "come her
 Env vars, see [.env.example](.env.example): server (`MC_HOST`, `MC_PORT`, `MC_AUTH`,
 `MC_PLATFORM`), `MC_OWNERS` (who may command bots), `MC_CAN_DIG`, `MC_LOG_LEVEL`. Per-bot values
 in the bot definition, profile or fleet file override them; profiles can use `${VAR:-default}`
-to read env vars. Full list in the [configuration reference](docs/reference/config.md).
+to read env vars. Unknown profile keys are logged as warnings and ignored; in a fleet, the
+fleet's `servers:` entry wins over a profile's `server` block. Full list in the
+[configuration reference](docs/reference/config.md).
 
 ## How it gets into a NeoForge server
 
@@ -235,6 +258,9 @@ just check      # typecheck + unit tests + adapter lint
 just parity     # offline parity: tests, golden snapshots, packet replay, intents bench
 just probe      # connect once, dump the world snapshot
 just chat-test  # join as a second player and send commands to a running bot
+just guard-bench     # bodyguard mob waves, duels, heavy fire (live server)
+just pvp-bench       # bot-vs-bot PvP duels (live server)
+just survival-bench  # a test bot alone for N in-game days, forest or ice scenario (live server)
 ```
 
 TypeScript runs directly on Node 26 (type stripping), no build step; `tsc` only typechecks.
