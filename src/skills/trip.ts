@@ -168,11 +168,15 @@ export function turnedBackText (trip: Trip, home?: ActionResult): string {
   return `turned back: ${trip.turnBack} (${trip.purpose})${tail}`
 }
 
-/** Tells the owners (or everyone) once per trip. */
+/**
+ * Whispers an online owner once per trip. With no owner online it only logs: a turn-back is
+ * routine (every dusk), not something to say in public chat.
+ */
 export function reportTurnBack (agent: Agent, bot: Bot, text: string): void {
   try {
     const owner = agent.owners.find(o => bot.players?.[o])
-    if (owner) agent.whisper(owner, text); else agent.say(text)
+    if (owner) agent.whisper(owner, text)
+    else agent.log.info(text)
   } catch {}
 }
 

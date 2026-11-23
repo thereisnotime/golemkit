@@ -876,9 +876,9 @@ makes one.
 - the daylight left is about the walk home (distance / `trips.speed`, 3 blocks a second) plus
   `trips.daylightMarginS` (60 s), or a thunderstorm starts.
 
-The walk stops mid-leg (`travel` throws `TripTurnBackError`), the bot walks home and tells its
+The walk stops mid-leg (`travel` throws `TripTurnBackError`), the bot walks home and whispers its
 owner, e.g. `turned back: food down to 6 of the 12 I left with (scouting 250 blocks out for
-food), back home`. A ring cut short this way is not remembered as empty, and `keep_fed` starts no
+food), back home` (with no owner online it is only logged). A ring cut short this way is not remembered as empty, and `keep_fed` starts no
 other trip in that run. A starving food trip has no food rule (home has nothing either); a trip
 that started at night (`scoutAtNight`) or whose way back alone takes longer than a day (the
 village 3500 blocks away) has no daylight rule.

@@ -35,7 +35,7 @@ On a trip the bot SHALL check every 2 seconds and turn back when the food left (
 - **THEN** it turns back (80 s of walking plus the 60 s margin)
 
 ### Requirement: After a turn-back
-Travel SHALL stop mid-leg with a turn-back error once the trip turns back, except on the walk home. The behaviour or action that started the trip SHALL walk home, report "turned back: <why> (<purpose>)" to an owner online (else in chat), and fail with `data.turnedBack`; what it gathered before turning back SHALL still be reported. keep_fed SHALL NOT record a ring cut short by a turn-back as empty and SHALL start no other trip in that run.
+Travel SHALL stop mid-leg with a turn-back error once the trip turns back, except on the walk home. The behaviour or action that started the trip SHALL walk home, report "turned back: <why> (<purpose>)" to an owner online by whisper (only logged when no owner is online), and fail with `data.turnedBack`; what it gathered before turning back SHALL still be reported. keep_fed SHALL NOT record a ring cut short by a turn-back as empty and SHALL start no other trip in that run.
 
 #### Scenario: Ring not forgotten
 - **WHEN** a scout of the 120 ring turns back for daylight

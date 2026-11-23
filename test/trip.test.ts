@@ -209,6 +209,6 @@ test('tripRun: a turn-back walks home and reports it', async () => {
   assert.equal(r.ok, false)
   assert.match(r.message, /^turned back: food down to 5 of the 12 I left with \(scouting 250 blocks out for food\), back home$/)
   assert.deepEqual(f.calls.map(c => c.name), ['prepare_trip', 'go_home'])
-  assert.equal(f.said.length, 1)
+  assert.equal(f.said.length, 0, 'no owner online: the turn-back is only logged, not said in public chat')
   assert.equal(activeTrip(f.bot), null, 'trip ended')
 })
