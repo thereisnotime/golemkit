@@ -166,8 +166,10 @@ test('torchSupplyStep: sticks from planks, planks from logs', () => {
 test('torchSupplyStep: no coal, charcoal from logs with planks as fuel and a furnace', () => {
   // no furnace and no cobblestone: stuck with the reason
   assert.deepEqual(torchSupplyStep({ oak_log: 6 }, 8), { do: 'stuck', why: 'out of coal and charcoal; no furnace and fewer than 8 cobblestone to make one', need: 'coal' })
-  // cobblestone: furnace first
-  assert.deepEqual(torchSupplyStep({ oak_log: 6, cobblestone: 8 }, 8), { do: 'craft', item: 'furnace', count: 1, why: 'a furnace for charcoal' })
+  // cobblestone: furnace first, on a crafting table (planks for one first when there is none)
+  assert.deepEqual(torchSupplyStep({ oak_log: 6, cobblestone: 8 }, 8), { do: 'craft', item: 'oak_planks', count: 4, why: 'planks for a crafting table (for the furnace)' })
+  assert.deepEqual(torchSupplyStep({ oak_log: 5, oak_planks: 4, cobblestone: 8 }, 8), { do: 'craft', item: 'furnace', count: 1, why: 'a furnace for charcoal' })
+  assert.deepEqual(torchSupplyStep({ oak_log: 6, cobblestone: 8 }, 8, { tableNear: true }), { do: 'craft', item: 'furnace', count: 1, why: 'a furnace for charcoal' })
   // furnace near, no fuel apart from the logs: planks first (never burn the input)
   assert.deepEqual(torchSupplyStep({ oak_log: 6 }, 8, { furnaceNear: true }), { do: 'craft', item: 'oak_planks', count: 4, why: 'planks to burn for charcoal' })
   // fuel there: smelt

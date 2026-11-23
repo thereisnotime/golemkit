@@ -283,7 +283,7 @@ const sum = (inv: Record<string, number>, test: (n: string) => boolean) =>
  * furnace from 8 cobblestone when there is none nearby). `ready` as soon as it has the torches,
  * or has some and can't make more. `stuck` says why.
  */
-export function torchSupplyStep (inv: Record<string, number>, want: number, o: { furnaceNear?: boolean } = {}): SupplyStep {
+export function torchSupplyStep (inv: Record<string, number>, want: number, o: { furnaceNear?: boolean, tableNear?: boolean } = {}): SupplyStep {
   const have = inv.torch ?? 0
   if (have >= want) return { do: 'ready', torches: want }
   const runs = Math.ceil((want - have) / 4)
@@ -309,14 +309,18 @@ export function torchSupplyStep (inv: Record<string, number>, want: number, o: {
   const furnace = !!o.furnaceNear || (inv.furnace ?? 0) > 0
   if (!furnace && (inv.cobblestone ?? 0) < 8) return enough('out of coal and charcoal; no furnace and fewer than 8 cobblestone to make one', 'coal')
   // logs that can go into the furnace once the planks for fuel (and one stick run) are made
+  // a furnace is crafted on a crafting table: one from 4 planks when there is none
+  const table = !!o.tableNear || (inv.crafting_table ?? 0) > 0
+  const tablePlanks = furnace || table ? 0 : 4
   const otherFuel = planks + sum(inv, n => isLog(n) && n !== log[0])
   let k = 0
   for (let t = Math.min(runs, log[1]); t >= 1; t--) {
     const fuel = Math.ceil(t / 1.5)
-    const planksNeeded = Math.max(0, fuel - otherFuel) + (sticks >= t ? 0 : 2)
+    const planksNeeded = Math.max(0, fuel + tablePlanks - otherFuel) + (sticks >= t ? 0 : 2)
     if (t + Math.ceil(planksNeeded / 4) <= log[1]) { k = t; break }
   }
   if (!k) return enough('out of coal and charcoal, and too few logs to make charcoal and fuel', 'coal')
+  if (!furnace && tablePlanks && planks < 4) return { do: 'craft', item: plankFor(log[0]), count: 4, why: 'planks for a crafting table (for the furnace)' }
   if (!furnace) return { do: 'craft', item: 'furnace', count: 1, why: 'a furnace for charcoal' }
   const fuel = Math.ceil(k / 1.5)
   if (otherFuel < fuel) return { do: 'craft', item: plankFor(log[0]), count: Math.ceil((fuel - otherFuel) / 4) * 4, why: 'planks to burn for charcoal' }

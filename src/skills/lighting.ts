@@ -194,9 +194,9 @@ async function placeTorch (bot: Bot, spot: TorchSpot, signal: AbortSignal): Prom
   return isTorchBlock(bot.blockAt(pos)?.name) ? null : "the server didn't take it"
 }
 
-function furnaceNear (bot: Bot): boolean {
-  const id = bot.registry.blocksByName.furnace?.id
-  return id !== undefined && !!bot.findBlock({ matching: id, maxDistance: 32 })
+function blockNear (bot: Bot, name: string, range: number): boolean {
+  const id = bot.registry.blocksByName[name]?.id
+  return id !== undefined && !!bot.findBlock({ matching: id, maxDistance: range })
 }
 
 /** Craft and smelt until it has `want` torches or can't make more. Returns the torches in hand, or a failure. */
@@ -204,7 +204,7 @@ async function supplyTorches (bot: Bot, signal: AbortSignal, log: { debug: (m: s
   let last = ''
   for (let i = 0; i < 12; i++) {
     checkAborted(signal)
-    const step = torchSupplyStep(inventoryCounts(bot), want, { furnaceNear: furnaceNear(bot) })
+    const step = torchSupplyStep(inventoryCounts(bot), want, { furnaceNear: blockNear(bot, 'furnace', 32), tableNear: blockNear(bot, 'crafting_table', 16) })
     if (step.do === 'ready') return step.torches
     if (step.do === 'stuck') return fail(step.why, { need: step.need })
     const sig = `${step.do} ${step.item} ${step.count}`

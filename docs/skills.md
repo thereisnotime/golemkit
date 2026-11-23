@@ -14,7 +14,7 @@ Two bundles live in `src/skills/index.ts`:
 - `standardSkills()`: status, config, movement, combat, survival, inventory, gather,
   [journal](/guide/journal), bodyguard.
 - `extendedSkills()`: crafting, containers, farming, food, search, woodcutting, building, construction,
-  roads, blueprint library, materials, progression, pickup, worldedit, spawn bed.
+  roads, blueprint library, materials, progression, pickup, worldedit, spawn bed, lighting.
 
 `navigation()`, `modsSkill()` and `config()` are exported on their own (the villager bot uses
 `navigation()`).
@@ -295,6 +295,13 @@ See [Tool progression](./guide/progression.md).
 
 Observe hook: `respawnPoint` (once known). The behaviour that uses them is
 [keep_spawn_bed](./guide/behaviors#respawn-point-keep-spawn-bed).
+
+### lighting
+| action | |
+|---|---|
+| `light_up` | Spawn-proof an area (home, farm:1, x y z or here): the fewest torches that bring every spot a mob could spawn on to a light target, crafted from coal or charcoal (charcoal smelted from logs), placed without breaking anything; never on farmland, paths, by doors, in water or protected areas. Remembers its own torches; `dry_run` only reports. |
+
+The behaviour that uses it is [light_home](./guide/behaviors#spawn-proofing-light-home).
 
 ### mods
 Not in a bundle; add `modsSkill()`.
