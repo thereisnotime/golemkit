@@ -24,6 +24,13 @@ Variants and scripts read the environment directly (`envOr('NAME', 'default')` f
 `.env` is loaded as soon as core is imported, also without `--env-file`. Keep owner names and token
 locations in `.env` instead of the repo:
 
+- `${NAME}` becomes the variable's value, or nothing if it is unset or empty.
+- `${NAME:-default}` uses `default` when the variable is unset or empty. The default is taken
+  literally up to the first `}`; there is no nesting and no `$NAME` form without braces.
+- Variables set in the shell win over `.env`, which is read from the working directory.
+- The text is expanded before the YAML is parsed, comments included, so quote a value that
+  may come out empty or contain YAML characters (`owners: ["${MC_OWNER:-Robin}"]`).
+
 ```yaml
 owners: ["${MC_OWNER:-Robin}"]
 llm:
@@ -45,7 +52,9 @@ persona: >-                   # replaces the variant's persona
 server:                       # optional; overrides .env for this bot
   host: mc.example.com
   port: 25565
-  auth: offline
+  auth: offline                 # offline | microsoft
+  version: 1.21.1
+  platform: neoforge            # neoforge (default) | vanilla | paper
 llm:                          # only for variants with an LLM brain
   provider: claude-subscription
   model: claude-sonnet-5-5
@@ -73,8 +82,13 @@ journal:                      # optional, event journal settings (on by default)
 | key | |
 |---|---|
 | `variant` | required; a name in `variants/` or a path |
+| `description` | shown by `just bots` |
 | `username`, `persona`, `owners`, `canDig` | identity and permissions |
-| `server` | per-bot server override |
+| `respectBuilds` | leave blocks that look player-made alone (default off). Lands in `settings.respectBuilds` |
+| `selfAware` | show the bot its own variant, profile, model and settings each turn (default on) |
+| `npcMode` | what runs while the LLM is paused (quota, budget): `false`, or `{ arm: { behaviour: options } }`, see [Behaviours](./behaviors) |
+| `server` | per-bot server override: `host`, `port`, `auth`, `version`, `platform` (`neoforge`, `vanilla`, `paper`; same as `MC_PLATFORM`) |
+| `intents` | [plain-language commands](/guide/intents) without the LLM: `mode`, `threshold`, `layers`, ... Lands in `settings.intents` |
 | `llm` | [LLM brain](/guide/llm-brain) settings: provider, model, effort, login, token source, `listen`, `immersive`, aliases, budget, [goals](/guide/goals-and-building) |
 | `reflexes` | eat/retreat thresholds, e.g. `retreatBelow: 0` to stand its ground ([details](../concepts/world#reflexes)) |
 | `retry`, `humanize`, `journal`, `context` | see the sections below and the linked guides |

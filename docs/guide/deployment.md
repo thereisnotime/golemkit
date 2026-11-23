@@ -8,7 +8,8 @@ Bots are long-running Node processes. Any process supervisor works; two tested s
 
 ## Podman
 
-The repo ships a `Containerfile`.
+The repo ships a `Containerfile` (Node 26 slim, production dependencies only, entrypoint
+`node src/cli.ts`). `just image [tag]` builds it.
 
 ```bash
 podman build -t golemkit .
@@ -19,7 +20,9 @@ podman run -d --name golemkit \
   golemkit fleet fleet.yaml
 ```
 
-- `data/` holds learned channels and bot storage; mount it so restarts keep them.
+- `data/` holds learned channels, bot storage and [journals](./journal); mount it so restarts keep them.
+- There is no `.env` file in the image; `--env-file .env` passes the same variables, and
+  `${VAR}` in profiles and fleet files expands from them.
 - For Microsoft auth also mount `.auth/` and run the first login interactively
   (`podman run -it ... run buddy`) to complete the device-code flow.
 - The default command is `run buddy`; pass any CLI arguments after the image name.

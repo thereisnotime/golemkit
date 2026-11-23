@@ -9,7 +9,9 @@ scope: minecraft
 - [asdf](https://asdf-vm.com) (or any way to get the versions in `.tool-versions`: Node 26, just)
 - A Minecraft Java server. The defaults are `localhost:25565`, offline mode, version 1.21.1;
   put your server in `.env` (`MC_HOST`, `MC_PORT`, `MC_AUTH`, `MC_VERSION`), see below.
-  Vanilla and Paper servers work too; the [NeoForge layer](/concepts/neoforge) simply stays idle.
+  Vanilla and Paper servers work too. The server platform is not detected: it defaults to
+  `neoforge`, whose [handshake layer](/concepts/neoforge) simply stays idle on other servers;
+  `MC_PLATFORM=vanilla` or `MC_PLATFORM=paper` skips it.
 
 ## Install
 
@@ -47,7 +49,7 @@ In game, say `!help`. Try `!come`, `!follow`, `!guard`, `!pos`. Whispers work wi
 MC_HOST=play.example.net MC_PORT=25565 just run
 ```
 
-or set them in `.env`. Online-mode servers need `MC_AUTH=microsoft` and a real account; the
+or set them in `.env` (variables set in the shell win over `.env`). Online-mode servers need `MC_AUTH=microsoft` and a real account; the
 first run prints a device-code login link and caches the token in `.auth/`.
 
 ## Next
