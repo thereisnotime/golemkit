@@ -60,6 +60,12 @@ settings:
   # Pantry in the room by home (placed by the owner's OK on 2026-11-23): keep_fed walks over and
   # looks inside when it has no food, so it works after a restart too.
   storage: { chests: [[559, 69, -47]] }
+  # Trips (docs/guide/behaviors.md#trips). Two deaths on 2026-11-23 were starving trips: food search
+  # out to 120 and 250 blocks, food 12 -> 0 in six minutes, then shot and drowned. Before a trip a
+  # behaviour starts it takes food from the pantry up to 8 items, holds a weapon and needs 12 health;
+  # out there it turns back home at half the food it left with or when the daylight left is the walk
+  # home plus a minute. Owner orders are left alone.
+  trips: { food: 8, minFood: 4, minHealth: 12, turnBackAt: 0.5, foodFloor: 6, daylightMarginS: 60 }
 # Behaviours that run on their own between LLM turns (docs/guide/behaviors.md). Pax or ${MC_OWNER:-Robin}
 # can arm more at runtime (behavior_arm / !behavior_arm follow_owner); those changes persist.
 behaviors:

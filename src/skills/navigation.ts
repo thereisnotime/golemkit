@@ -7,6 +7,7 @@ import {
   checkAborted, travel, swimUp
 } from '../core/index.ts'
 import { gotoWithin as walkWithin, GotoTimeoutError } from './world.ts'
+import { prepareTripAction } from './trip.ts'
 
 export interface Place {
   x: number
@@ -302,7 +303,7 @@ export const navigation = () => defineSkill({
   name: 'navigation',
   capabilities: ['move'],
   description: 'Home, wandering and named places.',
-  actions: [wander, setHomeAction, goHome, rememberPlace, forgetPlace, places, gotoPlace, flee],
+  actions: [wander, setHomeAction, goHome, rememberPlace, forgetPlace, places, gotoPlace, flee, prepareTripAction],
   observe: (agent, bot) => {
     const home = getHome(agent)
     return {

@@ -144,6 +144,17 @@ settings:
   mining: { gear: shield_or_armour, minFood: 4, retreatBelow: 12, retreatHostiles: 2 }
 ```
 
+### Ore trips
+
+When `keep_tools_upgraded` (or anything else that isn't an owner) runs `upgrade_tools` and the
+next step is going for iron, coal or diamonds, that is a [trip](./behaviors#trips): it first
+takes food from its pantry and own chests up to `trips.food`, holds its best weapon and checks
+its health, and stays with the reason when it can't (`would get 3 raw iron, but not ready for a
+trip (an ore trip): health 9/20 (needs 12)`). When safe mining says "not ready: food 1/3", the
+same top-up runs once and the plan is made again, so a full pantry ends that wait. On the way
+the trip budget applies (half the food it left with, daylight for the walk home), and after a
+turn-back it walks home and says so. `chop_tree` rings past 64 blocks are trips the same way.
+
 ## Where it runs
 
 | what | when | how far |

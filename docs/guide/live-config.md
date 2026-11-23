@@ -69,6 +69,17 @@ can't change their own.
 | `askHelp.tell` | owners / say | whisper the owners who are online, or public chat |
 | `askHelp.thanks` | on/off | say "sorted, thanks" once when something it asked about works again (default off) |
 | `askHelp.llm` | on/off | let the LLM brain know it asked (no extra turn unless `triggers.events.stuck`; default on) |
+| `trips.enabled` | on/off | [trips](./behaviors#trips) that behaviours start: prepare (food from own chests, weapon, health) and turn back when food or daylight runs short (default on) |
+| `trips.food` | 0–64 | food items to top up to from the pantry and own chests before a trip (default 8) |
+| `trips.minFood` | 0–64 | fewest food items to leave with; food trips are exempt (default 4) |
+| `trips.needWeapon` | on/off | a sword or axe is needed to leave (default on) |
+| `trips.minHealth` | 0–20 | health needed to leave (default 12) |
+| `trips.turnBackAt` | 0–1 | turn back when the food left (bar + carried) is down to this share of what it left with (default 0.5) |
+| `trips.foodFloor` | 0–20 | turn back when the food bar is at or below this with nothing to eat (default 6, 0 = off) |
+| `trips.daylightMarginS` | 0–600 | turn back when the daylight left is the walk home plus this many seconds (default 60) |
+| `trips.speed` | 0.5–10 | walking speed used for the way home, blocks per second (default 3) |
+| `trips.minDistance` | 0–1024 | walks shorter than this many blocks are not trips (default 64) |
+| `trips.ownerOrders` | on/off | also prepare and budget actions an owner ordered (default off) |
 | `humanize.enabled` | on/off | player-like reaction and typing delays |
 | `humanize.typoRate` | 0–1 | chance of a typo per message |
 | `humanize.lowercase` | on/off | write chat in lower case |
@@ -103,7 +114,7 @@ can't change their own.
 | `retry.actions.<action>` | 0–10 | extra attempts after a failed action |
 
 In a profile, the `reflexes.*` values go under `reflexes:`, the `combat.*` values under
-`settings: combat:` and the `mining.*` values under `settings: mining:` (a top-level `combat:`
+`settings: combat:`, the `mining.*` values under `settings: mining:` and the `trips.*` values under `settings: trips:` (a top-level `combat:`
 key is ignored with a warning, and unknown keys under either get one); see
 [Reflexes](/concepts/world#reflexes). The techniques behind the `combat.*` toggles are described
 in [Movement, protection and combat](/concepts/world#skilled-player-techniques).

@@ -834,6 +834,52 @@
       }
     },
     {
+      "name": "prepare_trip",
+      "description": "Get ready to leave home: take food from my pantry and own chests up to trips.food items, hold my best weapon, and check health. Fails with what is missing (no weapon, too little food, low health) when I should not go; a food trip while starving goes anyway.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "default": "a trip",
+            "description": "what the trip is for, for the report",
+            "type": "string",
+            "maxLength": 80
+          },
+          "kind": {
+            "default": "travel",
+            "description": "food trips may go while starving; the others need the kit",
+            "type": "string",
+            "enum": [
+              "food",
+              "wood",
+              "wool",
+              "ore",
+              "travel"
+            ]
+          },
+          "distance": {
+            "description": "planned distance from home, in blocks",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "waive": {
+            "default": [],
+            "description": "checks to skip for this trip",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "weapon",
+                "food",
+                "health"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
       "name": "craft",
       "description": "Craft an item from what is in the inventory. Uses a crafting table within 16 blocks when the recipe needs one, or puts one down (from the inventory, or made from planks).",
       "inputSchema": {
@@ -3988,6 +4034,52 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    {
+      "name": "prepare_trip",
+      "description": "Get ready to leave home: take food from my pantry and own chests up to trips.food items, hold my best weapon, and check health. Fails with what is missing (no weapon, too little food, low health) when I should not go; a food trip while starving goes anyway.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "default": "a trip",
+            "description": "what the trip is for, for the report",
+            "type": "string",
+            "maxLength": 80
+          },
+          "kind": {
+            "default": "travel",
+            "description": "food trips may go while starving; the others need the kit",
+            "type": "string",
+            "enum": [
+              "food",
+              "wood",
+              "wool",
+              "ore",
+              "travel"
+            ]
+          },
+          "distance": {
+            "description": "planned distance from home, in blocks",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "waive": {
+            "default": [],
+            "description": "checks to skip for this trip",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "weapon",
+                "food",
+                "health"
+              ]
+            }
           }
         }
       }

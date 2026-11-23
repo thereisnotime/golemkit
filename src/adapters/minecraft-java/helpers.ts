@@ -4,6 +4,7 @@ import type { Entity } from 'prismarine-entity'
 import pf from 'mineflayer-pathfinder'
 import { ActionAbortedError, checkAborted } from '../../core/action.ts'
 import { fmtPos } from '../../core/format.ts'
+import { activeTrip, TripTurnBackError } from '../../core/trip.ts'
 
 export const { goals, Movements } = pf
 export type Goal = InstanceType<typeof pf.goals.GoalBlock> | any
@@ -137,8 +138,16 @@ export async function travel (bot: Bot, target: { x: number, y?: number, z: numb
   const saved = mv ? { sprint: mv.allowSprinting, liquid: mv.liquidCost } : null
   if (mv && opts.walk) mv.allowSprinting = false
   if (mv && opts.avoidWater) mv.liquidCost = Math.max(mv.liquidCost, AVOID_WATER_COST)
+  // On a trip (core/trip.ts) the budget can say turn back at any moment: the walk stops mid-leg
+  // and throws TripTurnBackError, unless it is the walk home after turning back.
+  const trip = activeTrip(bot)
+  const budgeted = trip && !trip.returning ? trip : null
+  if (budgeted?.turnBack) throw new TripTurnBackError(budgeted.turnBack)
   try {
-    return await travelSurfacing(bot, target, signal, opts)
+    return await travelSurfacing(bot, target, budgeted ? AbortSignal.any([signal, budgeted.signal]) : signal, opts)
+  } catch (e) {
+    if (!signal.aborted && budgeted?.turnBack && !budgeted.returning) throw new TripTurnBackError(budgeted.turnBack)
+    throw e
   } finally {
     if (mv && saved) { mv.allowSprinting = saved.sprint; mv.liquidCost = saved.liquid }
   }

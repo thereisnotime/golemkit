@@ -9,6 +9,7 @@ import { getHome } from '../../../skills/navigation.ts'
 import { getFarms, nearestFarm, ownFarmRipe, saveFarm, animalsAround, type Farm } from '../../../skills/food.ts'
 import { breadToBake, breedPlan, seedCount, BREED_FOOD } from '../../../skills/foodPlan.ts'
 import { isHungry } from './keepFed.ts'
+import { tripRun } from './trip.ts'
 
 export type FarmTask = 'setup' | 'tend' | 'bake' | 'breed'
 
@@ -146,8 +147,10 @@ export const farmSetup = defineBehavior({
           case 'tend': {
             const farm = nearestFarm(agent, ctx.bot) as Farm
             const pos = ctx.bot.entity.position
-            if (Math.hypot(farm.x - pos.x, farm.z - pos.z) > 8) {
-              const there = await ctx.act('goto', { x: farm.x, y: farm.y + 1, z: farm.z })
+            const far = Math.hypot(farm.x - pos.x, farm.z - pos.z)
+            if (far > 8) {
+              // a farm further than trips.minDistance is a trip: prepared, and back home when food or daylight runs short
+              const there = await tripRun(ctx, { purpose: `a trip to ${farm.name}`, kind: 'food', distance: far }, () => ctx.act('goto', { x: farm.x, y: farm.y + 1, z: farm.z }))
               if (!there.ok) return { ok: false, message: `couldn't get to ${farm.name}: ${there.message}` }
             }
             saveFarm(agent, { ...farm, tended: Date.now() })

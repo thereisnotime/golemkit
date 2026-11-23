@@ -17,6 +17,7 @@ import { creativeGet } from './mods.ts'
 import { plankFuel } from './materials.ts'
 import { loadBlueprints } from './blueprint.ts'
 import { chooseWallMaterial, PLANKS_PER_TREE } from './efficiency.ts'
+import { actionTrip, isTurnBack } from './trip.ts'
 
 export type UpTo = 'stone' | 'iron' | 'diamond'
 const TIER_RANK: Record<string, number> = { none: 0, wooden: 1, stone: 2, iron: 3, diamond: 4, netherite: 5 }
@@ -338,7 +339,11 @@ export interface UpgradeRun extends UpgradeOptions {
   cheapOnly?: boolean
   /** Most steps in one go. Default 12. */
   maxSteps?: number
+  /** Before going for ore (an ore trip): pantry top-up, weapon, health, and the trip budget (skills/trip.ts). Null = go, else why not. */
+  beginTrip? (): Promise<string | null>
 }
+
+const ORE_ITEMS = new Set(['raw_iron', 'coal', 'diamond'])
 
 /**
  * Does the upgrade steps it can do now, one after another, until nothing is left, a step
@@ -352,6 +357,7 @@ export async function upgradeTools (ctx: Ctx, opts: UpgradeRun = {}): Promise<Ac
   const tiersBefore = toolSummary(inventoryCounts(bot), opts.kinds ?? DEFAULT_KINDS)
   let lastKey = ''
   let notReady = false
+  let tripTried = false
   for (let i = 0; i < (opts.maxSteps ?? 12); i++) {
     checkAborted(ctx.signal)
     const inv = inventoryCounts(bot)
@@ -363,6 +369,13 @@ export async function upgradeTools (ctx: Ctx, opts: UpgradeRun = {}): Promise<Ac
       // stuck only because it isn't fit to go underground: say so (and what to fix) instead of "nothing to do"
       const wouldDig = planOpts.mining && !planOpts.mining.ready ? nextToolUpgrade(inv, { ...nearby, ironOre: nearby.ironOre || nearby.ironOreDeep }, bot.game?.gameMode, { ...opts, mining: { ready: true } }) : null
       if (wouldDig?.do === 'gather') {
+        // short of food for the mine: the trip preparation tops up from the pantry, then plan again
+        if (opts.beginTrip && !tripTried && m.readiness.need === 'food') {
+          tripTried = true
+          const why = await opts.beginTrip()
+          if (!why) continue
+          notes.push(why)
+        }
         notReady = true
         notes.push(`${notReadyText(m.readiness)}; would ${describe(wouldDig)} but that means going deeper than ${m.s.safeDepth} blocks`)
         need = m.readiness.need
@@ -371,11 +384,16 @@ export async function upgradeTools (ctx: Ctx, opts: UpgradeRun = {}): Promise<Ac
     }
     if (opts.cheapOnly && !isCheapStep(step)) { notes.push(`next would be to ${describe(step)}`); break }
     if (step.do === 'gather' && !agent.canDig) { notes.push(`would ${describe(step)} but digging is disabled`); break }
+    if (step.do === 'gather' && ORE_ITEMS.has(step.item) && opts.beginTrip && !tripTried) {
+      tripTried = true
+      const why = await opts.beginTrip()
+      if (why) { notes.push(`would ${describe(step)}, but ${why}`); notReady = true; break }
+    }
     const key = JSON.stringify(step) + JSON.stringify(inv)
     if (key === lastKey) { notes.push(`no progress on: ${describe(step)}`); break }
     lastKey = key
     log.debug('upgrade step', { step: describe(step) })
-    const r = await runUpgradeStep(ctx, step, opts.safe !== false).catch(e => { checkAborted(ctx.signal); return fail((e as Error).message) })
+    const r = await runUpgradeStep(ctx, step, opts.safe !== false).catch(e => { checkAborted(ctx.signal); if (isTurnBack(e)) throw e; return fail((e as Error).message) })
     if (!r.ok) {
       notes.push(`${describe(step)} failed: ${r.message}`)
       need = (r.data as { need?: string } | undefined)?.need
@@ -423,7 +441,18 @@ const upgradeAction = defineAction({
     safe: z.boolean().default(true).describe('safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground')
   }),
   longRunning: true,
-  run: (ctx, { up_to, armour, kinds, prospect, safe }) => upgradeTools(ctx, { upTo: up_to, armour, kinds, prospect, safe, maxSteps: 30 })
+  async run (ctx, { up_to, armour, kinds, prospect, safe }) {
+    // going for ore is a trip: pantry food, a weapon and health first, home when food or daylight runs short
+    const trip = actionTrip(ctx, { purpose: 'an ore trip', kind: 'ore' })
+    try {
+      return await trip.finish(await upgradeTools(ctx, { upTo: up_to, armour, kinds, prospect, safe, maxSteps: 30, beginTrip: () => trip.begin() }))
+    } catch (e) {
+      if (isTurnBack(e)) return trip.finish(fail(e.message))
+      throw e
+    } finally {
+      trip.end()
+    }
+  }
 })
 
 export const progressionSkill = () => defineSkill({

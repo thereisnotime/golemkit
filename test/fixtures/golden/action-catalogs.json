@@ -839,7 +839,8 @@
       "forget_place",
       "places",
       "goto_place",
-      "flee"
+      "flee",
+      "prepare_trip"
     ],
     "catalog": [
       {
@@ -1444,9 +1445,58 @@
         },
         "exclusive": true,
         "longRunning": false
+      },
+      {
+        "name": "prepare_trip",
+        "description": "Get ready to leave home: take food from my pantry and own chests up to trips.food items, hold my best weapon, and check health. Fails with what is missing (no weapon, too little food, low health) when I should not go; a food trip while starving goes anyway.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "purpose": {
+              "default": "a trip",
+              "description": "what the trip is for, for the report",
+              "type": "string",
+              "maxLength": 80
+            },
+            "kind": {
+              "default": "travel",
+              "description": "food trips may go while starving; the others need the kit",
+              "type": "string",
+              "enum": [
+                "food",
+                "wood",
+                "wool",
+                "ore",
+                "travel"
+              ]
+            },
+            "distance": {
+              "description": "planned distance from home, in blocks",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "waive": {
+              "default": [],
+              "description": "checks to skip for this trip",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "weapon",
+                  "food",
+                  "health"
+                ]
+              }
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip (!help <command> for details)"
   },
   "variant:buddy": {
     "actions": [
@@ -2234,6 +2284,7 @@
       "places",
       "goto_place",
       "flee",
+      "prepare_trip",
       "craft",
       "smelt",
       "deposit",
@@ -3156,6 +3207,55 @@
               "type": "integer",
               "minimum": -9007199254740991,
               "maximum": 9007199254740991
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
+        "name": "prepare_trip",
+        "description": "Get ready to leave home: take food from my pantry and own chests up to trips.food items, hold my best weapon, and check health. Fails with what is missing (no weapon, too little food, low health) when I should not go; a food trip while starving goes anyway.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "purpose": {
+              "default": "a trip",
+              "description": "what the trip is for, for the report",
+              "type": "string",
+              "maxLength": 80
+            },
+            "kind": {
+              "default": "travel",
+              "description": "food trips may go while starving; the others need the kit",
+              "type": "string",
+              "enum": [
+                "food",
+                "wood",
+                "wool",
+                "ore",
+                "travel"
+              ]
+            },
+            "distance": {
+              "description": "planned distance from home, in blocks",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "waive": {
+              "default": [],
+              "description": "checks to skip for this trip",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "weapon",
+                  "food",
+                  "health"
+                ]
+              }
             }
           }
         },
@@ -5676,7 +5776,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !mods !mod_items !creative_get (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !mods !mod_items !creative_get (!help <command> for details)"
   },
   "variant:villager": {
     "actions": [
@@ -5717,6 +5817,7 @@
       "places",
       "goto_place",
       "flee",
+      "prepare_trip",
       "craft",
       "smelt",
       "deposit",
@@ -6376,6 +6477,55 @@
               "type": "integer",
               "minimum": -9007199254740991,
               "maximum": 9007199254740991
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
+        "name": "prepare_trip",
+        "description": "Get ready to leave home: take food from my pantry and own chests up to trips.food items, hold my best weapon, and check health. Fails with what is missing (no weapon, too little food, low health) when I should not go; a food trip while starving goes anyway.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "purpose": {
+              "default": "a trip",
+              "description": "what the trip is for, for the report",
+              "type": "string",
+              "maxLength": 80
+            },
+            "kind": {
+              "default": "travel",
+              "description": "food trips may go while starving; the others need the kit",
+              "type": "string",
+              "enum": [
+                "food",
+                "wood",
+                "wool",
+                "ore",
+                "travel"
+              ]
+            },
+            "distance": {
+              "description": "planned distance from home, in blocks",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "waive": {
+              "default": [],
+              "description": "checks to skip for this trip",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "weapon",
+                  "food",
+                  "health"
+                ]
+              }
             }
           }
         },
@@ -8822,7 +8972,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear (!help <command> for details)"
   },
   "profile:apprentice": {
     "actions": [
@@ -8862,7 +9012,8 @@
       "forget_place",
       "places",
       "goto_place",
-      "flee"
+      "flee",
+      "prepare_trip"
     ],
     "catalog": [
       {
@@ -9467,9 +9618,58 @@
         },
         "exclusive": true,
         "longRunning": false
+      },
+      {
+        "name": "prepare_trip",
+        "description": "Get ready to leave home: take food from my pantry and own chests up to trips.food items, hold my best weapon, and check health. Fails with what is missing (no weapon, too little food, low health) when I should not go; a food trip while starving goes anyway.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "purpose": {
+              "default": "a trip",
+              "description": "what the trip is for, for the report",
+              "type": "string",
+              "maxLength": 80
+            },
+            "kind": {
+              "default": "travel",
+              "description": "food trips may go while starving; the others need the kit",
+              "type": "string",
+              "enum": [
+                "food",
+                "wood",
+                "wool",
+                "ore",
+                "travel"
+              ]
+            },
+            "distance": {
+              "description": "planned distance from home, in blocks",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "waive": {
+              "default": [],
+              "description": "checks to skip for this trip",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "weapon",
+                  "food",
+                  "health"
+                ]
+              }
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip (!help <command> for details)"
   },
   "profile:example": {
     "actions": [
@@ -10257,6 +10457,7 @@
       "places",
       "goto_place",
       "flee",
+      "prepare_trip",
       "craft",
       "smelt",
       "deposit",
@@ -11179,6 +11380,55 @@
               "type": "integer",
               "minimum": -9007199254740991,
               "maximum": 9007199254740991
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
+        "name": "prepare_trip",
+        "description": "Get ready to leave home: take food from my pantry and own chests up to trips.food items, hold my best weapon, and check health. Fails with what is missing (no weapon, too little food, low health) when I should not go; a food trip while starving goes anyway.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "purpose": {
+              "default": "a trip",
+              "description": "what the trip is for, for the report",
+              "type": "string",
+              "maxLength": 80
+            },
+            "kind": {
+              "default": "travel",
+              "description": "food trips may go while starving; the others need the kit",
+              "type": "string",
+              "enum": [
+                "food",
+                "wood",
+                "wool",
+                "ore",
+                "travel"
+              ]
+            },
+            "distance": {
+              "description": "planned distance from home, in blocks",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "waive": {
+              "default": [],
+              "description": "checks to skip for this trip",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "weapon",
+                  "food",
+                  "health"
+                ]
+              }
             }
           }
         },
@@ -13699,6 +13949,6 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !mods !mod_items !creative_get (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !mods !mod_items !creative_get (!help <command> for details)"
   }
 }

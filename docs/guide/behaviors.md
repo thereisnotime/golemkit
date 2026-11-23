@@ -848,6 +848,49 @@ failed behaviour whose key changes ends its failure back-off early (at least 10 
 failure). `keep_tools_upgraded` uses the usable wood it holds, so it retries as soon as the wood
 is there.
 
+## Trips
+
+A trip is a walk away from home that a behaviour starts: `keep_fed` scouting rings and food
+trips (known food places, food spots, its farm), `farm_setup` walking to a far farm,
+`keep_spawn_bed` looking for sheep, `chop_wood_loop`'s `chop_tree` rings past 64 blocks and
+`keep_tools_upgraded`'s `upgrade_tools` going for ore. Walks shorter than `trips.minDistance`
+(64 blocks) are not trips. Actions an owner orders are left alone unless `trips.ownerOrders` is on.
+The planner is pure and game-agnostic (`src/core/trip.ts`); the Minecraft side is
+`src/skills/trip.ts` and `behaviors/trip.ts`.
+
+**Before leaving** (`prepare_trip`, also an action an LLM can call): it takes food out of its
+pantry and own chests (`settings.storage.chests` and chests it placed, within 160 blocks, best
+food first) until it carries `trips.food` items (8), puts its best sword or axe in hand, and
+checks it. With no weapon, fewer than `trips.minFood` items (4) or under `trips.minHealth`
+health (12) it stays and the behaviour backs off with the reason, e.g. `not ready for a trip
+(looking for sheep 120 blocks out): no weapon, food 1 of 4 items`. Food trips don't need food
+along (getting some is the point), and a food trip while starving (food bar 6 or less) goes
+whatever is missing. A wood trip with no weapon and no wood waives the weapon: the wood is what
+makes one.
+
+**On the way** a timer checks every 2 seconds and turns the trip back when
+
+- the food left (food bar plus the food points it carries, so eating on the way costs nothing)
+  is down to `trips.turnBackAt` (half) of what it left with,
+- the food bar is at `trips.foodFloor` (6) with nothing left to eat, or
+- the daylight left is about the walk home (distance / `trips.speed`, 3 blocks a second) plus
+  `trips.daylightMarginS` (60 s), or a thunderstorm starts.
+
+The walk stops mid-leg (`travel` throws `TripTurnBackError`), the bot walks home and tells its
+owner, e.g. `turned back: food down to 6 of the 12 I left with (scouting 250 blocks out for
+food), back home`. A ring cut short this way is not remembered as empty, and `keep_fed` starts no
+other trip in that run. A starving food trip has no food rule (home has nothing either); a trip
+that started at night (`scoutAtNight`) or whose way back alone takes longer than a day (the
+village 3500 blocks away) has no daylight rule.
+
+The settings live under `settings: trips:` and as live toggles (`!config_set trips.food 12`,
+see [live config](./live-config)). Pax sets:
+
+```yaml
+settings:
+  trips: { food: 8, minFood: 4, minHealth: 12, turnBackAt: 0.5, foodFloor: 6, daylightMarginS: 60 }
+```
+
 ## Respawn point: keep_spawn_bed
 
 `keep_spawn_bed` keeps a bed at home and the respawn point on it, so a death ends at home

@@ -7,7 +7,7 @@ import type { Block } from 'prismarine-block'
 import type { Entity } from 'prismarine-entity'
 import type { Vec3 } from 'vec3'
 import type { Agent, ActionContext, ActionResult } from '../core/index.ts'
-import { defineSkill, defineAction, z, ok, fail, goals, travel, sleep, checkAborted, fmtPos, needsSurvival, itemName, TravelUnderwaterError, swimUp } from '../core/index.ts'
+import { defineSkill, defineAction, z, ok, fail, goals, travel, sleep, checkAborted, fmtPos, needsSurvival, itemName, TravelUnderwaterError, swimUp, activeTrip, rethrowTurnBack, TripTurnBackError } from '../core/index.ts'
 import { huntRefusal, inPen, herdSurplus, unreachableAnimals, HUNTABLE, type HuntCandidate } from './combat.ts'
 import { CROPS, isMature, plantOn, TILLABLE } from './farming.ts'
 import { getHome, getPlaces, setPlace, sameDimension, reachDryLand, type Place } from './navigation.ts'
@@ -410,6 +410,7 @@ const findFood = defineAction({
         await travel(bot, { x: s.x, y: s.y, z: s.z }, signal, { range: 6 })
       } catch (e) {
         checkAborted(signal)
+        rethrowTurnBack(e)
         log.debug('find_food: known spot unreachable', { at: fmtPos(s), error: (e as Error).message })
       }
       const seen = look(agent, bot, p.animals, p.crops, p.keepAtLeast)
@@ -449,6 +450,9 @@ const findFood = defineAction({
     })
     while (true) {
       checkAborted(signal)
+      // a trip budget (skills/trip.ts) said turn back: food or daylight is short
+      const turned = activeTrip(bot)
+      if (turned?.turnBack && !turned.returning) { reason = `turned back: ${turned.turnBack}`; break }
       reason = scoutStopReason(progress(), limits)
       if (reason) break
       const i = nextWaypoint(wps, visited, blocked)
@@ -494,6 +498,7 @@ const findFood = defineAction({
         consecutiveFailures = 0
       } catch (e) {
         checkAborted(signal)
+        if (e instanceof TripTurnBackError) { reason = e.message; break }
         if (!ctl.signal.aborted) {
           consecutiveFailures++
           blocked.set(w.sector, w.ring + 1)

@@ -8,6 +8,7 @@ import { ensureTool, inventoryCounts, planksFor } from './toolkit.ts'
 import { fillerBlock } from './survival.ts'
 import { autoUpgrade } from './progression.ts'
 import { scoutWaypoints, compass, type XZ } from './foodPlan.ts'
+import { actionTrip, isTurnBack } from './trip.ts'
 import {
   nextTreeStep, mergeTreeSpot, markTreeSpotEmpty, recordTreeSearch, treeRetryInMs, spotKey, DEFAULT_TREE_RINGS,
   type TreeSpot, type SearchRecord
@@ -394,6 +395,8 @@ export interface WideFellOptions {
   atNight?: boolean
   /** Leave trees this close to the world spawn alone (see FellOptions). */
   avoidSpawn?: number
+  /** Prepares the first walk past trips.minDistance and budgets it (skills/trip.ts); null = go, else why not. */
+  beginTrip? (distance: number): Promise<string | null>
 }
 
 /**
@@ -436,10 +439,13 @@ export async function fellTreeWide (ctx: Pick<ActionContext, 'bot' | 'agent' | '
     if (step.step === 'spot') {
       tried.add(spotKey(step.spot))
       const at = step.spot
+      const refused = await o.beginTrip?.(Math.hypot(at.x - origin.x, at.z - origin.z))
+      if (refused) { notes.push(refused); break }
       try {
         if (Math.hypot(at.x - bot.entity.position.x, at.z - bot.entity.position.z) > 16) await travel(bot, { x: at.x, z: at.z }, signal, { range: 8, stepTimeoutMs: 45_000 })
       } catch (e) {
         checkAborted(signal)
+        if (isTurnBack(e)) throw e
         notes.push(`couldn't get to the trees at ${at.x} ${at.z} (${(e as Error).message})`)
         setTreeSpots(agent, markTreeSpotEmpty(getTreeSpots(agent), at, Date.now(), 24, dim))
         continue
@@ -463,6 +469,8 @@ export async function fellTreeWide (ctx: Pick<ActionContext, 'bot' | 'agent' | '
     }
     // scout: a spiral of waypoints out to the ring, looking around at every one
     if (isNightTime(bot) && !o.atNight) { notes.push(`it is night, so I did not scout ${step.radius} blocks out`); break }
+    const refused = await o.beginTrip?.(step.radius)
+    if (refused) { notes.push(refused); break }
     const wps = scoutWaypoints(origin, step.radius, { step: 64, minRadius: step.covered, skip: blocked, startAngle: Math.random() * Math.PI * 2 })
     let found = false
     let failures = 0
@@ -481,6 +489,7 @@ export async function fellTreeWide (ctx: Pick<ActionContext, 'bot' | 'agent' | '
         failures = 0
       } catch (e) {
         checkAborted(signal)
+        if (isTurnBack(e)) throw e
         if (!ctl.signal.aborted) { failures++; log.debug('tree scout: leg failed', { to: `${w.x} ${w.z}`, error: (e as Error).message }) }
       }
       legs++
@@ -526,9 +535,22 @@ const chopTree = defineAction({
     avoid_spawn: z.number().min(0).max(256).default(0).describe('leave trees within this many blocks of the world spawn alone (0 = no limit)')
   }),
   aliases: ['chop'],
-  run: (ctx, { radius, replant, make_axe, rings, avoid_spawn }) => rings?.length
-    ? fellTreeWide(ctx, { rings, replant, makeAxe: make_axe, avoidSpawn: avoid_spawn })
-    : fellTree(ctx, { radius, replant, makeAxe: make_axe, avoidSpawn: avoid_spawn })
+  async run (ctx, { radius, replant, make_axe, rings, avoid_spawn }) {
+    if (!rings?.length) return fellTree(ctx, { radius, replant, makeAxe: make_axe, avoidSpawn: avoid_spawn })
+    // rings past trips.minDistance (64) are a trip: pantry food and a weapon first, home again when
+    // food or daylight runs short (skills/trip.ts). With no weapon and no wood the wood is what makes one.
+    const inv = inventoryCounts(ctx.bot)
+    const wood = Object.entries(inv).reduce((n, [k, v]) => n + (/(_log|_stem)$/.test(k) ? 4 * v : k.endsWith('_planks') ? v : 0), 0)
+    const trip = actionTrip(ctx, { purpose: 'looking for trees', kind: 'wood', ...(wood < 3 ? { waive: ['weapon' as const] } : {}) })
+    try {
+      return await trip.finish(await fellTreeWide(ctx, { rings, replant, makeAxe: make_axe, avoidSpawn: avoid_spawn, beginTrip: d => trip.begin(d) }))
+    } catch (e) {
+      if (isTurnBack(e)) return trip.finish(fail(e.message))
+      throw e
+    } finally {
+      trip.end()
+    }
+  }
 })
 
 export const woodcutting = () => defineSkill({

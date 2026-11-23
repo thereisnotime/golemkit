@@ -41,3 +41,8 @@ export {
 export { MinecraftJavaAdapter, minecraftJava } from '../adapters/minecraft-java/adapter.ts'
 export { JournalCapture } from '../adapters/minecraft-java/journal-capture.ts'
 export { z } from 'zod'
+export {
+  TRIP_DEFAULTS, STARVING_BAR, DAYLIGHT_MS, tripSettings, planTripPrep, tripNotReadyText, tripStart, walkHomeMs, turnBackReason,
+  beginTrip, activeTrip, endTrip, checkTrip, rethrowTurnBack, TripTurnBackError,
+  type TripSettings, type TripKind, type TripKit, type TripPrep, type TripSample, type TripStart, type Trip
+} from './trip.ts'

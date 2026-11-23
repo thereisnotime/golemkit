@@ -34,6 +34,7 @@ import { knownContainers, configuredChests } from '../../../skills/containers.ts
 import { getPlaces, sameDimension } from '../../../skills/navigation.ts'
 import { dist, hostilesNear } from './util.ts'
 import { helpDesk } from '../../../brains/npc/help.ts'
+import { tripRun } from './trip.ts'
 
 /** Raw food -> what cooking makes of it. */
 export const COOKED: Record<string, string> = {
@@ -435,8 +436,9 @@ async function doChore (ctx: BehaviorContext, chore: FoodChore, o: O): Promise<A
 
 /** Goes to its farm (when not there) and runs `then` there. */
 async function atFarm (ctx: BehaviorContext, farm: Farm, then: () => Promise<ActionResult>): Promise<ActionResult> {
-  if (Math.hypot(farm.x - ctx.bot.entity.position.x, farm.z - ctx.bot.entity.position.z) > 8) {
-    const there = await ctx.act('goto', { x: farm.x, y: farm.y + 1, z: farm.z })
+  const far = Math.hypot(farm.x - ctx.bot.entity.position.x, farm.z - ctx.bot.entity.position.z)
+  if (far > 8) {
+    const there = await tripRun(ctx, { purpose: `a trip to ${farm.name}`, kind: 'food', distance: far }, () => ctx.act('goto', { x: farm.x, y: farm.y + 1, z: farm.z }))
     if (!there.ok) return { ok: false, message: `couldn't get to ${farm.name}: ${there.message}` }
   }
   return then()
@@ -448,9 +450,14 @@ async function atFarm (ctx: BehaviorContext, farm: Farm, then: () => Promise<Act
  * home. The place is left alone for a while afterwards (longer when it had nothing).
  */
 async function foodTrip (ctx: BehaviorContext, o: O): Promise<ActionResult> {
-  const { bot, agent } = ctx
-  const place = tripPlaces(agent, bot, o)[0]
+  const place = tripPlaces(ctx.agent, ctx.bot, o)[0]
   if (!place) return { ok: false, message: 'no known food place to go to' }
+  // prepared and budgeted (skills/trip.ts): turns back home when food or daylight runs short
+  return tripRun(ctx, { purpose: `a food trip to ${place.name}`, kind: 'food', distance: place.distance }, () => foodTripTo(ctx, o, place))
+}
+
+async function foodTripTo (ctx: BehaviorContext, o: O, place: ReturnType<typeof tripPlaces>[number]): Promise<ActionResult> {
+  const { bot, agent } = ctx
   const m = memory(agent)
   const pause = (ms: number) => { m.trips = { ...(m.trips ?? {}), [place.name]: Date.now() + ms }; saveMemory(agent, m) }
   const has = (n: string) => bot.inventory.items().filter(i => i.name === n).reduce((s, i) => s + i.count, 0)
@@ -580,7 +587,9 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
       const spot = rankSpots(getFoodSpots(agent), ['animals', 'village_farm'], Date.now(), pos, bot.game?.dimension)[0]
       if (!spot) return { ok: false, message: 'no food spots remembered' }
       const label = spot.kind === 'animals' ? `animal spot (${(spot.animals ?? []).join(', ') || 'animals'})` : 'village farm'
-      const there = await ctx.act('goto', { x: spot.x, y: spot.y, z: spot.z })
+      const there = await tripRun(ctx, { purpose: `going to a ${label}`, kind: 'food', distance: Math.hypot(spot.x - pos.x, spot.z - pos.z) },
+        () => ctx.act('goto', { x: spot.x, y: spot.y, z: spot.z }))
+      if ((there.data as { turnedBack?: string } | undefined)?.turnedBack || (there.data as { trip?: boolean } | undefined)?.trip) return there
       const w = senseFood(agent, bot, o)
       if (w.animals > 0 || (w.starving && (w.herd ?? 0) > 0) || w.ripeCrops > 0) return { ok: true, message: `went to the ${label} at ${fmtPos(spot)}, food is there` }
       forgetEmptySpot(agent, spot.kind, spot)
@@ -592,7 +601,7 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
     }
     case 'scout': {
       const radius = d.radius ?? Math.max(...ringsFor(o))
-      return ctx.act('find_food', {
+      return tripRun(ctx, { purpose: `scouting ${radius} blocks out for food`, kind: 'food', distance: radius }, () => ctx.act('find_food', {
         radius,
         minRadius: d.minRadius ?? 0,
         maxMinutes: Math.min(30, Math.max(3, Math.round(radius / 25))),
@@ -601,7 +610,7 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
         crops: o.harvest,
         keepAtLeast: d.keepAtLeast ?? 0,
         ...(d.seeds ? { seeds: d.seeds } : {})
-      })
+      }))
     }
     case 'seeds': {
       const farm = nearestFarm(agent, bot)
@@ -653,7 +662,7 @@ function foodStock (bot: Bot): string {
 }
 
 /** Search outcomes that say nothing about the ring (cut short by night or danger) are not remembered as empty. */
-const CUT_SHORT = /night fell|mobs|health is low|it is night/
+const CUT_SHORT = /night fell|mobs|health is low|it is night|turned back|not ready for a trip/
 
 export const keepFed = defineBehavior({
   name: 'keep_fed',
@@ -792,6 +801,8 @@ export const keepFed = defineBehavior({
             if (pause) { m.paused = { ...m.paused, [d.step]: Date.now() + pause }; saveMemory(agent, m) }
             // an empty ring: try the next one in the same run (the ladder widens), unless it was cut short
             if (d.step === 'scout' && !CUT_SHORT.test(r.message) && nextRing(m.searches, so.rings, Date.now(), so.ringMemoryMs)) tried.delete('scout')
+            // turned back from a trip (food or daylight short, back home now): no other trip this run
+            if ((r.data as { turnedBack?: string } | undefined)?.turnedBack) break
           }
         }
         const food = ctx.bot.food

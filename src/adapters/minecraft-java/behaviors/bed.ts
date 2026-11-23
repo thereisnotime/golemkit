@@ -17,6 +17,7 @@ import {
 import type { SearchRecord } from '../../../skills/foodPlan.ts'
 import { WOOD_NEED } from './tools.ts'
 import { isDay, flatDist } from './util.ts'
+import { tripRun } from './trip.ts'
 
 const SEARCHES_KEY = 'spawnBed.searches'
 
@@ -159,7 +160,10 @@ export const keepSpawnBed = defineBehavior({
           case 'hunt':
             return ctx.act('hunt', { animal: 'sheep', count: step.count, radius: o.radius, keepAtLeast: o.spareSheep })
           case 'search': {
-            const r = await ctx.act('find_food', { animals: ['sheep'], radius: step.radius, minRadius: step.covered, keepAtLeast: o.spareSheep, from: 'home', maxMinutes: 8 })
+            // a trip (skills/trip.ts): pantry food and a weapon first, and back home when food or daylight runs short
+            const r = await tripRun(ctx, { purpose: `looking for sheep ${step.radius} blocks out`, kind: 'wool', distance: step.radius },
+              () => ctx.act('find_food', { animals: ['sheep'], radius: step.radius, minRadius: step.covered, keepAtLeast: o.spareSheep, from: 'home', maxMinutes: 8 }))
+            if ((r.data as { turnedBack?: string, trip?: boolean } | undefined)?.turnedBack || (r.data as { trip?: boolean } | undefined)?.trip) return r
             // only a ring searched all the way round counts as empty; one cut short (night, time, a cave) is tried again
             const why = (r.data as { reason?: string } | undefined)?.reason ?? ''
             if (r.ok || /^covered every direction/.test(why)) {

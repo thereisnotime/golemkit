@@ -117,6 +117,39 @@ export function configuredChests (agent: Agent): Pos[] {
  * first, skipping ones it saw empty of wood and ones in protected areas. Returns what it took.
  */
 export async function takeWoodFromOwnChests (ctx: { bot: Bot, agent: Agent, signal: AbortSignal }, want: number, range = 48): Promise<{ took: Record<string, number>, units: number, notes: string[] }> {
+  return takeFromOwnChests(ctx, want, range, woodValue, woodToTake)
+}
+
+/**
+ * Takes food (best food points first) out of the bot's own and configured chests within `range`
+ * until it carries `want` more items: the pantry top-up before a trip (skills/trip.ts).
+ */
+export async function takeFoodFromOwnChests (ctx: { bot: Bot, agent: Agent, signal: AbortSignal }, want: number, range: number, points: (name: string) => number): Promise<{ took: Record<string, number>, units: number, notes: string[] }> {
+  return takeFromOwnChests(ctx, want, range, n => points(n) > 0 ? 1 : 0, (contents, left) => foodToTake(contents, left, points))
+}
+
+/** Which food to take from a chest's contents for `want` items: the most food points per item first. Pure. */
+export function foodToTake (contents: Record<string, number>, want: number, points: (name: string) => number): Record<string, number> {
+  const out: Record<string, number> = {}
+  let left = want
+  for (const [name, n] of Object.entries(contents).filter(([k]) => points(k) > 0).sort((a, b) => points(b[0]) - points(a[0]))) {
+    if (left <= 0) break
+    const take = Math.min(n, left)
+    out[name] = take
+    left -= take
+  }
+  return out
+}
+
+/**
+ * Takes items out of the bot's own chests (placed by it or listed in settings.storage.chests)
+ * within `range` until it holds `want` more units (value per item), chests known to hold some
+ * first, skipping ones seen without any and ones in protected areas. Returns what it took.
+ */
+async function takeFromOwnChests (
+  ctx: { bot: Bot, agent: Agent, signal: AbortSignal }, want: number, range: number,
+  value: (name: string) => number, toTake: (contents: Record<string, number>, left: number) => Record<string, number>
+): Promise<{ took: Record<string, number>, units: number, notes: string[] }> {
   const { bot, agent, signal } = ctx
   const here = bot.entity.position
   const seenList = knownContainers(agent)
@@ -125,11 +158,11 @@ export async function takeWoodFromOwnChests (ctx: { bot: Bot, agent: Agent, sign
     .filter(p => Math.hypot(p.x - here.x, p.y - here.y, p.z - here.z) <= range && !agent.protectedAreas?.isProtected?.(p as any))
     .map(p => {
       const s = seenList.find(c => c.x === p.x && c.y === p.y && c.z === p.z)
-      const wood = s ? Object.entries(s.contents).reduce((n, [k, v]) => n + woodValue(k) * v, 0) : null
-      return { p, wood }
+      const has = s ? Object.entries(s.contents).reduce((n, [k, v]) => n + value(k) * v, 0) : null
+      return { p, has }
     })
-    .filter(c => c.wood === null || c.wood > 0)
-    .sort((a, b) => (b.wood ?? 0.5) - (a.wood ?? 0.5))
+    .filter(c => c.has === null || c.has > 0)
+    .sort((a, b) => (b.has ?? 0.5) - (a.has ?? 0.5))
   const took: Record<string, number> = {}
   const notes: string[] = []
   let units = 0
@@ -149,7 +182,7 @@ export async function takeWoodFromOwnChests (ctx: { bot: Bot, agent: Agent, sign
     try { win = await openAt(bot, b, signal) } catch (e) { checkAborted(signal); notes.push((e as Error).message); continue }
     try {
       const contents = tally(win.containerItems().map(i => ({ name: itemName(i), count: i.count })))
-      const plan = woodToTake(contents, want - units)
+      const plan = toTake(contents, want - units)
       for (const [name, n] of Object.entries(plan)) {
         checkAborted(signal)
         const item = win.containerItems().find(i => itemName(i) === name)
@@ -158,7 +191,7 @@ export async function takeWoodFromOwnChests (ctx: { bot: Bot, agent: Agent, sign
         try { await win.withdraw(item.type, null, n) } catch {}
         await sleep(SETTLE_MS, signal)
         const moved = before - win.containerCount(item.type, null)
-        if (moved > 0) { took[name] = (took[name] ?? 0) + moved; units += moved * woodValue(name) }
+        if (moved > 0) { took[name] = (took[name] ?? 0) + moved; units += moved * value(name) }
         if (moved < n) break
       }
       remember(agent, b, win.containerItems())
