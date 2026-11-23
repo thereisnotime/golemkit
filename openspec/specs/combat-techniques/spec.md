@@ -36,15 +36,19 @@ With `combat.shieldMelee` on and a shield in the offhand, the bot SHALL raise th
 - **THEN** the shield is not swapped back in to block
 
 ### Requirement: Creeper that can't be outrun
-When the target creeper's fuse is lit and the rest of the fuse at walking speed does not get the bot 6 blocks away, the bot SHALL face it with a raised shield while backing off, if it has a shield and `combat.shieldMelee` is on; otherwise it runs.
+When a creeper's fuse is lit and backing off for the rest of the fuse (gaining about 2 blocks per second on it) does not get the bot 7 blocks away, the bot SHALL face it with a raised shield while backing off, if it has a shield and `combat.shieldMelee` is on; otherwise it runs. A creeper lighting its fuse within 5 blocks while the bot fights another creeper SHALL become the target.
 
-#### Scenario: Lit fuse at 2 blocks, half a second left
-- **WHEN** a creeper 2 blocks away has been fusing for 1 s and the bot has a shield
+#### Scenario: Lit fuse at 3 blocks
+- **WHEN** a creeper 3 blocks away lights its fuse and the bot has a shield
 - **THEN** the bot faces it with the shield up
 
-#### Scenario: Lit fuse just started
-- **WHEN** a creeper 2 blocks away has just lit its fuse
+#### Scenario: Lit fuse further out
+- **WHEN** a creeper 4.5 blocks away has just lit its fuse
 - **THEN** the bot runs
+
+#### Scenario: Second creeper
+- **WHEN** the bot fights one creeper and another lights its fuse 4 blocks away
+- **THEN** the bot turns to the lit one
 
 ### Requirement: Totem in the offhand when it matters
 With `combat.totem` on and a totem in the inventory, the bot SHALL move it into the offhand as soon as health drops to 8 or less, or during a fall that would kill it, and keep it there until health is above 14.

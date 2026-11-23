@@ -50,11 +50,11 @@ test('shield against melee: between slow swings, never against axes or creepers'
   assert.ok(!breaksShields('zombie'))
 })
 
-test('creeper escape: run when the rest of the fuse gets the bot clear, shield otherwise', () => {
-  assert.equal(creeperEscape({ dist: 2, msLeft: 1400, shield: true }), 'run', '2 + 4.3 * 1.4 > 6')
+test('creeper escape: run when backing off gets the bot past 7 blocks before the blast, shield otherwise', () => {
+  assert.equal(creeperEscape({ dist: 4.5, msLeft: 1400, shield: true }), 'run', '4.5 + 2 x 1.4 > 7')
+  assert.equal(creeperEscape({ dist: 3, msLeft: 1500, shield: true }), 'shield', 'close at the start of the fuse')
   assert.equal(creeperEscape({ dist: 2, msLeft: 500, shield: true }), 'shield')
   assert.equal(creeperEscape({ dist: 2, msLeft: 500, shield: false }), 'run', 'nothing to block with')
-  assert.equal(creeperEscape({ dist: 5, msLeft: 300, shield: true }), 'run')
 })
 
 test('totem: low health, lethal falls, burning at half health', () => {

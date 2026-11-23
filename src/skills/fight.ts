@@ -294,6 +294,11 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
           return finish('heal', `health ${Math.ceil(bot.health)}`)
         }
         if (outnumbered({ health: bot.health, meleeNear: meleeNear(bot) })) return finish('outnumbered', `${meleeNear(bot)} mobs close at health ${Math.ceil(bot.health)}`)
+        // another creeper fusing close while we fight this one: deal with the lit one first
+        if (target.name === 'creeper' && !creeperFuseLit(target)) {
+          const lit = bot.nearestEntity(e => e !== target && e.name === 'creeper' && creeperFuseLit(e) && e.position.distanceTo(me) <= 5)
+          if (lit) return finish('retarget', 'another creeper fusing')
+        }
         // a creeper walking up while we fight something else: it comes first (seen live: blown up in iron armour)
         if (target.name !== 'creeper') {
           const c = bot.nearestEntity(e => e.name === 'creeper' && isHostile(e) && e.position.distanceTo(me) <= 5)

@@ -238,9 +238,11 @@ loop, `defend` and the reflexes. Each one has a live toggle, on by default excep
   (vindicators, piglin brutes, players with an axe), never while the shield is disabled (the
   bot watches `set_cooldown` for the shield item), and a totem that went into the offhand for low
   health is not swapped out for it.
-- **Creeper behind the shield**: a lit fuse the bot can't outrun (distance + 4.3 blocks/s x the
-  rest of the 1.5 s fuse < 6 blocks) is faced with the shield up while backing off; a blocked
-  explosion does no damage. Otherwise it runs as before.
+- **Creeper behind the shield**: a lit fuse the bot can't outrun is faced with the shield up
+  while backing off; a blocked explosion does no damage. "Can't outrun": distance plus 2 blocks
+  per second (walking away from a creeper that follows) over the rest of the 1.5 s fuse stays
+  under the 7 blocks where the fuse stops. Otherwise it runs as before. Fighting one creeper
+  while another lights its fuse within 5 blocks switches to the lit one.
 - **Totem** (`combat.totem`): at 8 health or less, or in a fall that would kill, a totem of undying
   goes into the offhand at once (on the health event, not on the 10 s gear check). It stays
   there until health is back above 14.

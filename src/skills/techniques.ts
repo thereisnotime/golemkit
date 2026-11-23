@@ -81,18 +81,22 @@ export function shieldAgainstMelee (s: {
   return s.cooldownLeftMs > SHIELD_DELAY_MS + 100
 }
 
-/** Walking speed, blocks per second (backing off is no faster). */
-const WALK = 4.3
-/** A creeper blast (power 3) hurts out to about 6 blocks; damage falls off with distance. */
-const BLAST_SAFE = 6
+/**
+ * Distance gained per second backing off from a creeper that follows (walking 4.3 blocks/s, the
+ * creeper a bit over half that while it chases).
+ */
+const GAIN = 2.0
+/** A creeper stops fusing once its target is 7 blocks away; the blast (power 3) hurts out to about 6. */
+const FUSE_CANCEL = 7
 
 /**
- * A creeper with a lit fuse (1.5 s): run if the rest of the fuse gets the bot clear of the blast,
- * otherwise face it with a shield up (a blocked explosion does no damage). Without a shield, run.
+ * A creeper with a lit fuse (1.5 s): run if backing off for the rest of the fuse gets the bot past
+ * the 7 blocks where the fuse stops, otherwise face it with a shield up (a blocked explosion does
+ * no damage). Without a shield, run.
  */
 export function creeperEscape (s: { dist: number, msLeft: number, shield: boolean }): 'run' | 'shield' {
-  const reach = s.dist + WALK * Math.max(0, s.msLeft) / 1000
-  if (reach >= BLAST_SAFE || !s.shield) return 'run'
+  const reach = s.dist + GAIN * Math.max(0, s.msLeft) / 1000
+  if (reach >= FUSE_CANCEL || !s.shield) return 'run'
   return 'shield'
 }
 
