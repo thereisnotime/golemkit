@@ -71,6 +71,9 @@ behaviors:
                                                       # short of wood: its own chests, else a wood need for chop_wood_loop
   chop_wood_loop: { enabled: false, rings: [32, 64, 128, 250] }   # armed by npc mode / at runtime; no tree close: remembered trees,
                                                                   # then rings out to 250 blocks with a trip there and back
+  keep_spawn_bed: { homeRange: 6, graceSeconds: 12, ask: true }   # a bed by home (fortress, approved by ${MC_OWNER:-Robin}) as respawn point:
+                              # own bed, else one from its chests, else crafted (shears or sheep); at night a short sleep,
+                              # asking players still up to go to bed; redone when it respawns away from home
   anti_afk: { afterSeconds: 45 }   # small look/swing/hop so idle-kick servers don't drop it
 # Plain-language commands without the LLM (docs/guide/intents.md): "pax follow me", "pax chop some
 # wood". first = simple requests are handled directly (no tokens), everything else goes to the LLM.

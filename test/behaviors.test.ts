@@ -142,6 +142,9 @@ test('the shipped pax profile arms keep_fed (with scouting), stay_safe and farm_
   const v = validateBehaviorConfig((p.options.settings as any).behaviors, defaultBehaviorRegistry())
   assert.ok(v.keep_fed?.enabled && v.stay_safe?.enabled && v.farm_setup?.enabled)
   assert.equal(v.keep_fed?.options.scout, true)
+  assert.ok(v.keep_spawn_bed?.enabled, 'keeps a bed at home')
+  assert.equal(v.keep_spawn_bed?.options.graceSeconds, 12)
+  assert.equal(v.keep_spawn_bed?.options.askText, '{players}, could you hop into bed so we can skip the night?')
 })
 
 // ------------------------------------------------------------------ hunt filter

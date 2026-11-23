@@ -2291,6 +2291,9 @@
       "we_schem_save",
       "we_raw",
       "we_build",
+      "place_bed",
+      "set_spawn",
+      "shear",
       "mods",
       "mod_items",
       "creative_get"
@@ -5430,6 +5433,170 @@
         "longRunning": true
       },
       {
+        "name": "place_bed",
+        "description": "Put a bed from the inventory down near home (or near the bot without a home): an air spot with a floor and headroom, next to the home spot if possible, never in front of a door, on a chest, in a one-wide passage or in a protected area. With x y z (and facing) it goes exactly there. Remembers the bed as its own.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "item": {
+              "description": "which bed; default the first one in the inventory",
+              "type": "string"
+            },
+            "x": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "y": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "z": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "facing": {
+              "description": "which way the head goes from x y z",
+              "type": "string",
+              "enum": [
+                "north",
+                "south",
+                "east",
+                "west"
+              ]
+            },
+            "range": {
+              "default": 6,
+              "description": "how far from home to look for a spot",
+              "type": "number",
+              "minimum": 2,
+              "maximum": 16
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
+        "name": "set_spawn",
+        "description": "Set the respawn point at a bed: its own bed near home (or the bed at x y z) by right-clicking it. By day that only sets the point; at night it lies down, waits a few seconds for the night to skip and asks players still up to go to bed (a few polite asks at most), then gets up. Never in the Nether or the End (beds explode there).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "y": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "z": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "grace_seconds": {
+              "default": 12,
+              "description": "at night: how long to stay in bed waiting for the others",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 120
+            },
+            "ask": {
+              "default": true,
+              "description": "at night: ask players who are still up to go to bed",
+              "type": "boolean"
+            },
+            "ask_text": {
+              "default": "{players}, could you hop into bed so we can skip the night?",
+              "description": "first ask; {players} is replaced by the names",
+              "type": "string",
+              "maxLength": 200
+            },
+            "remind_text": {
+              "default": "Still in bed, {players}: {sleeping}/{needed} asleep.",
+              "description": "reminders; {players}, {sleeping}, {needed}",
+              "type": "string",
+              "maxLength": 200
+            },
+            "ask_every_seconds": {
+              "default": 5,
+              "description": "between asks",
+              "type": "number",
+              "minimum": 3,
+              "maximum": 60
+            },
+            "max_asks": {
+              "default": 3,
+              "description": "asks per night, the first one included",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "sleeping_percentage": {
+              "default": 100,
+              "description": "the server's playersSleepingPercentage, until the server reports a count",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 101
+            },
+            "ignore": {
+              "default": [],
+              "description": "players never asked (other bots)",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "stay": {
+              "default": false,
+              "description": "stay in bed until morning instead of getting up after the grace",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
+        "name": "shear",
+        "description": "Shear sheep nearby with shears from the inventory and pick up the wool. Leaves babies, named, leashed and penned sheep alone.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "count": {
+              "default": 3,
+              "description": "how many sheep to shear",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "radius": {
+              "default": 24,
+              "description": "how far to look",
+              "type": "number",
+              "minimum": 4,
+              "maximum": 64
+            },
+            "pens": {
+              "default": false,
+              "description": "also shear sheep inside fences (only your own)",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
         "name": "mods",
         "description": "List the mods this server runs (with versions when known) and how many items/blocks/mobs each adds. Use it before explaining or teaching a mod, so you talk about what is actually installed.",
         "inputSchema": {
@@ -5504,7 +5671,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !mods !mod_items !creative_get (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !mods !mod_items !creative_get (!help <command> for details)"
   },
   "variant:villager": {
     "actions": [
@@ -5601,7 +5768,10 @@
       "we_schem_load",
       "we_schem_save",
       "we_raw",
-      "we_build"
+      "we_build",
+      "place_bed",
+      "set_spawn",
+      "shear"
     ],
     "catalog": [
       {
@@ -8476,9 +8646,173 @@
         },
         "exclusive": true,
         "longRunning": true
+      },
+      {
+        "name": "place_bed",
+        "description": "Put a bed from the inventory down near home (or near the bot without a home): an air spot with a floor and headroom, next to the home spot if possible, never in front of a door, on a chest, in a one-wide passage or in a protected area. With x y z (and facing) it goes exactly there. Remembers the bed as its own.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "item": {
+              "description": "which bed; default the first one in the inventory",
+              "type": "string"
+            },
+            "x": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "y": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "z": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "facing": {
+              "description": "which way the head goes from x y z",
+              "type": "string",
+              "enum": [
+                "north",
+                "south",
+                "east",
+                "west"
+              ]
+            },
+            "range": {
+              "default": 6,
+              "description": "how far from home to look for a spot",
+              "type": "number",
+              "minimum": 2,
+              "maximum": 16
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
+        "name": "set_spawn",
+        "description": "Set the respawn point at a bed: its own bed near home (or the bed at x y z) by right-clicking it. By day that only sets the point; at night it lies down, waits a few seconds for the night to skip and asks players still up to go to bed (a few polite asks at most), then gets up. Never in the Nether or the End (beds explode there).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "y": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "z": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "grace_seconds": {
+              "default": 12,
+              "description": "at night: how long to stay in bed waiting for the others",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 120
+            },
+            "ask": {
+              "default": true,
+              "description": "at night: ask players who are still up to go to bed",
+              "type": "boolean"
+            },
+            "ask_text": {
+              "default": "{players}, could you hop into bed so we can skip the night?",
+              "description": "first ask; {players} is replaced by the names",
+              "type": "string",
+              "maxLength": 200
+            },
+            "remind_text": {
+              "default": "Still in bed, {players}: {sleeping}/{needed} asleep.",
+              "description": "reminders; {players}, {sleeping}, {needed}",
+              "type": "string",
+              "maxLength": 200
+            },
+            "ask_every_seconds": {
+              "default": 5,
+              "description": "between asks",
+              "type": "number",
+              "minimum": 3,
+              "maximum": 60
+            },
+            "max_asks": {
+              "default": 3,
+              "description": "asks per night, the first one included",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "sleeping_percentage": {
+              "default": 100,
+              "description": "the server's playersSleepingPercentage, until the server reports a count",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 101
+            },
+            "ignore": {
+              "default": [],
+              "description": "players never asked (other bots)",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "stay": {
+              "default": false,
+              "description": "stay in bed until morning instead of getting up after the grace",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
+        "name": "shear",
+        "description": "Shear sheep nearby with shears from the inventory and pick up the wool. Leaves babies, named, leashed and penned sheep alone.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "count": {
+              "default": 3,
+              "description": "how many sheep to shear",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "radius": {
+              "default": 24,
+              "description": "how far to look",
+              "type": "number",
+              "minimum": 4,
+              "maximum": 64
+            },
+            "pens": {
+              "default": false,
+              "description": "also shear sheep inside fences (only your own)",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear (!help <command> for details)"
   },
   "profile:apprentice": {
     "actions": [
@@ -9970,6 +10304,9 @@
       "we_schem_save",
       "we_raw",
       "we_build",
+      "place_bed",
+      "set_spawn",
+      "shear",
       "mods",
       "mod_items",
       "creative_get"
@@ -13109,6 +13446,170 @@
         "longRunning": true
       },
       {
+        "name": "place_bed",
+        "description": "Put a bed from the inventory down near home (or near the bot without a home): an air spot with a floor and headroom, next to the home spot if possible, never in front of a door, on a chest, in a one-wide passage or in a protected area. With x y z (and facing) it goes exactly there. Remembers the bed as its own.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "item": {
+              "description": "which bed; default the first one in the inventory",
+              "type": "string"
+            },
+            "x": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "y": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "z": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "facing": {
+              "description": "which way the head goes from x y z",
+              "type": "string",
+              "enum": [
+                "north",
+                "south",
+                "east",
+                "west"
+              ]
+            },
+            "range": {
+              "default": 6,
+              "description": "how far from home to look for a spot",
+              "type": "number",
+              "minimum": 2,
+              "maximum": 16
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
+        "name": "set_spawn",
+        "description": "Set the respawn point at a bed: its own bed near home (or the bed at x y z) by right-clicking it. By day that only sets the point; at night it lies down, waits a few seconds for the night to skip and asks players still up to go to bed (a few polite asks at most), then gets up. Never in the Nether or the End (beds explode there).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "y": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "z": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "grace_seconds": {
+              "default": 12,
+              "description": "at night: how long to stay in bed waiting for the others",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 120
+            },
+            "ask": {
+              "default": true,
+              "description": "at night: ask players who are still up to go to bed",
+              "type": "boolean"
+            },
+            "ask_text": {
+              "default": "{players}, could you hop into bed so we can skip the night?",
+              "description": "first ask; {players} is replaced by the names",
+              "type": "string",
+              "maxLength": 200
+            },
+            "remind_text": {
+              "default": "Still in bed, {players}: {sleeping}/{needed} asleep.",
+              "description": "reminders; {players}, {sleeping}, {needed}",
+              "type": "string",
+              "maxLength": 200
+            },
+            "ask_every_seconds": {
+              "default": 5,
+              "description": "between asks",
+              "type": "number",
+              "minimum": 3,
+              "maximum": 60
+            },
+            "max_asks": {
+              "default": 3,
+              "description": "asks per night, the first one included",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            },
+            "sleeping_percentage": {
+              "default": 100,
+              "description": "the server's playersSleepingPercentage, until the server reports a count",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 101
+            },
+            "ignore": {
+              "default": [],
+              "description": "players never asked (other bots)",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "stay": {
+              "default": false,
+              "description": "stay in bed until morning instead of getting up after the grace",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
+        "name": "shear",
+        "description": "Shear sheep nearby with shears from the inventory and pick up the wool. Leaves babies, named, leashed and penned sheep alone.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "count": {
+              "default": 3,
+              "description": "how many sheep to shear",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "radius": {
+              "default": 24,
+              "description": "how far to look",
+              "type": "number",
+              "minimum": 4,
+              "maximum": 64
+            },
+            "pens": {
+              "default": false,
+              "description": "also shear sheep inside fences (only your own)",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
         "name": "mods",
         "description": "List the mods this server runs (with versions when known) and how many items/blocks/mobs each adds. Use it before explaining or teaching a mod, so you talk about what is actually installed.",
         "inputSchema": {
@@ -13183,6 +13684,6 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !mods !mod_items !creative_get (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !mods !mod_items !creative_get (!help <command> for details)"
   }
 }
