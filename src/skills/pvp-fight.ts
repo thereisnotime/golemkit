@@ -3,10 +3,11 @@
 // items, raised shield, drawn bow, last swing, velocity, health) and turns the decisions into
 // control states:
 //   approach sprinting and strafing (zig-zag against a drawn bow), bow at range with lead
-//   -> sword hits on full charge, jump crits, W-tap sprint hits when knockback pays (enemy at a
-//      ledge, we're losing), axe swap to disable a raised shield, then back to the sword
-//   -> keep ~3 blocks while charging, circle, step back inside 2.4, shield up when their swing
-//      is ready or an arrow is coming, down to hit
+//   -> hits on full charge, jump crits, W-tap sprint hits when knockback pays (enemy at a
+//      ledge, we're losing); the axe against shield carriers (a raised shield gets hit at once,
+//      which disables it 5 s), the sword otherwise
+//   -> keep ~3 blocks while charging, circle, step back inside 2.4, shield up in reach while our
+//      hit charges and when an arrow is coming, down to hit
 //   -> totem into the offhand and golden apples at 10 health, retreat to heal when losing with
 //      nothing to heal with (the caller re-engages), food when they're far
 //   -> never with a drop or lava behind (sidestep), give up past the chase limit, out of sight
@@ -249,7 +250,7 @@ export async function fightPlayer (bot: Bot, target: Entity, signal: AbortSignal
       const sword = item(/_sword$/)
       const axe = item(/_axe$/)
       const facingUs = shieldCovers(target.yaw, tp, me)
-      const want = pvpWeapon({ sword: !!sword, axe: !!axe, enemyBlocking: enemyBlocking && facingUs, enemyShieldDownMs: enemyShieldDownUntil - now })
+      const want = pvpWeapon({ sword: !!sword, axe: !!axe, enemyShield: offhandOf(target) === 'shield' || heldOf(target) === 'shield', enemyBlocking })
       if (flags.adaptive !== false && want) await equipNamed(want === 'axe' ? axe : sword)
       else if (!want) await equipForTarget(bot, target, flags)
       held = bot.heldItem?.name ?? null
@@ -257,11 +258,8 @@ export async function fightPlayer (bot: Bot, target: Entity, signal: AbortSignal
       const aimAt = predict(tp, vel, 2)
 
       // ---- shield ----
-      const shieldCall = pvpShield({
-        hasShield: hasShield() || bot.inventory.items().some(i => i.name === 'shield'),
-        disabled: shieldDisabled(bot), dist: hd, enemyReadyInMs: enemyReadyIn(now - enemySwing, enemyHeld), myCdLeftMs: cdLeft,
-        arrowIncoming: arrowIncoming(), enemyDrawing, enemyAxe: !!enemyHeld?.endsWith('_axe')
-      })
+      const myShield = hasShield() || bot.inventory.items().some(i => i.name === 'shield')
+      const shieldCall = pvpShield({ hasShield: myShield, disabled: shieldDisabled(bot), dist: hd, myCdLeftMs: cdLeft, arrowIncoming: arrowIncoming(), enemyDrawing })
 
       // ---------- out of reach: approach ----------
       if (reach > MELEE_REACH) {
@@ -285,7 +283,7 @@ export async function fightPlayer (bot: Bot, target: Entity, signal: AbortSignal
           press('forward')
         } else {
           lowerShield()
-          const mv = pvpMove({ hd, myCdLeftMs: cdLeft, enemyReadyInMs: enemyReadyIn(now - enemySwing, enemyHeld), enemyDrawing, behind: enemyHealth - bot.health })
+          const mv = pvpMove({ hd, myCdLeftMs: cdLeft, enemyReadyInMs: enemyReadyIn(now - enemySwing, enemyHeld), enemyDrawing, behind: enemyHealth - bot.health, shield: myShield && !shieldDisabled(bot) })
           if (now > strafeFlip) { strafeDir = strafeDir === 'left' ? 'right' : 'left'; strafeFlip = now + (enemyDrawing ? 350 : STRAFE_FLIP_MS) + Math.random() * 300 }
           press(mv.dir === 'back' ? 'back' : 'forward', mv.sprint)
           if (mv.strafe) bot.setControlState(strafeDir, safeStep(bot, strafeDir))
@@ -348,7 +346,7 @@ export async function fightPlayer (bot: Bot, target: Entity, signal: AbortSignal
         const edge = edgeStep({ backSafe: safeStep(bot, 'back', 1) && safeStep(bot, 'back', 2), leftSafe: safeStep(bot, 'left'), rightSafe: safeStep(bot, 'right') })
         if (edge) press(edge)
         else {
-          const mv = pvpMove({ hd, myCdLeftMs: cdLeft, enemyReadyInMs: enemyReadyIn(now - enemySwing, enemyHeld), enemyDrawing, behind: enemyHealth - bot.health })
+          const mv = pvpMove({ hd, myCdLeftMs: cdLeft, enemyReadyInMs: enemyReadyIn(now - enemySwing, enemyHeld), enemyDrawing, behind: enemyHealth - bot.health, shield: myShield && !shieldDisabled(bot) })
           // a raised shield facing us and no axe: work round to its side
           const flank = enemyBlocking && facingUs && !axe
           if (now > strafeFlip && !flank) { strafeDir = strafeDir === 'left' ? 'right' : 'left'; strafeFlip = now + STRAFE_FLIP_MS + Math.random() * 400 }

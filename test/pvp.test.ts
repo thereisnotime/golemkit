@@ -166,22 +166,22 @@ test('enemy reading: velocity smoothing, teleports, prediction, swing charge, sh
   assert.equal(shieldCovers(0, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 3 }), false)
 })
 
-test('weapon: axe against a raised shield that is up, sword otherwise', () => {
-  assert.equal(pvpWeapon({ sword: true, axe: true, enemyBlocking: true, enemyShieldDownMs: 0 }), 'axe')
-  assert.equal(pvpWeapon({ sword: true, axe: true, enemyBlocking: true, enemyShieldDownMs: 3000 }), 'sword', 'already disabled')
-  assert.equal(pvpWeapon({ sword: true, axe: true, enemyBlocking: false, enemyShieldDownMs: 0 }), 'sword')
-  assert.equal(pvpWeapon({ sword: false, axe: true, enemyBlocking: false, enemyShieldDownMs: 0 }), 'axe')
-  assert.equal(pvpWeapon({ sword: false, axe: false, enemyBlocking: true, enemyShieldDownMs: 0 }), null)
+test('weapon: the axe against shield carriers, the sword otherwise', () => {
+  assert.equal(pvpWeapon({ sword: true, axe: true, enemyShield: true }), 'axe')
+  assert.equal(pvpWeapon({ sword: true, axe: true, enemyShield: false, enemyBlocking: true }), 'axe', 'a shield in the main hand')
+  assert.equal(pvpWeapon({ sword: true, axe: true, enemyShield: false }), 'sword')
+  assert.equal(pvpWeapon({ sword: false, axe: true, enemyShield: false }), 'axe')
+  assert.equal(pvpWeapon({ sword: true, axe: false, enemyShield: true }), 'sword')
+  assert.equal(pvpWeapon({ sword: false, axe: false, enemyShield: true }), null)
 })
 
-test('shield: up for arrows and charged swings, down to hit, never against an axe', () => {
-  const s = { hasShield: true, disabled: false, dist: 3, enemyReadyInMs: 0, myCdLeftMs: 500, arrowIncoming: false, enemyDrawing: false, enemyAxe: false }
+test('shield: up in reach while our hit charges and for arrows, down to hit', () => {
+  const s = { hasShield: true, disabled: false, dist: 3, myCdLeftMs: 500, arrowIncoming: false, enemyDrawing: false }
   assert.equal(pvpShield(s), 'raise')
   assert.equal(pvpShield({ ...s, myCdLeftMs: 40 }), 'lower', 'our hit is ready')
-  assert.equal(pvpShield({ ...s, myCdLeftMs: 200 }), 'lower', 'no time for the 5-tick delay')
-  assert.equal(pvpShield({ ...s, enemyAxe: true }), 'lower')
-  assert.equal(pvpShield({ ...s, enemyReadyInMs: 400 }), 'lower', 'they are still charging')
-  assert.equal(pvpShield({ ...s, dist: 10, enemyReadyInMs: 400, arrowIncoming: true, myCdLeftMs: 0 }), 'raise')
+  assert.equal(pvpShield({ ...s, myCdLeftMs: 300 }), 'lower', 'no time for the 5-tick delay')
+  assert.equal(pvpShield({ ...s, dist: 6 }), 'lower', 'out of their reach')
+  assert.equal(pvpShield({ ...s, dist: 10, arrowIncoming: true, myCdLeftMs: 0 }), 'raise')
   assert.equal(pvpShield({ ...s, dist: 10, enemyDrawing: true, myCdLeftMs: 0 }), 'raise')
   assert.equal(pvpShield({ ...s, disabled: true, arrowIncoming: true }), 'lower')
   assert.equal(pvpShield({ ...s, hasShield: false }), 'lower')
@@ -194,7 +194,8 @@ test('footwork: sprint in, zig-zag against a bow, step in only when charged, bac
   assert.deepEqual(pvpMove({ ...s, hd: 5, enemyDrawing: true }), { dir: 'forward', sprint: true, strafe: true })
   assert.deepEqual(pvpMove({ ...s, hd: 3.6 }), { dir: 'forward', sprint: true, strafe: false }, 'charged: W-tap in')
   assert.deepEqual(pvpMove({ ...s, hd: 3.6, myCdLeftMs: 400 }), { dir: 'strafe', sprint: false, strafe: true }, 'charging: circle')
-  assert.deepEqual(pvpMove({ ...s, hd: 2.8, myCdLeftMs: 400 }), { dir: 'back', sprint: false, strafe: true }, 'they are ready, we are not')
+  assert.deepEqual(pvpMove({ ...s, hd: 2.8, myCdLeftMs: 400 }), { dir: 'back', sprint: false, strafe: true }, 'they are ready, we are not, no shield')
+  assert.deepEqual(pvpMove({ ...s, hd: 2.8, myCdLeftMs: 400, shield: true }), { dir: 'strafe', sprint: false, strafe: true }, 'blocking instead')
   assert.deepEqual(pvpMove({ ...s, hd: 2.0 }), { dir: 'back', sprint: false, strafe: true })
   assert.equal(pvpKnockback({ enemyEdge: true, health: 20, enemyHealth: 20 }), true)
   assert.equal(pvpKnockback({ enemyEdge: false, health: 6, enemyHealth: 16 }), true)

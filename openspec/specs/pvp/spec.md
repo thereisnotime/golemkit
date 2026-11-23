@@ -69,11 +69,11 @@ The reflexes SHALL engage an allowed player within `combat.pvpEngage` blocks (16
 - **THEN** the bot gives up instead of chasing
 
 ### Requirement: PvP tactics
-With `combat.pvpTactics` on (default), fights with players SHALL use the PvP loop: sword on full charge with jump crits and a sprinted first hit; W-tap sprint hits when the enemy has a drop or lava behind or the bot is losing; an axe swap and immediate hit against a raised shield that faces the bot, then back to the sword; spacing of about 3 blocks while charging, circling, stepping back inside 2.4 blocks or when their swing is ready and ours is not; shield up for incoming arrows, a drawn bow, or their charged swing in reach, down to hit and never against an axe at close range; bow at 12 to 40 blocks with lead unless they block or close fast; a totem into the offhand and a golden apple at 10 health (apple at 6 when they are on it); backing off to heal when low with nothing to heal and losing, coming back at 14 or 4 more than them; sidestepping when a drop or lava is behind. Off, the mob fight loop is used.
+With `combat.pvpTactics` on (default), fights with players SHALL use the PvP loop: sword on full charge with jump crits and a sprinted first hit; W-tap sprint hits when the enemy has a drop or lava behind or the bot is losing; the axe as main weapon against a player carrying a shield (a hit on a raised shield, charged or not, disables it for 5 s) and the sword otherwise; spacing of about 3 blocks while charging, circling, stepping back inside 2.4 blocks or, without a shield, when their swing is ready and ours is not; shield up for incoming arrows, a drawn bow, and in reach while our hit is more than 5 ticks from charged, down to hit; bow at 12 to 40 blocks with lead unless they block or close fast; a totem into the offhand and a golden apple at 10 health (apple at 6 when they are on it); backing off to heal when low with nothing to heal and losing, coming back at 14 or 4 more than them; sidestepping when a drop or lava is behind. Off, the mob fight loop is used.
 
-#### Scenario: Raised shield
-- **WHEN** the enemy raises a shield facing the bot and the bot carries an axe
-- **THEN** it switches to the axe, hits at once (the shield is disabled 5 s) and switches back to the sword
+#### Scenario: Shield carrier
+- **WHEN** the enemy carries a shield and the bot has an axe
+- **THEN** it fights with the axe, and hits a raised shield at once so it is disabled for 5 s
 
 #### Scenario: Ledge behind
 - **WHEN** the bot stands with a 5-block drop behind it in a fight

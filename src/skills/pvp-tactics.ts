@@ -49,12 +49,16 @@ export function shieldCovers (targetYaw: number, target: V3, from: V3): boolean 
 // ---- weapon ----
 
 /**
- * Sword or axe for the next hit. The axe goes in when the enemy holds a raised shield that faces
- * us and isn't already disabled: any axe hit on it turns it off for 5 s. Back to the sword (more
- * damage per second) while their shield is down or not raised. Without one or the other: what is there.
+ * Sword or axe. Against a player who carries a shield the axe is the main weapon: every hit on a
+ * raised shield turns it off for 5 s, and against armour its big hits lose less (armour takes a
+ * smaller share of a big hit), so it comes out even on damage per second with the sword while
+ * never wasting a swing on a block. Swapping resets the charge, so it doesn't swap back and forth
+ * during the 5 s. Without a shield on them: the sword (1.6 hits a second). Measured in the
+ * bot-vs-bot benchmark: the old loop, which always takes the axe against shield users, beat an
+ * earlier sword-first version.
  */
-export function pvpWeapon (s: { sword: boolean, axe: boolean, enemyBlocking: boolean, enemyShieldDownMs: number }): 'sword' | 'axe' | null {
-  if (s.axe && s.enemyBlocking && s.enemyShieldDownMs <= 0) return 'axe'
+export function pvpWeapon (s: { sword: boolean, axe: boolean, enemyShield: boolean, enemyBlocking?: boolean }): 'sword' | 'axe' | null {
+  if (s.axe && (s.enemyShield || s.enemyBlocking)) return 'axe'
   if (s.sword) return 'sword'
   return s.axe ? 'axe' : null
 }
@@ -65,20 +69,18 @@ export const SHIELD_DISABLE_MS = 5000
 // ---- shield ----
 
 /**
- * Raise or lower our shield. Up against an arrow on its way or a bow at full draw aimed at us,
- * and when the enemy is in reach with a charged swing while our own hit is still charging (the
- * shield needs 5 ticks). Down to hit, when it's disabled, and against an axe at point-blank: an
- * axe hit turns it off for 5 s, so stepping back is better.
+ * Raise or lower our shield. Up against an arrow on its way or a bow drawn at us, and in reach
+ * whenever our own hit is more than 5 ticks (the raise delay) plus a margin from charged: a
+ * player's hit can come any time, and an axe hit on the raised shield is still blocked in full
+ * (the shield is then off for 5 s). Down a tick before our hit, and when it's disabled.
  */
 export function pvpShield (s: {
-  hasShield: boolean, disabled: boolean, dist: number, enemyReadyInMs: number, myCdLeftMs: number,
-  arrowIncoming: boolean, enemyDrawing: boolean, enemyAxe: boolean
+  hasShield: boolean, disabled: boolean, dist: number, myCdLeftMs: number, arrowIncoming: boolean, enemyDrawing: boolean
 }): 'raise' | 'lower' {
   if (!s.hasShield || s.disabled) return 'lower'
   if (s.arrowIncoming || (s.enemyDrawing && s.dist > 4)) return 'raise'
-  if (s.myCdLeftMs <= SHIELD_LOWER_MS) return 'lower'
-  if (s.enemyAxe) return 'lower'
-  if (s.dist <= MELEE_REACH + 0.6 && s.enemyReadyInMs <= 150 && s.myCdLeftMs > SHIELD_DELAY_MS) return 'raise'
+  if (s.myCdLeftMs <= SHIELD_DELAY_MS + 100) return 'lower'
+  if (s.dist <= MELEE_REACH + 0.8) return 'raise'
   return 'lower'
 }
 
@@ -98,6 +100,8 @@ export interface PvpMoveState {
   enemyDrawing: boolean
   /** Our health below theirs by this much (positive: we are losing). */
   behind: number
+  /** We have a working shield to block with. */
+  shield?: boolean
 }
 
 export type PvpMove = { dir: 'forward' | 'back' | 'strafe', sprint: boolean, strafe: boolean }
@@ -105,8 +109,8 @@ export type PvpMove = { dir: 'forward' | 'back' | 'strafe', sprint: boolean, str
 /**
  * Footwork: close in sprinting (strafing so a bow line misses) when far, step into reach as our
  * hit charges (the sprint makes it a knockback hit, W-tap), keep about 3 blocks while it
- * charges (in their reach only for the moment we swing), circle at that distance, and back off
- * inside 2.4 blocks (the enemy gets free hits that close).
+ * charges, circle at that distance (stepping out of their reach instead when we have no
+ * shield and their hit is ready), and back off inside 2.4 blocks.
  */
 export function pvpMove (s: PvpMoveState): PvpMove {
   if (s.enemyDrawing && s.hd > 4) return { dir: 'forward', sprint: true, strafe: true }
@@ -118,8 +122,8 @@ export function pvpMove (s: PvpMoveState): PvpMove {
     if (charged) return { dir: 'forward', sprint: true, strafe: false }
     return { dir: 'strafe', sprint: false, strafe: true }
   }
-  // inside reach while charging: they're ready and we aren't, step out
-  if (!charged && s.enemyReadyInMs <= 200 && s.behind > -4) return { dir: 'back', sprint: false, strafe: true }
+  // inside reach while charging: circle (the shield covers us); out of reach when we have none and they're ready
+  if (!charged && !s.shield && s.enemyReadyInMs <= 200 && s.behind > -4) return { dir: 'back', sprint: false, strafe: true }
   return { dir: 'strafe', sprint: false, strafe: true }
 }
 

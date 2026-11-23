@@ -739,12 +739,12 @@ to the sections above:
 
 | Section | PvP use |
 |---|---|
-| Attack cooldown | the enemy's charge from their last swing (`entitySwingArm`) and held item: shield up when it's ready, step out of reach while ours charges |
+| Attack cooldown | the enemy's charge from their last swing (`entitySwingArm`) and held item: without a shield, step out of reach while ours charges and theirs is ready |
 | Critical hits | jump crits on full charge, as against mobs |
 | Sprint hits, W-tap | sprint into reach only as the hit charges; sprint (knockback) hits when the enemy has a drop or lava behind them or the bot is losing |
 | Spacing and reach, strafing | about 3 blocks while charging, circle at that range, back off inside 2.4; zig-zag approach against a drawn bow |
-| Axe vs sword | axe swap and immediate hit on a raised shield facing the bot (disabled 5 s), then the sword again |
-| Shield | up for arrows on course, a drawn bow, or their charged swing in reach; down to hit; never against an axe at close range |
+| Axe vs sword | the axe against shield carriers (disables a raised shield 5 s, loses less to armour), the sword otherwise; an immediate axe hit on a raised shield, charged or not |
+| Shield | up for arrows on course, a drawn bow, and in reach while our own hit is more than 5 ticks from charged; down to hit |
 | Totem of Undying, golden apples | totem into the offhand and an apple at 10 health (PvP bursts are bigger than mob hits) |
 | Healing behind cover | retreat to heal when low with nothing to heal and losing, back at 14 or 4 more than them |
 | Bow | 12 to 40 blocks with velocity lead (`aimArrow`), not into a raised shield or at someone closing faster than a draw |

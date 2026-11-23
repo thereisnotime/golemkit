@@ -19,12 +19,12 @@ import mcProtocol from 'minecraft-protocol'
 const { ping } = mcProtocol as any
 import { Agent, defineVariant, serverFromEnv, PRIORITY, fmtPos, type ActionResult } from '../src/core/index.ts'
 import { standardSkills, extendedSkills, navigation } from '../src/skills/index.ts'
-import { reflexes } from '../src/brains/index.ts'
+import { reflexes, commandBrain } from '../src/brains/index.ts'
 
 const argv = process.argv.slice(2)
 const flag = (name: string) => argv.includes(`--${name}`)
 const opt = (name: string, def: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1]! : def }
-const BOOL_FLAGS = ['--scout', '--cleanup', '--force', '--no-bow', '--totem']
+const BOOL_FLAGS = ['--scout', '--cleanup', '--force', '--no-bow', '--totem', '--commands']
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i > 0 && argv[i - 1]!.startsWith('--') && !BOOL_FLAGS.includes(argv[i - 1]!)))
 const X = Number(positional[0] ?? 1250)
 const Z = Number(positional[1] ?? 445)
@@ -53,7 +53,8 @@ const pause = (ms: number) => new Promise(r => setTimeout(r, ms))
 const variant = defineVariant({
   name: 'pvp-bench',
   skills: [...standardSkills(), navigation(), ...extendedSkills()],
-  brains: [reflexes()]
+  // owner commands (the director is the only owner) for --commands
+  brains: [reflexes(), commandBrain({ greet: false })]
 })
 const sys = { kind: 'system', name: 'pvp-bench' } as const
 async function step (agent: Agent, name: string, params: Record<string, unknown> = {}): Promise<ActionResult> {
@@ -117,7 +118,8 @@ async function main (): Promise<void> {
     replies.length = 0
     await cmd(`/data get entity ${p} Pos`)
     for (let i = 0; i < 60; i++) {
-      const line = replies.find(r => r.includes(p) || /No entity was found/i.test(r))
+      // only the answer itself: "No entity was found" also comes back from the mob clean-up kills
+      const line = replies.find(r => r.includes(`${p} has the following entity data`))
       if (line) {
         const m = /\[(-?[\d.]+)d, (-?[\d.]+)d, (-?[\d.]+)d\]/.exec(line)
         return m ? Math.hypot(Number(m[1]) - X, Number(m[3]) - Z) : null
@@ -238,6 +240,31 @@ async function main (): Promise<void> {
     for (const ag of [a, b]) { wire(ag); ag.on('session', () => wire(ag)) }
 
     const spawnY = G + 1
+    if (flag('commands')) {
+      // owner commands over whispers, PvP never switched on long enough to fight (the two stand 30 apart)
+      await cmd(`/tp ${A} ${X - 15 + 0.5} ${spawnY} ${Z + 0.5}`)
+      await cmd(`/tp ${B} ${X + 15 + 0.5} ${spawnY} ${Z + 0.5}`)
+      a.setToggle('combat.pvpEngage', 4)
+      const heard: string[] = []
+      dir.bot.on('whisper', (u: string, m: string) => { if (u === A) heard.push(m) })
+      const ask = async (line: string, expect: RegExp) => {
+        heard.length = 0
+        dir.whisper(A, line)
+        for (let i = 0; i < 40 && !heard.length; i++) await pause(250)
+        await pause(800)
+        const got = heard.join(' | ')
+        log(`${expect.test(got) ? 'PASS' : 'FAIL'} ${line} -> ${got || '(nothing)'}`)
+      }
+      await ask('!pvp', /PvP off/)
+      await ask(`!attack_player ${DIRECTOR}`, /never/)
+      await ask(`!attack_player ${B}`, new RegExp(`${B} is a target`))
+      await ask('!pvp_list', new RegExp(`PvP targets; targets: ${B}`))
+      await ask('!stop', /PvP off/)
+      await ask('!pvp revenge', /revenge/)
+      await ask(`!spare_player ${B}`, /leaving|wasn't/)
+      await ask('!pvp off', /PvP off/)
+      return
+    }
     for (const p of [A, B]) await cmd(`/spawnpoint ${p} ${X} ${spawnY} ${Z + Math.min(12, R)}`)
     for (const p of [A, B]) await cmd(`/gamemode survival ${p}`)
     const setup = (ag: Agent, other: string, tactics: boolean) => {
@@ -304,13 +331,15 @@ async function main (): Promise<void> {
         b.setToggle('combat.pvp', 'targets')
         let lastLog = 0
         let lastClear = Date.now()
+      let clearing: Promise<void> = Promise.resolve()
         const sessions = drops
         while (Date.now() - start < ROUND_S * 1000 && deathAt.size === 0) {
           await pause(250)
           if (Date.now() - lastLog > 10_000) { lastLog = Date.now(); log(`  ${state(a)} || ${state(b)}`) }
-          if (Date.now() - lastClear > 8000) { lastClear = Date.now(); void clearMobs() }
+          if (Date.now() - lastClear > 8000) { lastClear = Date.now(); clearing = clearMobs() }
         }
-        const reconnected = drops !== sessions
+        await clearing
+      const reconnected = drops !== sessions
         measuring = false
         a.setToggle('combat.pvp', 'off')
         b.setToggle('combat.pvp', 'off')

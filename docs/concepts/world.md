@@ -344,18 +344,19 @@ block, crit, shoot, pearl and heal, so the PvP loop (`pvp-fight.ts`, decisions i
 flags), a drawn bow, their last swing (so it knows when their hit is charged), velocity from
 position samples, their health:
 
-- weapon: the sword, swapped for the axe when they raise a shield that faces the bot (any axe hit
-  on it turns it off for 5 s), hit at once, then back to the sword; swaps happen on the way in;
+- weapon: the axe against a player who carries a shield (every hit on a raised shield turns it
+  off for 5 s, and its big hits lose less to armour), the sword otherwise; swaps happen on the way
+  in, since a swap resets the charge; with an axe in hand a raised shield gets hit at once, charged
+  or not;
 - hits on full charge, jump crits, a sprinted first hit, W-tap sprint hits when the enemy has a
   drop or lava behind them (knock them off) or the bot is losing; aim 2 ticks ahead of their
   movement;
 - footwork: sprint in strafing (a faster zig-zag against a drawn bow), step into reach only when
-  the hit is (almost) charged, circle at about 3 blocks while it charges, step back inside 2.4 or
-  when their swing is ready and ours isn't; without an axe against a raised shield it works
-  round to the side;
-- shield: up when an arrow is on course or a bow is drawn at it, and in reach when their swing is
-  charged and ours has more than 5 ticks to go; down to hit, and never against an axe at close
-  range (it would be disabled for 5 s);
+  the hit is (almost) charged, circle at about 3 blocks while it charges (blocking), step back
+  inside 2.4, or when their swing is ready and it has no shield; without an axe against a raised
+  shield it works round to the side;
+- shield: up when an arrow is on course or a bow is drawn at it, and in reach whenever its own
+  hit is more than 5 ticks (the raise delay) from charged; down a tick before it hits;
 - bow at 12 to 40 blocks with arrows, with lead from arrow physics, unless they block or close in
   faster than a draw takes; melee once close;
 - sustain: a totem into the offhand at 10 health, a golden apple at 10 (when they're not on it)
