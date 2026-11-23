@@ -54,7 +54,7 @@ coordinates).
 |---|---|---|
 | `death` | the bot died | `cause`, `killer`, `weapon`, `message` (the server's death message), `healthBefore`, `action` (what it was doing), `lost` (inventory it carried), `lostCount` |
 | `respawn` | back alive | `keptInventory` |
-| `damage` | health dropped; aggregated per source over 10 s | `source` (entity, `environment`, `starvation`, `unknown`), `amount`, `hits`, `healthAfter` |
+| `damage` | health dropped; aggregated per source over 10 s | `source` (entity, `lava`, `fire`, `drowning`, `fall`, `starvation`, `unknown`), `amount`, `hits`, `healthAfter` |
 | `kill` | an entity the bot hit died within 10 s, or a death message names the bot as killer | `entity`; from a death message also `how` (the cause) and `weapon` |
 | `item_gained` / `item_lost` | net inventory change after 2 s of quiet (moving items between slots nets to nothing) | `items` (`{ name: count }`, modded names as the server registry has them), `action` |
 | `block_broken` / `block_placed` | per 16x16 column, reported 30 s after the first | `blocks`, `count`, `area` |
@@ -82,14 +82,17 @@ Death messages are parsed from the vanilla en_us wording ("Pax was slain by Zomb
 patterns in `src/core/journal/deathMessages.ts`) into a short `cause` (`slain`, `shot`,
 `explosion`, `fall`, `lava`, `drowning`, `starvation`, ...), the `killer` and the `weapon`. If
 no message arrives within 3 seconds, the death is still recorded: `cause` is then the entity
-that hurt the bot in the last 3 seconds, `environment`, or `unknown`.
+that hurt the bot in the last 3 seconds, or what its surroundings say: `lava`, `fire`,
+`drowning`, `fall`, `starvation` or `unknown` (the same classification the death report uses,
+`classifyEnv` in the adapter's `deaths.ts`; `damage` events name their source the same way).
 
 The same cause goes beyond the journal: the adapter emits a `deathCause` event with a report
 (the cause in chat form such as "slain by Zombie", or without a server message what the last
 hit was: "fell", "burned in lava", "drowned", "starved"; the server message, the damage sources
 of the last 15 seconds, hostiles within 8 blocks, the action that held the body, health before
 the last hit, the position). Hooks get it as `{cause}`, `{killer}`, `{deathMessage}` and
-`{deathDetail}` on `death` ([context pack](/guide/context-pack)), the LLM brain's death event
+`{deathDetail}` on `death` ([context pack](/guide/context-pack)), the
+[self-improver](/guide/self-improver)'s `death` triggers as `{cause}` and `{deathDetail}`, the LLM brain's death event
 carries it with an instruction to report it as it is, and `observe` shows it as `lastDeath`
 for 10 minutes. Live, Pax said "died again (zombie...)" after a death the defend reflex logged as
 "died fighting creeper"; the model had guessed, and only the server message said which.

@@ -10,12 +10,12 @@ import { getPlaces } from '../../skills/navigation.ts'
 import type { NpcWorldView } from '../npc/blackboard.ts'
 import type { Behavior, BehaviorContext, NpcContext, Blackboard } from '../npc/index.ts'
 import { NpcYield } from '../npc/index.ts'
-import type { Program, Scalar, Trigger } from './format.ts'
+import type { Program, Scalar, Trigger, TriggerEvent } from './format.ts'
 import { CapExceeded, ChatLimiter, ProgramMemory, RoutineFailed, evalCond, runRoutine, stepsOf, type Host, type RunEnv, type World } from './interpreter.ts'
 
 export const TRIGGER_BEHAVIOR = 'triggers'
 
-interface Pending { trigger: Trigger, player?: string, at: number }
+interface Pending { trigger: Trigger, player?: string, event?: TriggerEvent, at: number }
 
 /** Fired triggers waiting for the body. Entries expire so a stale greeting isn't run minutes later. */
 export class TriggerQueue {
@@ -83,7 +83,7 @@ function host (ctx: BehaviorContext, deps: CompileDeps): Host {
   }
 }
 
-async function execute (kind: 'rule' | 'trigger', name: string, steps: Program['routines'][string], ctx: BehaviorContext, deps: CompileDeps, player?: string) {
+async function execute (kind: 'rule' | 'trigger', name: string, steps: Program['routines'][string], ctx: BehaviorContext, deps: CompileDeps, player?: string, event?: TriggerEvent) {
   const env: RunEnv = {
     program: deps.program,
     world: deps.world(ctx),
@@ -91,7 +91,8 @@ async function execute (kind: 'rule' | 'trigger', name: string, steps: Program['
     host: host(ctx, deps),
     chat: deps.chat,
     player: player ?? ctx.bb.facts.nearestPlayer?.name,
-    bot: ctx.agent.username
+    bot: ctx.agent.username,
+    event
   }
   try {
     const r = await runRoutine(steps, env)
@@ -131,7 +132,7 @@ export function compile (deps: CompileDeps): Behavior[] {
         const item = deps.queue.take(Date.now())
         if (!item) return 'nothing queued'
         running = item.trigger.priority ?? 60
-        return execute('trigger', item.trigger.name, stepsOf(p, item.trigger.do), ctx, deps, item.player)
+        return execute('trigger', item.trigger.name, stepsOf(p, item.trigger.do), ctx, deps, item.player, item.event)
       }
     })
   }

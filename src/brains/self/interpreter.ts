@@ -2,7 +2,7 @@
 // world goes through Host.act (the NPC brain's ctx.act, so agent.act at PRIORITY.npc) or
 // Host.say/whisper (agent chat queue behind a per-program rate limiter). Each routine run has
 // a step budget and a time budget; running out of either ends the run with CapExceeded.
-import { fillTemplate, LIMITS, TIME_WINDOWS, type Cond, type Program, type Scalar, type Step, type TimeWindow } from './format.ts'
+import { fillTemplate, LIMITS, type TriggerEvent, TIME_WINDOWS, type Cond, type Program, type Scalar, type Step, type TimeWindow } from './format.ts'
 import type { ActionResult } from '../../core/index.ts'
 
 /** Read access to the world: observation, blackboard, places, program memory. */
@@ -85,6 +85,8 @@ export interface RunEnv {
   /** Player this run is about (chat speaker, joined player, nearest player). */
   player?: string
   bot: string
+  /** What fired the trigger ({cause}, {deathDetail} for a death). */
+  event?: TriggerEvent
   /** Called with every action result (for experience counters). */
   onAction? (name: string, result: ActionResult): void
 }
@@ -154,7 +156,7 @@ function pick (v: string | string[], env: RunEnv): string {
 }
 
 function fill (s: string, env: RunEnv): string {
-  return fillTemplate(s, { player: env.player, bot: env.bot, get: n => env.memory.get(n) })
+  return fillTemplate(s, { player: env.player, bot: env.bot, event: env.event, get: n => env.memory.get(n) })
 }
 
 function fillParams (v: unknown, env: RunEnv): unknown {

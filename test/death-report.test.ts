@@ -85,3 +85,30 @@ test('onDeathReport: uses the adapter report, or reports an unknown cause when n
   off()
   assert.equal(game.listenerCount('death'), 0)
 })
+
+test('classifyEnv: the one environmental classification deaths.ts and the journal share', async () => {
+  const { classifyEnv } = await import('../src/adapters/minecraft-java/deaths.ts')
+  const calm = { inLava: false, onFire: false, oxygen: 20, food: 20, sinceLandingMs: 60_000, fallen: 0 }
+  assert.equal(classifyEnv({ ...calm, inLava: true, onFire: true }), 'lava')
+  assert.equal(classifyEnv({ ...calm, onFire: true }), 'fire')
+  assert.equal(classifyEnv({ ...calm, oxygen: 0 }), 'drowning')
+  assert.equal(classifyEnv({ ...calm, sinceLandingMs: 200, fallen: 12 }), 'fall')
+  assert.equal(classifyEnv({ ...calm, sinceLandingMs: 200, fallen: 2 }), 'unknown')
+  assert.equal(classifyEnv({ ...calm, food: 0 }), 'starvation')
+  assert.equal(classifyEnv(calm), 'unknown')
+})
+
+test('envCauses: a landing after a long drop reads as a fall', async () => {
+  const { envCauses } = await import('../src/adapters/minecraft-java/deaths.ts')
+  const bot: any = Object.assign(new EventEmitter(), { food: 20, oxygenLevel: 20, entity: { position: { y: 80 }, onGround: false, metadata: [0] } })
+  const env = envCauses(bot)
+  bot.emit('physicsTick')
+  bot.entity.position.y = 64
+  bot.entity.onGround = true
+  bot.emit('physicsTick')
+  assert.equal(env.source(), 'fall')
+  bot.entity.isInLava = true
+  assert.equal(env.source(), 'lava')
+  env.dispose()
+  assert.equal(bot.listenerCount('physicsTick'), 0)
+})

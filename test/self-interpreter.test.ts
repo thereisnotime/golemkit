@@ -189,3 +189,11 @@ test('a failing rule counts as failure and cools down', async () => {
   assert.ok((s.c.status().cooldowns as any).patrol > 0)
   s.c.stop()
 })
+
+test('a death trigger fills {cause} and {deathDetail} from the death report', async () => {
+  const s = setup({ version: 1, name: 't', triggers: [{ name: 'died', on: 'death', do: [{ say: 'died to {cause}: {deathDetail}' }] }] })
+  s.queue.push({ trigger: s.program.triggers[0]!, event: { cause: 'lava', deathDetail: 'tried to swim in lava' }, at: Date.now() })
+  await s.c.tick(); await s.c.settled()
+  assert.deepEqual(s.said, ['died to lava: tried to swim in lava'])
+  s.c.stop()
+})

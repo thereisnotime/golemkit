@@ -147,7 +147,8 @@ Every step is an object with exactly one kind key.
 | `{ "fail": "no bed here" }` | end the routine as a failure |
 
 Templates in text and in string action params: `{player}` (chat speaker, joined player or
-nearest player), `{bot}`, `{var.<name>}`.
+nearest player), `{bot}`, `{var.<name>}`. In a `death` trigger also `{cause}` (`lava`,
+`slain by Zombie`, ...) and `{deathDetail}` (the one-line [death report](/guide/journal)).
 
 ### Conditions
 
@@ -175,7 +176,7 @@ remembered place), `var.<name>`, `timer.<name>`. Missing distances read -1.
 | `time` | once each time the day enters `at` | `at` (window name or range) |
 | `chat` | a chat line contains one of `match` (whole words, case-insensitive) | `match`, `near`, `ownersOnly` |
 | `hurt` | the bot took damage (debounced 10 s) | |
-| `death` | the bot died | |
+| `death` | the bot died, once the cause is known (a few seconds later) | fills `{cause}`, `{deathDetail}` |
 | `playerJoined` | someone joined | |
 | `spawn` | the bot (re)spawned | |
 

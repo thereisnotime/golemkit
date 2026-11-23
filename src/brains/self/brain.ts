@@ -6,7 +6,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  defineBrain, defineAction, noParams, ok, fail, z, distance,
+  defineBrain, defineAction, noParams, ok, fail, z, distance, onDeathReport,
   type Agent, type ActionContext, type ChatMessage, type Logger, type GameClient
 } from '../../core/index.ts'
 import { createProvider } from '../../llm/providers/index.ts'
@@ -15,7 +15,7 @@ import { fmtTotals } from '../../llm/usage.ts'
 import type { Price } from '../../llm/pricing.ts'
 import { NpcController, INTERRUPT_ACTION, type Behavior, type NpcOptions } from '../npc/index.ts'
 import { TriggerQueue, compile, liveWorld, type Outcome } from './compile.ts'
-import { diffSummary, makeCatalog, mustParse, parseProgram, type ActionCatalog, type CatalogPolicy, type Program, type ProgramInput, type Trigger } from './format.ts'
+import { diffSummary, makeCatalog, mustParse, parseProgram, type ActionCatalog, type CatalogPolicy, type Program, type ProgramInput, type Trigger, type TriggerEvent } from './format.ts'
 import { ChatLimiter, ProgramMemory, evalCond, inWindow, type Host } from './interpreter.ts'
 import { chatMatches, parseAnswer, parseInstruction, type IntakeOptions } from './intake.ts'
 import { Learner, type LearnBudget } from './learner.ts'
@@ -170,13 +170,13 @@ export class SelfImprover {
       lastHurt = Date.now()
       this.fireEvent('hurt')
     }
-    const onDeath = () => this.fireEvent('death')
+    // fires once the cause is known (server message, damage log), like the hooks and LLM brains
+    const offDeath = onDeathReport(game, (r) => this.fireEvent('death', undefined, { cause: r.cause, deathDetail: r.summary }))
     const onJoin = (player: string) => {
       if (Date.now() - spawnedAt < 10_000) return
       this.fireEvent('playerJoined', player)
     }
     game.on('hurt', onHurt)
-    game.on('death', onDeath)
     game.on('playerJoined', onJoin)
     const spawnTimer = setTimeout(() => this.fireEvent('spawn'), 4000)
     const clock = setInterval(() => this.clockTick(), this.opts.triggerTickMs ?? 1000)
@@ -185,7 +185,7 @@ export class SelfImprover {
     const inbox = inboxOn ? setInterval(() => this.pollInbox(), this.opts.intake?.inboxPollMs ?? 10_000) : null
     return () => {
       game.off('hurt', onHurt)
-      game.off('death', onDeath)
+      offDeath()
       game.off('playerJoined', onJoin)
       clearTimeout(spawnTimer)
       clearInterval(clock)
@@ -232,21 +232,21 @@ export class SelfImprover {
   }
 
   /** Queues a trigger's routine if its cooldown and condition allow. */
-  fire (t: Trigger, player?: string): boolean {
+  fire (t: Trigger, player?: string, event?: TriggerEvent): boolean {
     const now = Date.now()
     const key = player && (t.on === 'chat' || t.on === 'playerJoined') ? `${t.name}|${player}` : t.name
     const cd = t.cooldownMs ?? (t.on === 'chat' ? 30_000 : 0)
     if (now - (this.lastFired.get(key) ?? -Infinity) < cd) return false
     if (!this.conditionHolds(t)) return false
     this.lastFired.set(key, now)
-    this.queue.push({ trigger: t, player, at: now })
+    this.queue.push({ trigger: t, player, event, at: now })
     this.log.debug(`trigger ${t.name} fired`, { trigger: t.name, player })
     this.tickController()
     return true
   }
 
-  private fireEvent (on: Trigger['on'], player?: string): void {
-    for (const t of this.program.triggers) if (t.on === on) this.fire(t, player)
+  private fireEvent (on: Trigger['on'], player?: string, event?: TriggerEvent): void {
+    for (const t of this.program.triggers) if (t.on === on) this.fire(t, player, event)
   }
 
   private clockTick (): void {

@@ -309,3 +309,18 @@ test('empty owners means nobody can teach from chat, and a profile can switch le
     s.stop()
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('the death trigger fires with the cause report from deathCause', async () => {
+  const { EventEmitter } = await import('node:events')
+  const m = await make(null, { base: { version: 1, name: 'b', triggers: [{ name: 'died', on: 'death', do: [{ say: '{cause}' }] }] } as any })
+  const ev = new EventEmitter()
+  m.agent.adapter = { on: ev.on.bind(ev), off: ev.off.bind(ev), self: () => ({ position: { x: 0, y: 64, z: 0 }, game: { dimension: 'overworld' } }), time: () => ({ timeOfDay: 1000 }) }
+  const fired: any[] = []
+  m.s.fire = (t: any, player?: string, event?: any) => { fired.push({ t: t.name, player, event }); return true }
+  const end = m.s.session({} as any)
+  ev.emit('death')
+  ev.emit('deathCause', { cause: 'drowning', summary: 'drowned near 0 64 0', recentDamage: [] })
+  end()
+  assert.deepEqual(fired, [{ t: 'died', player: undefined, event: { cause: 'drowning', deathDetail: 'drowned near 0 64 0' } }])
+  m.done()
+})

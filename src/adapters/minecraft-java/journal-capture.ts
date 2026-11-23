@@ -6,6 +6,7 @@ import type { Entity } from 'prismarine-entity'
 import type { Agent, ActionInfo } from '../../core/agent.ts'
 import type { ActionResult } from '../../core/action.ts'
 import { itemName } from './helpers.ts'
+import { envCauses } from './deaths.ts'
 import type { Journal } from '../../core/journal/journal.ts'
 import type { Pos } from '../../core/journal/types.ts'
 import { InventoryTracker, DamageAggregator, BlockAggregator, type Counts } from '../../core/journal/aggregate.ts'
@@ -166,16 +167,19 @@ export class JournalCapture {
     const damage = new DamageAggregator()
     let health = bot.health || 20
     let lastHurt: { source: string, at: number } | null = null
+    // no attacker: lava, fire, drowning, fall, starvation, the same classification as deaths.ts
+    const env = envCauses(bot)
+    offs.push(() => env.dispose())
     on(bot, 'entityHurt', (e: Entity, source?: Entity) => {
       if (e !== bot.entity) return
-      lastHurt = { source: source ? entityName(source) : 'environment', at: Date.now() }
+      lastHurt = { source: source ? entityName(source) : env.source(), at: Date.now() }
     })
     let dead = false
     let healthBefore = health
     on(bot, 'health', () => {
       const h = bot.health
       if (h < health && h > 0 && !dead) {
-        const src = lastHurt && Date.now() - lastHurt.at < 1500 ? lastHurt.source : (bot.food === 0 ? 'starvation' : 'unknown')
+        const src = lastHurt && Date.now() - lastHurt.at < 1500 ? lastHurt.source : env.source()
         damage.hit(src, Math.round((health - h) * 10) / 10, Math.round(h), Date.now(), posOf(bot))
       }
       if (h > 0) healthBefore = h
@@ -202,12 +206,13 @@ export class JournalCapture {
       if (!Object.keys(carried).length && Date.now() - lastCarried.at < 5000) carried = lastCarried.items
       if (!Object.keys(carried).length) carried = inv.baseline
       const action = this.current ?? this.agent.currentAction?.name ?? null
+      const fallback = lastHurt && ts - lastHurt.at < 3000 ? lastHurt.source : env.source() // read now, before the respawn
       for (const d of damage.poll(ts, true)) writeDamage(d)
       const write = (info: DeathInfo | null) => {
         if (deathTimer) { clearTimeout(deathTimer); deathTimer = null }
         this.pendingDeath = null
         j.record('death', {
-          cause: info?.cause ?? (lastHurt && ts - lastHurt.at < 3000 ? lastHurt.source : 'unknown'),
+          cause: info?.cause ?? fallback,
           ...(info?.killer ? { killer: info.killer } : {}),
           ...(info?.weapon ? { weapon: info.weapon } : {}),
           ...(info?.message ? { message: info.message } : {}),

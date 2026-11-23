@@ -14,40 +14,36 @@ function sourceName (e: Entity): string {
   return e.name ?? (e.displayName as string | undefined) ?? 'unknown'
 }
 
-export function watchDeaths (bot: Bot, agent: Agent, emit: (r: DeathReport) => void): () => void {
-  const tracker = new DeathCauseTracker()
-  let lastSourceAt = 0
-  let health = 20
-  let healthBefore = 20
+/** What the bot's surroundings say about damage with no attacker. */
+export interface EnvState {
+  inLava: boolean
+  onFire: boolean
+  /** Air left (undefined: not known). */
+  oxygen?: number
+  food: number
+  /** ms since the last landing, and how many blocks that landing fell. */
+  sinceLandingMs: number
+  fallen: number
+}
+
+/** Cause of damage nothing hit us for: lava, fire, drowning, fall, starvation or unknown. */
+export function classifyEnv (s: EnvState): string {
+  if (s.inLava) return 'lava'
+  if (s.onFire) return 'fire'
+  if (typeof s.oxygen === 'number' && s.oxygen <= 0) return 'drowning'
+  if (s.sinceLandingMs < 1000 && s.fallen > 3) return 'fall'
+  if (s.food === 0) return 'starvation'
+  return 'unknown'
+}
+
+/**
+ * Watches the bot's landings and reads its state, so `source()` can name the environmental cause
+ * of damage right now. Shared by the death-cause tracker and the journal.
+ */
+export function envCauses (bot: Bot): { source (): string, dispose (): void } {
   let airTop: number | null = null
   let landedFrom = 0 // blocks fallen in the last landing
   let landedAt = 0
-
-  const envSource = (): string => {
-    const e = bot.entity as any
-    if (!e) return 'unknown'
-    if (e.isInLava) return 'lava'
-    const flags = e.metadata?.[0]
-    if (typeof flags === 'number' && flags & 1) return 'fire'
-    if (typeof (bot as any).oxygenLevel === 'number' && (bot as any).oxygenLevel <= 0) return 'drowning'
-    if (Date.now() - landedAt < 1000 && landedFrom > 3) return 'fall'
-    if (bot.food === 0) return 'starvation'
-    return 'unknown'
-  }
-
-  const onHurt = (e: Entity, source?: Entity) => {
-    if (e !== bot.entity) return
-    if (source) { lastSourceAt = Date.now(); tracker.hurt(sourceName(source)) } else tracker.hurt(envSource())
-  }
-  const onHealth = () => {
-    const h = bot.health
-    if (h < health && h >= 0 && Date.now() - lastSourceAt > 1500) {
-      const src = envSource()
-      if (src !== 'unknown') tracker.hurt(src)
-    }
-    if (h > 0) healthBefore = h
-    health = h
-  }
   const onMove = () => {
     const e = bot.entity as any
     if (!e) return
@@ -56,6 +52,46 @@ export function watchDeaths (bot: Bot, agent: Agent, emit: (r: DeathReport) => v
       if (airTop !== null && airTop - y > 0) { landedFrom = airTop - y; landedAt = Date.now() }
       airTop = null
     } else if (airTop === null || y > airTop) airTop = y
+  }
+  bot.on('physicsTick', onMove)
+  return {
+    source () {
+      const e = bot.entity as any
+      if (!e) return 'unknown'
+      const flags = e.metadata?.[0]
+      const oxygen = (bot as any).oxygenLevel
+      return classifyEnv({
+        inLava: !!e.isInLava,
+        onFire: typeof flags === 'number' && (flags & 1) === 1,
+        ...(typeof oxygen === 'number' ? { oxygen } : {}),
+        food: bot.food,
+        sinceLandingMs: Date.now() - landedAt,
+        fallen: landedFrom
+      })
+    },
+    dispose () { bot.off('physicsTick', onMove) }
+  }
+}
+
+export function watchDeaths (bot: Bot, agent: Agent, emit: (r: DeathReport) => void): () => void {
+  const tracker = new DeathCauseTracker()
+  const env = envCauses(bot)
+  let lastSourceAt = 0
+  let health = 20
+  let healthBefore = 20
+
+  const onHurt = (e: Entity, source?: Entity) => {
+    if (e !== bot.entity) return
+    if (source) { lastSourceAt = Date.now(); tracker.hurt(sourceName(source)) } else tracker.hurt(env.source())
+  }
+  const onHealth = () => {
+    const h = bot.health
+    if (h < health && h >= 0 && Date.now() - lastSourceAt > 1500) {
+      const src = env.source()
+      if (src !== 'unknown') tracker.hurt(src)
+    }
+    if (h > 0) healthBefore = h
+    health = h
   }
   const onDeath = () => {
     const me = bot.entity
@@ -79,17 +115,16 @@ export function watchDeaths (bot: Bot, agent: Agent, emit: (r: DeathReport) => v
 
   bot.on('entityHurt', onHurt)
   bot.on('health', onHealth)
-  bot.on('physicsTick', onMove)
   bot.on('death', onDeath)
   bot.on('messagestr', onMessage)
   bot.on('spawn', onSpawn)
   return () => {
     bot.off('entityHurt', onHurt)
     bot.off('health', onHealth)
-    bot.off('physicsTick', onMove)
     bot.off('death', onDeath)
     bot.off('messagestr', onMessage)
     bot.off('spawn', onSpawn)
     tracker.dispose()
+    env.dispose()
   }
 }

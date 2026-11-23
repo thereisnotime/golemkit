@@ -377,7 +377,7 @@ function parseSteps (raw: unknown[], path: string, ctx: ParseCtx): Step[] {
   return out
 }
 
-const TEMPLATE = /\{(player|bot|var\.[A-Za-z0-9_]+)\}/g
+const TEMPLATE = /\{(player|bot|cause|deathDetail|var\.[A-Za-z0-9_]+)\}/g
 
 function parseStep (raw: unknown, path: string, ctx: ParseCtx): Step | undefined {
   const kind = oneKind(raw, STEP_KINDS, 'step', path, ctx.issues)
@@ -491,7 +491,7 @@ function checkStatic (p: Program, issues: string[]): void {
     for (const c of calls(steps)) if (!p.routines[c]) issues.push(`${path}: runs unknown routine "${c}"`)
     for (const t of textsIn(steps)) {
       for (const m of t.matchAll(/\{([^}]*)\}/g)) {
-        if (!new RegExp(`^${TEMPLATE.source}$`).test(m[0])) issues.push(`${path}: unknown placeholder ${m[0]} (use {player}, {bot} or {var.<name>})`)
+        if (!new RegExp(`^${TEMPLATE.source}$`).test(m[0])) issues.push(`${path}: unknown placeholder ${m[0]} (use {player}, {bot}, {cause}, {deathDetail} or {var.<name>})`)
       }
     }
   }
@@ -535,10 +535,14 @@ export function mustParse (raw: unknown, catalog: ActionCatalog): Program {
 }
 
 /** Fills template placeholders in a string. Unknown values become "". */
-export function fillTemplate (s: string, vars: { player?: string, bot?: string, get (name: string): Scalar | undefined }): string {
+/** What fired a trigger, for the templates: the death trigger's cause report. */
+export interface TriggerEvent { cause?: string, deathDetail?: string }
+
+export function fillTemplate (s: string, vars: { player?: string, bot?: string, event?: TriggerEvent, get (name: string): Scalar | undefined }): string {
   return s.replace(TEMPLATE, (_m, key: string) => {
     if (key === 'player') return vars.player ?? ''
     if (key === 'bot') return vars.bot ?? ''
+    if (key === 'cause' || key === 'deathDetail') return vars.event?.[key] ?? ''
     return String(vars.get(key.slice(4)) ?? '')
   })
 }
@@ -646,8 +650,8 @@ export function formatSpec (catalog: ActionCatalog): string {
   for (const [k, v] of Object.entries(FACTS)) lines.push(`- ${k}: ${v}`)
   lines.push(`TIME WINDOWS: ${Object.entries(TIME_WINDOWS).map(([k, v]) => `${k}=${v[0]}..${v[1]}`).join(', ')}, or [from, to] in game ticks (wraps past 23999).`)
   lines.push('RULES are utility behaviours: while "when" holds the rule scores "score" and the highest score runs its "do" (a routine name or inline steps). Bands: idle 5-15, social 15-25, chores 25-45, routine 40-70, needs 50-90. A rule ends when its steps end; it is picked again on later ticks (use cooldownMs to space it out).')
-  lines.push(`TRIGGERS: on interval (everyMs >= ${LIMITS.intervalMinMs}), time (at: window, once per window), chat (match: words, near: blocks, ownersOnly), hurt, death, playerJoined, spawn. A fired trigger queues its "do" and competes in the brain with "priority" (default 60). {player} is the speaker / joined player / nearest player.`)
-  lines.push('TEMPLATES in say/whisper text and string action params: {player}, {bot}, {var.<name>}.')
+  lines.push(`TRIGGERS: on interval (everyMs >= ${LIMITS.intervalMinMs}), time (at: window, once per window), chat (match: words, near: blocks, ownersOnly), hurt, death, playerJoined, spawn. A fired trigger queues its "do" and competes in the brain with "priority" (default 60). {player} is the speaker / joined player / nearest player; a death trigger also fills {cause} (lava, fall, a mob...) and {deathDetail} (one line from the server message and damage log).`)
+  lines.push('TEMPLATES in say/whisper text and string action params: {player}, {bot}, {var.<name>}, and on death {cause}, {deathDetail}.')
   lines.push(`LIMITS: ${LIMITS.rules} rules, ${LIMITS.routines} routines, ${LIMITS.triggers} triggers, ${LIMITS.stepsPerList} steps per list, nesting ${LIMITS.depth}, repeat.times <= ${LIMITS.repeatTimes}, while.max <= ${LIMITS.whileMax} (required), wait <= ${LIMITS.waitMs} ms, one routine run must finish within ${LIMITS.execSteps} steps and ${LIMITS.execMs / 60000} minutes, no recursion through "run". Chat is rate limited.`)
   lines.push('ACTIONS usable in {"act": name, "params": {...}} (anything else is rejected):')
   for (const a of catalog.allowed()) {
