@@ -34,7 +34,7 @@ The benchmark SHALL append one JSON line per run to `data/survival-bench/results
 - **THEN** the compare table shows a delta of -3.5 deaths and calls it better
 
 ### Requirement: Clean-up
-After every run, also a failed one, the director SHALL remove the blocks the bot placed, only at the noted positions and only where that same block is still there, kill dropped items and experience at the start, the death spots and those blocks, clear the bot's inventory and effects, put its spawnpoint back to world spawn and disconnect. What could not be cleaned (blocks it broke, placed blocks that changed since, positions the journal counted but the bench did not note) SHALL be reported. A run that broke before its clean-up SHALL leave `pending-cleanup.json`, which `--cleanup` and the next run finish.
+After every run, also a failed one, the director SHALL remove the blocks the bot placed, only at the noted positions and only where that same block is still there (placed dirt that grew grass counts as the same), kill dropped items and experience at the start, the death spots and those blocks, clear the bot's inventory and effects, put its spawnpoint back to world spawn and disconnect. What could not be cleaned (blocks it broke, placed blocks that changed since, positions the journal counted but the bench did not note) SHALL be reported. A run that broke before its clean-up SHALL leave `pending-cleanup.json`, which `--cleanup` and the next run finish.
 
 #### Scenario: A sapling that grew
 - **WHEN** the bot planted a sapling that became a tree before the clean-up

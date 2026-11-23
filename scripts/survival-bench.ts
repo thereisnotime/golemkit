@@ -318,7 +318,10 @@ async function cleanUp (p: Pending): Promise<{ removed: number, gone: number, ch
         const [bx, by, bz] = at.split(' ').map(Number) as [number, number, number]
         const b = d.agent.bot.blockAt(d.agent.bot.entity.position.clone().set(bx, by, bz))
         if (!b) { unloaded++; continue }
-        if (b.name === name) { await d.cmd(`/execute if block ${at} minecraft:${name} run setblock ${at} minecraft:air`); removed++ } else if (/air$/.test(b.name)) gone++
+        // placed dirt that grew grass is still the bot's block
+        if (b.name === name || (name === 'dirt' && /^(grass_block|podzol|mycelium)$/.test(b.name))) {
+          await d.cmd(`/execute if block ${at} minecraft:${b.name} run setblock ${at} minecraft:air`); removed++
+        } else if (/air$/.test(b.name)) gone++
         else changed.push(`${name}->${b.name}@${at}`)
       }
     }
