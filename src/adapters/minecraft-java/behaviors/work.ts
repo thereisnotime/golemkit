@@ -112,7 +112,7 @@ export const chopWoodLoop = defineBehavior({
     radius: z.number().min(4).max(64).default(32).describe('how far to look for trees when rings is empty'),
     rings: z.array(z.number().int().min(8).max(512)).max(8).default([...DEFAULT_TREE_RINGS])
       .describe('search rings when no tree is close, smallest first; rings past 64 blocks are scouting trips; [] = only radius'),
-    spawnClearance: z.number().min(0).max(256).default(48).describe('never chop within this distance of the world spawn'),
+    spawnClearance: z.number().min(0).max(256).default(48).describe('leave trees within this distance of the world spawn alone (it still chops further out after respawning there)'),
     replant: z.boolean().default(true).describe('plant saplings afterwards')
   }),
   requires: ['chop_tree'],
@@ -126,13 +126,13 @@ export const chopWoodLoop = defineBehavior({
       score ({ bot, bb }) {
         const needed = bb.need(WOOD_NEED) > 0
         if (!isDay(bot) || (woodStock(bot) >= o.keep && !needed) || bot.inventory?.emptySlotCount?.() === 0) return 0
-        const spawn = (bot as any).spawnPoint
-        if (spawn && o.spawnClearance && flatDist(spawn, bot.entity.position) < o.spawnClearance) return 0
+        // spawnClearance is about the trees (chop_tree skips those near spawn), not where the bot
+        // stands: it respawns at the world spawn after a death and has to start from there
         return needed ? 38 : 30
       },
       async run (ctx) {
         const before = woodStock(ctx.bot)
-        const r = await ctx.act('chop_tree', { radius: o.radius, replant: o.replant, ...(o.rings.length ? { rings: o.rings } : {}) })
+        const r = await ctx.act('chop_tree', { radius: o.radius, replant: o.replant, avoid_spawn: o.spawnClearance, ...(o.rings.length ? { rings: o.rings } : {}) })
         if (r.ok && woodStock(ctx.bot) > before) ctx.bb.setNeed(WOOD_NEED, 0)
         return r
       }

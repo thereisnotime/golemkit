@@ -1022,7 +1022,7 @@ Keeps a stock of wood: by day, while it has fewer than `keep` logs (4 planks cou
 | `keep` | integer (1..512) | `16` | logs to keep in stock |
 | `radius` | number (4..64) | `32` | how far to look for trees when rings is empty |
 | `rings` | list | `[32,64,128,250]` | search rings when no tree is close, smallest first; rings past 64 blocks are scouting trips; [] = only radius |
-| `spawnClearance` | number (0..256) | `48` | never chop within this distance of the world spawn |
+| `spawnClearance` | number (0..256) | `48` | leave trees within this distance of the world spawn alone (it still chops further out after respawning there) |
 | `replant` | boolean | `true` | plant saplings afterwards |
 
 ### `collect_drops`

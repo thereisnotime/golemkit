@@ -1152,6 +1152,7 @@ Fell the nearest natural tree (any wood type): cut the logs it can reach, pick u
 | `replant` | boolean |  | `true` | plant a sapling of the same kind afterwards if the bot has one |
 | `make_axe` | boolean |  | `true` | craft a wooden axe first when there is none and there is wood for it |
 | `rings` | array |  |  | look further out when there is no tree close: remembered tree spots first, then these rings (e.g. [32, 64, 128, 250]); rings past 64 are a scouting trip out and back, by day |
+| `avoid_spawn` | number (0..256) |  | `0` | leave trees within this many blocks of the world spawn alone (0 = no limit) |
 
 ## worldedit
 

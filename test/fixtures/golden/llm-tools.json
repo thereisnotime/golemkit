@@ -1547,6 +1547,13 @@
               "minimum": 8,
               "maximum": 512
             }
+          },
+          "avoid_spawn": {
+            "default": 0,
+            "description": "leave trees within this many blocks of the world spawn alone (0 = no limit)",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 256
           }
         }
       }
@@ -4539,6 +4546,13 @@
               "minimum": 8,
               "maximum": 512
             }
+          },
+          "avoid_spawn": {
+            "default": 0,
+            "description": "leave trees within this many blocks of the world spawn alone (0 = no limit)",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 256
           }
         }
       }

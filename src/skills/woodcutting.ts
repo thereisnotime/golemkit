@@ -110,13 +110,15 @@ export interface FellOptions {
   replant: boolean
   /** Craft a wooden axe first when there is none and the inventory has the wood for it. */
   makeAxe?: boolean
+  /** Leave trees within this many blocks (flat) of the world spawn alone. Default 0 (no limit). */
+  avoidSpawn?: number
 }
 
 /**
  * Fells one natural tree (the chop_tree action's body, reused by gather_materials inside its
  * own lock). Crafts an axe first when asked and the wood for it is already in the inventory.
  */
-export async function fellTree ({ bot, agent, signal, log }: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>, { radius, replant, makeAxe = true }: FellOptions): Promise<ActionResult> {
+export async function fellTree ({ bot, agent, signal, log }: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>, { radius, replant, makeAxe = true, avoidSpawn = 0 }: FellOptions): Promise<ActionResult> {
   if (!agent.canDig) return fail('digging is disabled for this bot')
   let axeNote = await autoUpgrade({ bot, agent, signal, log }, { kinds: ['axe', 'pickaxe'] })
   if (makeAxe && !axeNote) {
@@ -129,8 +131,10 @@ export async function fellTree ({ bot, agent, signal, log }: Pick<ActionContext,
   const danger = dangerMemory(agent)
   const from = bot.entity.position.clone()
   let avoided = 0
+  const spawn = (bot as { spawnPoint?: { x: number, z: number } }).spawnPoint
   const skip = (p: Vec3) => {
     if (agent.protectedAreas.isProtected(p)) return true
+    if (avoidSpawn > 0 && spawn && Math.hypot(p.x - spawn.x, p.z - spawn.z) < avoidSpawn) return true
     if (danger.isInDanger(p) || danger.crosses(from, p)) { avoided++; return true }
     return false
   }
@@ -388,6 +392,8 @@ export interface WideFellOptions {
   maxMinutes?: number
   /** Scout at night too. Default false. */
   atNight?: boolean
+  /** Leave trees this close to the world spawn alone (see FellOptions). */
+  avoidSpawn?: number
 }
 
 /**
@@ -412,7 +418,7 @@ export async function fellTreeWide (ctx: Pick<ActionContext, 'bot' | 'agent' | '
   }
   const tried = new Set<string>()
   const notes: string[] = []
-  const fell = (radius: number) => fellTree(ctx, { radius, replant: o.replant, makeAxe: o.makeAxe })
+  const fell = (radius: number) => fellTree(ctx, { radius, replant: o.replant, makeAxe: o.makeAxe, avoidSpawn: o.avoidSpawn })
   const back = async (r: ActionResult, how: string): Promise<ActionResult> => {
     const far = Math.round(Math.hypot(bot.entity.position.x - origin.x, bot.entity.position.z - origin.z))
     let tail = ''
@@ -516,12 +522,13 @@ const chopTree = defineAction({
     replant: z.boolean().default(true).describe('plant a sapling of the same kind afterwards if the bot has one'),
     make_axe: z.boolean().default(true).describe('craft a wooden axe first when there is none and there is wood for it'),
     rings: z.array(z.number().int().min(8).max(512)).max(8).optional()
-      .describe('look further out when there is no tree close: remembered tree spots first, then these rings (e.g. [32, 64, 128, 250]); rings past 64 are a scouting trip out and back, by day')
+      .describe('look further out when there is no tree close: remembered tree spots first, then these rings (e.g. [32, 64, 128, 250]); rings past 64 are a scouting trip out and back, by day'),
+    avoid_spawn: z.number().min(0).max(256).default(0).describe('leave trees within this many blocks of the world spawn alone (0 = no limit)')
   }),
   aliases: ['chop'],
-  run: (ctx, { radius, replant, make_axe, rings }) => rings?.length
-    ? fellTreeWide(ctx, { rings, replant, makeAxe: make_axe })
-    : fellTree(ctx, { radius, replant, makeAxe: make_axe })
+  run: (ctx, { radius, replant, make_axe, rings, avoid_spawn }) => rings?.length
+    ? fellTreeWide(ctx, { rings, replant, makeAxe: make_axe, avoidSpawn: avoid_spawn })
+    : fellTree(ctx, { radius, replant, makeAxe: make_axe, avoidSpawn: avoid_spawn })
 })
 
 export const woodcutting = () => defineSkill({
