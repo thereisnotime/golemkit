@@ -244,8 +244,8 @@ loop, `defend` and the reflexes. Each one has a live toggle, on by default excep
   per second (walking away from a creeper that follows) over the rest of the 1.5 s fuse stays
   under the 7 blocks where the fuse stops. Otherwise it runs as before. Fighting one creeper
   while another lights its fuse within 5 blocks switches to the lit one.
-- **Totem** (`combat.totem`): at 8 health or less, or in a fall that would kill, a totem of undying
-  goes into the offhand at once (on the health event, not on the 10 s gear check). It stays
+- **Totem** (`combat.totem`): at 8 health or less (10 while on fire), or in a fall that would
+  kill, a totem of undying goes into the offhand at once (on the health event, not on the 10 s gear check). It stays
   there until health is back above 14.
 - **Golden apples** (`combat.goldenApple`): at 8 health or less (12 with three or more melee mobs
   within 4), not with a lit creeper close, it eats a golden apple on the spot while backing off
@@ -269,7 +269,8 @@ loop, `defend` and the reflexes. Each one has a live toggle, on by default excep
 - **No running from fast mobs** (`combat.fightFastMobs`): the low-health back-off
   (`reflexes.retreatBelow`) doesn't apply to mobs that outrun the bot (vindicators, ravagers,
   spiders, wolves, piglin brutes, hoglins): backing off only turned its back on them. It keeps
-  fighting; golden apples and the back-off to eat at 4 health still apply.
+  fighting; golden apples and the back-off to eat at 4 health still apply, and so does the
+  water back-off (`reflexes.waterFightAbove`) from one standing in water.
 - **Warden**: never fought (500 health, its hits go through shields); hit by one, the bot backs off.
 - Kept from before: weapon-cooldown timing, crit jumps, the sprinted first hit, spacing and
   strafing, hit-and-step-back, bow lead with arrow physics, shield against archers, pillaring
@@ -431,7 +432,7 @@ climbs per run before it gives up).
 flowchart TB
   H(["bot got hurt"]) --> M{"hostile within 8<br/>(flyers: 20)?"}
   M -- no --> X(["ignore"])
-  M -- yes --> R{"retreat?<br/>health ≤ retreatBelow, or<br/>mob in water and health<br/>&lt; waterFightAbove<br/>(never for flyers<br/>or fast mobs)"}
+  M -- yes --> R{"retreat?<br/>health ≤ retreatBelow, or<br/>mob in water and health<br/>&lt; waterFightAbove<br/>(never for flyers; fast mobs:<br/>water rule only)"}
   R -- yes --> RT["retreat: back off 18 blocks"]
   R -- no --> DF["defend: fight it"]
   T(["every 2 s"]) --> LR{"health ≤ retreatBelow,<br/>hostile within 6?"}

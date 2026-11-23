@@ -43,11 +43,11 @@ can't change their own.
 | `combat.sprintReset` | on/off | W-tap: sprint into ground hits for knockback when a crit isn't possible or knockback is worth more (default on) |
 | `combat.sweep` | on/off | with a sword, plain ground hits when mobs bunch around the target, so the sweep hits them all (default on) |
 | `combat.shieldMelee` | on/off | shield up against melee mobs between slow swings, and against a lit creeper it can't outrun; an axe hit is blocked, then the shield is down 5 s (default on) |
-| `combat.totem` | on/off | totem of undying into the offhand at 8 health or less, or in a fall that could kill; it stays there until health is above 14 (default on) |
+| `combat.totem` | on/off | totem of undying into the offhand at 8 health or less (10 while on fire), or in a fall that could kill; it stays there until health is above 14 (default on) |
 | `combat.goldenApple` | on/off | eat a golden apple mid-fight at 8 health or less, 12 when surrounded (default on) |
 | `combat.waterClutch` | on/off | water bucket against fall damage and to put out fire, scooped back up (default on) |
 | `combat.endermanGaze` | on/off | never look an enderman in the eyes unless fighting it (default on) |
-| `combat.fightFastMobs` | on/off | at low health keep fighting mobs faster than the bot (vindicators, ravagers, spiders, wolves, piglin brutes, hoglins) instead of backing off (default on) |
+| `combat.fightFastMobs` | on/off | at low health keep fighting mobs faster than the bot (vindicators, ravagers, spiders, wolves, piglin brutes, hoglins) instead of backing off at `retreatBelow`; the water back-off (`waterFightAbove`) still applies (default on) |
 | `combat.chokepoints` | on/off | against 3+ melee mobs with half health or more, fight from a 1-wide gap nearby (default on) |
 | `combat.pvp` | off / defend | `defend`: fight back a player who attacks the bot or the player it guards, stop when they stop or run; never owners or friends (default off) |
 | `combat.friends` | names | players never fought back, even with `combat.pvp defend` (comma separated) |

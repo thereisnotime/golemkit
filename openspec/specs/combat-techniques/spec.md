@@ -51,10 +51,14 @@ When a creeper's fuse is lit and backing off for the rest of the fuse (gaining a
 - **THEN** the bot turns to the lit one
 
 ### Requirement: Totem in the offhand when it matters
-With `combat.totem` on and a totem in the inventory, the bot SHALL move it into the offhand as soon as health drops to 8 or less, or during a fall that would kill it, and keep it there until health is above 14.
+With `combat.totem` on and a totem in the inventory, the bot SHALL move it into the offhand as soon as health drops to 8 or less (10 or less while the bot is on fire, read from its entity flags), or during a fall that would kill it, and keep it there until health is above 14.
 
 #### Scenario: Health drops in a fight
 - **WHEN** a hit leaves the bot at 7 health with a shield in the offhand and a totem in the inventory
+- **THEN** the totem goes into the offhand right away
+
+#### Scenario: Burning
+- **WHEN** the bot is on fire and a burn tick leaves it at 10 health with a shield in the offhand and a totem in the inventory
 - **THEN** the totem goes into the offhand right away
 
 #### Scenario: Healing back
@@ -129,11 +133,15 @@ Bots SHALL never start a fight with a player. With `combat.pvp` set to `defend`,
 - **THEN** the bot fights that player until they stop or run
 
 ### Requirement: No running from faster mobs
-With `combat.fightFastMobs` on, the low-health back-off (`reflexes.retreatBelow`) SHALL NOT apply to mobs that outrun the bot (vindicators, ravagers, spiders, cave spiders, wolves, piglin brutes, hoglins, zoglins); the bot keeps fighting them.
+With `combat.fightFastMobs` on, the low-health back-off (`reflexes.retreatBelow`) SHALL NOT apply to mobs that outrun the bot (vindicators, ravagers, spiders, cave spiders, wolves, piglin brutes, hoglins, zoglins); the bot keeps fighting them. The water back-off (`reflexes.waterFightAbove`, from a mob standing in water) SHALL still apply to them.
 
 #### Scenario: Vindicator at 7 health
 - **WHEN** the bot is at 7 health with `retreatBelow` 8 and a vindicator hits it
 - **THEN** it fights the vindicator instead of turning to run
+
+#### Scenario: Fast mob in water
+- **WHEN** the bot is at 12 health with `waterFightAbove` 14 and a spider standing in water hits it
+- **THEN** it backs off as from any mob in water
 
 ### Requirement: Never fight the warden
 The bot SHALL NOT attack a warden, and SHALL back off when one hurts it.

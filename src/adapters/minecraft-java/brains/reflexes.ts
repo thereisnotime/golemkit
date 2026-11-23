@@ -16,7 +16,7 @@ import { rangedSituation, onRangedAlarm, noteUnexplainedHit } from '../../../ski
 import { isShooter, rangedResponse } from '../../../skills/ranged-plan.ts'
 import { wornArmorPoints } from '../../../skills/gear.ts'
 import { clutchInputs, extinguishInputs, hasWaterBucket, burning } from '../../../skills/clutch.ts'
-import { totemSwap, retreatPointless } from '../../../skills/techniques.ts'
+import { totemSwap, retreatPointless, retreatReason } from '../../../skills/techniques.ts'
 import { pvpAllowed } from '../../../skills/defense.ts'
 
 export interface ReflexOptions {
@@ -62,9 +62,12 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       const totemCheck = (lethalFall = false) => {
         if (!needsSurvival(bot) || bot.currentWindow || !agent.getAction('gear_up') || Date.now() - totemTriedAt < 1000) return
         const off = bot.inventory.slots[45]?.name ?? null
-        if (!totemSwap({ enabled: combatCfg().totem !== false, hasTotem: bot.inventory.items().some(i => i.name === 'totem_of_undying'), offhand: off, health: bot.health, lethalFall })) return
+        // on fire (shared flags bit 0): the totem goes in at 10 health instead of 8
+        const onFire = burning(bot)
+        if (!totemSwap({ enabled: combatCfg().totem !== false, hasTotem: bot.inventory.items().some(i => i.name === 'totem_of_undying'), offhand: off, health: bot.health, lethalFall, burning: onFire })) return
         totemTriedAt = Date.now()
-        void agent.act('gear_up', lethalFall ? { danger: true } : {}, { caller, priority: PRIORITY.reflex })
+        // danger: gear_up keeps the totem over a shield whatever the health
+        void agent.act('gear_up', lethalFall || onFire ? { danger: true } : {}, { caller, priority: PRIORITY.reflex })
       }
 
       // ---- water bucket: a damaging fall (MLG clutch) or burning ----
@@ -119,10 +122,13 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         return b?.name === 'water' || e.name === 'drowned' || e.name === 'guardian'
       }
       // Running from flyers is pointless (they're faster); fight them even when low.
-      // Neither from mobs that outrun it (combat.fightFastMobs): it would die from behind.
+      // Neither from mobs that outrun it at low health (combat.fightFastMobs): it would die from
+      // behind. The water rule (drowned, guardians) still applies to those.
       const fastMob = (mob: any) => retreatPointless({ enabled: (agent.settings.combat as { fightFastMobs?: boolean } | undefined)?.fightFastMobs !== false, mob: mob?.name })
-      const shouldRetreat = (mob: any) => !FLYING.has(mob.name ?? '') && !fastMob(mob) &&
-        ((bot.health > 0 && bot.health <= cfg().retreatBelow) || (inWater(mob) && bot.health < cfg().waterFightAbove))
+      const shouldRetreat = (mob: any) => retreatReason({
+        health: bot.health, retreatBelow: cfg().retreatBelow, waterFightAbove: cfg().waterFightAbove,
+        flying: FLYING.has(mob.name ?? ''), fast: fastMob(mob), mobInWater: inWater(mob)
+      }) !== null
 
       // Climbing out of a cave (climb_out, or goto starting underground): going on up beats
       // stopping to fight unless a melee mob is right on us (keepClimbing). Fighting underground

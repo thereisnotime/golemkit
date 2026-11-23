@@ -10,7 +10,8 @@
 //   waterClutch  water bucket against a damaging fall, and to put out fire
 //   endermanGaze never look an enderman in the eyes unless fighting it
 //   chokepoints  outnumbered with health left: fight from a 1-wide gap so mobs come one at a time
-//   fightFastMobs  no low-health back-off from mobs that outrun the bot (vindicators, spiders...)
+//   fightFastMobs  no low-health back-off from mobs that outrun the bot (vindicators, spiders...);
+//                  the water back-off (waterFightAbove) still applies
 
 export interface V3 { x: number, y: number, z: number }
 
@@ -228,6 +229,18 @@ export const FASTER_THAN_US = new Set(['vindicator', 'ravager', 'spider', 'cave_
  */
 export function retreatPointless (s: { enabled: boolean, mob: string | undefined }): boolean {
   return s.enabled && FASTER_THAN_US.has(s.mob ?? '')
+}
+
+/**
+ * Why the reflexes back off from a mob, or null to fight it: 'low' at or below `retreatBelow`
+ * health (not from mobs that outrun the bot, `fast`, see retreatPointless), 'water' from a mob in
+ * water below `waterFightAbove` (fast or not). Never from flyers, which outrun anything.
+ */
+export function retreatReason (s: { health: number, retreatBelow: number, waterFightAbove: number, flying: boolean, fast: boolean, mobInWater: boolean }): 'low' | 'water' | null {
+  if (s.flying || s.health <= 0) return null
+  if (s.health <= s.retreatBelow && !s.fast) return 'low'
+  if (s.mobInWater && s.health < s.waterFightAbove) return 'water'
+  return null
 }
 
 // ---- chokepoints ----

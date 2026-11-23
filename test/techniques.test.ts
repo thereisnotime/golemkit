@@ -192,6 +192,32 @@ test('no running from mobs that outrun the bot', async () => {
   assert.equal(retreatPointless({ enabled: false, mob: 'vindicator' }), false)
 })
 
+test('fightFastMobs only drops the low-health back-off, not the water one', async () => {
+  const { retreatReason } = await import('../src/skills/techniques.ts')
+  const s = { health: 7, retreatBelow: 8, waterFightAbove: 14, flying: false, fast: false, mobInWater: false }
+  assert.equal(retreatReason(s), 'low')
+  assert.equal(retreatReason({ ...s, fast: true }), null, 'vindicator at 7 health: fight')
+  assert.equal(retreatReason({ ...s, fast: true, mobInWater: true }), 'water', 'fast mob in water: still back off')
+  assert.equal(retreatReason({ ...s, health: 12, mobInWater: true }), 'water')
+  assert.equal(retreatReason({ ...s, health: 12, mobInWater: true, fast: true }), 'water')
+  assert.equal(retreatReason({ ...s, health: 14, mobInWater: true }), null)
+  assert.equal(retreatReason({ ...s, flying: true, mobInWater: true }), null, 'flyers: never')
+  assert.equal(retreatReason({ ...s, health: 0 }), null)
+})
+
+test('burning reads the shared flags bit the totem check uses', async () => {
+  const { burning } = await import('../src/skills/clutch.ts')
+  assert.equal(burning({ entity: { metadata: [0x01] } } as any), true)
+  assert.equal(burning({ entity: { metadata: [0x09] } } as any), true, 'on fire and sprinting')
+  assert.equal(burning({ entity: { metadata: [0x08] } } as any), false)
+  assert.equal(burning({ entity: { metadata: [] } } as any), false)
+  assert.equal(burning({ entity: undefined } as any), false)
+  // totemSwap gets the flag: at 10 health on fire the totem goes in, at 10 not burning it doesn't
+  const s = { enabled: true, hasTotem: true, offhand: 'shield', health: 10 }
+  assert.equal(totemSwap({ ...s, burning: burning({ entity: { metadata: [1] } } as any) }), true)
+  assert.equal(totemSwap({ ...s, burning: burning({ entity: { metadata: [0] } } as any) }), false)
+})
+
 test('the warden is never fought', async () => {
   const { attackRefusal } = await import('../src/skills/tactics.ts')
   const r = attackRefusal({ name: 'warden', player: false, named: false, owned: false, hostile: true, attacking: true })
