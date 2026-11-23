@@ -4,11 +4,11 @@ Every phase ends with the parity checks below; a phase is done only when they al
 
 ## Phase 0: safety net (no code moves)
 
-- [ ] Baseline: test count, `tsc`, docs build, `just scope-check` counts, recorded in `openspec/changes/game-adapters/baseline.md`
-- [ ] Golden snapshots as test fixtures: `observe()` output for fixed fake worlds, the action catalog and LLM tool schemas, intent decisions for the seen and held-out phrase sets
-- [ ] Packet replay harness: record a real session (login, NeoForge handshake, a few minutes of play) and replay it offline through the client; assert the same handshake and events
-- [ ] Benchmark baselines saved in the repo: `just intents-bench`, `just guard-bench` (mixed and ranged waves, 3 runs each)
-- [ ] Live smoke script: connect, follow, chop, find iron, bring planks, go home; results recorded
+- [x] Baseline: test count, `tsc`, docs build, `just scope-check` counts, recorded in `openspec/changes/game-adapters/baseline.md`
+- [x] Golden snapshots as test fixtures: `observe()` output for fixed fake worlds, the action catalog and LLM tool schemas, intent decisions for the seen and held-out phrase sets
+- [x] Packet replay harness: record a real session (login, NeoForge handshake, a few minutes of play) and replay it offline through the client; assert the same handshake and events
+- [x] Benchmark baselines saved in the repo: `just intents-bench`, `just guard-bench` (mixed waves, 3 runs of 3 min, guard phase; ranged waves left for phase 4)
+- [x] Live smoke script: connect, follow, chop, find iron, bring planks, go home; results recorded
 
 ## Phase 1: the line (no behaviour change)
 
