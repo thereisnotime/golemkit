@@ -89,12 +89,12 @@ export function safeStep (bot: Bot, dir: Dir, dist = 1): boolean {
   return false // cliff
 }
 
-function headroom (bot: Bot): boolean {
+export function headroom (bot: Bot): boolean {
   const p = bot.entity.position.floored()
   return bot.blockAt(p.offset(0, 2, 0))?.boundingBox === 'empty'
 }
 
-function inLiquid (bot: Bot, pos = bot.entity.position): boolean {
+export function inLiquid (bot: Bot, pos = bot.entity.position): boolean {
   const b = bot.blockAt(pos.floored())
   return !!b && LIQUID.test(b.name)
 }
@@ -143,7 +143,7 @@ const GOLDEN = /^(enchanted_)?golden_apple$/
 const lastApple = new WeakMap<Bot, number>()
 
 /** Eats a golden apple now, backing away from `from` while it does (combat.goldenApple). */
-async function eatAppleInFight (bot: Bot, from: Entity, signal: AbortSignal): Promise<boolean> {
+export async function eatAppleInFight (bot: Bot, from: Entity, signal: AbortSignal): Promise<boolean> {
   const apple = bot.inventory.items().find(i => i.name === 'enchanted_golden_apple') ?? bot.inventory.items().find(i => GOLDEN.test(i.name))
   if (!apple) return false
   lastApple.set(bot, Date.now())
@@ -176,7 +176,7 @@ export async function eatNow (bot: Bot, signal: AbortSignal): Promise<boolean> {
   } catch { return false }
 }
 
-function clearMoves (bot: Bot): void {
+export function clearMoves (bot: Bot): void {
   for (const c of ['forward', 'back', 'left', 'right', 'sprint', 'jump', 'sneak'] as const) bot.setControlState(c, false)
 }
 
@@ -572,7 +572,7 @@ function sweepingLevel (bot: Bot): number {
 }
 
 /** Where to look to hit: the point of its hitbox nearest our eye line, a little inside. */
-function aimPoint (bot: Bot, t: Entity): any {
+export function aimPoint (bot: Bot, t: Entity): any {
   const ey = bot.entity.position.y + EYE
   const y = Math.max(t.position.y + 0.2, Math.min(ey, t.position.y + (t.height ?? 1.8) - 0.2))
   return t.position.offset(0, y - t.position.y, 0)

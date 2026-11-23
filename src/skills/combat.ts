@@ -17,6 +17,8 @@ import { installShieldWatch } from './fight.ts'
 import { findChokepoint, wantChokepoint } from './techniques.ts'
 import { waterBucket } from './clutch.ts'
 import { defendPlayer, notePlayerHit, installGazeGuard } from './defense.ts'
+import { PVP_ACTION_DEFS, installPvp } from './pvp-actions.ts'
+import { escorting } from './bodyguard.ts'
 const WEAPONS = ['netherite_sword', 'diamond_sword', 'iron_sword', 'stone_sword', 'golden_sword', 'wooden_sword',
   'netherite_axe', 'diamond_axe', 'iron_axe', 'stone_axe']
 
@@ -577,7 +579,7 @@ export const combat = () => defineSkill({
   name: 'combat',
   capabilities: ['move', 'combat'],
   description: 'Fighting hostile mobs, guarding players and hunting animals for food.',
-  actions: [attack, guard, defend, retreat, hunt, gearUp, rangedDefense, waterBucket, defendPlayer],
+  actions: [attack, guard, defend, retreat, hunt, gearUp, rangedDefense, waterBucket, defendPlayer, ...PVP_ACTION_DEFS],
   setup: (agent, bot) => {
     // remember who hit us: neutral mobs are fought only while they attack; players hitting
     // anyone are logged for combat.pvp defend
@@ -592,7 +594,9 @@ export const combat = () => defineSkill({
     const unshield = installShieldWatch(bot)
     // never look an enderman in the eyes unless it is already fighting us (combat.endermanGaze)
     const ungaze = installGazeGuard(bot, () => ((agent.settings.combat ?? {}) as { endermanGaze?: boolean }).endermanGaze !== false, id => recentAttacker(bot, id))
-    return () => { bot.off('entityHurt', onHurt as any); unwatch(); unshield(); ungaze() }
+    // PvP modes: grudges, kill counts, last-seen positions for hunts, mode-change whispers (pvp-actions.ts)
+    const unpvp = installPvp(agent, bot, () => escorting(agent))
+    return () => { bot.off('entityHurt', onHurt as any); unwatch(); unshield(); ungaze(); unpvp() }
   },
   observe: (_agent, bot) => {
     const mob = threats(bot, 16)[0] ?? nearestHostile(bot, bot.entity.position, 16)

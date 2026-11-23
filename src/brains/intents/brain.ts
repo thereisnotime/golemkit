@@ -267,7 +267,7 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
       }
       case 'stop': {
         const r = await act('stop')
-        let text = r.ok ? 'stopped' : `can't: ${r.message}`
+        let text = r.ok ? (r.message || 'stopped') : `can't: ${r.message}`
         if (a.stay) {
           // "stay": following would pick up again right away
           for (const b of ['follow_owner', 'bodyguard', 'guard_owner']) if (armed(b)) await disarm(b)
@@ -339,6 +339,26 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
         for (const b of ['bodyguard', 'guard_owner', 'guard_area']) if (armed(b)) { const r = await disarm(b); if (r.ok) off.push(b) }
         const n = agent.cancelActions(i => i.name === 'guard', 'stopped')
         return reply(off.length || n ? `stopped guarding${off.length ? ` (disarmed ${off.join(', ')})` : ''}` : "I wasn't guarding")
+      }
+      case 'pvp_mode': {
+        if (!has('pvp')) return reply("can't: I don't have PvP")
+        const r = await act('pvp', { mode: String(a.mode) })
+        return reply(r.ok ? r.message : `can't: ${r.message}`)
+      }
+      case 'pvp_attack': {
+        const name = String(a.player ?? '')
+        // only players online by that name: "attack the zombie" or a typo never adds a target
+        const online = players().find(p => p.toLowerCase() === name.toLowerCase())
+        if (!online) return reply(`no player called ${name} online (!attack_player ${name} adds them anyway)`)
+        if (a.hunt) { await run('hunt_player', { player: online }, `hunting ${online}`); return }
+        if (!has('attack_player')) return reply("can't: I don't have PvP")
+        const r = await act('attack_player', { player: online })
+        return reply(r.ok ? r.message : `can't: ${r.message}`)
+      }
+      case 'pvp_spare': {
+        if (!has('spare_player')) return reply("can't: I don't have PvP")
+        const r = await act('spare_player', { player: playerName(String(a.player ?? '')) })
+        return reply(r.ok ? r.message : `can't: ${r.message}`)
       }
       case 'farm': {
         if (a.create) {

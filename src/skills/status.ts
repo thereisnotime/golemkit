@@ -1,4 +1,5 @@
 import { defineSkill, defineAction, z, noParams, ok, fmtPos } from '../core/index.ts'
+import { killSwitch } from './pvp-actions.ts'
 
 const pos = defineAction({
   name: 'pos',
@@ -20,10 +21,14 @@ const hp = defineAction({
 
 const stop = defineAction({
   name: 'stop',
-  description: 'Stop whatever the bot is doing.',
+  description: 'Stop whatever the bot is doing. Also the PvP kill switch: ends every fight with a player and every hunt, and an attacking PvP mode (revenge, targets, all) goes off.',
   params: noParams,
   exclusive: false,
-  run: ({ agent }) => { agent.stopActions('stopped'); return ok('stopped') }
+  run: ({ agent, caller }) => {
+    const pvp = killSwitch(agent, caller.kind === 'player' ? caller.name : caller.kind)
+    agent.stopActions('stopped')
+    return ok(pvp ? `stopped (${pvp})` : 'stopped')
+  }
 })
 
 const say = defineAction({

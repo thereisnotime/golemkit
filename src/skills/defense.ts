@@ -10,7 +10,9 @@ import type { Agent } from '../core/index.ts'
 import { defineAction, z, ok, fail, goals, sleep, checkAborted, ActionAbortedError } from '../core/index.ts'
 import { fightTarget, eatNow, fightFood } from './fight.ts'
 import { weaponFlags } from './weapons.ts'
-import { pvpDecision, pvpRefusal, pvpMode, PVP_CALM_MS } from './pvp.ts'
+import { pvpDecision, pvpRefusal, pvpMode, pvpSettings as readPvp, PVP_CALM_MS } from './pvp.ts'
+import { fightPlayer } from './pvp-fight.ts'
+import { playerOdds } from './pvp-actions.ts'
 import { avertGaze } from './techniques.ts'
 
 // ---- player aggression log ----
@@ -66,7 +68,7 @@ function watched (signal: AbortSignal, check: () => string | null): { signal: Ab
 export const defendPlayer = defineAction({
   name: 'defend_player',
   capabilities: ['move', 'combat'],
-  description: 'Fight back against a player who attacked this bot (or the player it guards), only with combat.pvp set to defend; ' +
+  description: 'Fight back against a player who attacked this bot (or the player it guards), with combat.pvp set to anything but off; ' +
     'stops as soon as they stop attacking or run. Never owners or friends, and never starts a fight (used by reflexes).',
   params: z.object({
     player: z.string().describe('the attacking player'),
@@ -101,7 +103,11 @@ export const defendPlayer = defineAction({
       const sub = watched(signal, () => { const s = state(); return s.act === 'stop' ? s.why : null })
       let r
       try {
-        r = await fightTarget(bot, target, sub.signal, { maxMs: 30_000, flags, tactical: true })
+        const c = readPvp(agent.settings.combat as Record<string, unknown> | undefined)
+        const totem = (agent.settings.combat as { totem?: boolean } | undefined)?.totem !== false
+        r = c.tactics
+          ? await fightPlayer(bot, target, sub.signal, { maxMs: 30_000, flags, chase: 12, lostSec: 5, odds: () => playerOdds(bot, target), totem })
+          : await fightTarget(bot, target, sub.signal, { maxMs: 30_000, flags, tactical: true })
       } catch (e) {
         if (signal.aborted || !(e instanceof ActionAbortedError)) throw e
         why = sub.why() ?? 'stopped'

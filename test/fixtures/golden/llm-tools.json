@@ -130,7 +130,7 @@
     },
     {
       "name": "stop",
-      "description": "Stop whatever the bot is doing.",
+      "description": "Stop whatever the bot is doing. Also the PvP kill switch: ends every fight with a player and every hunt, and an attacking PvP mode (revenge, targets, all) goes off.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -379,6 +379,81 @@
             "type": "boolean"
           }
         }
+      }
+    },
+    {
+      "name": "pvp",
+      "description": "PvP mode (owners only): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "defend",
+              "revenge",
+              "targets",
+              "all"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "attack_player",
+      "description": "Put a player on the PvP target list (owners only): attacked on sight from now on (switches PvP to targets mode if needed). Never owners or friends.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "player": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "player"
+        ]
+      }
+    },
+    {
+      "name": "spare_player",
+      "description": "Take a player off the PvP target list and forgive any grudge against them, ending a fight or hunt with them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "player": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "player"
+        ]
+      }
+    },
+    {
+      "name": "hunt_player",
+      "description": "Hunt a player down (owners only): put them on the target list, go where they were last seen and fight them. Gives up after combat.huntMinutes; \"stop\" or \"pvp off\" ends it. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "player": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "player"
+        ]
+      }
+    },
+    {
+      "name": "pvp_list",
+      "description": "Show the PvP mode, the target list, grudges (revenge: who, why, minutes left) and hunts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
       }
     },
     {
@@ -3485,7 +3560,7 @@
     },
     {
       "name": "stop",
-      "description": "Stop whatever the bot is doing.",
+      "description": "Stop whatever the bot is doing. Also the PvP kill switch: ends every fight with a player and every hunt, and an attacking PvP mode (revenge, targets, all) goes off.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -3734,6 +3809,81 @@
             "type": "boolean"
           }
         }
+      }
+    },
+    {
+      "name": "pvp",
+      "description": "PvP mode (owners only): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "defend",
+              "revenge",
+              "targets",
+              "all"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "attack_player",
+      "description": "Put a player on the PvP target list (owners only): attacked on sight from now on (switches PvP to targets mode if needed). Never owners or friends.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "player": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "player"
+        ]
+      }
+    },
+    {
+      "name": "spare_player",
+      "description": "Take a player off the PvP target list and forgive any grudge against them, ending a fight or hunt with them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "player": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "player"
+        ]
+      }
+    },
+    {
+      "name": "hunt_player",
+      "description": "Hunt a player down (owners only): put them on the target list, go where they were last seen and fight them. Gives up after combat.huntMinutes; \"stop\" or \"pvp off\" ends it. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "player": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "player"
+        ]
+      }
+    },
+    {
+      "name": "pvp_list",
+      "description": "Show the PvP mode, the target list, grudges (revenge: who, why, minutes left) and hunts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
       }
     },
     {

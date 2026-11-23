@@ -21,6 +21,7 @@ import { wornArmorPoints } from '../../../skills/gear.ts'
 import { clutchInputs, extinguishInputs, hasWaterBucket, burning } from '../../../skills/clutch.ts'
 import { totemSwap, retreatPointless, retreatReason } from '../../../skills/techniques.ts'
 import { pvpAllowed } from '../../../skills/defense.ts'
+import { pvpCandidate, PVP_ACTIONS } from '../../../skills/pvp-actions.ts'
 import { undergroundNow } from '../../../skills/mining.ts'
 import { miningSettings, undergroundRetreat } from '../../../skills/minePlan.ts'
 
@@ -38,7 +39,7 @@ export interface ReflexOptions {
 }
 
 /** Actions the ranged reflex never interrupts. */
-const RANGED_KEEP = new Set(['ranged_defense', 'retreat', 'bunker', 'pillar', 'climb_out', 'eat', 'water_bucket', 'defend_player'])
+const RANGED_KEEP = new Set(['ranged_defense', 'retreat', 'bunker', 'pillar', 'climb_out', 'eat', 'water_bucket', 'defend_player', 'pvp_engage', 'hunt_player'])
 
 export const reflexes = (defaults: ReflexOptions = {}) => {
   const caller = { kind: 'reflex', name: 'reflexes' } as const
@@ -103,7 +104,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       }
       bot.on('physicsTick', onTick)
 
-      // ---- PvP (combat.pvp defend): fight back a player who hits the bot or the player it guards ----
+      // ---- PvP (combat.pvp defend or above): fight back a player who hits the bot or the player it guards ----
       let pvpBusy = false
       const onPlayerHit = (entity: any, source: any) => {
         if (!source || source.type !== 'player' || source === bot.entity || pvpBusy || !cfg().selfDefense) return
@@ -113,7 +114,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         const victimMe = entity === bot.entity
         if (!victimMe && !(guarded && entity?.username?.toLowerCase() === guarded.toLowerCase())) return
         if (pvpAllowed(agent, bot, who)) return
-        if (agent.currentAction?.name === 'defend_player' || !agent.getAction('defend_player')) return
+        if (PVP_ACTIONS.has(agent.currentAction?.name ?? '') || !agent.getAction('defend_player')) return
         pvpBusy = true
         setImmediate(() => {
           void agent.act('defend_player', guarded ? { player: who, protect: guarded } : { player: who }, { caller, priority: PRIORITY.reflex })
@@ -121,6 +122,21 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         })
       }
       bot.on('entityHurt', onPlayerHit)
+
+      // ---- PvP (combat.pvp revenge/targets/all): engage an allowed player in range (policy in pvp.ts) ----
+      let engaging = false
+      const pvpBusyActions = new Set([...PVP_ACTIONS, 'retreat', 'bunker', 'pillar', 'climb_out', 'eat', 'water_bucket', 'ranged_defense'])
+      const pvpTimer = setInterval(() => {
+        try {
+          if (engaging || pvpBusy || !bot.entity || bot.health <= 0 || !needsSurvival(bot) || !agent.getAction('pvp_engage')) return
+          if (pvpBusyActions.has(agent.currentAction?.name ?? '')) return
+          const pick = pvpCandidate(agent, bot)
+          if (!pick) return
+          engaging = true
+          agent.log.info(`pvp: engaging ${pick.player} (${pick.why}, ${pick.dist.toFixed(0)} blocks)`)
+          void agent.act('pvp_engage', { player: pick.player }, { caller, priority: PRIORITY.reflex }).finally(() => { engaging = false })
+        } catch {}
+      }, 500)
 
       const inWater = (e: any) => {
         const b = bot.blockAt(e.position)
@@ -211,7 +227,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           bot.nearestEntity((e: any) => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20)
         if (!mob) return
         const cur = agent.currentAction?.name
-        if (cur === 'bunker' || cur === 'defend_player' || cur === 'water_bucket') return
+        if (cur === 'bunker' || PVP_ACTIONS.has(cur ?? '') || cur === 'water_bucket') return
         // Phantoms at night with no weapon (or hurt): dig in instead of punching the sky.
         const unarmed = !bot.inventory.items().some(i => /_(sword|axe)$/.test(i.name))
         const night = bot.time.timeOfDay >= 12_500 && bot.time.timeOfDay <= 23_500
@@ -300,6 +316,8 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           gearTriedAt = Date.now()
           void agent.act('gear_up', {}, { caller, priority: PRIORITY.reflex })
         }
+        // a PvP fight eats for itself (pvpSustain), between rounds of hits
+        if (PVP_ACTIONS.has(agent.currentAction?.name ?? '')) return
         if (autoEat && bot.food < eatBelow && agent.getAction('eat') && bestFood(bot)) void reflex('eat')
         // Eat to heal when hurt and safe (food above 17 doesn't heal faster, but saturation helps).
         else if (autoEat && !mob && bot.health < 14 && bot.food < 20 && agent.getAction('eat') && bestFood(bot)) void reflex('eat')
@@ -313,6 +331,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         bot.off('spawn', onSpawn)
         clearInterval(timer)
         clearInterval(rangedTimer)
+        clearInterval(pvpTimer)
         unalarm()
       }
     }
