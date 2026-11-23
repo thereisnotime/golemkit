@@ -10,7 +10,7 @@ scopeNote: "Generated from the skills: most are Minecraft; the journal and confi
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-25 skills, 106 actions.
+25 skills, 108 actions.
 
 ## blueprint-library
 
@@ -274,7 +274,9 @@ Put on the best armour in the inventory and put a totem of undying or a shield i
 
 *non-exclusive*
 
-No parameters.
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `danger` | boolean |  |  | a fall or fire that could kill: the totem goes in the offhand whatever the health |
 
 ### `ranged_defense`
 
@@ -287,6 +289,28 @@ Deal with mobs shooting at the bot (skeletons, strays, bogged, pillagers, witche
 | `cover` | boolean |  | `false` | hide or back off instead of fighting, whatever the gear |
 | `build` | boolean |  | `true` | on open ground, place a few blocks (dirt, cobblestone, planks) for cover when there is none to walk to |
 | `maxSeconds` | number (5..120) |  | `45` | give up after this long |
+
+### `water_bucket`
+
+Use a water bucket: land a long fall in water placed just before the ground, or put out fire, then scoop the water back up (used by reflexes).
+
+*internal*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `reason` | `fall` \| `fire` | yes |  |  |
+| `fallStartY` | number |  |  | height the fall started at (fall) |
+
+### `defend_player`
+
+Fight back against a player who attacked this bot (or the player it guards), only with combat.pvp set to defend; stops as soon as they stop attacking or run. Never owners or friends, and never starts a fight (used by reflexes).
+
+*internal*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `player` | string | yes |  | the attacking player |
+| `protect` | string |  |  | the player the bot guards, whose attackers count too |
 
 ## config
 
