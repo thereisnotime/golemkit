@@ -47,7 +47,12 @@ interface Stats {
   flipUntil: number
   last?: string
   lastAt?: number
+  /** Behavior.retryKey when the last run failed. */
+  failKey?: string
 }
+
+/** A failure back-off is cut short by a changed retryKey only this long after the failure. */
+const RETRY_MIN_MS = 10_000
 
 /** Public view of one behaviour's run history (for status actions). */
 export interface BehaviorStats {
@@ -237,6 +242,17 @@ export class NpcController {
   scoreAll (ctx: NpcContext, isBlocked: (priority: number) => boolean = () => false): Scored[] {
     return this.behaviors().map(b => {
       const st = this.stats.get(b.name)!
+      if (ctx.now < st.cooldownUntil && st.failures > 0 && b.retryKey && st.failKey !== undefined && ctx.now - (st.lastAt ?? 0) >= RETRY_MIN_MS) {
+        // what made it fail changed (wood arrived for the tools, say): retry now, not in 15 minutes
+        let key: string | undefined
+        try { key = b.retryKey(ctx) } catch {}
+        if (key !== undefined && key !== st.failKey) {
+          this.log.debug(`${b.name}: retrying early (${st.failKey} -> ${key})`)
+          st.cooldownUntil = 0
+          st.failures = Math.max(0, st.failures - 1)
+          st.failKey = undefined
+        }
+      }
       if (ctx.now < st.cooldownUntil) return { name: b.name, score: 0 }
       if (isBlocked(this.prio(b))) return { name: b.name, score: 0 }
       if (b.requires?.some(a => !this.agent.getAction(a))) return { name: b.name, score: 0 }
@@ -376,12 +392,14 @@ export class NpcController {
       const end = this.now()
       if (outcome === 'ok') {
         st.failures = 0
+        st.failKey = undefined
         if (!signal.aborted) st.flips = 0 // a run that finished by itself, not one cut short
         st.cooldownUntil = end + (behavior.cooldownMs ?? 0)
       } else if (outcome === 'fail') {
         st.failures++
         const cd = failureCooldown(st.failures, behavior.failureCooldownMs ?? 5000, behavior.maxFailureCooldownMs ?? 120000)
         st.cooldownUntil = end + cd
+        try { st.failKey = behavior.retryKey?.(this.context(end)) } catch { st.failKey = undefined }
         this.log.debug(`${name} failed (${detail}), cooling down ${Math.round(cd / 1000)}s`)
       }
       st.last = `${outcome}: ${detail}`

@@ -50,6 +50,12 @@ export interface Behavior {
   /** Ceiling for the failure back-off. Default 120000. */
   maxFailureCooldownMs?: number
   /**
+   * A short summary of what the last failure depended on (e.g. the wood held). While the
+   * failure back-off runs, a different value ends it early (at least 10 s after the failure), so
+   * the behaviour retries as soon as the cause is gone instead of waiting out the back-off.
+   */
+  retryKey? (ctx: NpcContext): string
+  /**
    * Priority this behaviour acts at, overriding the brain's (PRIORITY.npc by default). A
    * behaviour above whoever holds the body keeps running instead of backing off, e.g. an
    * armed keep_fed at PRIORITY.behavior (35) still runs while an LLM (30) holds the body.

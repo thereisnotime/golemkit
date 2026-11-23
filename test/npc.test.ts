@@ -242,6 +242,28 @@ test('failed behaviours cool down with back-off', async () => {
   c.stop()
 })
 
+test('a changed retryKey ends the failure back-off early', async () => {
+  const f = fake()
+  let runs = 0
+  let wood = 0
+  const tools: Behavior = {
+    name: 'tools', failureCooldownMs: 60_000, maxFailureCooldownMs: 900_000, score: () => 50,
+    retryKey: () => `wood ${wood}`,
+    run: async () => { runs++; return wood ? 'ok' : fail('needs wood') }
+  }
+  const c = controller(f, [tools])
+  await c.tick(); await c.settled()
+  assert.equal(runs, 1)
+  f.clock.t += 20_000
+  await c.tick(); await c.settled()
+  assert.equal(runs, 1, 'same wood: still backing off')
+  wood = 8
+  f.clock.t += 1000
+  await c.tick(); await c.settled()
+  assert.equal(runs, 2, 'wood arrived: retried before the 60 s back-off ran out')
+  c.stop()
+})
+
 test('actionBehavior scores 0 when the action is missing', async () => {
   const f = fake(['wander'])
   const chop = actionBehavior('chop_tree', {}, 40)
