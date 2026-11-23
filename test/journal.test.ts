@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import {
   Journal, resolveJournalConfig, parseDeathMessage, parseAdvancement, RateLimiter, InventoryTracker, DamageAggregator,
   BlockAggregator, countsDiff, buildDayRollup, filterEvents, parseRange, dayKey, dayStart, maskChat, reasonText,
-  summarizeRollup, summaryInput, fmtEvent, type JournalEvent
+  summarizeRollup, summaryInput, fmtEvent, JOURNAL_TYPES, type JournalEvent
 } from '../src/core/journal/index.ts'
 import { parseProfile } from '../src/core/profile.ts'
 import { journal as journalSkill, fmtDeath, resolveTypes, recentEventsObservation } from '../src/skills/journal.ts'
@@ -413,6 +413,11 @@ test('journal actions: compact, useful text', async () => {
 
   assert.deepEqual(resolveTypes('deaths, chat'), ['death', 'chat_in', 'chat_out', 'whisper'])
   assert.ok(fmtEvent({ ts: now, type: 'kill', data: { entity: 'Zombie' } }, now).endsWith('killed Zombie'))
+  // search finds: a journal type with its own filter group and line
+  assert.ok(JOURNAL_TYPES.includes('found'))
+  assert.deepEqual(resolveTypes('finds'), ['found'])
+  assert.deepEqual(resolveTypes('found'), ['found'])
+  assert.ok(fmtEvent({ ts: now, type: 'found', pos: { x: 10, y: 64, z: -5 }, data: { target: 'iron', what: 'iron ore', count: 3, how: 'in sight' } }, now).endsWith('found iron ore (3) at 10 64 -5, in sight'))
   assert.match(fmtDeath({ ts: now - 600_000, lost: {}, lostCount: 0, itemsMayRemain: false, keptInventory: true, cause: 'fall' }, now), /Kept the inventory/)
 })
 

@@ -8,7 +8,7 @@ export const JOURNAL_TYPES = [
   'action', 'goal',
   'player_seen', 'player_joined', 'player_left',
   'place_visited', 'advancement', 'protected_area',
-  'food_spot', 'farm_started',
+  'food_spot', 'farm_started', 'found',
   'connect', 'disconnect',
   'llm_turn',
   /** Written by the journal itself when a type hit its per-minute cap. */

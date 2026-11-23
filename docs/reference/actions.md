@@ -653,7 +653,7 @@ What happened: recent journal events (deaths, damage, kills, items, chat, action
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, connect, disconnect, llm_turn; or deaths, chat, items, blocks, players, combat, connections |
+| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn; or deaths, chat, items, blocks, players, combat, connections, food, finds |
 | `since` | string |  |  | how far back: 30m, 1h, 2d, today, yesterday, a date (YYYY-MM-DD); default 24h |
 | `player` | string |  |  | only events involving this player |
 | `near` | string |  |  | only events near "x y z" or "x z", optionally with a radius as 4th number (default 32) |

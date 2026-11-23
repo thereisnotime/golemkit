@@ -157,7 +157,7 @@ The journal skill's actions are chat commands and LLM tools like every other act
 
 | action | |
 |---|---|
-| `recall_events` (`!events`) | recent events, filtered: `type` (`death`, `chat`, `items`, `blocks`, `players`, `actions`, `places`, `combat`, `connections`, `food`, `llm` or any type), `since` (`30m`, `1h`, `today`, `yesterday`, `2026-11-20`; default 24 h), `player`, `near` (`"x y z"` or `"x z"`, optional radius), `text`, `limit`, `fleet` |
+| `recall_events` (`!events`) | recent events, filtered: `type` (`death`, `chat`, `items`, `blocks`, `players`, `actions`, `places`, `combat`, `connections`, `food`, `finds` (search finds), `llm` or any type), `since` (`30m`, `1h`, `today`, `yesterday`, `2026-11-20`; default 24 h), `player`, `near` (`"x y z"` or `"x z"`, optional radius), `text`, `limit`, `fleet` |
 | `last_death` (`!death`) | where, when, what killed it, what it was doing, what it lost and whether the drops may still be there (items despawn 5 minutes after death) |
 | `history` (`!summary`) | a summary of `today`, `yesterday`, a date, `3h`, or hours today like `10-12` |
 | `goto_death` | walk back to the last death position and pick up the drops (exclusive, long-running) |
