@@ -63,6 +63,68 @@ export function plankUnits (inv: Record<string, number>): number {
 }
 
 /**
+ * Wood usable for crafting, in plank units. A recipe takes planks of one kind (two oak, not one
+ * oak and one spruce), so a lone plank of a kind that no log in the inventory turns into counts
+ * for nothing: 1 oak + 1 spruce planks and no logs can't make sticks.
+ */
+export function usablePlankUnits (inv: Record<string, number>): number {
+  const fromLogs = new Set<string>()
+  let logs = 0
+  for (const [k, v] of Object.entries(inv)) {
+    const p = planksFor(k)
+    if (p && v > 0) { logs += v; fromLogs.add(p) }
+  }
+  let planks = 0
+  for (const [k, v] of Object.entries(inv)) if (/_planks$/.test(k) && v > 0 && (v >= 2 || fromLogs.has(k))) planks += v
+  return planks + 4 * logs
+}
+
+/** Most planks of one kind in the inventory. */
+export function samePlanks (inv: Record<string, number>): { item: string | null, count: number } {
+  let best: { item: string | null, count: number } = { item: null, count: 0 }
+  for (const [k, v] of Object.entries(inv)) if (/_planks$/.test(k) && v > best.count) best = { item: k, count: v }
+  return best
+}
+
+/**
+ * Which log to turn into planks (and how many crafts) so that one kind of planks reaches
+ * `want`: 'enough' when a kind already has that many, null when no log can get there. Prefers
+ * the kind with the most planks already, then the most logs. `known` filters plank names the
+ * game has (modded logs whose planks have another name are skipped). Pure.
+ */
+export function plankTopUp (inv: Record<string, number>, want: number, known: (planks: string) => boolean = () => true): 'enough' | { log: string, planks: string, runs: number } | null {
+  if (samePlanks(inv).count >= want) return 'enough'
+  let best: { log: string, planks: string, runs: number, score: number } | null = null
+  for (const [k, v] of Object.entries(inv)) {
+    const p = planksFor(k)
+    if (!p || v <= 0 || !known(p)) continue
+    const have = inv[p] ?? 0
+    const runs = Math.min(v, Math.ceil((want - have) / 4))
+    if (have + 4 * runs < want) continue
+    const score = have * 1000 + v
+    if (!best || score > best.score) best = { log: k, planks: p, runs, score }
+  }
+  // none can reach `want` alone: the kind that gets closest
+  if (!best) {
+    for (const [k, v] of Object.entries(inv)) {
+      const p = planksFor(k)
+      if (!p || v <= 0 || !known(p)) continue
+      const reach = (inv[p] ?? 0) + 4 * v
+      if (!best || reach > best.score) best = { log: k, planks: p, runs: v, score: reach }
+    }
+  }
+  return best ? { log: best.log, planks: best.planks, runs: best.runs } : null
+}
+
+/** "1 oak_planks, 1 spruce_planks, no logs" for failure messages. */
+export function woodSummary (inv: Record<string, number>): string {
+  const planks = Object.entries(inv).filter(([k, v]) => /_planks$/.test(k) && v > 0).map(([k, v]) => `${v} ${k}`)
+  const logs = Object.entries(inv).filter(([k, v]) => planksFor(k) && v > 0).map(([k, v]) => `${v} ${k}`)
+  const sticks = inv.stick ? [`${inv.stick} stick`] : []
+  return [...sticks, ...(planks.length ? planks : ['no planks']), ...(logs.length ? logs : ['no logs'])].join(', ')
+}
+
+/**
  * Tiers of a tool kind the inventory can make right now, best first. Sticks may still have to
  * be made from planks, planks from logs, and a crafting table from planks (`needTable`).
  */
@@ -70,7 +132,7 @@ export function craftableTiers (inv: Record<string, number>, kind: ToolKind, nee
   const shape = TOOL_SHAPE[kind]
   const sticks = inv.stick ?? 0
   const stickPlanks = sticks >= shape.sticks ? 0 : 2 * Math.ceil((shape.sticks - sticks) / 4)
-  const wood = plankUnits(inv)
+  const wood = usablePlankUnits(inv)
   const out: Tier[] = []
   for (const tier of TIERS) {
     if (tier === 'netherite') continue
@@ -122,10 +184,28 @@ function sumPlanks (bot: Bot): number {
   return bot.inventory.items().filter(i => /_planks$/.test(itemName(i))).reduce((n, i) => n + i.count, 0)
 }
 
+/**
+ * Like ensurePlanks, but for one recipe: crafts planks until a single kind has `want` (a stick
+ * or a tool takes planks of one kind; 1 oak + 1 spruce plank make nothing). Returns the most
+ * planks of one kind it ends up with.
+ */
+export async function ensureSamePlanks (bot: Bot, signal: AbortSignal, want: number): Promise<number> {
+  for (let guard = 0; guard < 6; guard++) {
+    checkAborted(signal)
+    const inv = inventoryCounts(bot)
+    const plan = plankTopUp(inv, want, p => !!bot.registry.itemsByName[p])
+    if (plan === 'enough' || !plan) break
+    const before = inv[plan.planks] ?? 0
+    const r = await craftItem(bot, signal, plan.planks, plan.runs * 4).catch(e => fail((e as Error).message))
+    if (!r.ok || countItem(bot, plan.planks) <= before) break
+  }
+  return samePlanks(inventoryCounts(bot)).count
+}
+
 export async function ensureSticks (bot: Bot, signal: AbortSignal, want: number): Promise<boolean> {
   const have = countItem(bot, 'stick')
   if (have >= want) return true
-  await ensurePlanks(bot, signal, 2 * Math.ceil((want - have) / 4))
+  await ensureSamePlanks(bot, signal, 2 * Math.ceil((want - have) / 4))
   const r = await craftItem(bot, signal, 'stick', want - have)
   return r.ok && countItem(bot, 'stick') >= want
 }
@@ -149,7 +229,7 @@ export async function ensureTool (bot: Bot, signal: AbortSignal, kind: ToolKind,
   if (have && toolTier(have, kind) >= min) return ok(`have ${have}`, { item: have, crafted: false })
   const needTable = !hasTableNear(bot) && !names.includes('crafting_table')
   const tiers = craftableTiers(inventoryCounts(bot), kind, needTable).filter(t => RANK[t]! >= min)
-  if (opts.cheapOnly && needTable && tiers.length && plankUnits(inventoryCounts(bot)) < 4 + TOOL_SHAPE[kind].head + 2) return fail(`no ${kind}`)
+  if (opts.cheapOnly && needTable && tiers.length && usablePlankUnits(inventoryCounts(bot)) < 4 + TOOL_SHAPE[kind].head + 2) return fail(`no ${kind}`)
   const tier = tiers[0]
   if (!tier) {
     const s = TOOL_SHAPE[kind]
@@ -157,9 +237,10 @@ export async function ensureTool (bot: Bot, signal: AbortSignal, kind: ToolKind,
   }
   checkAborted(signal)
   const shape = TOOL_SHAPE[kind]
-  if (!await ensureSticks(bot, signal, shape.sticks)) return fail(`could not make sticks for a ${tier} ${kind}`)
-  if (tier === 'wooden') await ensurePlanks(bot, signal, shape.head + (needTable ? 4 : 0))
-  else if (needTable) await ensurePlanks(bot, signal, 4)
+  if (!await ensureSticks(bot, signal, shape.sticks)) return fail(`could not make sticks for a ${tier} ${kind} (have ${woodSummary(inventoryCounts(bot))})`, { need: 'wood' })
+  // the table is crafted first (inside craftItem), so a wooden tool wants head + 4 of one kind
+  if (tier === 'wooden') await ensureSamePlanks(bot, signal, shape.head + (needTable ? 4 : 0))
+  else if (needTable) await ensureSamePlanks(bot, signal, 4)
   const item = `${tier}_${kind}`
   const r = await craftItem(bot, signal, item, 1)
   if (!r.ok) return fail(`could not craft a ${item}: ${r.message}`)
