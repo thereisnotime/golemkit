@@ -19,13 +19,13 @@ defaults:
 bots:
   # Casting fills roles with free actors (lowest name first); `roles` lets a bot ask for
   # particular parts. Roles a scene doesn't have are ignored.
-  - bot: actor
+  - variant: actor
     username: Hauler
     settings: { scenes: { roles: [hauler, talker] } }
-  - bot: actor
+  - variant: actor
     username: Foreman
     settings: { scenes: { roles: [foreman, listener] } }
     # settings: { scenes: { director: true } }   # make this one direct every scene
-  - bot: actor
+  - variant: actor
     username: Miner
     settings: { scenes: { roles: [miner] } }

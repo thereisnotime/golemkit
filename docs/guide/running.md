@@ -48,9 +48,9 @@ defaults:
   server: mc02
   owners: [Robin]
 bots:
-  - bot: buddy
+  - variant: buddy
     username: McBuddy
-  - bot: buddy
+  - variant: buddy
     username: Helper
     count: 3                 # Helper1, Helper2, Helper3
     canDig: true
@@ -84,8 +84,8 @@ servers:
   creative: { host: localhost, port: 25566, staggerMs: 2000 }
 defaults: { server: mc02 }
 bots:
-  - { bot: buddy, username: McBuddy }
-  - { bot: buddy, username: McBuddy, server: creative }
+  - { variant: buddy, username: McBuddy }
+  - { variant: buddy, username: McBuddy, server: creative }
 ```
 
 Servers start in parallel; logins are staggered per server. Each server gets its own learned

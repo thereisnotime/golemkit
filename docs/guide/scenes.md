@@ -262,10 +262,10 @@ Per-bot settings go in the [fleet file](/guide/running#a-fleet):
 
 ```yaml
 bots:
-  - bot: actor
+  - variant: actor
     username: Hauler
     settings: { scenes: { roles: [hauler, talker] } }
-  - bot: actor
+  - variant: actor
     username: Stage
     settings: { scenes: { director: true } }   # directs everything while online
 ```

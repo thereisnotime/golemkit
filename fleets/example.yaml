@@ -17,11 +17,11 @@ defaults:
   owners: [Robin]        # who may command the bots
 
 bots:
-  - bot: buddy
+  - variant: buddy
     username: McBuddy
-  # - bot: buddy
+  # - variant: buddy
   #   username: Helper
   #   count: 2           # Helper1, Helper2
-  # - bot: buddy
+  # - variant: buddy
   #   server: local
   #   username: LocalBuddy

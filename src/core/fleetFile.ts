@@ -5,8 +5,8 @@
 //     test: { host: localhost, port: 25566 }
 //   defaults: { server: mc02, owners: [Robin] }
 //   bots:
-//     - { bot: buddy, username: McBuddy }
-//     - { bot: villager, server: test, count: 3 }
+//     - { variant: buddy, username: McBuddy }
+//     - { variant: villager, server: test, count: 3 }
 //
 // The older single-server form (`server: {...}` at the top) still works.
 import { join } from 'node:path'
