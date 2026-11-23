@@ -12,12 +12,12 @@ import {
   type Agent, type ActionContext, type ActionResult, type Caller, type Logger,
   type TripSettings, type TripKind, type TripKit, type TripSample, type TripPrep, type Trip
 } from '../core/index.ts'
-import { takeFoodFromOwnChests, knownContainers, knownAt, ownChests, configuredChests } from './containers.ts'
+import { takeFoodFromOwnChests, knownContainers, knownAt, pantryChests } from './containers.ts'
 import { getHome, sameDimension } from './navigation.ts'
 
 const BAD_FOOD = new Set(['rotten_flesh', 'spider_eye', 'poisonous_potato', 'pufferfish', 'suspicious_stew', 'chorus_fruit'])
 const WEAPON = /(_sword|_axe)$|^(trident|mace)$/
-/** Own chests further than this are not walked to for the top-up (keep_fed's pantry range). */
+/** Pantry chests further than this from the bot are not walked to for the top-up (keep_fed's pantry range). */
 export const PANTRY_RANGE = 160
 /** How often the budget is checked on a trip. */
 const CHECK_MS = 2000
@@ -64,12 +64,15 @@ export function tripSample (bot: Bot, agent: Agent): TripSample {
   return { bar: typeof bot.food === 'number' ? bot.food : 20, carried, items, distanceHome, daylightMs: daylightMs(bot), ...(storm ? { storm } : {}) }
 }
 
-/** Food items in own and configured chests within range, from what the bot saw inside them (unseen chests count as unknown). */
-function pantryFood (bot: Bot, agent: Agent): { items: number, unseen: number } {
+/** The trip's pantry: the pantry (own and configured chests near home, pantryChests) within PANTRY_RANGE of the bot. */
+export function tripPantry (bot: Bot, agent: Agent) {
   const pos = bot.entity.position
-  const own = [...ownChests(agent), ...configuredChests(agent)]
-    .filter((p, i, a) => a.findIndex(q => q.x === p.x && q.y === p.y && q.z === p.z) === i)
-    .filter(p => Math.hypot(p.x - pos.x, p.y - pos.y, p.z - pos.z) <= PANTRY_RANGE)
+  return pantryChests(agent, bot).filter(p => Math.hypot(p.x - pos.x, p.y - pos.y, p.z - pos.z) <= PANTRY_RANGE)
+}
+
+/** Food items in the trip's pantry, from what the bot saw inside them (unseen chests count as unknown). */
+function pantryFood (bot: Bot, agent: Agent): { items: number, unseen: number } {
+  const own = tripPantry(bot, agent)
   const seen = knownContainers(agent)
   let items = 0
   let unseen = 0
@@ -131,7 +134,7 @@ export async function prepareTrip (ctx: Pick<ActionContext, 'bot' | 'agent' | 's
   let plan = planTripPrep(tripKit(bot, agent, s), s, spec.kind, spec.waive)
   const notes: string[] = []
   if (plan.topUp > 0) {
-    const r = await takeFoodFromOwnChests({ bot, agent, signal }, plan.topUp, PANTRY_RANGE, n => foodPoints(bot, n))
+    const r = await takeFoodFromOwnChests({ bot, agent, signal }, plan.topUp, PANTRY_RANGE, n => foodPoints(bot, n), tripPantry(bot, agent))
       .catch(e => { checkAborted(signal); return { took: {}, units: 0, notes: [(e as Error).message] } })
     if (r.units) notes.push(`took ${Object.entries(r.took).map(([k, v]) => `${v} ${k}`).join(', ')} from my chest`)
     if (r.notes.length) log.debug('trip top-up', { notes: r.notes })

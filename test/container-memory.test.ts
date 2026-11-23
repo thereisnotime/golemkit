@@ -315,3 +315,23 @@ test('wiring: a container placed in view is remembered without contents', () => 
   assert.equal(k.length, 1)
   assert.equal(k[0]!.freshness, 'unknown')
 })
+
+test('pantry: own and configured chests near home, the same set for the low report and the trip (plus walking range)', async () => {
+  const { pantryChests, pantryReport } = await import('../src/skills/containers.ts')
+  const { tripPantry } = await import('../src/skills/trip.ts')
+  const kv = new FakeKV()
+  const w = world()
+  for (const [x, z] of [[5, 5], [10, 10], [300, 0]] as const) w.set(x, 64, z, 'chest')
+  const a = agentWith(kv, ON)                      // configured: 5 64 5
+  ;(a.agent as any).bot = w.bot
+  kv.set('home', { x: 0, y: 64, z: 0 })
+  kv.set(OWN_CHESTS_KEY, [{ x: 10, y: 64, z: 10 }, { x: 300, y: 64, z: 0 }, { x: 5, y: 64, z: 5 }])
+  assert.deepEqual(pantryChests(a.agent, w.bot), [{ x: 10, y: 64, z: 10 }, { x: 5, y: 64, z: 5 }], 'own + configured within 48 of home, once each')
+  opened(a.agent, w.bot, w.bot.blockAt({ x: 5, y: 64, z: 5 }), items({ bread: 2 }) as any, Date.now())
+  opened(a.agent, w.bot, w.bot.blockAt({ x: 10, y: 64, z: 10 }), items({ bread: 3 }) as any, Date.now())
+  opened(a.agent, w.bot, w.bot.blockAt({ x: 300, y: 64, z: 0 }), items({ bread: 30 }) as any, Date.now())
+  assert.equal(pantryReport(a.agent, w.bot, 48)?.text, 'pantry low: 5 bread left', 'both near chests count, the far one does not')
+  assert.deepEqual(tripPantry(w.bot, a.agent), pantryChests(a.agent, w.bot), 'at home: the whole pantry')
+  w.bot.entity.position = new Vec3(200, 64, 0)
+  assert.deepEqual(tripPantry(w.bot, a.agent), [], 'out of walking range; the outpost chest 100 blocks away is no pantry')
+})

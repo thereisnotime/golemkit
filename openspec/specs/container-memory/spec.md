@@ -45,7 +45,7 @@ With `grumble` on, when its own or a configured chest is emptied, raided, moved 
 - **THEN** it whispers Robin something like "who took my bread?!" once
 
 ### Requirement: Periodic check
-With `indexOwn` on, the `check_storage` behaviour SHALL, by day and near home, look into its own and configured chests within `radius` of home not seen inside for `refreshMinutes` (`check_chests`, up to `max` per run), with a score below food, safety, tools and lighting; a chest it tried SHALL wait `refreshMinutes` whatever happened. When the food in the pantry (configured chests, else its own) is below `lowFood` items it SHALL tell the owners through the help desk, at most every 6 hours unless the pantry ran out since.
+With `indexOwn` on, the `check_storage` behaviour SHALL, by day and near home, look into its own and configured chests within `radius` of home not seen inside for `refreshMinutes` (`check_chests`, up to `max` per run), with a score below food, safety, tools and lighting; a chest it tried SHALL wait `refreshMinutes` whatever happened. When the food in the pantry (its own and configured chests within `radius` of home, the same set the pre-trip top-up uses) is below `lowFood` items it SHALL tell the owners through the help desk, at most every 6 hours unless the pantry ran out since.
 
 #### Scenario: Pantry low
 - **WHEN** it is day, the pantry was last checked 2 hours ago and holds 6 bread

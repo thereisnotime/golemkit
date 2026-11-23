@@ -414,10 +414,11 @@ export async function takeWoodFromOwnChests (ctx: { bot: Bot, agent: Agent, sign
 
 /**
  * Takes food (best food points first) out of the bot's own and configured chests within `range`
- * until it carries `want` more items: the pantry top-up before a trip (skills/trip.ts).
+ * until it carries `want` more items: the pantry top-up before a trip (skills/trip.ts). `chests`
+ * narrows the candidates (the trip passes the pantry, pantryChests).
  */
-export async function takeFoodFromOwnChests (ctx: { bot: Bot, agent: Agent, signal: AbortSignal }, want: number, range: number, points: (name: string) => number): Promise<{ took: Record<string, number>, units: number, notes: string[] }> {
-  return takeFromOwnChests(ctx, want, range, n => points(n) > 0 ? 1 : 0, (contents, left) => foodToTake(contents, left, points))
+export async function takeFoodFromOwnChests (ctx: { bot: Bot, agent: Agent, signal: AbortSignal }, want: number, range: number, points: (name: string) => number, chests?: Pos[]): Promise<{ took: Record<string, number>, units: number, notes: string[] }> {
+  return takeFromOwnChests(ctx, want, range, n => points(n) > 0 ? 1 : 0, (contents, left) => foodToTake(contents, left, points), chests)
 }
 
 /** Which food to take from a chest's contents for `want` items: the most food points per item first. Pure. */
@@ -440,13 +441,13 @@ export function foodToTake (contents: Record<string, number>, want: number, poin
  */
 async function takeFromOwnChests (
   ctx: { bot: Bot, agent: Agent, signal: AbortSignal }, want: number, range: number,
-  value: (name: string) => number, toTake: (contents: Record<string, number>, left: number) => Record<string, number>
+  value: (name: string) => number, toTake: (contents: Record<string, number>, left: number) => Record<string, number>,
+  chests?: Pos[]
 ): Promise<{ took: Record<string, number>, units: number, notes: string[] }> {
   const { bot, agent, signal } = ctx
   const here = bot.entity.position
   const seenList = knownContainers(agent)
-  const own = [...ownChests(agent), ...configuredChests(agent)]
-    .filter((p, i, a) => a.findIndex(q => q.x === p.x && q.y === p.y && q.z === p.z) === i)
+  const own = uniquePositions(chests ?? [...ownChests(agent), ...configuredChests(agent)])
     .filter(p => Math.hypot(p.x - here.x, p.y - here.y, p.z - here.z) <= range && !agent.protectedAreas?.isProtected?.(p as any))
     .map(p => {
       const s = knownAt(seenList, p)
@@ -687,15 +688,29 @@ export function storageDue (agent: Agent, bot: Bot, radius: number, now = Date.n
   return checkDue(chests, lookup, now, refreshMs, { x: me.x, y: me.y, z: me.z })
 }
 
-/** Food in the pantry (configured chests, else its own ones) within `radius` of home, from fresh memory: "pantry low: ..." or null. */
+function uniquePositions (list: Pos[]): Pos[] {
+  return list.filter((p, i, a) => a.findIndex(q => q.x === p.x && q.y === p.y && q.z === p.z) === i)
+}
+
+/**
+ * The pantry: its own chests (ones it placed) and the configured ones (settings.storage.chests)
+ * within `radius` (default inventoryMemory.radius, 48) blocks of home, or of the bot when it has
+ * no home in this dimension. The one definition for the pantry-low report (check_chests,
+ * check_storage) and the pre-trip top-up (skills/trip.ts, which also keeps to the ones within
+ * walking range of the bot).
+ */
+export function pantryChests (agent: Agent, bot: Bot, radius = memoryOptions(agent).radius): Pos[] {
+  const center = homeOf(agent, bot) ?? bot.entity?.position
+  if (!center) return []
+  return uniquePositions([...ownChests(agent), ...configuredChests(agent)])
+    .filter(p => Math.hypot(p.x - center.x, p.z - center.z) <= radius)
+}
+
+/** Food in the pantry (pantryChests) from fresh memory: "pantry low: ..." or null. */
 export function pantryReport (agent: Agent, bot: Bot, radius: number, now = Date.now()): { items: number, text: string } | null {
   const o = memoryOptions(agent)
-  const center = homeOf(agent, bot) ?? bot.entity?.position
-  if (!center) return null
   const known = knownContainers(agent, { now })
-  const pantry = configuredChests(agent).length ? configuredChests(agent) : ownChests(agent)
-  const seen = pantry
-    .filter(p => Math.hypot(p.x - center.x, p.z - center.z) <= radius)
+  const seen = pantryChests(agent, bot, radius)
     .map(p => knownAt(known, p))
     .filter((c): c is KnownContainer => !!c && c.freshness === 'fresh')
     .filter((c, i, a) => a.indexOf(c) === i)
