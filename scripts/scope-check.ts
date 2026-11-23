@@ -1,6 +1,6 @@
 // Where does the code touch Minecraft? Counts, per directory, the TypeScript files that import a
 // Mineflayer / PrismarineJS package and the files that reach into the bot (agent.bot, bot.entity,
-// ...), then lists files outside src/adapters, src/skills, src/core/neoforge and scripts that import one of
+// ...), then lists files outside src/adapters, src/skills and scripts that import one of
 // those packages. Informational only: it always exits 0. See docs/concepts/scope.md.
 //   node scripts/scope-check.ts [--files]
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -8,7 +8,7 @@ import { join } from 'node:path'
 
 const ROOTS = ['src', 'variants', 'scripts']
 /** directories where Minecraft packages are expected (today and after the adapter split) */
-const EXPECTED = ['src/adapters/', 'src/skills/', 'src/core/neoforge/', 'scripts/']
+const EXPECTED = ['src/adapters/', 'src/skills/', 'scripts/']
 
 const GAME_IMPORT = /(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"](mineflayer(?:-[\w-]+)?|prismarine-[\w-]+|minecraft-[\w-]+|vec3)['"]/g
 // direct use of the Mineflayer bot: agent.bot / ctx.bot / this.bot, or the bot's own state and calls

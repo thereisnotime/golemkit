@@ -1,8 +1,9 @@
 // Live test of food self-sufficiency (keep_fed scouting, start_farm, farm_setup) on a real server.
-//   node scripts/food-test.ts run 760 45 [minutes]   walk to x/z, empty the inventory, set home, arm keep_fed + farm_setup, watch
+//   node scripts/food-test.ts run 760 45 [minutes]   walk to x/z, empty the inventory, set home, arm keep_fed (and farm_setup
+//                                                    with FOOD_FARM_SETUP=true), watch (default 30 minutes)
 //   node scripts/food-test.ts farm 800 -40           walk to x/z and run start_farm there directly (no behaviours)
 //   node scripts/food-test.ts tend [seeds]           go to the farm the last run made, gather seeds, run tend_farm and show the plot
-//   node scripts/food-test.ts seeds 900 300 [count]   walk to x/z and run gather_seeds there (a grassy spot away from bases)
+//   node scripts/food-test.ts seeds 900 300 [count]   walk to x/z and run gather_seeds there (a grassy spot away from bases; default 10 seeds)
 //   node scripts/food-test.ts report                  farms and food spots the last run remembered
 //   node scripts/food-test.ts remove                  break the crops, fences and torches of the farms the last run made
 // The bot is FOOD_BOT (default FoodTest), owned by FOOD_TESTER (default FoodTester), who joins
@@ -192,7 +193,7 @@ async function seeds (): Promise<void> {
   if (far() > 24) { log(`never got to ${X} ${Z}`); await bot.stop(); return }
   const before = state(bot)
   log(`at the spot: ${before}`)
-  await step(bot, 'gather_seeds', { count: Number(mins === '30' ? 10 : mins), radius: 64, maxMinutes: 4 })
+  await step(bot, 'gather_seeds', { count: Number(process.argv[5] ?? 10), radius: 64, maxMinutes: 4 })
   log(state(bot))
   bot.storage.flush()
   await bot.stop()
