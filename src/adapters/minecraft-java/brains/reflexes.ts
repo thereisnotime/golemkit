@@ -22,6 +22,7 @@ import { clutchInputs, extinguishInputs, hasWaterBucket, burning } from '../../.
 import { totemSwap, retreatPointless, retreatReason } from '../../../skills/techniques.ts'
 import { pvpAllowed } from '../../../skills/defense.ts'
 import { pvpCandidate, PVP_ACTIONS } from '../../../skills/pvp-actions.ts'
+import { mayReplace } from '../../../skills/reflexPlan.ts'
 import { undergroundNow } from '../../../skills/mining.ts'
 import { miningSettings, undergroundRetreat } from '../../../skills/minePlan.ts'
 
@@ -57,8 +58,31 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       let bunkerFailedAt = 0
       let gearTriedAt = 0
       const combatCfg = () => (agent.settings.combat ?? {}) as { autoArmor?: boolean, disengageToHeal?: boolean, totem?: boolean, waterClutch?: boolean }
+      // ---- arbitration: one reflex holds the body for a while (reflexPlan.ts) ----
+      let started = { name: '', at: 0, health: 20 }
+      const meleeDist = (): number => {
+        let d = Infinity
+        for (const e of Object.values(bot.entities)) {
+          if (e === bot.entity || !isHostile(e) || FLYING.has(e.name ?? '') || isRangedMob(e.name) || !e.position) continue
+          d = Math.min(d, e.position.distanceTo(bot.entity.position))
+        }
+        return d
+      }
+      /** True when `next` may take the body now (and notes it as started). */
+      const arbitrate = (next: string): boolean => {
+        const cur = agent.currentAction
+        const mine = !!cur && started.name === cur.name
+        const why = mayReplace({
+          current: cur?.name ?? null, currentIsReflex: cur?.caller.kind === 'reflex', sinceStartMs: mine ? Date.now() - started.at : Infinity,
+          healthDrop: mine ? started.health - bot.health : 0, next, meleeDist: meleeDist()
+        })
+        if (why) { agent.log.debug(`reflex ${next} held back: ${why}`); return false }
+        started = { name: next, at: Date.now(), health: bot.health }
+        return true
+      }
       const reflex = async (action: string, force = false, params: Record<string, unknown> = {}) => {
         if (busy && !force) return
+        if (!arbitrate(action)) return
         busy = true
         try { await agent.act(action, params, { caller, priority: PRIORITY.reflex }) } finally { busy = false }
       }
@@ -114,7 +138,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         const victimMe = entity === bot.entity
         if (!victimMe && !(guarded && entity?.username?.toLowerCase() === guarded.toLowerCase())) return
         if (pvpAllowed(agent, bot, who)) return
-        if (PVP_ACTIONS.has(agent.currentAction?.name ?? '') || !agent.getAction('defend_player')) return
+        if (PVP_ACTIONS.has(agent.currentAction?.name ?? '') || !agent.getAction('defend_player') || !arbitrate('defend_player')) return
         pvpBusy = true
         setImmediate(() => {
           void agent.act('defend_player', guarded ? { player: who, protect: guarded } : { player: who }, { caller, priority: PRIORITY.reflex })
@@ -131,7 +155,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           if (engaging || pvpBusy || !bot.entity || bot.health <= 0 || !needsSurvival(bot) || !agent.getAction('pvp_engage')) return
           if (pvpBusyActions.has(agent.currentAction?.name ?? '')) return
           const pick = pvpCandidate(agent, bot)
-          if (!pick) return
+          if (!pick || !arbitrate('pvp_engage')) return
           engaging = true
           agent.log.info(`pvp: engaging ${pick.player} (${pick.why}, ${pick.dist.toFixed(0)} blocks)`)
           void agent.act('pvp_engage', { player: pick.player }, { caller, priority: PRIORITY.reflex }).finally(() => { engaging = false })
@@ -174,6 +198,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         const u = undergroundNow(bot, s.hostileRadius)
         const why = undergroundRetreat({ ...u, health: bot.health }, s)
         if (!why) return false
+        if (!arbitrate('climb_out')) return false
         climbTriedAt = Date.now()
         escaping = true
         agent.log.info(`underground retreat: ${why}, climbing out`)
@@ -236,7 +261,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         if (mob.name === 'phantom' && night && (unarmed || bot.health <= 12) && !guarding && agent.canDig && agent.getAction('bunker') &&
             !agent.protectedAreas.isProtected(bot.entity.position) && Date.now() - bunkerFailedAt > 60_000) {
           // A failed bunker (thin ground, nothing to seal with) isn't retried for a minute; fight instead.
-          if (!busy) {
+          if (!busy && arbitrate('bunker')) {
             busy = true
             void agent.act('bunker', {}, { caller, priority: PRIORITY.reflex })
               .then(r => { if (!r.ok) bunkerFailedAt = Date.now() })

@@ -535,6 +535,14 @@ Besides this loop the reflexes also:
   `combat.pvp` anything but `off`, and `pvp_engage` against an allowed player in range in the
   attacking modes (see [PvP](#pvp)).
 
+The reflexes all run at the same priority, and an equal priority replaces the running action, so
+a referee (`reflexPlan.ts`, pure and tested) decides whether a new reflex may take the body from
+the one running: a reflex keeps it for 1.5 s unless health drops by 4 or more; `climb_out` and
+`retreat` aren't interrupted by `ranged_defense`, nor by a fight unless a melee mob is within 2
+blocks; `ranged_defense` isn't interrupted by `defend` for a mob more than 3 blocks away; the water
+bucket always goes. Without it, a bot underground with skeletons and a spider switched between
+`ranged_defense`, `climb_out` and `defend` every 0.2 to 2 s and died without finishing any.
+
 `reflexes.selfDefense` off turns off all the fighting parts, PvP defence included. In creative
 and spectator the mob, hunger and fall reflexes are off.
 
