@@ -51,7 +51,7 @@ flowchart TB
 | `on(event)`, `off(event)` | `spawn`, `end`, `chat`, `serverMessage`, `hurt`, `health`, `death`, `respawn`, `playerJoined`, `playerLeft`, `gameMode`, `kicked`, `error` |
 
 Optional primitives the core and the brain frameworks use when the game has them:
-`entities()`, `inventory()`, `time()`, `players()`, `playerPosition()`, `inDanger()`,
+`start()` (once per agent start), `entities()`, `inventory()`, `time()`, `players()`, `playerPosition()`, `inDanger()`,
 `stopMotion()`, `replan()`, `settingsChanged()`, `holdStill()`, `fidget()`, `isMoving()`.
 
 Brains read the game through `agent.adapter` and never touch `agent.bot`. Actions and
@@ -82,8 +82,15 @@ platform).
 Inside the Minecraft adapter, `src/adapters/minecraft-java/platform.ts`: what differs between
 server software. `neoforge` (the default) negotiates mod channels, syncs registries, treats
 modded blocks as solid and skips packets vanilla definitions can't parse (see
-[NeoForge support](./neoforge.md)); `vanilla` and `paper` add nothing. Pick one with
-`MC_PLATFORM` or `server.platform` in a profile or fleet file.
+[NeoForge support](./neoforge.md)), and also works on vanilla servers since it only answers
+what NeoForge asks; `vanilla` and `paper` add nothing. Pick one with `MC_PLATFORM` or
+`server.platform` in a profile or fleet file; `platforms/index.ts` (`platformFor`) maps the
+name to a platform.
+
+A platform has a `name`, the `capabilities` it adds (NeoForge: `mods`) and optional hooks:
+`install` (process-wide setup such as parser patches), `describe` (text for the connect log
+line), `attach` (a fresh client before login), `afterPlugins` and `onLogin` (registry fixes
+for modded content).
 
 ## Checking the line
 

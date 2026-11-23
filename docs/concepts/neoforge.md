@@ -7,7 +7,10 @@ scope: neoforge
 Mineflayer only speaks the vanilla protocol. A NeoForge server rejects vanilla clients when
 its mods register network channels (any content mod does), so golemkit adds a NeoForge layer
 in `src/adapters/minecraft-java/platforms/neoforge/`, the default server platform of the
-[Minecraft Java adapter](./adapters.md). Skills and brains never see it.
+[Minecraft Java adapter](./adapters.md). Skills and brains never see it. It also works on
+vanilla servers, since it only answers what NeoForge asks; set `MC_PLATFORM=vanilla` or `paper`
+(or `server.platform` in a profile) to leave it out. The file names below are in that
+directory unless a path is given.
 
 Everything here is written against NeoForge's 1.21.1 source
 (`neoforged/NeoForge`, branch `1.21.1`, `network/payload/` and `network/registration/`).
@@ -122,7 +125,7 @@ those particular stacks remain invisible even though the item's name is known.
 
 NeoForge appends modded block states after the vanilla ones, so vanilla state ids stay valid
 and anything above the vanilla maximum is modded. prismarine-block would treat those as air,
-so the bot would fall through Create casings. `modded.ts` maps them to a stand-in
+so the bot would fall through Create casings. `src/adapters/minecraft-java/modded.ts` maps them to a stand-in
 `modded_block`: a solid, non-diggable full cube. Pathfinding treats machines as walls, which
 is the safe default.
 
