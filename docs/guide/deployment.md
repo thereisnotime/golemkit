@@ -9,7 +9,10 @@ Bots are long-running Node processes. Any process supervisor works; two tested s
 ## Podman
 
 The repo ships a `Containerfile` (Node 26 slim, production dependencies only, entrypoint
-`node src/cli.ts`). `just image [tag]` builds it.
+`node src/cli.ts`). `just image [tag]` builds it. The image holds `src/`, `variants/`,
+`profiles/`, `fleets/`, `blueprints/` and `scenes/`, with writable `data/`, `.auth/` and
+`logs/` owned by the `node` user. A private `fleet.yaml` (gitignored) or your own profiles are
+not in it; mount them.
 
 ```bash
 podman build -t golemkit .

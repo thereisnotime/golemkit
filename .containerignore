@@ -7,3 +7,7 @@ data
 docs
 openspec
 test
+logs
+fleet.yaml
+blueprints/downloaded
+profiles/*/MEMORY.md
