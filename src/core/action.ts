@@ -70,6 +70,11 @@ export interface ActionDef<S extends z.ZodObject = z.ZodObject> {
   /** Hide from LLM tool lists. */
   internal?: boolean
   /**
+   * Anyone may send it as a chat command, not only owners. Only for actions that make the bot
+   * more peaceful; the action itself refuses whatever else a non-owner asks of it.
+   */
+  anyone?: boolean
+  /**
    * What the game must support for this action (see Capability in core/adapter.ts). An agent
    * whose adapter lacks one doesn't register it: no command, no LLM tool, not in help.
    * Default: the skill's `capabilities`, else none.

@@ -302,7 +302,9 @@ Safety rails, in every mode:
   while `combat.spareProtected` is on (default);
 - only owners change the mode or the lists (`!pvp`, `!attack_player`, `!hunt_player`,
   `!config_set`); an LLM or [NPC brain](/guide/npc-brain) can't start PvP. Anyone may make it more peaceful
-  (`!pvp off`, `!spare_player`);
+  (`!pvp off`, `!pvp defend` when the mode is higher, `!spare_player`, and "pax pvp off", "pax
+  stop attacking", "pax leave bob alone"): the command and intents brains take these from any
+  player and ignore everything else non-owners say;
 - the kill switch: `!pvp off`, or "pax stop" / `!stop` from an owner, ends every fight with a
   player and every hunt at once; `stop` also drops an attacking mode to `off` (`defend` stays,
   it only answers attacks);

@@ -298,3 +298,22 @@ test('layers: an unavailable embeddings layer falls back to patterns + LLM as be
   assert.equal(provider.inputs.length >= 1, true)
   await done()
 })
+
+test('non-owners: only the peaceful PvP lines (pvp off, stop attacking, spare), nothing else', async () => {
+  const pvpCalls: string[] = []
+  const agent = new IntentAgent([
+    ...actions(),
+    defineAction({ name: 'pvp', description: 'pvp', params: z.object({ mode: z.string().optional() }), exclusive: false, anyone: true, run: (_c, p) => { pvpCalls.push(`pvp ${p.mode}`); return ok(`PvP ${p.mode}`) } }),
+    defineAction({ name: 'spare_player', description: 'spare', params: z.object({ player: z.string() }), exclusive: false, anyone: true, run: (_c, p) => { pvpCalls.push(`spare ${p.player}`); return ok(`leaving ${p.player} alone`) } })
+  ])
+  const brain = intentsBrain({ ackAfterMs: 20, llmBlocked: () => undefined, llmHandoff: () => false })
+  brain.start!(agent as any)
+  for (const line of ['pax follow me', 'pax pvp all', 'pax hunt tester', 'pax pvp off', 'pax stop attacking', 'pax no more pvp', 'pax leave bob alone', 'pax pvp defend']) {
+    agent.chat('Stranger', line)
+    await settle(30)
+  }
+  assert.deepEqual(agent.calls.map(c => `${c.name} ${JSON.stringify(c.params)}`), [
+    'pvp {"mode":"off"}', 'pvp {"mode":"off"}', 'pvp {"mode":"off"}', 'spare_player {"player":"bob"}', 'pvp {"mode":"defend"}'
+  ])
+  agent.stopActions()
+})

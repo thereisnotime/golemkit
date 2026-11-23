@@ -129,8 +129,8 @@ patterns first is the predictable choice.
 
 ### What the loose layers may and may not do
 
-- **Never PvP.** The PvP intents (pvp mode, attack, hunt, spare) come from the anchored patterns
-  only: they are not in the label set the embeddings and the local LLM choose from, so a loose
+- **Never PvP.** The PvP intents (pvp mode, attack, hunt, spare) and hunting animals come from
+  the anchored patterns only: they are not in the label set the embeddings and the local LLM choose from, so a loose
   guess can't start a fight.
 - **They only pick the intent.** Counts, items, places, players and templates come from the line
   through the parser's own helpers (`slots.ts`): "dig up twenty sand" is collect, sand, 20 because
@@ -141,7 +141,8 @@ patterns first is the predictable choice.
   and be in the line ("bring me bread" answered with `diamond_sword` is rejected), a count or a
   coordinate must be said, a place or player must appear. Its JSON is parsed, never evaluated, and
   the intent must be one of the known names.
-- **Same sentence rules as the patterns**: negations ("don't mine that") and questions don't act,
+- **Same sentence rules as the patterns**: negations ("don't mine that") and questions don't act
+  (the patterns let "don't follow me", "don't attack bob" and "no pvp" / "no more pvp" through),
   statements ("I'm going to get some wood", "can anyone trade me iron") and lines that start by
   naming someone else ("steve, give me your sword") are rejected. The embeddings layer also has a
   `none` class of chat examples; a line closest to those is left alone.
@@ -237,7 +238,9 @@ carries a few examples from the seen set, so its seen numbers are slightly flatt
 
 ## Who it listens to
 
-- **Owners only** (`--owners` / `MC_OWNERS`; an empty list means everyone).
+- **Owners only** (`--owners` / `MC_OWNERS`; an empty list means everyone). Other players get
+  only the peaceful PvP lines ("pvp off", "pvp defend" from a higher mode, "stop attacking",
+  "leave bob alone"), from the patterns; everything else they say is left alone.
 - **Addressed lines only**: the bot's name or an alias at the start ("pax, follow me",
   "@pax stop", "hey pax come here") or at the end ("follow me pax"). A name in the middle ("I
   think pax is lost") doesn't count. Whispers always count. When the owner is the only other
@@ -332,10 +335,11 @@ the LLM in `first` mode.
 | set home | set home, set home here, this is your home | `set_home` (bot's or speaker's position) |
 | remember | remember this place as the mine, save this spot as wheat field | `remember_place` at the speaker's position |
 | build | build a house (here), build me a log cabin, put up a shelter | `build` with the [blueprint](/guide/goals-and-building#blueprint-format) (house = small_house, big house = cottage, log cabin = cabin); "here" = the speaker's position |
-| PvP mode | pvp off, pvp defend, set pvp to revenge, switch pvp to targets, pvp mode all; stop attacking, stop fighting, stop pvp, ceasefire, peace (= off; with a name it is "spare") | `pvp {mode}`; off is the kill switch (ends every fight and hunt). Owners only, see [PvP](/concepts/world#pvp) |
+| PvP mode | pvp off, pvp defend, set pvp to revenge, switch pvp to targets, pvp mode all; stop attacking, stop fighting, stop pvp, no pvp, no more pvp, ceasefire, peace (= off; with a name it is "spare") | `pvp {mode}`; off is the kill switch (ends every fight and hunt). Owners only, except that anyone may turn it off or lower it (see [PvP](/concepts/world#pvp)) |
 | attack a player | attack bob, fight bob, go after bob, take out bob, kill bob on sight | `attack_player {player}`: only a player online by that name (never "attack zombies", "kill everything", "attack me"); a name nobody online has gets "no player called bob online" |
-| hunt a player | hunt bob, hunt bob down, track down bob, find and kill bob | `hunt_player {player}`: goes where they were last seen and fights them; same online check |
-| spare a player | stop attacking bob, stop hunting bob, leave bob alone, don't attack bob, never attack bob, spare bob, forgive bob | `spare_player {player}`: off the list, grudge forgiven, fight ended |
+| hunt a player | hunt bob, hunt bob down, track down bob, find and kill bob, hunt player bob | `hunt_player {player}`: goes where they were last seen and fights them. Only when bob is online ("hunt player bob" says it outright); otherwise "track down iron" is a search and "hunt eve" with no eve online is nothing |
+| hunt animals | hunt rabbits, kill 3 cows, go hunt some animals, go hunting for food | `hunt {animal, count}` (cow, pig, sheep, chicken, rabbit, mooshroom; none named = the nearest) |
+| spare a player | stop attacking bob, stop hunting bob, leave bob alone, don't attack bob, never attack bob, spare bob, forgive bob | `spare_player {player}`: off the list, grudge forgiven, fight ended. Anyone may say it |
 | behaviours | start farming, keep chopping, go exploring, stop chopping, turn on keep_fed, disarm farm_loop | `behavior_arm` / `behavior_disarm` (farming = farm_loop, chopping = chop_wood_loop, following = follow_owner, exploring = wander, ...) |
 | help | help, what can you do? | lists the phrases |
 

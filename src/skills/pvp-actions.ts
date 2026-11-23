@@ -3,7 +3,8 @@
 //   !attack_player Bob / !spare_player Bob / !hunt_player Bob   the target list (combat.targets)
 //   !pvp_list                                 mode, targets, grudges (revenge) and hunts
 // pvp_engage (internal) is what the reflexes start when an allowed player comes in range.
-// Only owners change any of it (an LLM or NPC brain can't start PvP); anyone may turn it off.
+// Only owners change any of it (an LLM or NPC brain can't start PvP); anyone may make it more
+// peaceful: !pvp off, !pvp to a lower mode (defend when it was revenge), !spare_player, "stop attacking".
 // The bot whispers mode changes to the owners online and says nothing in public unless
 // combat.taunts is on. Grudges and hunts are kept in storage (pvp.revenge, pvp.hunts).
 import type { Bot } from 'mineflayer'
@@ -12,7 +13,7 @@ import type { Agent, ActionContext } from '../core/index.ts'
 import { defineAction, z, ok, fail, goals, gotoTimed, sleep, checkAborted, ActionAbortedError, parseDeathMessage } from '../core/index.ts'
 import {
   pvpSettings, pvpMode, aggressive, aggression, addRevenge, pruneRevenge, revengeKill, revengeWorthy, pickPvpTarget,
-  duelOdds, engageCheck, spared, modeLine, tauntLine, minutesLeft, PVP_MODES,
+  duelOdds, engageCheck, spared, modeLine, deescalates, tauntLine, minutesLeft, PVP_MODES,
   type PvpMode, type RevengeEntry, type Fighter, type AggroWhy, type Candidate, type PvpSettings
 } from './pvp.ts'
 import { reengage } from './pvp-tactics.ts'
@@ -297,14 +298,16 @@ export const pvpEngage = defineAction({
 
 export const pvpCommand = defineAction({
   name: 'pvp',
-  description: 'PvP mode (owners only): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | ' +
+  description: 'PvP mode (owners only; anyone may turn it off or lower it): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | ' +
     'targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.',
   params: z.object({ mode: z.enum(PVP_MODES as [PvpMode, ...PvpMode[]]).optional() }),
   exclusive: false,
+  anyone: true,
   run (ctx, { mode }) {
-    if (!mode) return ok(statusLine(ctx.agent))
+    if (!mode) return ownerOnly(ctx) ? fail('only my owners can see who I fight') : ok(statusLine(ctx.agent))
     if (mode === 'off') return ok(killSwitch(ctx.agent, byOf(ctx), true) || 'PvP was already off')
-    const denied = ownerOnly(ctx)
+    // anyone may lower the mode; raising it is for owners
+    const denied = deescalates(pvpConfig(ctx.agent).mode, pvpMode(mode)) ? null : ownerOnly(ctx)
     if (denied) return fail(denied)
     const changed = setMode(ctx.agent, pvpMode(mode), byOf(ctx))
     if (!aggressive(mode)) { ctx.agent.cancelActions(i => i.name === 'pvp_engage' || i.name === 'hunt_player', 'pvp mode'); setHunts(ctx.agent, []) }
@@ -349,6 +352,7 @@ export const sparePlayer = defineAction({
   description: 'Take a player off the PvP target list and forgive any grudge against them, ending a fight or hunt with them.',
   params: z.object({ player: z.string().min(1) }),
   exclusive: false,
+  anyone: true,
   run (ctx, { player }) {
     // anyone may make the bot more peaceful
     const n = player.toLowerCase()

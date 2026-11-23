@@ -2,13 +2,14 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   pvpMode, pvpSettings, aggressive, aggression, addRevenge, pruneRevenge, revengeKill, revengeWorthy, activeRevenge, pickPvpTarget,
-  afterArmor, duelOdds, engageCheck, chaseVerdict, pvpRefusal, modeLine, type AggroCheck, type Fighter
+  afterArmor, duelOdds, engageCheck, chaseVerdict, pvpRefusal, modeLine, deescalates, type AggroCheck, type Fighter
 } from '../src/skills/pvp.ts'
 import {
   trackVelocity, teleported, predict, enemyReadyIn, shieldCovers, pvpWeapon, pvpShield, pvpMove, pvpKnockback, edgeStep, pvpRange,
   pvpSustain, reengage
 } from '../src/skills/pvp-tactics.ts'
 import { parseIntent } from '../src/brains/intents/parse.ts'
+import { pvpCommand, sparePlayer, attackPlayer } from '../src/skills/pvp-actions.ts'
 import { findToggle, parseToggleValue } from '../src/core/toggles.ts'
 
 const NOW = 1_000_000
@@ -252,4 +253,71 @@ test('intents: PvP phrases, never mobs, and the kill switch', () => {
     assert.notEqual(parseIntent(t, ctx)?.intent, 'pvp_attack', t)
   }
   assert.equal((parseIntent('did you attack bob?', ctx)?.confidence ?? 0) < 0.7, true, 'a question is no order')
+})
+
+test('intents: "no pvp" and "no more pvp" turn PvP off, other negations stay no request', () => {
+  const ctx = { speaker: 'Robin' }
+  for (const t of ['no pvp', 'no more pvp']) assert.deepEqual(parseIntent(t, ctx), { intent: 'pvp_mode', args: { mode: 'off' }, confidence: 0.9 }, t)
+  assert.equal(parseIntent('no attack bob', ctx)?.intent, undefined)
+  assert.equal(parseIntent('do not pvp all', ctx), null, 'a negated attacking mode is no request')
+})
+
+test('intents: hunt and track down name a player only when one is online', () => {
+  const online = { speaker: 'Robin', players: ['Bob', 'Robin'] }
+  assert.deepEqual(parseIntent('hunt bob', online)?.args, { player: 'bob', hunt: true })
+  assert.deepEqual(parseIntent('track down bob', online)?.args, { player: 'bob', hunt: true })
+  assert.equal(parseIntent('hunt eve', online), null, 'not online')
+  assert.deepEqual(parseIntent('hunt player eve', online)?.args, { player: 'eve', hunt: true }, 'explicitly a player')
+  assert.deepEqual(parseIntent('track down iron', online), { intent: 'find', args: { target: 'iron' }, confidence: 0.9 })
+  assert.deepEqual(parseIntent('track down iron', { speaker: 'Robin' })?.intent, 'find', 'no player list: track down is a search')
+  assert.deepEqual(parseIntent('hunt rabbits', online), { intent: 'hunt', args: { animal: 'rabbit' }, confidence: 0.9 })
+  assert.deepEqual(parseIntent('hunt rabbits', { speaker: 'Robin' })?.args, { animal: 'rabbit' })
+  assert.deepEqual(parseIntent('kill 3 cows', online)?.args, { animal: 'cow', count: 3 })
+  assert.deepEqual(parseIntent('go hunt some animals', online)?.args, {})
+  for (const t of ['hunt mooshrooms', 'hunt bunnies', 'attack rabbits', 'hunt goats']) assert.notEqual(parseIntent(t, online)?.intent, 'pvp_attack', t)
+})
+
+// ---- who may change the mode ----
+
+function pvpAgent (mode: string) {
+  const store = new Map<string, unknown>()
+  const agent = {
+    username: 'Pax',
+    owners: ['robin'],
+    settings: { combat: { pvp: mode } } as Record<string, any>,
+    isOwner: (p: string) => p.toLowerCase() === 'robin',
+    setToggle (key: string, v: unknown) { if (key === 'combat.pvp') agent.settings.combat.pvp = v },
+    resetToggle () {},
+    cancelActions: () => 0,
+    storage: { get: (k: string, d: unknown) => store.has(k) ? store.get(k) : d, set: (k: string, v: unknown) => { store.set(k, v) } }
+  }
+  return agent
+}
+const asPlayer = (agent: unknown, name: string) => ({ agent, bot: {}, caller: { kind: 'player', name } }) as any
+
+test('pvp: anyone may lower the mode, only owners raise it or read the lists', async () => {
+  assert.equal(deescalates('all', 'defend'), true)
+  assert.equal(deescalates('revenge', 'defend'), true)
+  assert.equal(deescalates('defend', 'revenge'), false)
+  assert.equal(deescalates('off', 'defend'), false)
+  assert.equal(pvpCommand.anyone, true)
+  assert.equal(sparePlayer.anyone, true)
+  assert.equal(attackPlayer.anyone, undefined)
+
+  let a = pvpAgent('all')
+  let r = await pvpCommand.run(asPlayer(a, 'Stranger'), { mode: 'defend' }) as any
+  assert.equal(r.ok, true, r.message)
+  assert.equal(a.settings.combat.pvp, 'defend')
+  r = await pvpCommand.run(asPlayer(a, 'Stranger'), { mode: 'revenge' }) as any
+  assert.equal(r.ok, false, 'raising is for owners')
+  assert.equal(a.settings.combat.pvp, 'defend')
+  r = await pvpCommand.run(asPlayer(a, 'Stranger'), { mode: 'off' }) as any
+  assert.equal(r.ok, true)
+  assert.equal(a.settings.combat.pvp, 'off')
+  r = await pvpCommand.run(asPlayer(a, 'Stranger'), {}) as any
+  assert.equal(r.ok, false, 'status is for owners')
+  a = pvpAgent('off')
+  r = await pvpCommand.run(asPlayer(a, 'Robin'), { mode: 'all' }) as any
+  assert.equal(r.ok, true)
+  assert.equal(a.settings.combat.pvp, 'all')
 })

@@ -1,6 +1,7 @@
 // Player-assistant brain: turns chat commands into actions. Every registered action is a
 // command automatically ("!goto 10 64 -20", "!follow Steve"); positional words map to the
-// action's parameters in schema order, "key=value" works too.
+// action's parameters in schema order, "key=value" works too. Only owners are obeyed, except
+// for actions marked `anyone` (the ones that make the bot more peaceful, like !pvp off).
 import { z } from 'zod'
 import { defineBrain, PRIORITY, type Agent, type ActionDef, type ChatMessage } from '../core/index.ts'
 
@@ -32,14 +33,15 @@ export const commandBrain = (opts: CommandBrainOptions = {}) => {
   })
 
   async function handle (agent: Agent, msg: ChatMessage): Promise<void> {
-    if (!agent.isOwner(msg.from) || msg.claimedBy) return
+    if (msg.claimedBy || msg.from === agent.username) return
     let body = msg.message.trim()
     if (body.startsWith(prefix)) body = body.slice(prefix.length)
     else if (!msg.whisper || whisperNeedsPrefix) return
 
     const [name = '', ...words] = body.split(/\s+/)
-    if (name === 'help') return help(agent, msg, words[0])
     const def = agent.getAction(name.toLowerCase())
+    if (!agent.isOwner(msg.from) && !anyoneMay(def)) return
+    if (name === 'help') return help(agent, msg, words[0])
     if (!def || def.internal) {
       if (verbose && msg.whisper) agent.reply(msg, `unknown command, try ${prefix}help`)
       return
@@ -63,6 +65,11 @@ export const commandBrain = (opts: CommandBrainOptions = {}) => {
     const names = agent.listActions().filter(a => !a.internal).map(a => a.name)
     agent.reply(msg, `commands: ${names.map(n => prefix + n).join(' ')} (${prefix}help <command> for details)`)
   }
+}
+
+/** Non-owners may send only commands for actions marked `anyone` (they make the bot more peaceful). */
+export function anyoneMay (def: ActionDef | undefined): boolean {
+  return !!def && !def.internal && def.anyone === true
 }
 
 /**

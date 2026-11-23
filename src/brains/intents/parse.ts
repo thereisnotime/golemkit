@@ -8,12 +8,12 @@ export type IntentName =
   | 'follow' | 'unfollow' | 'come' | 'go_home' | 'goto' | 'guard' | 'unguard' | 'farm' | 'chop' | 'collect'
   | 'find' | 'bring' | 'give' | 'drop' | 'eat' | 'sleep' | 'stop' | 'status' | 'where' | 'inventory'
   | 'set_home' | 'remember_place' | 'build' | 'behavior_on' | 'behavior_off' | 'help'
-  | 'pvp_attack' | 'pvp_spare' | 'pvp_mode'
+  | 'pvp_attack' | 'pvp_spare' | 'pvp_mode' | 'hunt'
 
 /**
  * Every intent the brain can act on (the label set for classifiers and the local LLM prompt).
- * The PvP intents (pvp_attack, pvp_spare, pvp_mode) are left out on purpose: only the anchored
- * patterns produce them, never a guess from the embeddings or a local model.
+ * The PvP intents (pvp_attack, pvp_spare, pvp_mode) and hunt are left out on purpose: only the
+ * anchored patterns produce them, never a guess from the embeddings or a local model.
  */
 export const INTENT_NAMES: readonly IntentName[] = [
   'follow', 'unfollow', 'come', 'go_home', 'goto', 'guard', 'unguard', 'farm', 'chop', 'collect',
@@ -31,6 +31,11 @@ export interface Intent {
 export interface ParseContext {
   /** Who said it: "me", "us" and "here" resolve to this player. */
   speaker: string
+  /**
+   * Players online now (any case). When given, "hunt X" / "track down X" is a player hunt only
+   * if X is one of them; without it only the kill verbs ("hunt X") guess at a player.
+   */
+  players?: readonly string[]
 }
 
 /** Default confidence threshold below which the brain does nothing. */
@@ -362,7 +367,19 @@ export function who (word: string | undefined, ctx: ParseContext): string {
 }
 
 /** Words after "attack"/"kill" that are mobs, not players. */
-const MOBS = /^(zombies?|skeletons?|creepers?|spiders?|endermen|enderman|mobs?|monsters?|hostiles?|everything|everyone|anything|animals?|cows?|pigs?|sheep|chickens?|witch(es)?|pillagers?|phantoms?|slimes?|drowned|husks?|strays?|vindicators?|blazes?|ghasts?|them all|all)$/
+const MOBS = /^(zombies?|skeletons?|creepers?|spiders?|endermen|enderman|mobs?|monsters?|hostiles?|everything|everyone|anything|animals?|cows?|pigs?|sheep|chickens?|witch(es)?|pillagers?|phantoms?|slimes?|drowned|husks?|strays?|vindicators?|blazes?|ghasts?|rabbits?|bunny|bunnies|mooshrooms?|goats?|horses?|llamas?|foxes|fox|wolves|wolf|cats?|squids?|cod|salmon|them all|all)$/
+
+/** Animals the hunt action takes ("hunt rabbits" -> hunt { animal: 'rabbit' }). */
+const HUNT_ANIMALS: Record<string, string> = {
+  cow: 'cow', cows: 'cow', pig: 'pig', pigs: 'pig', sheep: 'sheep', chicken: 'chicken', chickens: 'chicken',
+  rabbit: 'rabbit', rabbits: 'rabbit', bunny: 'rabbit', bunnies: 'rabbit', mooshroom: 'mooshroom', mooshrooms: 'mooshroom'
+}
+
+/** "hunt X" names a player when X is online (when the online list is known); "hunt player X" has its own rule. */
+function huntsPlayer (verb: string, word: string, ctx: ParseContext): boolean {
+  if (ctx.players) return ctx.players.some(p => p.toLowerCase() === word)
+  return verb !== 'track down' // no list: only the kill verbs guess at a player; "track down iron" is a search
+}
 
 export const NOT_PLAYERS = new Set(['it', 'that', 'this', 'them', 'there', 'here', 'around', 'everyone', 'everybody', 'someone', 'home', 'the', 'a', 'my', 'your'])
 
@@ -411,7 +428,13 @@ const RULES: Rule[] = [
   { re: /^(pvp|pvp mode|set pvp|set pvp to|set pvp mode to|switch pvp to|pvp mode to) (off|defend|revenge|targets|all)$/, build: m => ({ intent: 'pvp_mode', args: { mode: m[2] } }) },
   { re: /^(stop attacking|stop fighting|stop the pvp|stop pvp|no more pvp|no pvp|ceasefire|cease fire|peace)$/, build: () => ({ intent: 'pvp_mode', args: { mode: 'off' } }) },
   { re: new RegExp(`^(stop attacking|stop fighting|stop hunting|leave|spare|forgive|do not attack|do not fight|do not hurt|never attack) ${PLAYER}( alone)?$`), build: m => NOT_PLAYERS.has(m[2]!) || MOBS.test(m[2]!) || (m[1] === 'leave' && !m[3]) ? null : ({ intent: 'pvp_spare', args: { player: m[2] } }) },
-  { re: new RegExp(`^(hunt|hunt down|track down|find and kill|go hunt|go find and kill) ${PLAYER}( down)?$`), build: m => NOT_PLAYERS.has(m[2]!) || MOBS.test(m[2]!) || /^(me|us|myself|for)$/.test(m[2]!) ? null : ({ intent: 'pvp_attack', args: { player: m[2], hunt: true } }) },
+  { re: /^(hunt|hunt down|go hunt|go hunting for|kill|go kill)( a| an| one| some| the| (\d+))? (cows?|pigs?|sheep|chickens?|rabbits?|bunny|bunnies|mooshrooms?|animals|food)( for me| for us| for food)?$/, build: m => {
+    const animal = HUNT_ANIMALS[m[4]!]
+    const count = m[3] ? Number(m[3]) : undefined
+    return { intent: 'hunt', args: { ...(animal ? { animal } : {}), ...(count ? { count } : {}) } }
+  } },
+  { re: new RegExp(`^(hunt|hunt down|track down|find and kill|go hunt|go find and kill)( the player| player) ${PLAYER}( down)?$`), build: m => ({ intent: 'pvp_attack', args: { player: m[3], hunt: true } }) },
+  { re: new RegExp(`^(hunt|hunt down|track down|find and kill|go hunt|go find and kill) ${PLAYER}( down)?$`), build: (m, ctx) => NOT_PLAYERS.has(m[2]!) || MOBS.test(m[2]!) || /^(me|us|myself|for)$/.test(m[2]!) || !huntsPlayer(m[1]!, m[2]!, ctx) ? null : ({ intent: 'pvp_attack', args: { player: m[2], hunt: true } }) },
   { re: new RegExp(`^(attack|fight|go after|kill|take out) ${PLAYER}( on sight)?$`), build: m => NOT_PLAYERS.has(m[2]!) || MOBS.test(m[2]!) || /^(me|us|myself)$/.test(m[2]!) ? null : ({ intent: 'pvp_attack', args: { player: m[2] }, confidence: 0.85 }) },
 
   // ---- guard
@@ -504,7 +527,7 @@ export const INFO: ReadonlySet<IntentName> = new Set(['help', 'status', 'where',
 
 /** A cleaned line plus what kind of sentence it is: question, negation, polite request. */
 export interface LineShape extends Cleaned {
-  /** "don't X" / "never X" / "no X": only unfollow and unguard may come out of it. */
+  /** "don't X" / "never X" / "no X": only unfollow, unguard, pvp_spare and pvp off may come out of it. */
   negated: boolean
   /** A real question (not "can you ...?"): only the info intents act on it at full confidence. */
   asksQuestion: boolean
@@ -536,11 +559,11 @@ export function lineShape (text: string): LineShape {
 
 /**
  * Applies the sentence shape to a classifier's raw confidence: negated requests other than
- * unfollow/unguard are no request at all (null), questions halve the confidence of action
+ * unfollow/unguard/pvp_spare and "pvp off" ("no pvp", "no more pvp") are no request at all (null), questions halve the confidence of action
  * intents ("did you follow him?"), except searches phrased as questions ("where is the village?").
  */
-export function shapeConfidence (intent: IntentName, confidence: number, shape: LineShape): number | null {
-  if (shape.negated && intent !== 'unfollow' && intent !== 'unguard' && intent !== 'pvp_spare') return null
+export function shapeConfidence (intent: IntentName, confidence: number, shape: LineShape, args?: Record<string, unknown>): number | null {
+  if (shape.negated && intent !== 'unfollow' && intent !== 'unguard' && intent !== 'pvp_spare' && !(intent === 'pvp_mode' && args?.mode === 'off')) return null
   let c = confidence
   if (shape.asksQuestion && !INFO.has(intent)) {
     if (!(intent === 'find' && /^(where|is there|are there|any)\b/.test(shape.t))) c *= 0.5
@@ -569,7 +592,7 @@ export function parseIntent (text: string, ctx: ParseContext): Intent | null {
     if (!m) continue
     const r = rule.build(m, ctx)
     if (!r) continue
-    const confidence = shapeConfidence(r.intent, r.confidence ?? 0.9, shape)
+    const confidence = shapeConfidence(r.intent, r.confidence ?? 0.9, shape, r.args)
     if (confidence === null) return null
     return { intent: r.intent, args: resolvePlayers(r.intent, r.args ?? {}, ctx), confidence }
   }
@@ -582,6 +605,6 @@ export function helpLines (name: string): string[] {
     `say "${name} <request>": follow me, stop following, come here, go home, go to <place>, guard me / guard here / stop guarding, stay, stop`,
     'farm (at <place>), make a farm, chop some wood, get 64 cobblestone, mine 10 iron, find <thing>, bring me bread 5, give me your <item>, drop <item>',
     'eat, sleep, status / what are you doing / where are you, inventory, set home, remember this place as <name>, build a house (here), start/stop farming|chopping|following|guarding',
-    'PvP (owners): pvp off|defend|revenge|targets|all, attack <player>, hunt <player>, stop attacking <player>; "stop" ends every fight'
+    'PvP (owners): pvp off|defend|revenge|targets|all, attack <player>, hunt <player> (or hunt player <name>), stop attacking <player>; hunt rabbits|cows|... for food; "stop" ends every fight'
   ]
 }

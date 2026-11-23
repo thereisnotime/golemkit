@@ -235,9 +235,9 @@ export function extractSlots (intent: IntentName, text: string, ctx: ParseContex
       if (!act) return { ok: false, missing: 'activity' }
       return done(intent, { activity: act })
     }
-    case 'pvp_attack': case 'pvp_spare': case 'pvp_mode':
+    case 'pvp_attack': case 'pvp_spare': case 'pvp_mode': case 'hunt':
       // pattern-only intents: a classifier never gets to pick them (see INTENT_NAMES)
-      return { ok: false, missing: intent === 'pvp_mode' ? 'mode' : 'player' }
+      return { ok: false, missing: intent === 'pvp_mode' ? 'mode' : intent === 'hunt' ? 'animal' : 'player' }
   }
 }
 
@@ -270,7 +270,7 @@ export function refine (intent: IntentName, t: string): IntentName {
 const ARG_TYPES: Record<string, 'string' | 'number' | 'boolean'> = {
   player: 'string', distance: 'number', at: 'string', x: 'number', y: 'number', z: 'number', place: 'string', target: 'string',
   stay: 'boolean', create: 'boolean', crop: 'string', count: 'number', unit: 'string', wood: 'string', item: 'string', radius: 'number',
-  bring: 'boolean', template: 'string', name: 'string', behavior: 'string', activity: 'string', hunt: 'boolean', mode: 'string'
+  bring: 'boolean', template: 'string', name: 'string', behavior: 'string', activity: 'string', hunt: 'boolean', mode: 'string', animal: 'string'
 }
 
 /** Which args belong to which intent (for the local LLM prompt and for merging model values). */
@@ -280,7 +280,7 @@ export const INTENT_ARGS: Record<IntentName, string[]> = {
   collect: ['item', 'count'], find: ['target', 'radius', 'bring'], bring: ['item', 'count'], give: ['item', 'count'], drop: ['item', 'count'],
   eat: [], sleep: [], stop: ['stay'], status: [], where: [], inventory: [], set_home: ['at'], remember_place: ['name'],
   build: ['template', 'at'], behavior_on: ['behavior', 'activity'], behavior_off: ['behavior', 'activity'], help: [],
-  pvp_attack: ['player', 'hunt'], pvp_spare: ['player'], pvp_mode: ['mode']
+  pvp_attack: ['player', 'hunt'], pvp_spare: ['player'], pvp_mode: ['mode'], hunt: ['animal', 'count']
 }
 
 /** Args the extractor works out from the line itself; a model's odd value for them is ignored, not fatal. */

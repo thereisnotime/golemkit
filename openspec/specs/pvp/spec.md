@@ -43,7 +43,7 @@ In `revenge`, `targets` and `all`, the bot SHALL remember a player who killed or
 - **THEN** it fights back but keeps no grudge
 
 ### Requirement: Owner control and kill switch
-Only owners (or the system) SHALL change the mode, add targets or start hunts (`pvp`, `attack_player`, `hunt_player`, `config_set`); LLM and NPC brains SHALL NOT. Anyone may make the bot more peaceful (`pvp off`, `spare_player`). `pvp off`, or `stop` from an owner, SHALL end every fight with a player and every hunt immediately; `stop` SHALL also switch an attacking mode to `off`. Mode changes SHALL be whispered to the owners online; the bot SHALL say nothing in public about PvP unless `combat.taunts` is on.
+Only owners (or the system) SHALL change the mode, add targets or start hunts (`pvp`, `attack_player`, `hunt_player`, `config_set`); LLM and NPC brains SHALL NOT. Anyone may make the bot more peaceful: `!pvp off`, `!pvp` to a lower mode than the current one (`defend` when it is `revenge`, `targets` or `all`), `!spare_player`, and the plain-language "pvp off", "no more pvp", "stop attacking" and "leave Bob alone". The command and intents brains SHALL obey a non-owner for these only (actions marked `anyone`) and ignore every other command or request from them, as before; raising the mode or reading the PvP lists SHALL stay owner-only. `pvp off`, or `stop` from an owner, SHALL end every fight with a player and every hunt immediately; `stop` SHALL also switch an attacking mode to `off`. Mode changes SHALL be whispered to the owners online; the bot SHALL say nothing in public about PvP unless `combat.taunts` is on.
 
 #### Scenario: pax stop
 - **WHEN** the bot is hunting Bob in mode `targets` and an owner says "pax stop"
@@ -56,6 +56,14 @@ Only owners (or the system) SHALL change the mode, add targets or start hunts (`
 #### Scenario: Intents
 - **WHEN** an owner says "pax attack Bob" and Bob is online
 - **THEN** Bob is added to `combat.targets` and the mode becomes `targets`; "pax attack zombies" or a name that isn't online adds nobody
+
+#### Scenario: A stranger calms it down
+- **WHEN** the mode is `all` and a player who is not an owner says "!pvp defend", then "pax stop attacking"
+- **THEN** the mode becomes `defend`, then `off`; "!pvp all", "!goto 1 2 3" or "pax follow me" from them are ignored
+
+#### Scenario: Hunt words
+- **WHEN** an owner says "pax hunt Bob" or "pax track down Bob" and Bob is online
+- **THEN** the bot hunts Bob; "pax track down iron" searches for iron, "pax hunt rabbits" hunts rabbits for food, "pax hunt player Eve" hunts Eve even when she is not on the online list, and "pax hunt Eve" with no Eve online does nothing
 
 ### Requirement: Engage, chase and give up
 The reflexes SHALL engage an allowed player within `combat.pvpEngage` blocks (16) who is in sight or within 4 blocks, grudges before targets before anyone, nearest first. In `targets` and `all` (and `revenge` unless `combat.revengeIgnoresOdds`) a gear check SHALL skip fights whose duel odds are below `combat.pvpMinOdds` (0.7). A fight SHALL end past `combat.pvpChase` blocks (48) from its start, after `combat.pvpLostSec` seconds (30) out of sight, or after a pearl or teleport beyond half the chase limit; the player then waits a minute before the next engagement. `hunt_player` SHALL walk to the player's last known position and give up after `combat.huntMinutes` (10).

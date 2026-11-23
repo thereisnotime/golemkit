@@ -28,6 +28,11 @@ export function aggressive (mode: PvpMode): boolean {
   return mode === 'revenge' || mode === 'targets' || mode === 'all'
 }
 
+/** True when going from one mode to the other makes the bot more peaceful (all > targets > revenge > defend > off). */
+export function deescalates (from: PvpMode, to: PvpMode): boolean {
+  return PVP_MODES.indexOf(to) < PVP_MODES.indexOf(from)
+}
+
 // ---- settings ----
 
 export interface PvpSettings {

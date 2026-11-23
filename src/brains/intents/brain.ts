@@ -1,5 +1,6 @@
 // Intents brain: plain-language owner commands without an LLM ("pax guard me", "chop some
-// wood", "bring me bread"). Parses addressed owner chat (parse.ts), maps the intent to actions
+// wood", "bring me bread"). Non-owners only get the peaceful PvP ones ("pvp off", "stop
+// attacking", "leave bob alone"). Parses addressed owner chat (parse.ts), maps the intent to actions
 // through agent.act() at player priority or to behaviour arm/disarm, and replies briefly and
 // truthfully. With an LLM brain it either fills in while the LLM can't think (mode fallback) or
 // takes the simple requests itself and leaves the rest to the LLM (mode first).
@@ -15,7 +16,7 @@
 import { defineBrain, PRIORITY, type Agent, type ActionResult, type ChatMessage, type Logger } from '../../core/index.ts'
 import { llmRuntime } from '../llm.ts'
 import { runtimeFor } from '../behaviors/actions.ts'
-import { addressed, helpLines, ACTIVITIES, type Intent, type Addressed } from './parse.ts'
+import { addressed, helpLines, parseIntent, ACTIVITIES, DEFAULT_THRESHOLD, type Intent, type Addressed } from './parse.ts'
 import { resolveConfig, buildPipeline, type LayerConfig, type PipelineConfig, type IntentsSettings, type BuildDeps } from './config.ts'
 import { formatDecision, type Decision, type IntentLayer, type IntentPipeline, type Strategy } from './pipeline.ts'
 
@@ -47,6 +48,11 @@ export interface IntentsBrainOptions {
 }
 
 export const INTENTS_CALLER = 'intents'
+
+/** Intents a non-owner may use: they only make the bot more peaceful (pvp off or defend, spare a player). */
+export function peaceful (i: Pick<Intent, 'intent' | 'args'>): boolean {
+  return i.intent === 'pvp_spare' || (i.intent === 'pvp_mode' && (i.args.mode === 'off' || i.args.mode === 'defend'))
+}
 
 /** Behaviours that move the bot, worth mentioning after "stop" because they pick up again. */
 const MOVING_BEHAVIOURS = ['follow_owner', 'guard_owner', 'bodyguard', 'guard_area', 'chop_wood_loop', 'farm_loop', 'farm_setup', 'wander']
@@ -126,7 +132,8 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
   })
 
   function onChat (agent: Agent, msg: ChatMessage, log: Logger): void {
-    if (msg.claimedBy || msg.from === agent.username || !agent.isOwner(msg.from)) return
+    if (msg.claimedBy || msg.from === agent.username) return
+    const owner = agent.isOwner(msg.from)
     const mode = modeOf(agent)
     if (mode === 'off') return
     const prefix = process.env.MC_PREFIX ?? '!'
@@ -143,10 +150,11 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
       inConversation: convMs > 0 && last > 0 && Date.now() - last < convMs
     })
     if (!addr) return
+    if (!owner) return stranger(agent, msg, addr, log)
     const down = llmDown(agent)
     if (mode === 'fallback' && !down) return
     const { cfg, pipe } = pipelineOf(agent, log)
-    const ctx = { speaker: msg.from }
+    const ctx = { speaker: msg.from, ...(agent.inSession && agent.adapter.players ? { players: agent.adapter.players() } : {}) }
     const n = ++seq
     const sync = pipe.decideSync(addr.body, ctx)
     if (sync) return conclude(agent, msg, addr, sync, { cfg, down, mode, n, early: false }, log)
@@ -159,6 +167,19 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
         log.warn(`pipeline: ${(e as Error).message}`)
         if (!down && cfg.handoff) handoff(agent, msg)
       })
+  }
+
+  /**
+   * A non-owner's line: only the patterns, and only what makes the bot more peaceful ("pvp off",
+   * "stop attacking", "leave bob alone"); the action refuses raising the mode. Everything else is
+   * left alone, as before.
+   */
+  function stranger (agent: Agent, msg: ChatMessage, addr: Addressed, log: Logger): void {
+    const i = parseIntent(addr.body, { speaker: msg.from })
+    if (!i || !peaceful(i) || i.confidence < (pipelineOf(agent, log).cfg.layers.find(l => l.name === 'patterns')?.threshold ?? DEFAULT_THRESHOLD)) return
+    msg.claimedBy = INTENTS_CALLER
+    log.info(`${msg.from} (not an owner): ${addr.body} -> ${i.intent}`, { args: JSON.stringify(i.args) })
+    void execute(agent, msg, i, log).catch(e => log.warn(`${i.intent} failed: ${(e as Error).message}`))
   }
 
   function conclude (agent: Agent, msg: ChatMessage, addr: Addressed, d: Decision, o: { cfg: PipelineConfig, down: string | null, mode: IntentsMode, n: number, early: boolean }, log: Logger): void {
@@ -354,6 +375,13 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
         if (!has('attack_player')) return reply("can't: I don't have PvP")
         const r = await act('attack_player', { player: online })
         return reply(r.ok ? r.message : `can't: ${r.message}`)
+      }
+      case 'hunt': {
+        if (!has('hunt')) return reply("can't: I don't have the hunt action")
+        const animal = a.animal ? String(a.animal) : undefined
+        const count = typeof a.count === 'number' ? Math.min(a.count, 8) : undefined
+        await run('hunt', { ...(animal ? { animal } : {}), ...(count ? { count } : {}) }, `hunting ${animal ?? 'animals'}${count ? ` (${count})` : ''}`)
+        return
       }
       case 'pvp_spare': {
         if (!has('spare_player')) return reply("can't: I don't have PvP")
