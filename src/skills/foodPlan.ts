@@ -510,7 +510,7 @@ export interface FoodStepOptions {
   scoutFoodFloor?: number
   /** Trips to known food places (default true; without a knownPlace there is nothing to go to anyway). */
   trips?: boolean
-  /** How long an empty ring is remembered (default 20 minutes). */
+  /** How long an empty ring is remembered (default 3 hours, RING_MEMORY_MS). */
   ringMemoryMs?: number
   /** Seeds to have before starting a farm; fewer, with grass near, means gather first (default 8). */
   minSeeds?: number

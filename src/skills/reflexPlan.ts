@@ -7,7 +7,8 @@
 //   - getting away (climb_out, retreat) is not interrupted by a fight unless a melee mob is
 //     adjacent, and not by ranged_defense at all
 //   - ranged_defense is not interrupted by defend for a mob more than 3 blocks away
-//   - emergencies (water_bucket, bunker) and the PvP actions follow the same hold
+//   - water_bucket (a lethal fall or fire) always goes first, even during the hold
+//   - bunker and the PvP actions follow the same hold as the rest
 // Nothing here is about which reflex to pick; the brain still decides that.
 
 /** Reflex actions the arbiter referees (others, e.g. a player's command, are not its business). */

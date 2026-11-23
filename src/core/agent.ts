@@ -120,7 +120,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
   readonly username: string
   readonly log: Logger
   /** Category loggers: "<username>/action", "/chat", "/neoforge", "/server". */
-  private readonly logs: { action: Logger, chat: Logger, neoforge: Logger, server: Logger }
+  private readonly logs: { action: Logger, chat: Logger, server: Logger }
   readonly storage: Storage
   readonly dataDir: string
   readonly owners: string[]
@@ -168,7 +168,6 @@ export class Agent extends TypedEmitter<AgentEvents> {
     this.logs = {
       action: this.log.child('action'),
       chat: this.log.child('chat'),
-      neoforge: this.log.child('neoforge'),
       server: this.log.child('server')
     }
     this.dataDir = opts.dataDir || join('data', 'bots', this.username)

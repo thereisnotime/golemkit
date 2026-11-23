@@ -640,7 +640,7 @@ Look after its own farm (farm:1, farm:2...): put the water back if it is gone (w
 
 ### `gather_seeds`
 
-Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. Needs digging enabled.
+Get seeds for a farm by breaking surface grass and ferns nearby (open to the sky and near its own height, never cave grass; wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. Needs digging enabled.
 
 *long-running*
 
@@ -731,7 +731,7 @@ What happened: recent journal events (deaths, damage, kills, items, chat, action
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck |
+| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, actions, places, combat, llm, connections, food, finds, stuck, chests, containers, storage |
 | `since` | string |  |  | how far back: 30m, 1h, 2d, today, yesterday, a date (YYYY-MM-DD); default 24h |
 | `player` | string |  |  | only events involving this player |
 | `near` | string |  |  | only events near "x y z" or "x z", optionally with a radius as 4th number (default 32) |
@@ -1028,7 +1028,7 @@ Tool progression: stone, iron and diamond tools.
 
 ### `upgrade_tools`
 
-Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, axe, shovel and sword, armour optionally. Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). Safe mining: without a weapon, food (and a shield or armour if mining.gear asks) it only takes ore near the surface and says "not ready to mine: ..." instead of going into caves. In creative it just takes the tools.
+Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, sword, axe and shovel, armour optionally. Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). Safe mining: without a weapon, food (and a shield or armour if mining.gear asks) it only takes ore near the surface and says "not ready to mine: ..." instead of going into caves. In creative it just takes the tools.
 
 *long-running*
 
@@ -1036,7 +1036,7 @@ Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines
 |---|---|---|---|---|
 | `up_to` | `stone` \| `iron` \| `diamond` |  | `"iron"` | highest tier to aim for |
 | `armour` | boolean |  | `false` | also make iron armour once iron tools are done |
-| `kinds` | array |  |  | tool kinds to upgrade; default pickaxe, axe, shovel, sword |
+| `kinds` | array |  |  | tool kinds to upgrade; default pickaxe, sword, axe, shovel |
 | `prospect` | boolean |  | `true` | when no iron ore is in sight, dig a staircase and strip mine to look for some |
 | `safe` | boolean |  | `true` | safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground |
 
@@ -1046,7 +1046,7 @@ Getting your own things back after a death (recover_items).
 
 ### `recover_items`
 
-After your own death: walk back to where you died, pick up your dropped things before they despawn (5 minutes), put the armour and weapon back on, and say what came back ("got back 23 of 31 items: stone sword, ..."). Refuses when the drops are lost (lava, void, another dimension, too far for the time left) or the spot is too dangerous; force=true goes anyway.
+After your own death: walk back to where you died, pick up your dropped things before they despawn (5 minutes), put the armour and weapon back on, and say what came back ("got back 23 of 32 items: stone sword, ..."). Refuses when the drops are lost (lava, void, another dimension, too far for the time left) or the spot is too dangerous; force=true goes anyway.
 
 *long-running*
 
@@ -1318,7 +1318,7 @@ Felling trees.
 
 ### `chop_tree`
 
-Fell the nearest natural tree (any wood type): cut the logs it can reach, pick up the drops and plant a sapling. With rings it widens the search (remembered tree spots, then ring by ring, with a trip out and back) instead of giving up. Crafts a wooden axe first if there is none and the inventory has the wood. Needs digging enabled. For "get N planks/logs" or materials for a build, prefer gather_materials, which chops as many trees as needed.
+Fell the nearest natural tree (any wood type): cut the logs, climbing the trunk on a pillar for the ones out of reach from the ground (and taking the pillar down again), pick up the drops and plant a sapling. With rings it widens the search (remembered tree spots, then ring by ring, with a trip out and back) instead of giving up. Crafts a wooden axe first if there is none and the inventory has the wood. Needs digging enabled. For "get N planks/logs" or materials for a build, prefer gather_materials, which chops as many trees as needed.
 
 *aliases: `chop`*
 

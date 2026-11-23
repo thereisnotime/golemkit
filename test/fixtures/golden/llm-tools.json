@@ -615,7 +615,7 @@
         "type": "object",
         "properties": {
           "type": {
-            "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
+            "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, actions, places, combat, llm, connections, food, finds, stuck, chests, containers, storage",
             "type": "string"
           },
           "since": {
@@ -1427,7 +1427,7 @@
     },
     {
       "name": "gather_seeds",
-      "description": "Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. Needs digging enabled. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "description": "Get seeds for a farm by breaking surface grass and ferns nearby (open to the sky and near its own height, never cave grass; wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. Needs digging enabled. (Long-running: starts in the background and keeps going until stopped or replaced.)",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1683,7 +1683,7 @@
     },
     {
       "name": "chop_tree",
-      "description": "Fell the nearest natural tree (any wood type): cut the logs it can reach, pick up the drops and plant a sapling. With rings it widens the search (remembered tree spots, then ring by ring, with a trip out and back) instead of giving up. Crafts a wooden axe first if there is none and the inventory has the wood. Needs digging enabled. For \"get N planks/logs\" or materials for a build, prefer gather_materials, which chops as many trees as needed.",
+      "description": "Fell the nearest natural tree (any wood type): cut the logs, climbing the trunk on a pillar for the ones out of reach from the ground (and taking the pillar down again), pick up the drops and plant a sapling. With rings it widens the search (remembered tree spots, then ring by ring, with a trip out and back) instead of giving up. Crafts a wooden axe first if there is none and the inventory has the wood. Needs digging enabled. For \"get N planks/logs\" or materials for a build, prefer gather_materials, which chops as many trees as needed.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2602,7 +2602,7 @@
     },
     {
       "name": "upgrade_tools",
-      "description": "Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, axe, shovel and sword, armour optionally. Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). Safe mining: without a weapon, food (and a shield or armour if mining.gear asks) it only takes ore near the surface and says \"not ready to mine: ...\" instead of going into caves. In creative it just takes the tools. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "description": "Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, sword, axe and shovel, armour optionally. Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). Safe mining: without a weapon, food (and a shield or armour if mining.gear asks) it only takes ore near the surface and says \"not ready to mine: ...\" instead of going into caves. In creative it just takes the tools. (Long-running: starts in the background and keeps going until stopped or replaced.)",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2622,7 +2622,7 @@
             "type": "boolean"
           },
           "kinds": {
-            "description": "tool kinds to upgrade; default pickaxe, axe, shovel, sword",
+            "description": "tool kinds to upgrade; default pickaxe, sword, axe, shovel",
             "type": "array",
             "items": {
               "type": "string",
@@ -3331,7 +3331,7 @@
     },
     {
       "name": "recover_items",
-      "description": "After your own death: walk back to where you died, pick up your dropped things before they despawn (5 minutes), put the armour and weapon back on, and say what came back (\"got back 23 of 31 items: stone sword, ...\"). Refuses when the drops are lost (lava, void, another dimension, too far for the time left) or the spot is too dangerous; force=true goes anyway. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "description": "After your own death: walk back to where you died, pick up your dropped things before they despawn (5 minutes), put the armour and weapon back on, and say what came back (\"got back 23 of 32 items: stone sword, ...\"). Refuses when the drops are lost (lava, void, another dimension, too far for the time left) or the spot is too dangerous; force=true goes anyway. (Long-running: starts in the background and keeps going until stopped or replaced.)",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4045,7 +4045,7 @@
         "type": "object",
         "properties": {
           "type": {
-            "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
+            "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, actions, places, combat, llm, connections, food, finds, stuck, chests, containers, storage",
             "type": "string"
           },
           "since": {
@@ -4857,7 +4857,7 @@
     },
     {
       "name": "gather_seeds",
-      "description": "Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. Needs digging enabled. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "description": "Get seeds for a farm by breaking surface grass and ferns nearby (open to the sky and near its own height, never cave grass; wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. Needs digging enabled. (Long-running: starts in the background and keeps going until stopped or replaced.)",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5113,7 +5113,7 @@
     },
     {
       "name": "chop_tree",
-      "description": "Fell the nearest natural tree (any wood type): cut the logs it can reach, pick up the drops and plant a sapling. With rings it widens the search (remembered tree spots, then ring by ring, with a trip out and back) instead of giving up. Crafts a wooden axe first if there is none and the inventory has the wood. Needs digging enabled. For \"get N planks/logs\" or materials for a build, prefer gather_materials, which chops as many trees as needed.",
+      "description": "Fell the nearest natural tree (any wood type): cut the logs, climbing the trunk on a pillar for the ones out of reach from the ground (and taking the pillar down again), pick up the drops and plant a sapling. With rings it widens the search (remembered tree spots, then ring by ring, with a trip out and back) instead of giving up. Crafts a wooden axe first if there is none and the inventory has the wood. Needs digging enabled. For \"get N planks/logs\" or materials for a build, prefer gather_materials, which chops as many trees as needed.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6032,7 +6032,7 @@
     },
     {
       "name": "upgrade_tools",
-      "description": "Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, axe, shovel and sword, armour optionally. Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). Safe mining: without a weapon, food (and a shield or armour if mining.gear asks) it only takes ore near the surface and says \"not ready to mine: ...\" instead of going into caves. In creative it just takes the tools. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "description": "Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, sword, axe and shovel, armour optionally. Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). Safe mining: without a weapon, food (and a shield or armour if mining.gear asks) it only takes ore near the surface and says \"not ready to mine: ...\" instead of going into caves. In creative it just takes the tools. (Long-running: starts in the background and keeps going until stopped or replaced.)",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6052,7 +6052,7 @@
             "type": "boolean"
           },
           "kinds": {
-            "description": "tool kinds to upgrade; default pickaxe, axe, shovel, sword",
+            "description": "tool kinds to upgrade; default pickaxe, sword, axe, shovel",
             "type": "array",
             "items": {
               "type": "string",
@@ -6761,7 +6761,7 @@
     },
     {
       "name": "recover_items",
-      "description": "After your own death: walk back to where you died, pick up your dropped things before they despawn (5 minutes), put the armour and weapon back on, and say what came back (\"got back 23 of 31 items: stone sword, ...\"). Refuses when the drops are lost (lava, void, another dimension, too far for the time left) or the spot is too dangerous; force=true goes anyway. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "description": "After your own death: walk back to where you died, pick up your dropped things before they despawn (5 minutes), put the armour and weapon back on, and say what came back (\"got back 23 of 32 items: stone sword, ...\"). Refuses when the drops are lost (lava, void, another dimension, too far for the time left) or the spot is too dangerous; force=true goes anyway. (Long-running: starts in the background and keeps going until stopped or replaced.)",
       "inputSchema": {
         "type": "object",
         "properties": {

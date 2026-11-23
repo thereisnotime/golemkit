@@ -1115,7 +1115,7 @@ const tendFarm = defineAction({
 
 const gatherSeeds = defineAction({
   name: 'gather_seeds',
-  description: 'Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. ' +
+  description: 'Get seeds for a farm by breaking surface grass and ferns nearby (open to the sky and near its own height, never cave grass; wheat seeds drop about 1 in 8) and picking them up. ' +
     'Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. ' +
     'Skips protected areas and the world spawn. Needs digging enabled.',
   params: z.object({

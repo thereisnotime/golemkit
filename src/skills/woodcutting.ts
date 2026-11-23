@@ -522,7 +522,7 @@ export async function fellTreeWide (ctx: Pick<ActionContext, 'bot' | 'agent' | '
 
 const chopTree = defineAction({
   name: 'chop_tree',
-  description: 'Fell the nearest natural tree (any wood type): cut the logs it can reach, pick up the drops and plant a sapling. ' +
+  description: 'Fell the nearest natural tree (any wood type): cut the logs, climbing the trunk on a pillar for the ones out of reach from the ground (and taking the pillar down again), pick up the drops and plant a sapling. ' +
     'With rings it widens the search (remembered tree spots, then ring by ring, with a trip out and back) instead of giving up. ' +
     'Crafts a wooden axe first if there is none and the inventory has the wood. Needs digging enabled. ' +
     'For "get N planks/logs" or materials for a build, prefer gather_materials, which chops as many trees as needed.',

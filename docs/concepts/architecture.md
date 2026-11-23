@@ -189,8 +189,8 @@ to stop exactly what it started).
 
 Every reflex runs at 60, so one reflex would replace another on every check. The reflexes brain
 asks a referee first (`mayReplace` in `src/skills/reflexPlan.ts`): a reflex keeps the body for
-1.5 s unless health drops sharply, and escapes such as `climb_out` aren't cut short by a fight
-that can't reach the bot yet. Details under [Reflexes](./world#reflexes).
+1.5 s unless health drops sharply (`water_bucket`, for a lethal fall or fire, always goes
+first), and escapes such as `climb_out` aren't cut short by a fight that can't reach the bot yet. Details under [Reflexes](./world#reflexes).
 
 A behaviour on the NPC controller can act at its own priority instead of its brain's (armed
 behaviours take `priority: idle | npc | behavior`), so an armed `keep_fed` (35) keeps running

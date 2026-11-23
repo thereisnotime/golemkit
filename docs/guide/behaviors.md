@@ -170,6 +170,10 @@ players (50) and reflexes (60). Survival behaviours (`keep_fed`, `stay_safe`, `a
 use it, so a bot whose LLM is busy following someone still gets fed: the LLM's long-running
 action is suspended and resumes when the behaviour is done.
 
+While the bot is cast in a [scene](/guide/scenes) (which holds the body at 25), every armed
+behaviour pauses, whatever its level, and picks up again when the scene releases it; reflexes
+still cover emergencies.
+
 ```mermaid
 flowchart TB
   T(["tick (1 s)"]) --> H{"who holds the body?"}
@@ -1557,7 +1561,7 @@ Looks after food on its own, climbing a ladder when hungry (or hurt and too hung
 
 *survival · priority behavior (35) · needs `recover_items` · uses `go_home`, `prepare_trip` when present*
 
-After a death, goes back for the dropped things before they despawn (5 minutes): only when they can still be had (not lava, void, deep water or another dimension, close enough for the time left at walking speed) and the spot is safe enough for its gear (the killer and the hostiles reported there; night counts). Waits while it isn't, gives up when the despawn gets close, it gets hurt badly or the spot is a danger zone; picks the items up, puts armour and weapon back on, goes home and says what came back ("got back 23 of 31 items: stone sword, ..."). Once per death, right after the respawn, below immediate safety.
+After a death, goes back for the dropped things before they despawn (5 minutes): only when they can still be had (not lava, void, deep water or another dimension, close enough for the time left at walking speed) and the spot is safe enough for its gear (the killer and the hostiles reported there; night counts). Waits while it isn't, gives up when the despawn gets close, it gets hurt badly or the spot is a danger zone; picks the items up, puts armour and weapon back on, goes home and says what came back ("got back 23 of 32 items: stone sword, ..."). Once per death, right after the respawn, below immediate safety.
 
 | option | type | default | description |
 |---|---|---|---|

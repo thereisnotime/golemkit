@@ -42,7 +42,7 @@ export const recoverDrops = defineBehavior({
     '(not lava, void, deep water or another dimension, close enough for the time left at walking speed) and the spot is safe enough ' +
     "for its gear (the killer and the hostiles reported there; night counts). Waits while it isn't, gives up when the despawn gets close, " +
     'it gets hurt badly or the spot is a danger zone; picks the items up, puts armour and weapon back on, goes home and says what came ' +
-    'back ("got back 23 of 31 items: stone sword, ..."). Once per death, right after the respawn, below immediate safety.',
+    'back ("got back 23 of 32 items: stone sword, ..."). Once per death, right after the respawn, below immediate safety.',
   options,
   requires: ['recover_items'],
   uses: ['go_home', 'prepare_trip'],

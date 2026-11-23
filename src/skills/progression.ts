@@ -430,13 +430,13 @@ export async function autoUpgrade (ctx: Ctx, opts: UpgradeRun = {}): Promise<str
 const upgradeAction = defineAction({
   name: 'upgrade_tools',
   description: 'Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> ' +
-    'smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, axe, shovel and sword, armour optionally. ' +
+    'smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, sword, axe and shovel, armour optionally. ' +
     'Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). Safe mining: without a weapon, food (and a shield or armour if mining.gear asks) ' +
     'it only takes ore near the surface and says "not ready to mine: ..." instead of going into caves. In creative it just takes the tools.',
   params: z.object({
     up_to: z.enum(['stone', 'iron', 'diamond']).default('iron').describe('highest tier to aim for'),
     armour: z.boolean().default(false).describe('also make iron armour once iron tools are done'),
-    kinds: z.array(z.enum(['pickaxe', 'axe', 'shovel', 'sword', 'hoe'])).optional().describe('tool kinds to upgrade; default pickaxe, axe, shovel, sword'),
+    kinds: z.array(z.enum(['pickaxe', 'axe', 'shovel', 'sword', 'hoe'])).optional().describe('tool kinds to upgrade; default pickaxe, sword, axe, shovel'),
     prospect: z.boolean().default(true).describe('when no iron ore is in sight, dig a staircase and strip mine to look for some'),
     safe: z.boolean().default(true).describe('safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground')
   }),

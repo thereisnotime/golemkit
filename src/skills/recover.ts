@@ -249,7 +249,7 @@ const recoverItems = defineAction({
   name: 'recover_items',
   capabilities: ['move', 'inventory'],
   description: 'After your own death: walk back to where you died, pick up your dropped things before they despawn (5 minutes), ' +
-    'put the armour and weapon back on, and say what came back ("got back 23 of 31 items: stone sword, ..."). ' +
+    'put the armour and weapon back on, and say what came back ("got back 23 of 32 items: stone sword, ..."). ' +
     'Refuses when the drops are lost (lava, void, another dimension, too far for the time left) or the spot is too dangerous; force=true goes anyway.',
   params: z.object({
     force: z.boolean().default(false).describe('go even when it looks too dangerous or too far'),

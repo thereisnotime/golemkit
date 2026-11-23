@@ -57,7 +57,7 @@ const recallEvents = defineAction({
   name: 'recall_events',
   description: 'What happened: recent journal events (deaths, damage, kills, items, chat, actions, players, places...). Filter by type, time, place, player or text.',
   params: z.object({
-    type: z.string().optional().describe(`event types, comma separated: ${JOURNAL_TYPES.filter(t => t !== 'journal_dropped').join(', ')}; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck`),
+    type: z.string().optional().describe(`event types, comma separated: ${JOURNAL_TYPES.filter(t => t !== 'journal_dropped').join(', ')}; or ${Object.keys(TYPE_ALIASES).filter(a => !JOURNAL_TYPES.includes(a as never)).join(', ')}`),
     since: z.string().optional().describe('how far back: 30m, 1h, 2d, today, yesterday, a date (YYYY-MM-DD); default 24h'),
     player: z.string().optional().describe('only events involving this player'),
     near: z.string().optional().describe('only events near "x y z" or "x z", optionally with a radius as 4th number (default 32)'),
