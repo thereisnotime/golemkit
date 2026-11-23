@@ -24,7 +24,7 @@ export function lowReportDue (last: { at: number, items: number } | undefined, i
 function reportLow (agent: Agent, low: { items: number, text: string }, now: number): void {
   const last = agent.storage.get<{ at: number, items: number } | undefined>(LOW_KEY)
   if (!lowReportDue(last, low.items, now)) return
-  const asked = helpDesk(agent).ask({ behavior: 'check_storage', reason: 'pantry low', key: 'pantry low', goal: 'keep the pantry stocked', help: 'some food in the pantry', text: low.text }, now)
+  const asked = helpDesk(agent).ask({ behavior: 'pantry', reason: 'pantry low', key: 'pantry low', goal: 'keep the pantry stocked', help: 'some food in the pantry', text: low.text }, now)
   if (asked) agent.storage.set(LOW_KEY, { at: now, items: low.items })
   else agent.log.info(`check_storage: ${low.text} (not told: nobody online or rate limited)`)
 }

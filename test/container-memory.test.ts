@@ -264,8 +264,10 @@ test('wiring: a chest broken in view is dropped and journalled; one moved next d
   kv.set(OWN_CHESTS_KEY, [{ x: 5, y: 64, z: 5 }])
   opened(a.agent, w.bot, w.bot.blockAt({ x: 5, y: 64, z: 5 }), items({ bread: 4 }) as any, 0)
   // moved: the old spot is air, a chest stands two blocks over
-  w.set(5, 64, 5, 'air')
+  // the new chest shows up first (placed in view), then the old one goes
   w.set(7, 64, 5, 'chest')
+  blockChanged(a.agent, w.bot, { name: 'air' } as any, w.bot.blockAt({ x: 7, y: 64, z: 5 }), H)
+  w.set(5, 64, 5, 'air')
   blockChanged(a.agent, w.bot, null, w.bot.blockAt({ x: 5, y: 64, z: 5 }), H)
   const gone = a.events.find(e => e.type === 'container_gone')
   assert.ok(gone)

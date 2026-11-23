@@ -225,7 +225,8 @@ export function containerGone (agent: Agent, bot: Bot, p: Pos, found: string | n
   try {
     moved = bot.findBlocks({ matching: ids, maxDistance: 32, count: 32, point: vec(bot, g.pos.x, g.pos.y, g.pos.z) } as any)
       .map(v => ({ x: v.x, y: v.y, z: v.z }))
-      .filter(v => Math.hypot(v.x - g.pos.x, v.y - g.pos.y, v.z - g.pos.z) <= 6 && !b.has(sc, v))[0] ?? null
+      // not one it has looked into (a chest placed in view a moment ago is remembered without contents)
+      .filter(v => Math.hypot(v.x - g.pos.x, v.y - g.pos.y, v.z - g.pos.z) <= 6 && !b.get(sc, v)?.entry.contents)[0] ?? null
   } catch {}
   if (moved) {
     const mb = bot.blockAt(vec(bot, moved.x, moved.y, moved.z))
