@@ -1,7 +1,9 @@
 import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
-import { defineSkill, defineAction, z, ok, fail, sleep, checkAborted, fmtPos, itemName, type ActionResult } from '../core/index.ts'
-import { reachBlock, placeAt, findFreeSpot, findItem, countItem } from './world.ts'
+import type { Vec3 } from 'vec3'
+import { defineSkill, defineAction, z, ok, fail, sleep, checkAborted, fmtPos, itemName, goals, type ActionResult, type Agent } from '../core/index.ts'
+import { reachBlock, placeAt, findFreeSpot, findItem, countItem, gotoWithin } from './world.ts'
+import { stationSpotBlocked, leaveSpawnPoint, inSpawnProtection, refusedPlacementText, isPlacementRefusal, spotKey, SPAWN_PROTECTION, type StationRules } from './stationPlan.ts'
 import { makeRoom, dropsNear } from './efficiency.ts'
 import { pickupNearby } from './pickup.ts'
 
@@ -65,6 +67,76 @@ function names (bot: Bot, ids: { id: number, need: number }[]): string {
   return ids.map(m => `${m.need} ${bot.registry.items[m.id]?.name ?? `#${m.id}`}`).join(', ')
 }
 
+// ---- where stations go: outside spawn protection and protected areas ----
+
+interface StationContext { agent: Agent, refused: Set<string> }
+const stationCtx = new WeakMap<Bot, StationContext>()
+
+/** The spawn-protection radius: settings.world.spawnProtection, default 16 (server.properties spawn-protection). */
+export function spawnProtectionOf (agent: Agent | undefined): number {
+  const v = Number((agent?.settings as { world?: { spawnProtection?: unknown } } | undefined)?.world?.spawnProtection)
+  return Number.isFinite(v) && v >= 0 ? v : SPAWN_PROTECTION
+}
+
+function stationRules (bot: Bot): StationRules & { ctx?: StationContext } {
+  const ctx = stationCtx.get(bot)
+  const spawn = (bot as { spawnPoint?: { x: number, z: number } }).spawnPoint ?? null
+  return {
+    ctx,
+    spawn,
+    spawnRadius: spawnProtectionOf(ctx?.agent),
+    isProtected: ctx?.agent.protectedAreas ? p => ctx.agent.protectedAreas.isProtected(p) : undefined,
+    refused: ctx?.refused
+  }
+}
+
+/**
+ * Puts a crafting table or furnace down next to the bot, outside spawn protection and protected
+ * areas. A spot the server refuses is remembered (and reported as protected, so a second refusal
+ * nearby makes it a protected area); the next try is another spot, and when every spot near is
+ * ruled out inside spawn protection it walks out of it first. Returns the placed block or why not.
+ */
+export async function placeStation (bot: Bot, item: 'crafting_table' | 'furnace', signal: AbortSignal): Promise<Block | string> {
+  const r = stationRules(bot)
+  const refused: Set<string> = r.ctx?.refused ?? new Set<string>()
+  const rules = { ...r, refused }
+  const skip = (p: Vec3) => !!stationSpotBlocked(p, rules)
+  let why = `no room to put down a ${item.replace('_', ' ')}`
+  for (let i = 0; i < 4; i++) {
+    checkAborted(signal)
+    let spot = findFreeSpot(bot, skip)
+    if (!spot) {
+      const out = leaveSpawnPoint(bot.entity.position, r.spawn, r.spawnRadius)
+      if (!out) break
+      // every spot near is inside spawn protection: walk out of it first
+      try {
+        await gotoWithin(bot, new goals.GoalNearXZ(out.x, out.z, 2), signal, 30_000)
+      } catch (e) {
+        checkAborted(signal)
+        return `${why}; couldn't walk out of spawn protection: ${(e as Error).message}`
+      }
+      spot = findFreeSpot(bot, skip)
+      if (!spot) continue
+    }
+    try {
+      await placeAt(bot, item, spot, signal)
+    } catch (e) {
+      checkAborted(signal)
+      const msg = (e as Error).message
+      if (!isPlacementRefusal(msg)) { why = msg; await sleep(400, signal); continue }
+      refused.add(spotKey(spot))
+      why = refusedPlacementText(item, spot, rules)
+      r.ctx?.agent.markProtected?.(spot, { confirmed: inSpawnProtection(spot, r.spawn, r.spawnRadius) })
+      continue
+    }
+    const b = bot.blockAt(spot)
+    if (b?.name === item) return b
+    refused.add(spotKey(spot))
+    why = refusedPlacementText(item, spot, rules)
+  }
+  return `could not place a ${item.replace('_', ' ')}: ${why}`
+}
+
 /** Nearest crafting table, or one we place (from inventory, or crafted from planks). */
 async function getTable (bot: Bot, signal: AbortSignal): Promise<{ table: Block, placed: boolean } | string> {
   const tableId = bot.registry.blocksByName.crafting_table.id
@@ -77,11 +149,8 @@ async function getTable (bot: Bot, signal: AbortSignal): Promise<{ table: Block,
     await sleep(SETTLE_MS, signal)
   }
   checkAborted(signal)
-  const spot = findFreeSpot(bot)
-  if (!spot) return 'no room to put down a crafting table'
-  await placeAt(bot, 'crafting_table', spot, signal)
-  const table = bot.blockAt(spot)
-  if (table?.name !== 'crafting_table') return 'could not place a crafting table'
+  const table = await placeStation(bot, 'crafting_table', signal)
+  if (typeof table === 'string') return table
   return { table, placed: true }
 }
 
@@ -197,21 +266,10 @@ export async function smeltItem (bot: Bot, signal: AbortSignal, log: { debug: (m
   let furnaceBlock = bot.findBlock({ matching: bot.registry.blocksByName.furnace.id, maxDistance: FURNACE_SEARCH })
   if (!furnaceBlock) {
     if (!findItem(bot, 'furnace')) return fail('no furnace nearby and none in the inventory')
-    // a spot can be refused (a mob standing there, a block update race): try a few
-    let why = 'no room to put down a furnace'
-    for (let i = 0; i < 3 && furnaceBlock?.name !== 'furnace'; i++) {
-      const spot = findFreeSpot(bot)
-      if (!spot) break
-      try {
-        await placeAt(bot, 'furnace', spot, signal)
-      } catch (e) {
-        checkAborted(signal)
-        why = (e as Error).message
-        await sleep(400, signal)
-      }
-      furnaceBlock = bot.blockAt(spot)
-    }
-    if (!furnaceBlock || furnaceBlock.name !== 'furnace') return fail(`could not place a furnace: ${why}`)
+    // a spot can be refused (spawn protection, a mob standing there, a block update race): placeStation tries others
+    const put = await placeStation(bot, 'furnace', signal)
+    if (typeof put === 'string') return fail(put)
+    furnaceBlock = put
     placed = furnaceBlock.position
   }
   await reachBlock(bot, furnaceBlock.position, signal)
@@ -285,5 +343,10 @@ export const crafting = () => defineSkill({
   name: 'crafting',
   capabilities: ['craft'],
   description: 'Crafting and smelting.',
-  actions: [craft, smelt]
+  actions: [craft, smelt],
+  // where crafting tables and furnaces may go: the agent's protected areas and spawn-protection setting
+  setup: (agent, bot) => {
+    stationCtx.set(bot as Bot, { agent, refused: new Set() })
+    return () => { stationCtx.delete(bot as Bot) }
+  }
 })

@@ -157,8 +157,8 @@ export function occupies (bot: Bot, pos: Vec3): boolean {
   return Math.floor(p.x) === pos.x && Math.floor(p.z) === pos.z && (Math.floor(p.y) === pos.y || Math.floor(p.y) + 1 === pos.y)
 }
 
-/** A free spot next to the bot where a block can stand on solid ground (for tables/furnaces). */
-export function findFreeSpot (bot: Bot): Vec3 | null {
+/** A free spot next to the bot where a block can stand on solid ground (for tables/furnaces); `skip` rules spots out (spawn protection, refused spots). */
+export function findFreeSpot (bot: Bot, skip?: (p: Vec3) => boolean): Vec3 | null {
   const base = bot.entity.position.floored()
   for (let r = 1; r <= 3; r++) {
     for (let dx = -r; dx <= r; dx++) {
@@ -169,6 +169,7 @@ export function findFreeSpot (bot: Bot): Vec3 | null {
           if (!isReplaceable(bot.blockAt(p)?.name) || bot.blockAt(p)?.name === 'water' || bot.blockAt(p)?.name === 'lava') continue
           if (!isPlaceFace(bot.blockAt(p.offset(0, -1, 0)))) continue
           if (occupies(bot, p)) continue
+          if (skip?.(p)) continue
           return p
         }
       }
