@@ -20,7 +20,7 @@ With memory on, every container the bot opens SHALL be stored in agent storage p
 - **THEN** `knownContainers()` still lists the pantry with its bread and age, and keep_fed and trip preparation use it
 
 ### Requirement: Facts and hints
-An entry seen inside within `maxAgeHours` SHALL be a fact (`fresh`); an older one, or one in doubt (half of a double chest broken, a second half added), SHALL be a hint: it MAY choose which chest to try first but SHALL be re-checked on the spot before anything relies on it. An old entry without the wanted item SHALL NOT rule the chest out. The pre-trip pantry count SHALL count only fresh entries as food. `knownContainers()` SHALL expose `ageMs` and `freshness`.
+An entry whose contents were seen within `maxAgeHours` (now minus `at`, default 24; the same rule applies with memory off) and that is not in doubt SHALL be a fact (`fresh`); an older one, or one in doubt (half of a double chest broken, a second half added), SHALL be a hint: it MAY choose which chest to try first but SHALL be re-checked on the spot before anything relies on it. An old entry without the wanted item SHALL NOT rule the chest out. The pre-trip pantry count (`prepare_trip`) and the pantry-low check SHALL count only fresh entries as food. `knownContainers()` SHALL expose `ageMs` and `freshness`.
 
 #### Scenario: Old sighting
 - **WHEN** the pantry was seen with 20 bread 30 hours ago and a trip needs food
@@ -52,7 +52,7 @@ With `indexOwn` on, the `check_storage` behaviour SHALL, by day and near home, l
 - **THEN** check_storage opens it and whispers the owners "pantry low: 6 bread left"
 
 ### Requirement: Where is X
-`where_stored` SHALL answer from memory with position and age ("12 iron_ingot in the chest at 559 69 -47, seen 2 h ago"), exact names first, fresh before old, old ones marked as maybe changed. "where is my X" in plain language SHALL route to it, and when the item is in its own chest the answer SHALL say that "bring me X" fetches it.
+`where_stored` SHALL answer from memory with position and age ("12 iron_ingot in the chest at 559 69 -47, seen 2 h ago"), exact names first, fresh before old, old ones marked as maybe changed. "where is my X" in plain language SHALL route to it, and when the item is in its own or a configured chest the plain-language answer SHALL say that "bring me X" fetches it.
 
 #### Scenario: Where's my iron
 - **WHEN** Robin says "pax where's my iron" and the bot saw 12 iron ingots in its chest 2 hours ago

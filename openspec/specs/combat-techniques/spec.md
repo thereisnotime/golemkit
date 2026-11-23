@@ -110,7 +110,7 @@ With `combat.chokepoints` on, when three or more melee mobs come at the bot and 
 - **THEN** it fights as before
 
 ### Requirement: PvP is opt-in
-Bots SHALL never fight a player while `combat.pvp` is `off` (the default). With `defend` or any mode above it (see the [pvp spec](../pvp/spec.md)), the bot SHALL fight back against a player who hits it, or who hits the player it is guarding, and SHALL stop defending when that player has not hit for 5 s or is more than 10 blocks away. It SHALL never fight an owner, a player in `combat.friends`, or a player in creative or spectator.
+Bots SHALL never fight a player while `combat.pvp` is `off` (the default). With `defend` or any mode above it (see the [pvp spec](../pvp/spec.md)) and `reflexes.selfDefense` on, the bot SHALL fight back against a player who hits it, or who hits the player it is guarding, and SHALL stop defending when that player has not hit for 5 s or is more than 10 blocks away. It SHALL never fight an owner, a player in `combat.friends`, or a player in creative or spectator.
 
 #### Scenario: Default
 - **WHEN** a player hits the bot and `combat.pvp` is not set

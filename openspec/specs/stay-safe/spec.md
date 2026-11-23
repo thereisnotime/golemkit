@@ -6,18 +6,18 @@ How stay_safe and go_home decide the bot is home at night, how the bot deals wit
 ## Requirements
 
 ### Requirement: Home measured with vertical slack
-The bot SHALL count as home when its horizontal distance to the home block, plus any height difference beyond 3 blocks, is within the range; `go_home` SHALL succeed at once without pathing when the bot is already within its range by that measure.
+The bot SHALL count as home when its distance to the middle of the home block, counting only the part of the height difference beyond 3 blocks, is within the range (`homeOffset` in `src/skills/navigation.ts`); `go_home` SHALL succeed at once without pathing when the bot is already within its range by that measure.
 
 #### Scenario: Inside the base, a floor up
 - **WHEN** the bot stands 2 blocks from home and 2 blocks higher and go_home runs with range 4
 - **THEN** go_home returns "already home" and does not start the pathfinder
 
 #### Scenario: Below the base
-- **WHEN** the bot stands 7 blocks below and 7 blocks beside home with homeRange 8
+- **WHEN** the bot stands 7 blocks below and 6 blocks beside home with homeRange 8
 - **THEN** stay_safe does not send it home
 
 ### Requirement: Night hysteresis
-stay_safe SHALL start heading home at night when the bot is farther than homeRange, SHALL keep going until it is within go_home's range, and for 3 minutes after arriving SHALL only head home again beyond homeRange + 4.
+stay_safe SHALL start heading home at night when the bot is farther than homeRange, SHALL keep going until it is within go_home's range (homeRange, at most 4), and for 3 minutes after arriving SHALL only head home again beyond homeRange + 4.
 
 #### Scenario: Walking back
 - **WHEN** stay_safe is taking the bot home and it is 6 blocks out with homeRange 8
@@ -132,7 +132,7 @@ Under heavy fire (3 or more shooters or patrol mobs and a gear score under what 
 - **THEN** it leaves the spot and does not use it again
 
 ### Requirement: Hide time and retreat cap
-Behind cover the bot SHALL leave as soon as every shooter is gone or, at 16 health or more, nothing shoots at it, and SHALL stay at most 4 s at 16+ health, 8 s at 12+ and 15 s below. After a fight against shooters that went badly it SHALL hide 3 s at 16+ health, 6 s at 12+, 10 s above 8 and 15 s at 8 or less, and stop hiding early when at 16+ health no shooter has a line to it. Backing off SHALL stop 24 blocks from where the shooting started; at that cap it SHALL stand its ground with a bow, shield or weapon, except at 8 health or less, where it MAY back off up to 16 blocks more.
+Behind cover the bot SHALL leave as soon as every shooter is gone or, at 16 health or more, nothing shoots at it, and SHALL stay at most 4 s at 16+ health, 8 s at 12+ and 15 s below. After a fight against shooters that went badly it SHALL hide 3 s at 16+ health, 6 s at 12+, 10 s above 8 and 15 s at 8 or less, and stop hiding early when at 16+ health no shooter has a line to it. Backing off SHALL stop 24 blocks from where the shooting started (48 under heavy fire); at that cap it SHALL stand its ground with a bow, shield or weapon, except at 8 health or less or with nothing to fight with, where it MAY back off up to 16 blocks more.
 
 #### Scenario: Healthy after a bad fight
 - **WHEN** a charge at a skeleton is broken off and the bot is back to 18 health with the skeleton out of sight

@@ -58,7 +58,7 @@ With two or more ground melee mobs within 4 blocks of the player that are hittin
 - **THEN** there is no pull; the bot fights it
 
 ### Requirement: Intercept and pull aggro can be turned off
-The bodyguard behaviour and the protect action SHALL take `intercept` and `pullAggro` options (both default on). With `intercept: false` the bot SHALL not walk to a mob's predicted path and SHALL rank threats without the time-to-player bonus; with `pullAggro: false` it SHALL not tag mobs and step off the player. The guard benchmark SHALL arm the bodyguard with them off for `--no-intercept` and `--no-pull` and record the variant with each result.
+The bodyguard behaviour and the protect action SHALL take `intercept` and `pullAggro` options (both default on). With `intercept: false` the bot SHALL not walk to a mob's predicted path and SHALL rank threats without the time-to-player bonus; with `pullAggro: false` it SHALL not tag mobs and step off the player. The guard benchmark (`scripts/guard-bench.ts`) SHALL arm the bodyguard with them off for `--no-intercept` and `--no-pull` (`--variants all,no-intercept,no-pull,neither` runs one guard phase per variant) and record the variant with each result.
 
 #### Scenario: Intercept off
 - **WHEN** the bodyguard is armed with intercept false and a zombie 10 blocks from the player walks at them
@@ -172,7 +172,7 @@ When the player's health (10 or less) or hunger (6 or less) is visible and low, 
 - **THEN** it doesn't feed
 
 ### Requirement: Night and offline
-While the bodyguard is armed and the player is online, the bot SHALL stay with them at night instead of going home or digging in, but SHALL still pillar up, retreat or back off to heal when it is about to die; when the player goes offline it SHALL wait where they were last seen or go home, as configured.
+While the bodyguard is armed and the player is online, the bot SHALL stay with them at night instead of going home or digging in, but SHALL still pillar up, retreat or back off to heal when it is about to die; when the player goes offline it SHALL wait where they were last seen or go home, as configured (`whenGone: stay | home`, default stay).
 
 #### Scenario: Night
 - **WHEN** night falls far from home while escorting

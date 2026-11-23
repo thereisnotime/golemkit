@@ -28,7 +28,7 @@ keep_fed SHALL search the smallest ring of `rings` (default 48, 120, 250, 400, 6
 - **THEN** the next search has radius 120 and skips the rings inside 48
 
 #### Scenario: Memory runs out
-- **WHEN** every ring came up empty more than 20 minutes ago
+- **WHEN** every ring came up empty more than `ringMemoryMinutes` (default 180) ago
 - **THEN** keep_fed searches the 48 ring again
 
 #### Scenario: Past the wide ring
@@ -70,7 +70,7 @@ With food at or below 6, keep_fed SHALL go to its own farm, a food chest or a re
 - **THEN** keep_fed holds the body near home and chop_wood_loop does not run
 
 ### Requirement: Trips to known food places
-With `trips` on, keep_fed SHALL take a trip to the best known food place, by day and out of danger, when the next ring is a far one or every ring came up empty. Known places SHALL be the profile's `foodPlaces` (coordinates or a remembered place name, with optional crops), its own farms, and remembered `found:<crop>`, `found:village`, `food:village_farm` and `food:animals` places. The pure `rankFoodPlaces` SHALL order them by distance divided by a trust weight (listed places and own farms 1.5, crop fields 1.2, villages 1, animals 0.6) and SHALL leave out places in another dimension, in a remembered danger zone, closer than 48 blocks or `radius` (whichever is more), further than `tripRange` (default 4000) or visited recently. On a trip it SHALL walk there on the surface, harvest ripe crops and replant (the whole field for listed places and its own farms, otherwise only crops by a village), hunt animals beyond the breeders, gather a few seeds when short, bake bread, eat, and walk back home. A visited place SHALL be left alone for 20 minutes, 45 when it had nothing or could not be reached.
+With keep_fed's `trips` option on (default), keep_fed SHALL take a trip to the best known food place, by day and out of danger, when the next ring is a far one or every ring came up empty. Known places SHALL be the profile's `foodPlaces` (coordinates or a remembered place name, with optional crops), its own farms, and remembered `found:<crop>`, `found:village`, `food:village_farm` and `food:animals` places. The pure `rankFoodPlaces` SHALL order them by distance divided by a trust weight (listed places and own farms 1.5, crop fields 1.2, villages 1, animals 0.6) and SHALL leave out places in another dimension, in a remembered danger zone, closer than 48 blocks or `radius` (whichever is more), further than `tripRange` (default 4000) or visited recently. On a trip it SHALL walk there on the surface, harvest ripe crops and replant (the whole field for listed places and its own farms, otherwise only crops by a village), hunt animals beyond the breeders, gather a few seeds when short, bake bread, eat, and walk back home. These walks, its scouting rings, remembered food spots and far farm visits SHALL be trips under `settings.trips` (pantry top-up, weapon and turn-back budget; see the trips spec). A visited place SHALL be left alone for 20 minutes, 45 when it had nothing or could not be reached.
 
 #### Scenario: Village before the far rings
 - **WHEN** rings 48, 120 and 250 came up empty by day and the profile lists the village near -2770 1090

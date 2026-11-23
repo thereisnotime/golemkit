@@ -6,7 +6,7 @@ A behaviour that keeps failing the same way tells its owners once what it was tr
 ## Requirements
 
 ### Requirement: Failure grouping
-The NPC controller SHALL report every failed behaviour run, with its failure message, to the agent's help desk, and every successful run. The desk SHALL group failures per behaviour and per normalized reason: lower case, bracketed details and everything after the first ";" removed, numbers and coordinates replaced by one placeholder. A kind with no new failure for `forgetMinutes` (120) SHALL start over. A success SHALL clear the behaviour's failure kinds. Aborted and yielded runs SHALL count as neither.
+The NPC controller SHALL report every failed behaviour run, with its failure message, to the agent's help desk, and every successful run. The desk SHALL group failures per behaviour and per normalized reason: lower case, bracketed details, quotes and everything after the first ";" or spaced dash removed, numbers and coordinates replaced by one placeholder. A kind with no new failure for `forgetMinutes` (120) SHALL start over. A success SHALL clear the behaviour's failure kinds. Aborted and yielded runs SHALL count as neither.
 
 #### Scenario: Wider rings are the same failure
 - **WHEN** chop_wood_loop fails with "no natural tree within 32 blocks" and later "no natural tree within 64 blocks"
@@ -27,7 +27,7 @@ A Behavior and a BehaviorDefinition MAY define `goal` and `help(ctx, failure)`; 
 - **THEN** the generic escalation stays quiet and keep_fed's own starving report is the one message
 
 ### Requirement: Shared limits for behaviours that ask on their own
-A behaviour MAY ask through the desk directly (keep_fed's starving report). Such an ask SHALL share the per-reason and per-behaviour limits with the escalations, SHALL go out even with askHelp off (the behaviour has its own switch, and the hourly cap does not apply then), MAY fall back to public chat when no owner is online, and SHALL be recorded like an escalation.
+A behaviour MAY ask through the desk directly (keep_fed's starving report). Such an ask SHALL share the per-reason and per-behaviour limits with the escalations, SHALL go out even with askHelp off (the behaviour has its own switch, and the hourly cap does not apply then) and during quietHours, MAY fall back to public chat when no owner is online, and SHALL be recorded like an escalation.
 
 #### Scenario: No double message
 - **WHEN** keep_fed whispered that it is starving and then keeps failing for 15 minutes

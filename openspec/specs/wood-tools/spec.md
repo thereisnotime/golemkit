@@ -24,7 +24,7 @@ The tool kinds SHALL be upgraded in the order pickaxe, sword, axe, shovel. A bot
 - **THEN** the next step is a stone sword
 
 ### Requirement: Wood for tools
-When the next upgrade step needs logs, upgrade_tools SHALL first take logs, then planks of one kind, from the bot's own chests (placed by it or listed in storage.chests) within 48 blocks that are not in a protected area, then fell a tree within 32 blocks. When neither gives wood it SHALL fail with a message starting "needs wood" and data.need = 'wood'.
+When the next upgrade step needs logs, upgrade_tools SHALL first take logs, then planks of one kind, from the bot's own chests (placed by it or listed in `settings.storage.chests`) within 48 blocks that are not in a protected area, then fell a tree within 32 blocks. When neither gives wood it SHALL fail with a message starting "needs wood" and data.need = 'wood'.
 
 #### Scenario: Wood in the chest
 - **WHEN** an own chest 10 blocks away holds spruce logs and the bot needs sticks
@@ -49,7 +49,7 @@ When crafting or smelting needs a crafting table or furnace and none is near, th
 - **THEN** the message says the server refused it because of spawn protection, not that the block is still snow
 
 ### Requirement: Wood ladder
-chop_tree with `rings` and chop_wood_loop (option `rings`, default 32, 64, 128, 250) SHALL look for a natural tree in this order: remembered tree spots within the widest ring, nearest first, not found empty within 30 minutes; then the smallest ring no empty search covered within 20 minutes. Rings up to 64 blocks SHALL be a scan from where the bot stands; wider rings SHALL be a scouting spiral out to the ring, by day, that stops at the first natural tree. Spots and waypoints in protected areas, in or across remembered danger zones SHALL be skipped. Natural trees seen while felling or scouting SHALL be remembered in agent storage and journalled as found events. After felling a tree more than 48 blocks away the bot SHALL walk back to where it started. A scouting trip cut short SHALL NOT be remembered as an empty ring.
+chop_tree with `rings` and chop_wood_loop (option `rings`, default 32, 64, 128, 250) SHALL look for a natural tree in this order: remembered tree spots within the widest ring, nearest first, not found empty within 30 minutes; then the smallest ring no empty search covered within 20 minutes. Rings up to 64 blocks SHALL be a scan from where the bot stands; wider rings SHALL be a scouting spiral out to the ring, by day, that stops at the first natural tree. Spots and waypoints in protected areas, in or across remembered danger zones SHALL be skipped. Natural trees seen while felling or scouting SHALL be remembered in agent storage and journalled as found events. After felling a tree more than 48 blocks away the bot SHALL walk back to where it started. A scouting trip cut short SHALL NOT be remembered as an empty ring. Leaving for a ring past `trips.minDistance` (default 64) SHALL be a trip under `settings.trips` (see the trips spec) unless a player ordered it and `trips.ownerOrders` is off; with fewer than 3 planks' worth of wood the weapon check SHALL be waived.
 
 #### Scenario: Trees near home cut down
 - **WHEN** no natural tree is within 32 or 64 blocks and those rings came up empty in this run
