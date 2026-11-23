@@ -182,7 +182,7 @@ test('controller: a behaviour that keeps flipping on and off is held back unless
 })
 
 test('go_home fails when the walk settles without getting home', async () => {
-  const { bot, agent, gotos } = homeBot({ x: 547, y: 76, z: 33 }, () => Promise.resolve())
+  const { bot, agent, gotos } = homeBot({ x: 580, y: 68, z: -30 }, () => Promise.resolve())
   const r = await goHomeAction().run({ agent, bot, signal: new AbortController().signal } as any, { range: 4 }) as ActionResult
   assert.equal(r.ok, false)
   assert.match(r.message, /ended short of home/)

@@ -4,7 +4,7 @@ import type { Bot } from 'mineflayer'
 import type { Agent } from '../core/index.ts'
 import {
   defineSkill, defineAction, z, noParams, ok, fail, goals, fmtPos, nearestHostile,
-  checkAborted
+  checkAborted, travel
 } from '../core/index.ts'
 import { gotoWithin as walkWithin, GotoTimeoutError } from './world.ts'
 
@@ -178,6 +178,11 @@ const setHomeAction = defineAction({
   }
 })
 
+/** Beyond this, go_home walks in legs (travel) before the final approach. */
+const FAR_HOME = 40
+/** Longest go_home trip in legs. */
+const FAR_HOME_MS = 5 * 60_000
+
 const goHome = defineAction({
   name: 'go_home',
   description: 'Walk back to the remembered home position.',
@@ -190,6 +195,18 @@ const goHome = defineAction({
     if (atHome(bot.entity.position, home, range)) return ok(`already home (${fmtPos(home)})`)
     let arrived = false
     try {
+      // far out (after a respawn at world spawn, say): the pathfinder only plans through loaded
+      // chunks, so walk most of the way in legs first
+      if (homeOffset(bot.entity.position, home) > FAR_HOME) {
+        const trip = AbortSignal.any([signal, AbortSignal.timeout(FAR_HOME_MS)])
+        try {
+          await travel(bot, home, trip, { range: Math.max(range, 3) })
+        } catch (e) {
+          checkAborted(signal)
+          if (trip.aborted) throw new Error(`took over ${FAR_HOME_MS / 1000}s`)
+          throw e
+        }
+      }
       arrived = await gotoWithin(bot, new goals.GoalNear(home.x, home.y, home.z, range), signal, 60000)
     } catch (e) {
       checkAborted(signal)
