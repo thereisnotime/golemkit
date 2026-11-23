@@ -116,6 +116,21 @@ When the bot hides from shooters, finds no cover within 8 blocks, may place bloc
 - **WHEN** the bot stands at the east edge of its block so its body overlaps the next cell
 - **THEN** the wall goes one cell further out
 
+### Requirement: Heavy fire
+Under heavy fire (3 or more shooters or patrol mobs and a gear score under what that many need, or 8 health or less) the bot SHALL take cover only when the spot can be reached before about one hit is expected (distance / 5 blocks per second x shooters x 0.3 hits per shooter per second under 1), and build cover only when the wall can be finished as fast (0.45 s per block, 0.6 s per pillar block). Otherwise it SHALL back off out of sight, sprinting, up to 48 blocks from where the shooting started, towards home when home lies within 100 degrees of straight away from the shooters. Slow cover or a slow wall SHALL only be used when it can't back off further. A cover spot where it is hit from range SHALL be left at once and not used again in that fight. With a shield it SHALL block an incoming arrow while backing off when at 12 health or less or facing at most 2 shooters, at most every 1.5 s. The rules SHALL be pure (heavyFire, quickCover, quickWall, fleePoint, shieldWhileFleeing in `src/skills/ranged-plan.ts`).
+
+#### Scenario: Three skeletons, stone sword
+- **WHEN** three skeletons shoot at a bot with a stone sword, no armour and no shield, and the nearest cover is 9 blocks away
+- **THEN** it backs off out of sight instead of walking to the cover, and logs "heavy fire, getting out of sight"
+
+#### Scenario: Cover right there
+- **WHEN** the same bot has cover 3 blocks away
+- **THEN** it takes that cover
+
+#### Scenario: Hit behind cover
+- **WHEN** the bot is hit by an arrow while holding a cover spot
+- **THEN** it leaves the spot and does not use it again
+
 ### Requirement: Hide time and retreat cap
 Behind cover the bot SHALL leave as soon as every shooter is gone or, at 16 health or more, nothing shoots at it, and SHALL stay at most 4 s at 16+ health, 8 s at 12+ and 15 s below. After a fight against shooters that went badly it SHALL hide 3 s at 16+ health, 6 s at 12+, 10 s above 8 and 15 s at 8 or less, and stop hiding early when at 16+ health no shooter has a line to it. Backing off SHALL stop 24 blocks from where the shooting started; at that cap it SHALL stand its ground with a bow, shield or weapon, except at 8 health or less, where it MAY back off up to 16 blocks more.
 

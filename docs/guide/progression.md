@@ -159,6 +159,19 @@ behaviors:
   keep_tools_upgraded: { upTo: iron, armour: true }
 ```
 
+### Where the crafting table and furnace go
+
+With no crafting table within 16 blocks (or furnace within 32) it puts one down next to itself,
+but never inside the server's spawn protection (a square of `world.spawnProtection` blocks around
+the world spawn, 16 by default like `spawn-protection` in server.properties; set it to the
+server's value, 0 when there is none), in a [protected area](/concepts/world#protected-areas) or on
+a spot the server already refused. When every spot next to it is inside spawn protection (a bot
+that just respawned at the world spawn with logs) it walks out through the nearest side first. A
+refused placement is reported as what it is, `the server refused to place crafting_table at 544
+78 47 (spawn protection: 2 blocks from the world spawn, inside its 16-block square)`, instead of
+mineflayer's `the block is still snow`; the spot is noted as protected and the next try goes to
+another one.
+
 ## Gathering
 
 **Wood.** `chop_tree` cuts the trunk from the ground, then climbs what is out of reach: it

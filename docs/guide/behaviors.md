@@ -237,6 +237,19 @@ pillagers, witches, blazes, ghasts, drowned with tridents); the details are unde
   then cover up to 14 blocks out, and only then backing off, at most 24 blocks from where the
   shooting started. At that cap it stands its ground with a bow, shield or weapon (at 8 health or less it keeps
   going, up to 16 blocks more).
+- **Heavy fire** (outnumbered with too little gear, or 8 health or less) changes the order:
+  every second in sight is a hit from each shooter, so walking far to a cover spot or building a
+  wall in the open loses. Cover counts only when it can be reached before about one hit lands (5
+  blocks against 3 shooters, 8 against 2, at 0.3 hits per shooter per second and 5 blocks a
+  second), and a wall only when it can be finished as fast (2 blocks against 3 shooters). Failing
+  both it gets out of sight: it sprints away, up to 48 blocks from where the shooting started
+  instead of 24, towards home when home lies roughly away from the shooters, and with a shield it
+  blocks an arrow on the way when hurt or when at most 2 shoot. The log says so (`retreat (3
+  shooting at me, gear 24 of 65 needed; heavy fire, getting out of sight (cover 9 blocks off is
+  too slow))`). A slow cover or wall is only the fallback when it can't back off any further. A
+  cover spot where it gets hit anyway (a flank, arrows over the top) is left at once and not used
+  again. Pax died this way on 23 Nov 2026: food 12, stone sword, no armour, three skeletons, it
+  walked to cover and held it for 12 s while being shot.
 - Behind cover it eats; it never stands in the open eating while something shoots at it. It leaves
   cover as soon as the shooters are gone or, at 16+ health, nothing shoots at it, and stays at most
   4 s when healthy, 8 s at 12+ and 15 s below. After a fight that went badly it hides 3 s at full
@@ -615,6 +628,13 @@ flowchart TB
   remembered for `ringMemoryMinutes` (default 20) in `agent.storage` key `foodLadder`, so a
   restart doesn't rescan it. A search cut short by night or mobs is not remembered as empty.
   Within one run it moves on to the next ring right away.
+  **Gear and hunger:** rings wider than `riskyRingsFrom` (default 48) are trips far from home.
+  With a gear score (the [ranged safety](#ranged-safety) score: armour, shield, weapon, bow,
+  health) under `scoutGear` (default 40; stone tools and no armour score about 25, iron armour and
+  a sword about 50, a shield adds 20) it takes them only once food is at or below `scoutHungerAt`
+  (default 8) or it is starving. Until then it bakes, tends or starts its farm, forages and waits
+  for crops (the next try is 3 minutes later), and the log says why (`food 12/20 is not urgent and
+  gear 25 is under 40: not scouting 120 blocks out yet`). `scoutGear: 0` turns the rule off.
 - **3b · trip to a known food place** (`trips`, on by default): before the far rings, and when
   every ring came up empty, it walks to the best known food place by day, any distance (it
   travels on the surface, so 3000+ blocks is fine, up to `tripRange`, default 4000). Known
@@ -932,6 +952,9 @@ Looks after food on its own, climbing a ladder when hungry (or hurt and too hung
 | `scout` | boolean | `true` | when nothing is in range, search further out (find_food), one ring wider each time a ring comes up empty |
 | `rings` | list | `[48,120,250,400,600]` | search rings around home, smallest first: close, wider, wide, then far ones (by day only, after known food places) |
 | `farRingsFrom` | number (32..1024) | `250` | rings wider than this are far: searched by day only, and only after a trip to a known food place |
+| `scoutGear` | number (0..100) | `40` | gear score (armour, shield, weapon, bow, health; stone tools and no armour score about 25) from which searching rings wider than riskyRingsFrom is fine at any food level; 0 = no gear rule |
+| `scoutHungerAt` | number (0..20) | `8` | with gear under scoutGear, rings wider than riskyRingsFrom are searched only when food is at or below this; until then it uses its farm, bakes, waits for crops |
+| `riskyRingsFrom` | number (16..1024) | `48` | rings wider than this count as risky trips for the gear rule |
 | `ringMemoryMinutes` | number (1..240) | `20` | remember an empty ring this long before searching it again |
 | `scoutRadius` | number (32..1024) |  | old single search radius; when set it caps the rings |
 | `scoutAtNight` | boolean | `false` | also make far trips (searching, known spots, its farm) at night |

@@ -39,6 +39,21 @@ keep_fed SHALL search the smallest ring of `rings` (default 48, 120, 250, 400, 6
 - **WHEN** the 250 ring came up empty, it is night and scoutAtNight is on
 - **THEN** keep_fed does not search the 400 ring and waits for day
 
+### Requirement: Far rings need gear or hunger
+A ring wider than `riskyRingsFrom` (default 48) SHALL be searched only when the bot's gear score (the stay-safe gear score: armour, shield, weapon, bow and arrows, health) is at least `scoutGear` (default 40), or food is at or below `scoutHungerAt` (default 8), or the bot is starving. Otherwise the search SHALL count as blocked with a reason naming the food, the gear score and the ring, the ladder SHALL go on to baking, its farm, seeds, breeding and foraging, and the next try SHALL be no sooner than 3 minutes later. `scoutGear: 0` SHALL turn the rule off. The rule SHALL be the pure `riskyRing` in `src/skills/foodPlan.ts`.
+
+#### Scenario: Stone tools at food 12
+- **WHEN** the bot has food 12, a stone sword, no armour or shield (gear about 25), its farm growing, and the 48 ring came up empty
+- **THEN** keep_fed does not search the 120 ring and waits for the crops, logging "not scouting 120 blocks out yet"
+
+#### Scenario: Hungry enough
+- **WHEN** the same bot's food drops to 8
+- **THEN** keep_fed searches the 120 ring
+
+#### Scenario: Geared
+- **WHEN** the bot wears iron armour and carries an iron sword at food 12
+- **THEN** keep_fed searches the 120 ring
+
 ### Requirement: Trips to known food places
 With `trips` on, keep_fed SHALL take a trip to the best known food place, by day and out of danger, when the next ring is a far one or every ring came up empty. Known places SHALL be the profile's `foodPlaces` (coordinates or a remembered place name, with optional crops), its own farms, and remembered `found:<crop>`, `found:village`, `food:village_farm` and `food:animals` places. The pure `rankFoodPlaces` SHALL order them by distance divided by a trust weight (listed places and own farms 1.5, crop fields 1.2, villages 1, animals 0.6) and SHALL leave out places in another dimension, in a remembered danger zone, closer than 48 blocks or `radius` (whichever is more), further than `tripRange` (default 4000) or visited recently. On a trip it SHALL walk there on the surface, harvest ripe crops and replant (the whole field for listed places and its own farms, otherwise only crops by a village), hunt animals beyond the breeders, gather a few seeds when short, bake bread, eat, and walk back home. A visited place SHALL be left alone for 20 minutes, 45 when it had nothing or could not be reached.
 

@@ -37,6 +37,17 @@ keep_tools_upgraded SHALL set the blackboard need `wood` when upgrade_tools fail
 - **WHEN** keep_tools_upgraded failed for wood 20 seconds ago with a 60 second back-off and the bot now holds logs
 - **THEN** it runs again on the next tick
 
+### Requirement: Stations outside spawn protection
+When crafting or smelting needs a crafting table or furnace and none is near, the bot SHALL put one down on a spot outside the server's spawn protection (a square of `world.spawnProtection`, default 16, around the world spawn), outside protected areas and not on a spot the server refused in this session. When every spot next to it is inside spawn protection it SHALL walk out through the nearest side of the square first. A refused placement SHALL be reported as the server refusing it, with the likely reason (spawn protection with the distance to the world spawn, or a protected area), SHALL be marked as protected (confirmed when inside spawn protection) and the next try SHALL use another spot, up to 4 tries. The spot rules SHALL be pure (`src/skills/stationPlan.ts`).
+
+#### Scenario: Respawned at the world spawn
+- **WHEN** the bot respawned at the world spawn with logs and needs a crafting table
+- **THEN** it walks out of the 16-block square and places the table there
+
+#### Scenario: Refused placement
+- **WHEN** the server refuses a crafting table on snow at 544 78 47, 2 blocks from the world spawn
+- **THEN** the message says the server refused it because of spawn protection, not that the block is still snow
+
 ### Requirement: Wood ladder
 chop_tree with `rings` and chop_wood_loop (option `rings`, default 32, 64, 128, 250) SHALL look for a natural tree in this order: remembered tree spots within the widest ring, nearest first, not found empty within 30 minutes; then the smallest ring no empty search covered within 20 minutes. Rings up to 64 blocks SHALL be a scan from where the bot stands; wider rings SHALL be a scouting spiral out to the ring, by day, that stops at the first natural tree. Spots and waypoints in protected areas, in or across remembered danger zones SHALL be skipped. Natural trees seen while felling or scouting SHALL be remembered in agent storage and journalled as found events. After felling a tree more than 48 blocks away the bot SHALL walk back to where it started. A scouting trip cut short SHALL NOT be remembered as an empty ring.
 

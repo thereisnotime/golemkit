@@ -86,6 +86,7 @@ can't change their own.
 | `building` | library / creative / ask | reuse a saved [blueprint](/guide/goals-and-building#blueprint-format), design a new one, or let the owner pick (see [Blueprint libraries](./blueprints#building-policy)) |
 | `build.creativeMethod` | auto / hand / commands | how a creative bot builds: hand = block by block like a player (auto means hand), commands = `/fill` and `/setblock` when it is op (each command shows to other ops as an admin message); survival always builds by hand (see [creative builds](./goals-and-building#creative-mode)) |
 | `build.handDelayMs` | 0–5000 | pause after each block in a creative hand build (default 150, jittered ±50) |
+| `world.spawnProtection` | 0–256 | the server's spawn-protection radius (default 16): crafting tables and furnaces go outside it (see [tool progression](./progression#where-the-crafting-table-and-furnace-go)) |
 | `road.width` | 1–5 | lanes of a new [road](./roads.md) (even widths round up; default 3) |
 | `road.palette` | stone_bricks / cobblestone / stone / oak / spruce | what roads are made of (default stone_bricks: stone brick floor and stairs, cobblestone base, stone brick wall railings) |
 | `road.maxCut` / `road.maxFill` | 0–16 / 0–24 | deepest cut into the ground and highest fill above it for any lane (default 6 / 6) |
