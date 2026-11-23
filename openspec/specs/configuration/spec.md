@@ -24,6 +24,21 @@ Loading a profile SHALL log a warning naming the file and the dotted key for eve
 - **WHEN** any `profiles/*.yaml` in the repo is loaded
 - **THEN** no unknown-key warning is logged
 
+#### Scenario: Keys the code reads are declared
+- **WHEN** a profile sets `settings: { mining: { hostileRadius: 12 } }` or `llm: { goals: { ownerWaitMin: 5 } }`
+- **THEN** no warning is logged and the value reaches the code (both are live toggles too)
+
+### Requirement: Unknown fleet keys are reported
+Parsing a fleet file SHALL log a warning naming the file and the dotted key (`bots[0].usrname`, `servers.mc.prot`, `defaults.ownres`) for every key the fleet format does not declare, at the top level, in each server entry, in `defaults` and in each bot entry. The fleet SHALL still start without those keys. The free-form `settings` maps SHALL NOT be reported.
+
+#### Scenario: Typo in a bot entry
+- **WHEN** a fleet file has `bots: [{ variant: buddy, usrname: B }]`
+- **THEN** the fleet starts, the bot gets the default name, and a warning names `bots[0].usrname`
+
+#### Scenario: Stock fleets
+- **WHEN** any `fleets/*.yaml` in the repo is parsed
+- **THEN** no unknown-key warning is logged
+
 ### Requirement: Profile reflexes match the reflexes brain
 The profile `reflexes:` block SHALL accept every option the reflexes brain reads from settings: `selfDefense`, `autoEat`, `eatBelow`, `retreatBelow`, `waterFightAbove` and `rangedDefense`, and `reflexes.rangedDefense` SHALL be a live toggle.
 
@@ -39,18 +54,30 @@ The profile `reflexes:` block SHALL accept every option the reflexes brain reads
 - **THEN** safe mining uses safeDepth 8
 
 ### Requirement: askHelp from a profile
-The top-level profile key `askHelp` SHALL land in `settings.askHelp`: `true`/`false` set `enabled`, and an options map turns asking for help on unless it has `enabled: false`. Without the key, asking for help is off.
+The top-level profile key `askHelp` SHALL land in `settings.askHelp`: `true`/`false` set `enabled`. Only `askHelp: true` or `enabled: true` turns asking for help on; an options map without `enabled: true` tunes it but leaves it off (a profile like that gets a warning). The same holds for live toggles: `!config_set askHelp.failures 5` SHALL NOT turn it on. Without the key, asking for help is off.
 
 #### Scenario: Options only
 - **WHEN** a profile has `askHelp: { failures: 5 }`
+- **THEN** asking for help stays off and a warning says the map has no `enabled: true`
+
+#### Scenario: Options with enabled
+- **WHEN** a profile has `askHelp: { enabled: true, failures: 5 }`
 - **THEN** asking for help is on and asks after 5 failures of the same kind
 
-### Requirement: Fleet server wins over a profile's server
-For a fleet bot, the connection settings SHALL be the environment (and `--host`/`--port`), then the profile's `server:` block, then the keys the fleet's server entry sets, later winning. A profile only fills keys the fleet leaves out.
+#### Scenario: A live sub-key on a bot without askHelp
+- **WHEN** an owner sends `!config_set askHelp.failures 5` to a bot whose profile has no `askHelp`
+- **THEN** asking for help stays off until `askHelp.enabled` is set to true
+
+### Requirement: Fleet server wins over a profile's server, flags win over both
+For a fleet bot, the connection settings SHALL be the environment, then the profile's `server:` block, then the keys the fleet's server entry sets, then `--host`/`--port` on the command line, later winning. A profile only fills keys the fleet leaves out. The command-line flags SHALL win in a fleet as they do with `run`. The startup line per fleet server SHALL show the address each bot really connects to (after profiles and flags).
 
 #### Scenario: Profile pointing elsewhere
 - **WHEN** a fleet server sets `host: fleet.example` and the bot's profile sets `server: { host: other.example, platform: paper }`
 - **THEN** the bot connects to fleet.example with platform paper
+
+#### Scenario: Command-line host
+- **WHEN** the same fleet is started with `--host cli.example`
+- **THEN** the bot connects to cli.example with platform paper, and the startup line shows cli.example
 
 ### Requirement: .env before the logger
 The logger SHALL load `.env` from the working directory before it reads `MC_LOG_*` and collects the secrets to redact, so these apply when Node is started without `--env-file`. Variables already set in the environment SHALL win over `.env`.

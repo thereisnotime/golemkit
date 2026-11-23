@@ -1,6 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseFleetFile, resolveUsername, fleetServerConfig } from '../src/core/fleetFile.ts'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import YAML from 'yaml'
+import { parseFleetFile, resolveUsername, fleetServerConfig, fleetAddresses } from '../src/core/fleetFile.ts'
 import { Agent, Fleet, defineVariant } from '../src/core/index.ts'
 
 const base = { host: 'base.example', port: 25565, auth: 'offline' as const, version: '1.21.1' }
@@ -74,4 +77,37 @@ test("fleet server wins over a profile's server:, the profile fills the gaps", (
   const s = fleetServerConfig(p, { host: 'profile.example', port: 1, platform: 'paper', version: '1.21.4' })
   assert.deepEqual(s, { host: 'fleet.example', port: 25570, auth: 'offline', version: '1.21.4', platform: 'paper' })
   assert.deepEqual(fleetServerConfig(p), { host: 'fleet.example', port: 25570, auth: 'offline', version: '1.21.1' }, 'no profile: fleet over environment, no staggerMs')
+})
+
+test('fleet: --host/--port beat the fleet entry and the profile, like with run', () => {
+  const plan = parseFleetFile('servers:\n  mc: { host: fleet.example, port: 25570 }\nbots:\n  - profile: p\n', base)
+  const p = plan.agents[0]!
+  const s = fleetServerConfig(p, { host: 'profile.example', version: '1.21.4' }, { host: 'cli.example', port: 1234 })
+  assert.deepEqual(s, { host: 'cli.example', port: 1234, auth: 'offline', version: '1.21.4' })
+  assert.equal(fleetServerConfig(p, {}, { port: 9 }).host, 'fleet.example', 'only the flags given')
+})
+
+test('fleet: startup line shows the address each bot really uses', () => {
+  const line = fleetAddresses([
+    { username: 'Pax', server: { ...base, host: 'a.example' } },
+    { username: 'Helper', server: { ...base, host: 'a.example' } },
+    { username: 'Scout', server: { ...base, host: 'b.example', port: 25566 } }
+  ])
+  assert.equal(line, 'a.example:25565: Pax, Helper; b.example:25566: Scout')
+})
+
+test('fleet: unknown keys are warned about, not silently dropped', async () => {
+  const { subscribeLogs } = await import('../src/core/log.ts')
+  const { unknownKeys } = await import('../src/core/schemaKeys.ts')
+  const { FleetFileSchema } = await import('../src/core/fleetFile.ts')
+  const text = 'staggerMS: 10\nservers:\n  mc: { host: a, prot: 1 }\ndefaults: { ownres: [x] }\nbots:\n  - { variant: buddy, usrname: B }\n  - { profile: pax, settings: { anything: 1 } }\n'
+  assert.deepEqual(unknownKeys(YAML.parse(text), FleetFileSchema), ['staggerMS', 'servers.mc.prot', 'defaults.ownres', 'bots[0].usrname'])
+  const seen: string[] = []
+  const off = subscribeLogs(e => { if (e.level === 'warn') seen.push(e.msg) })
+  try { parseFleetFile(text, base, 'fleets/x.yaml') } finally { off() }
+  assert.equal(seen.length, 4)
+  assert.match(seen[3]!, /fleets\/x\.yaml: unknown key bots\[0\]\.usrname \(ignored\)/)
+  for (const f of readdirSync('fleets').filter(f => /\.ya?ml$/.test(f))) {
+    assert.deepEqual(unknownKeys(YAML.parse(readFileSync(join('fleets', f), 'utf8')), FleetFileSchema), [], f)
+  }
 })

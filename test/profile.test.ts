@@ -87,3 +87,13 @@ test('stock profiles load without unknown keys', () => {
     assert.deepEqual(unknownProfileKeys(YAML.parse(readFileSync(join('profiles', f), 'utf8'))), [], f)
   }
 })
+
+test('keys the code reads are not reported: mining.hostileRadius, llm.goals.ownerWaitMin and every goals toggle', async () => {
+  const { TOGGLES } = await import('../src/core/toggles.ts')
+  const raw = YAML.parse('variant: x\nsettings: { mining: { hostileRadius: 12 } }\nllm: { goals: { ownerWaitMin: 5 } }\n')
+  assert.deepEqual(unknownProfileKeys(raw), [])
+  const p = parseProfile('variant: x\nllm: { goals: { ownerWaitMin: 5 } }\n')
+  assert.equal((p.options.settings as any).llm.goals.ownerWaitMin, 5, 'kept, not stripped')
+  const goals = Object.fromEntries(TOGGLES.filter(t => t.key.startsWith('llm.goals.')).map(t => [t.key.slice('llm.goals.'.length), 1]))
+  assert.deepEqual(unknownProfileKeys({ variant: 'x', llm: { goals: goals } }), [])
+})

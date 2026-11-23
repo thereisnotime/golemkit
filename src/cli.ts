@@ -8,7 +8,7 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { Agent, Fleet, serverFromEnv, createLogger, configureLogging, installCrashHandlers, type BotDefinition, type InstanceOptions, type ServerConfig } from './core/index.ts'
-import { parseFleetFile, resolveUsername, fleetServerConfig } from './core/fleetFile.ts'
+import { parseFleetFile, resolveUsername, fleetServerConfig, fleetAddresses } from './core/fleetFile.ts'
 import { loadProfile, mergeOptions, PROFILES_DIR, type LoadedProfile } from './core/profile.ts'
 import { validateBehaviorConfig, defaultBehaviorRegistry } from './brains/behaviors/index.ts'
 
@@ -97,11 +97,12 @@ async function main (): Promise<void> {
   }
   configureLogging(cliLogging)
   const [cmd, arg] = positionals
-  const server: ServerConfig = {
-    ...serverFromEnv(),
+  /** --host/--port: they beat the environment, profiles and fleet files. */
+  const serverFlags: Partial<ServerConfig> = {
     ...(values.host ? { host: values.host } : {}),
     ...(values.port ? { port: Number(values.port) } : {})
   }
+  const server: ServerConfig = { ...serverFromEnv(), ...serverFlags }
 
   switch (cmd) {
     case 'run': {
@@ -115,7 +116,7 @@ async function main (): Promise<void> {
       // env < profile < CLI flags
       if (profile?.profile.logging) configureLogging({ ...profile.profile.logging, file: profile.profile.logging.file ?? undefined, dir: profile.profile.logging.dir ?? undefined })
       configureLogging(cliLogging)
-      const target: ServerConfig = { ...serverFromEnv(), ...profile?.server, ...(values.host ? { host: values.host } : {}), ...(values.port ? { port: Number(values.port) } : {}) }
+      const target: ServerConfig = { ...serverFromEnv(), ...profile?.server, ...serverFlags }
       if (profile) log.info(`profile ${profile.name} (variant ${def.name})`)
       const fleet = new Fleet()
       fleet.add(new Agent(def, target, mergeOptions(profile?.options, flags)))
@@ -124,7 +125,9 @@ async function main (): Promise<void> {
     }
     case 'fleet': {
       if (!arg) throw new Error('usage: fleet <name|file.yaml>')
-      const plan = parseFleetFile(readFileSync(fleetPath(arg), 'utf8'), server)
+      const file = fleetPath(arg)
+      // env < profile server: < fleet servers: entry < --host/--port (same as run: flags win)
+      const plan = parseFleetFile(readFileSync(file, 'utf8'), serverFromEnv(), file)
       // Fleet file logging first, then CLI flags on top.
       if (plan.logging) configureLogging({ ...plan.logging, file: plan.logging.file ?? undefined, dir: plan.logging.dir ?? undefined })
       configureLogging(cliLogging)
@@ -133,12 +136,10 @@ async function main (): Promise<void> {
         const { def, profile } = p.profile ? await resolveTarget(p.profile) : { def: await loadVariant(p.variant!), profile: null }
         const merged = mergeOptions(profile?.options, p.options)
         const opts = resolveUsername(p, merged.username ?? def.username ?? def.name, plan.multiServer, merged)
-        fleet.add(new Agent(def, fleetServerConfig(p, profile?.server), opts), p.server)
+        fleet.add(new Agent(def, fleetServerConfig(p, profile?.server, serverFlags), opts), p.server)
       }
-      for (const name of fleet.servers) {
-        const s = plan.servers[name]!
-        log.info(`${name} (${s.host}:${s.port}): ${fleet.onServer(name).map(a => a.username).join(', ')}`)
-      }
+      // the address each bot really connects to (after profiles and flags), grouped
+      for (const name of fleet.servers) log.info(`${name}: ${fleetAddresses(fleet.onServer(name))}`)
       // Logins are staggered per server; servers start in parallel.
       runFleet(fleet, (name) => plan.servers[name]?.staggerMs ?? plan.staggerMs)
       break

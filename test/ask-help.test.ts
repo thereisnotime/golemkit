@@ -27,7 +27,8 @@ interface FakeAgent {
 
 function fakeAgent (askHelp: unknown = true, online = ['Robin']): FakeAgent {
   const f: FakeAgent = {
-    settings: { askHelp },
+    // an options map here means "on with these options" (enabled: true unless it says otherwise)
+    settings: { askHelp: askHelp && typeof askHelp === 'object' ? { enabled: true, ...askHelp } : askHelp },
     owners: ['robin'],
     online,
     whispers: [],
@@ -85,13 +86,17 @@ test('asks once after N failures spread over M minutes, whispering the online ow
   assert.equal(f.whispers.length, 2)
 })
 
-test('disabled: tracks but never asks; enabled by an options map', () => {
+test('disabled: tracks but never asks; only true or enabled: true turns it on', () => {
   const f = fakeAgent(false)
   const d = new HelpDesk(f.agent)
   for (let i = 0; i < 10; i++) d.failure(tools, 'x', i * 5 * MIN)
   assert.equal(f.whispers.length, 0)
   assert.equal(d.open()[0]?.count, 10)
-  assert.equal(resolveHelpOptions({ askHelp: { failures: 5 } }).enabled, true)
+  // !config_set askHelp.failures 5 on a bot without askHelp: tuned, still off
+  assert.equal(resolveHelpOptions({ askHelp: { failures: 5 } }).enabled, false)
+  assert.equal(resolveHelpOptions({ askHelp: { failures: 5 } }).failures, 5)
+  assert.equal(resolveHelpOptions({ askHelp: { enabled: true, failures: 5 } }).enabled, true)
+  assert.equal(resolveHelpOptions({ askHelp: true }).enabled, true)
   assert.equal(resolveHelpOptions({}).enabled, false)
   assert.equal(resolveHelpOptions({ askHelp: { enabled: false } }).enabled, false)
 })
@@ -241,9 +246,10 @@ test('stock help texts for the usual failures', () => {
 test('profile askHelp lands in settings.askHelp', () => {
   const on = parseProfile('variant: buddy\naskHelp: true\n')
   assert.deepEqual((on.options.settings as any).askHelp, { enabled: true })
-  const opts = parseProfile('variant: buddy\naskHelp: { failures: 4, minutes: 20, tell: say, quietHours: [23, 7] }\n')
+  const opts = parseProfile('variant: buddy\naskHelp: { enabled: true, failures: 4, minutes: 20, tell: say, quietHours: [23, 7] }\n')
   const o = resolveHelpOptions(opts.options.settings as any)
   assert.equal(o.enabled, true)
+  assert.equal(resolveHelpOptions(parseProfile('variant: buddy\naskHelp: { failures: 4 }\n').options.settings as any).enabled, false, 'a map needs enabled: true')
   assert.equal(o.failures, 4)
   assert.equal(o.tell, 'say')
   assert.deepEqual(o.quietHours, [23, 7])

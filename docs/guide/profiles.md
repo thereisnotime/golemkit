@@ -34,8 +34,8 @@ locations in `.env` instead of the repo:
 ```yaml
 owners: ["${MC_OWNER:-Robin}"]
 llm:
-  oauthTokenVar: ${MC_OAUTH_TOKEN_VAR:-CLAUDE_CODE_OAUTH_TOKEN}
-  oauthTokenFile: ${MC_OAUTH_TOKEN_FILE:-~/.config/golemkit/secrets.env}
+  oauthTokenVar: ${MC_CLAUDE_OAUTH_TOKEN_VAR:-CLAUDE_CODE_OAUTH_TOKEN}
+  oauthTokenFile: ${MC_CLAUDE_OAUTH_TOKEN_FILE:-~/.config/golemkit/secrets.env}
 ```
 
 ## Format
@@ -87,7 +87,7 @@ journal:                      # optional, event journal settings (on by default)
 | `respectBuilds` | leave blocks that look player-made alone (default off). Lands in `settings.respectBuilds` |
 | `selfAware` | show the bot its own variant, profile, model and settings each turn (default on) |
 | `npcMode` | what runs while the LLM is paused (quota, budget): `false`, or `{ arm: { behaviour: options } }`, see [Behaviours](./behaviors) |
-| `askHelp` | when a behaviour keeps failing the same way, tell the owners once what would help: `true`, or options (`failures`, `minutes`, `tell`, `thanks`, `quietHours`, ...; a map turns it on unless it has `enabled: false`), see [asking for help](./behaviors#asking-for-help). Lands in `settings.askHelp`; default off |
+| `askHelp` | when a behaviour keeps failing the same way, tell the owners once what would help: `true`, or options (`failures`, `minutes`, `tell`, `thanks`, `quietHours`, ...; a map needs `enabled: true` to turn it on), see [asking for help](./behaviors#asking-for-help). Lands in `settings.askHelp`; default off |
 | `server` | per-bot server override: `host`, `port`, `auth`, `version`, `platform` (`neoforge`, `vanilla`, `paper`; same as `MC_PLATFORM`) |
 | `intents` | [plain-language commands](/guide/intents) without the LLM: `mode`, `threshold`, `layers`, ... Lands in `settings.intents` |
 | `llm` | [LLM brain](/guide/llm-brain) settings: provider, model, effort, login, token source, `listen`, `immersive`, aliases, budget, [goals](/guide/goals-and-building) |

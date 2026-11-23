@@ -29,7 +29,7 @@ scopeNote: "run, fleet and list are game-agnostic; probes, live tests and benchm
 | [blueprints](/guide/goals-and-building#blueprint-format) | `just blueprint-preview [name] [facing] [--top]` | print a blueprint as text, or list them |
 | blueprints | `just blueprint-import <file> [--bot name \| --out dir]` | convert a `.schem` / `.schematic` / `.litematic` / `.nbt` / `.bp` into a blueprint ([Blueprint libraries](/guide/blueprints#import)) |
 | blueprints | `just blueprint-fetch [args]` | download and convert the schematics in `blueprints/sources.yaml` |
-| llm | `just llm-login <provider> [mode]` | log a subscription CLI (`claude`, `codex`, `opencode`) into its isolated profile in `.auth/`; mode `token` or `device`, `--profile DIR` for another folder |
+| llm | `just llm-login <provider> [mode]` | log a subscription CLI (`claude`, `codex`, `opencode`) into its isolated profile in `.auth/`; mode `token` or `device`, `--login DIR` for another folder (default `MC_<PROVIDER>_LOGIN`, else `.auth/<provider>`; `--profile` is the old name) |
 | llm | `just llm-status` | which LLM providers are logged in |
 | llm | `just llm-usage [bot] [date] [--days N]` | LLM usage from a bot's [journal](/guide/journal#llm-usage) (default `Pax`, today) |
 | llm | `just llm-eval --dry` | A/B eval of a [profile](/guide/profiles)'s [context pack](/guide/context-pack) (real providers need `--yes`) |
@@ -139,9 +139,8 @@ logging flags (any command):
 `<name>` is a profile (`profiles/<name>.yaml` or `.yml`, or a path to a YAML file) or, failing
 that, a variant (`variants/<name>.ts`, `variants/<name>/index.ts` or a path to a `.ts` file).
 `fleet` looks for `fleets/<name>.yaml`, `fleets/<name>.yml`, then treats the argument as a path.
-`--host` and `--port` override `.env` and a profile's `server:` for `run`. For `fleet` they
-only replace the environment: a profile's `server:` and the fleet's own server entries win over
-them (see [Running](/guide/running#a-fleet)). `--username`, `--owners` and `--dig` only apply to
+`--host` and `--port` override `.env`, a profile's `server:` and, for `fleet`, the fleet's own
+server entries (see [Running](/guide/running#a-fleet)). `--username`, `--owners` and `--dig` only apply to
 `run`. `list` and `actions` don't connect.
 
 ## .env

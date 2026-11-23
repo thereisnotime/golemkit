@@ -48,7 +48,7 @@ Every ask SHALL be a `help` journal event (status, behaviour, reason, goal, help
 - **THEN** no LLM turn starts, and the next turn's memory says it asked for help and should not repeat the request
 
 ### Requirement: Configuration
-The profile key `askHelp` SHALL accept true, false or an options map (enabled, failures, minutes, forgetMinutes, perReasonMinutes, maxPerHour, tell, llm, thanks, quietHours, observeMinutes), landing in settings.askHelp; an options map without `enabled: false` turns it on. It SHALL be off by default. askHelp.enabled, failures, minutes, maxPerHour, tell, thanks and llm SHALL be live toggles. The game-agnostic desk SHALL not import Minecraft packages or touch agent.bot.
+The profile key `askHelp` SHALL accept true, false or an options map (enabled, failures, minutes, forgetMinutes, perReasonMinutes, maxPerHour, tell, llm, thanks, quietHours, observeMinutes), landing in settings.askHelp; only `true` or `enabled: true` turns it on: an options map without `enabled: true` (in a profile, or built up by `!config_set askHelp.<key>` on a bot without askHelp) tunes it but leaves it off. It SHALL be off by default. askHelp.enabled, failures, minutes, maxPerHour, tell, thanks and llm SHALL be live toggles. The game-agnostic desk SHALL not import Minecraft packages or touch agent.bot.
 
 #### Scenario: Pax
 - **WHEN** profiles/pax.yaml is loaded

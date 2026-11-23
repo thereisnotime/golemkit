@@ -20,7 +20,7 @@ to one. Flags override the [profile](/guide/profiles) and the bot definition for
 | `--username`, `-u` | Minecraft username |
 | `--owners a,b` | only these players may command it |
 | `--dig` | let it break blocks (pathfinding through walls, `collect`) |
-| `--host`, `--port` | server, overriding `.env` and the profile's `server:` (in a fleet they rank lower, see below) |
+| `--host`, `--port` | server, overriding `.env`, the profile's `server:` and (in a fleet) the fleet's server entry |
 
 Logging flags (`-v`, `-q`, `-l`, `--log-format`, `--log-file`, `--log-dir`) are listed in the
 [CLI reference](/reference/cli#node-src-cli-ts). `just dev <bot>` restarts the bot when you save a file.
@@ -66,23 +66,24 @@ one-server fleets.
 Server keys: `host`, `port`, `auth`, `version`, `platform`, `staggerMs`. The top-level
 `staggerMs` (default 5000) applies to servers without their own. A top-level `logging:` block
 sets [logging](./logging#in-a-fleet-file) for the whole process. Fleet files expand `${VAR}` and
-`${VAR:-default}` like [profiles](./profiles#personal-values-from-the-environment). Unlike a
-profile, a fleet file gets no warning for keys it doesn't know; they are dropped.
+`${VAR:-default}` like [profiles](./profiles#personal-values-from-the-environment). Keys a fleet
+file doesn't know are dropped with a warning naming them (`fleets/x.yaml: unknown key
+bots[0].usrname (ignored)`), like in a profile.
 
 For a `profile:` entry, the fleet's `owners`, `canDig`, `username` and `settings` override the
 profile (`settings.llm` is merged key by key, other settings groups are replaced whole).
 
-The fleet decides where its bots connect. For each connection key, the first of these that sets
-it wins:
+The fleet decides where its bots connect, unless the command line says otherwise. For each
+connection key, the first of these that sets it wins:
 
-1. the fleet's `servers:` entry (or the single `server:` block)
-2. the profile's `server:` block, for `profile:` entries (useful for `platform` or `version`)
-3. `--host` / `--port` on the command line
+1. `--host` / `--port` on the command line (as with `run`)
+2. the fleet's `servers:` entry (or the single `server:` block)
+3. the profile's `server:` block, for `profile:` entries (useful for `platform` or `version`)
 4. the environment (`MC_HOST`, `MC_PORT`, `MC_AUTH`, `MC_VERSION`, `MC_PLATFORM`) and the defaults
 
-So `--host` only reaches bots whose server entry and profile leave `host` out; this differs
-from `run`, where the flags beat the profile. The startup line per server
-(`mc02 (host:port): McBuddy, Helper1`) shows the fleet's address, before profiles fill in.
+So `--host` sends every bot of the fleet to that host. The startup line per server
+(`mc02: mc.example.com:25565: McBuddy, Helper1`) shows the address each bot really connects to,
+after profiles and flags.
 `--username`, `--owners` and `--dig` only apply to `run`, not to fleets.
 
 ## Several servers

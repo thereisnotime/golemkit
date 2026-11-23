@@ -118,7 +118,7 @@ pickaxe, which closes the gap.
 - a torch every `torchEvery` (8) steps on the floor behind it when the spot is dark, crafted
   from coal or charcoal and a stick when it has none (`torches: false` turns it off);
 - every step checks health and hostiles: underground at `retreatBelow` (10) health or with
-  `retreatHostiles` (2) hostiles within `hostileRadius` (8), it abandons the dig, skips the drop
+  `retreatHostiles` (2) hostiles within `hostileRadius` (8, the `mining.hostileRadius` toggle), it abandons the dig, skips the drop
   sweep and walks back up the staircase it came down. Running out of air (6 of 20 or less)
   counts too.
 
@@ -150,7 +150,7 @@ settings:
 
 When `keep_tools_upgraded` (or anything else that isn't an owner) runs `upgrade_tools` and the
 next step is going for iron, coal or diamonds, that is a [trip](./behaviors#trips): it first
-takes food from its pantry and own chests up to `trips.food`, holds its best weapon and checks
+takes food from its pantry (own and configured chests near home) up to `trips.food`, holds its best weapon and checks
 its health, and stays with the reason when it can't (`would get 3 raw iron, but not ready for a
 trip (an ore trip): health 9/20 (needs 12)`). When safe mining says "not ready: food 1/3", the
 same top-up runs once and the plan is made again, so a full pantry ends that wait. On the way

@@ -950,8 +950,9 @@ The planner is pure and game-agnostic (`src/core/trip.ts`); the Minecraft side i
 `src/skills/trip.ts` and `behaviors/trip.ts`.
 
 **Before leaving** (`prepare_trip`, also an action an LLM can call): it takes food out of its
-pantry and own chests (`settings.storage.chests` and chests it placed, within 160 blocks, best
-food first) until it carries `trips.food` items (8), puts its best sword or axe in hand, and
+pantry (chests it placed and `settings.storage.chests`, within `inventoryMemory.radius` (48)
+blocks of home, the same chests the pantry-low check counts; of those only the ones within 160
+blocks of where it stands, best food first) until it carries `trips.food` items (8), puts its best sword or axe in hand, and
 checks it. With no weapon (`trips.needWeapon`, on by default), fewer than `trips.minFood` items (4) or under `trips.minHealth`
 health (12) it stays and the behaviour backs off with the reason, e.g. `not ready for a trip
 (looking for sheep 120 blocks out): no weapon, food 1 of 4 items`. Food trips don't need food
@@ -1169,7 +1170,7 @@ askHelp:
   observeMinutes: 60   # how long observe shows an ask
 ```
 
-Off by default; an options map turns it on unless it says `enabled: false`. Pax's profile turns
+Off by default; only `askHelp: true` or `enabled: true` turns it on (an options map without `enabled: true` only tunes it, and `!config_set askHelp.failures 5` on a bot without askHelp leaves it off). Pax's profile turns
 it on. `!config_set askHelp.enabled false` (and `failures`, `minutes`, `maxPerHour`, `tell`,
 `thanks`, `llm`) change it live.
 
@@ -1288,8 +1289,8 @@ looked into for `refreshMinutes`. It then runs `check_chests`: walks over, opens
 them, and updates the memory. A chest it tried is left alone for `refreshMinutes` whatever
 happened, so an unreachable one doesn't loop. It never opens anyone else's chest.
 
-**Pantry low.** After a round it adds up the food in the configured chests (its own ones when
-none is configured) from fresh memory. Below `lowFood` items it tells the owners through the
+**Pantry low.** After a round it adds up the food in the pantry (chests it placed and the
+configured ones, within the round's radius of home) from fresh memory. Below `lowFood` items it tells the owners through the
 [help desk](#asking-for-help): "pantry low: 6 bread left", by whisper to the owners online, at
 most every 6 hours (sooner only when the pantry ran out), within the help desk's hourly cap; it is
 journalled as a `help` event.

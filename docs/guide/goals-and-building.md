@@ -124,6 +124,7 @@ that waited for a fully idle body would never get a turn. The rule:
 |---|---|---|
 | `maxTurns` | 40 | goal turns allowed without hearing from the owner |
 | `timeoutMin` | 45 | minutes on its own without hearing from the owner |
+| `ownerWaitMin` | 15 | minutes to wait for an owner answer before going on alone (0 = forever) |
 | `maxSameFailures` | 3 | the same failure (action + message, numbers blanked) this often puts that action on hold for 10 min |
 | `budgetReserve` | 0.15 | share of the hourly turn/token budget kept for chat |
 | `continueDelayMs` | 1500 | gap before the next turn after progress |

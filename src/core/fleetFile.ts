@@ -13,6 +13,8 @@ import { join } from 'node:path'
 import YAML from 'yaml'
 import { z } from 'zod'
 import { serverFromEnv, expandEnv, type InstanceOptions, type ServerConfig } from './definition.ts'
+import { createLogger } from './log.ts'
+import { unknownKeys } from './schemaKeys.ts'
 
 const ServerSchema = z.object({
   host: z.string().optional(),
@@ -89,13 +91,24 @@ export interface FleetPlan {
 }
 
 /**
- * Connection settings for one fleet bot: environment (and --host/--port) < the profile's
- * `server:` < what the fleet's server entry sets. The fleet decides where its bots connect; a
- * profile only fills what the fleet leaves out (e.g. `platform` or `version`).
+ * Connection settings for one fleet bot: environment < the profile's `server:` < what the
+ * fleet's server entry sets < command-line flags (--host/--port). The fleet decides where its
+ * bots connect, a profile only fills what the fleet leaves out (e.g. `platform` or `version`),
+ * and the command line beats both, as with `run`.
  */
-export function fleetServerConfig (p: PlannedAgent, profileServer: Partial<ServerConfig> = {}): ServerConfig {
+export function fleetServerConfig (p: PlannedAgent, profileServer: Partial<ServerConfig> = {}, flags: Partial<ServerConfig> = {}): ServerConfig {
   const { staggerMs: _s, ...base } = p.serverConfig as ServerConfig & { staggerMs?: number }
-  return { ...base, ...profileServer, ...p.serverFields }
+  return { ...base, ...profileServer, ...p.serverFields, ...flags }
+}
+
+/** "a.example:25565: Pax, Helper; b.example:25566: Scout" for the bots of one fleet server. */
+export function fleetAddresses (agents: { username: string, server: ServerConfig }[]): string {
+  const by = new Map<string, string[]>()
+  for (const a of agents) {
+    const k = `${a.server.host}:${a.server.port}`
+    by.set(k, [...(by.get(k) ?? []), a.username])
+  }
+  return [...by].map(([addr, names]) => `${addr}: ${names.join(', ')}`).join('; ')
 }
 
 /** Final username and data dir once the default username (profile or variant) is known. */
@@ -109,8 +122,15 @@ export function resolveUsername (p: PlannedAgent, defUsername: string, multiServ
   }
 }
 
-export function parseFleetFile (text: string, base: ServerConfig = serverFromEnv()): FleetPlan {
-  const file = FleetFileSchema.parse(YAML.parse(expandEnv(text)))
+/** Parses a fleet file; keys the schema doesn't know are warned about (and ignored), like in profiles. */
+export function parseFleetFile (text: string, base: ServerConfig = serverFromEnv(), source = 'fleet'): FleetPlan {
+  const raw = YAML.parse(expandEnv(text))
+  const file = FleetFileSchema.parse(raw)
+  const unknown = unknownKeys(raw, FleetFileSchema)
+  if (unknown.length) {
+    const log = createLogger('golemkit/fleet')
+    for (const k of unknown) log.warn(`${source}: unknown key ${k} (ignored)`)
+  }
   const servers: FleetPlan['servers'] = {}
   const declared: Record<string, Partial<ServerConfig>> = {}
   const rawServers = file.servers ?? { default: file.server ?? {} }

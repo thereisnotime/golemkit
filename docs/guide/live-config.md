@@ -71,7 +71,8 @@ can't change their own.
 | `mining.gear` | none / shield_or_armour / armour | gear needed to be ready (default none); with shield_or_armour the first iron ingot becomes a shield |
 | `mining.minArmour` | 0–20 | armour points worn that count as armour (default 1) |
 | `mining.retreatBelow` | 0–20 | underground: abandon the dig and climb out at or below this health; separate from `reflexes.retreatBelow` (default 10, 0 = never) |
-| `mining.retreatHostiles` | 0–20 | underground: climb out when this many hostiles are within 8 blocks (default 2, 0 = never) |
+| `mining.retreatHostiles` | 0–20 | underground: climb out when this many hostiles are within `mining.hostileRadius` blocks (default 2, 0 = never) |
+| `mining.hostileRadius` | 2–32 | underground: how close a hostile counts for `mining.retreatHostiles`, in blocks (default 8) |
 | `mining.torches` | on/off | light tunnels, crafting torches from coal or charcoal and sticks (default on) |
 | `mining.torchEvery` | 1–64 | a torch every this many tunnel steps (default 8) |
 | `askHelp.enabled` | on/off | when a behaviour keeps failing the same way, tell the owners once what it was trying, why it fails and what would help ([asking for help](./behaviors#asking-for-help); default off) |
@@ -82,7 +83,7 @@ can't change their own.
 | `askHelp.thanks` | on/off | say "sorted, thanks" once when something it asked about works again (default off) |
 | `askHelp.llm` | on/off | let the LLM brain know it asked (no extra turn unless `triggers.events.stuck`; default on) |
 | `trips.enabled` | on/off | [trips](./behaviors#trips) that behaviours start: prepare (food from own chests, weapon, health) and turn back when food or daylight runs short (default on) |
-| `trips.food` | 0–64 | food items to top up to from the pantry and own chests before a trip (default 8) |
+| `trips.food` | 0–64 | food items to top up to from the pantry (own and configured chests near home) before a trip (default 8) |
 | `trips.minFood` | 0–64 | fewest food items to leave with; food trips are exempt (default 4) |
 | `trips.needWeapon` | on/off | a sword or axe is needed to leave (default on) |
 | `trips.minHealth` | 0–20 | health needed to leave (default 12) |
@@ -139,8 +140,8 @@ top-level `askHelp:` key, and the `combat.*`, `mining.*`, `trips.*` and `invento
 values under `settings:` (`settings: { combat: { pvp: defend } }`). A top-level `combat:` key
 is ignored with a warning, and so is any key under `settings.combat`, `settings.mining`,
 `settings.trips` or `settings.inventoryMemory` that is not in the table above (see
-[Profiles](./profiles#format)). An `askHelp:` map turns asking for help on unless it says
-`enabled: false`, and `inventoryMemory: true` is short for `{ enabled: true }`. See
+[Profiles](./profiles#format)). An `askHelp:` map turns asking for help on only with
+`enabled: true` (setting `askHelp.failures` and the like live doesn't turn it on either), and `inventoryMemory: true` is short for `{ enabled: true }`. See
 [Reflexes](/concepts/world#reflexes). The techniques behind the `combat.*` toggles are described
 in [Movement, protection and combat](/concepts/world#skilled-player-techniques).
 

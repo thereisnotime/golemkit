@@ -54,7 +54,11 @@ const num = (v: unknown, fb: number, min: number, max: number): number => {
   return typeof n === 'number' && Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fb
 }
 
-/** settings.askHelp: true/false or an options map. Unknown or bad values fall back to defaults. */
+/**
+ * settings.askHelp: true/false or an options map. Only `true` or `enabled: true` turns it on: a map
+ * without it (`!config_set askHelp.failures 5` on a bot that never asked) tunes it but stays off.
+ * Unknown or bad values fall back to defaults.
+ */
 export function resolveHelpOptions (settings: Record<string, unknown> | undefined): HelpOptions {
   const raw = settings?.askHelp
   if (raw === undefined || raw === null || raw === false) return { ...HELP_DEFAULTS }
@@ -65,7 +69,7 @@ export function resolveHelpOptions (settings: Record<string, unknown> | undefine
     ? [num(r.quietHours[0], 0, 0, 24), num(r.quietHours[1], 0, 0, 24)] as [number, number]
     : null
   return {
-    enabled: r.enabled !== false,
+    enabled: r.enabled === true,
     failures: Math.round(num(r.failures, HELP_DEFAULTS.failures, 1, 100)),
     minutes: num(r.minutes, HELP_DEFAULTS.minutes, 0, 1440),
     forgetMinutes: num(r.forgetMinutes, HELP_DEFAULTS.forgetMinutes, 1, 10_080),

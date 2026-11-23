@@ -18,6 +18,7 @@ import { expandEnv } from './definition.ts'
 import { LoggingSchema } from './fleetFile.ts'
 import { createLogger } from './log.ts'
 import { TOGGLES } from './toggles.ts'
+import { unknownKeys } from './schemaKeys.ts'
 
 export const LlmProfileSchema = z.object({
   provider: z.string().optional().describe('claude-subscription | codex | anthropic | opencode | openai'),
@@ -44,7 +45,8 @@ export const LlmProfileSchema = z.object({
     continueDelayMs: z.number().optional(),
     idleBaseMs: z.number().optional(),
     idleMaxMs: z.number().optional(),
-    budgetReserve: z.number().min(0).max(1).optional()
+    budgetReserve: z.number().min(0).max(1).optional(),
+    ownerWaitMin: z.number().min(0).max(1440).optional().describe('minutes to wait for an owner answer before going on alone (0 = forever)')
   }).optional().describe('persistent goals and continuation guardrails')
 }).passthrough()
 
@@ -218,42 +220,19 @@ const toggleKeys = (group: string) => new Set(TOGGLES.filter(t => t.key.startsWi
 const CHECKED_SETTINGS: Record<string, Set<string>> = { combat: toggleKeys('combat'), mining: toggleKeys('mining'), trips: toggleKeys('trips'), inventoryMemory: toggleKeys('inventoryMemory') }
 
 /**
- * Keys in `raw` that `schema` doesn't declare (zod strips them without a word), as dotted paths.
- * Records are not looked into, passthrough objects only for their declared keys, strict objects
- * not at all (zod fails on those); settings.combat and settings.mining are checked against their toggles.
+ * Keys in `raw` that `schema` doesn't declare (zod strips them without a word), as dotted paths
+ * (see unknownKeys); settings.combat, mining, trips and inventoryMemory are checked against their toggles.
  */
-export function unknownProfileKeys (raw: unknown, schema: z.ZodType = ProfileSchema, path = ''): string[] {
+export function unknownProfileKeys (raw: unknown, schema: z.ZodType = ProfileSchema): string[] {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
-  const def = (schema as any)._zod.def
-  switch (def.type) {
-    case 'optional': case 'nullable': case 'default': case 'readonly':
-      return unknownProfileKeys(raw, def.innerType, path)
-    case 'union': {
-      const objs = (def.options as z.ZodType[]).filter(o => ['object', 'optional', 'nullable'].includes((o as any)._zod.def.type))
-      return objs.length === 1 ? unknownProfileKeys(raw, objs[0]!, path) : []
+  const out = unknownKeys(raw, schema)
+  for (const [group, keys] of Object.entries(CHECKED_SETTINGS)) {
+    const sub = (raw as { settings?: Record<string, unknown> }).settings?.[group]
+    if (sub && typeof sub === 'object' && !Array.isArray(sub)) {
+      out.push(...Object.keys(sub).filter(k => !keys.has(k)).map(k => `settings.${group}.${k}`))
     }
-    case 'object': {
-      const catchall = def.catchall?._zod.def.type
-      if (catchall === 'never') return []   // strict: zod reports unknown keys itself
-      const out: string[] = []
-      for (const [k, v] of Object.entries(raw)) {
-        const key = path ? `${path}.${k}` : k
-        if (!(k in def.shape)) { if (!catchall) out.push(key) }   // passthrough objects take any key
-        else out.push(...unknownProfileKeys(v, def.shape[k], key))
-      }
-      if (path === '') {
-        for (const [group, keys] of Object.entries(CHECKED_SETTINGS)) {
-          const sub = (raw as { settings?: Record<string, unknown> }).settings?.[group]
-          if (sub && typeof sub === 'object' && !Array.isArray(sub)) {
-            out.push(...Object.keys(sub).filter(k => !keys.has(k)).map(k => `settings.${group}.${k}`))
-          }
-        }
-      }
-      return out
-    }
-    default:
-      return []
   }
+  return out
 }
 
 export function parseProfile (text: string, name = 'profile', file = '(inline)'): LoadedProfile {
@@ -263,6 +242,9 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (unknown.length) {
     const log = createLogger('golemkit/profile')
     for (const k of unknown) log.warn(`${file === '(inline)' ? name : file}: unknown key ${k} (ignored)${HINTS[k] ? `; ${HINTS[k]}` : ''}`)
+  }
+  if (profile.askHelp && typeof profile.askHelp === 'object' && profile.askHelp.enabled === undefined) {
+    createLogger('golemkit/profile').warn(`${file === '(inline)' ? name : file}: askHelp has options but no enabled: true, so asking for help stays off`)
   }
   const settings: Record<string, unknown> = { ...profile.settings }
   if (profile.respectBuilds !== undefined) settings.respectBuilds = profile.respectBuilds
