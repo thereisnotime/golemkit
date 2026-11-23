@@ -10,12 +10,14 @@ blocks, chat, actions, players, places, connections and LLM usage. Facts are wri
 JSON lines, rolled up per hour and day, pruned after a while, and can be queried from code,
 from chat (`!last_death`) and by an LLM bot (the same actions are tools).
 
-Recording is in core, so every bot gets it whatever brains it runs. The actions that read the
+Storage, rollups and queries are in core (`src/core/journal/`); the Minecraft adapter feeds it
+from agent and Mineflayer events (`src/adapters/minecraft-java/journal-capture.ts`) as soon as
+it attaches to an agent, so every bot records whatever brains it runs. The actions that read the
 journal come with the `journal` skill, which is part of `standardSkills()`.
 
 ```mermaid
 flowchart TD
-  subgraph cap["Capture (core, every bot)"]
+  subgraph cap["Capture (adapter, every bot)"]
     BOT["mineflayer events<br/>death · health · inventory<br/>dig · place · players"]
     AG["agent events<br/>actions · chat · LLM usage<br/>protected areas · goals"]
   end
@@ -67,6 +69,7 @@ coordinates).
 | `protected_area` | the server refused a block break and the area is now avoided | |
 | `food_spot` | `find_food` / `keep_fed` saw huntable animals, a village farm or water to farm by (also kept as places `food:animals`, `food:village_farm`, `food:water`) | `kind`, `count`, `animals` |
 | `farm_started` | `start_farm` planted a new farm (also a place `farm:<n>`) | `name`, `size`, `crop`, `tilled`, `planted` |
+| `found` | a [search](/guide/search) (`find_target`, `search`) found what it was looking for (also a place `found:<target>`) | `target`, `what`, `count`, `how`, `note` |
 | `connect` / `disconnect` | each session | `server`, `gameMode` / `reason` (kick text when kicked) |
 | `llm_turn` | after every LLM turn | `provider`, `model`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `toolCalls`, `ms`, `ok`, `trigger` if the brain reports one |
 | `journal_dropped` | a type went over its per-minute cap | `type`, `count` |
@@ -86,6 +89,10 @@ are skipped by default; failures are kept. Set `journal.actions.includeStatus: t
 them all, or `journal.actions.skip` to drop specific ones.
 
 ## Files
+
+The journal lives in the bot's data directory: `data/bots/<username>/`, or
+`data/bots/<server>/<username>/` when a [fleet](./running#several-servers) runs the same
+username on several servers.
 
 ```
 data/bots/<username>/journal/
@@ -150,7 +157,7 @@ The journal skill's actions are chat commands and LLM tools like every other act
 
 | action | |
 |---|---|
-| `recall_events` (`!events`) | recent events, filtered: `type` (`death`, `chat`, `items`, `blocks`, `players`, `combat`, `connections`, `food` or any type), `since` (`30m`, `1h`, `today`, `yesterday`, `2026-11-20`; default 24 h), `player`, `near` (`"x y z"` or `"x z"`, optional radius), `text`, `limit`, `fleet` |
+| `recall_events` (`!events`) | recent events, filtered: `type` (`death`, `chat`, `items`, `blocks`, `players`, `actions`, `places`, `combat`, `connections`, `food`, `llm` or any type), `since` (`30m`, `1h`, `today`, `yesterday`, `2026-11-20`; default 24 h), `player`, `near` (`"x y z"` or `"x z"`, optional radius), `text`, `limit`, `fleet` |
 | `last_death` (`!death`) | where, when, what killed it, what it was doing, what it lost and whether the drops may still be there (items despawn 5 minutes after death) |
 | `history` (`!summary`) | a summary of `today`, `yesterday`, a date, `3h`, or hours today like `10-12` |
 | `goto_death` | walk back to the last death position and pick up the drops (exclusive, long-running) |

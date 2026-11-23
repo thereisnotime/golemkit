@@ -38,7 +38,8 @@ Loggers are hierarchical, `<username>/<component>/...`:
 | `McBuddy/action/<name>` | logs written by an action itself (`ctx.log`) |
 | `McBuddy/chat` | chat in (`<Steve> hi`), whispers, and what the bot says (`> hello`) |
 | `McBuddy/server` | system messages: joins, deaths, advancements (debug) |
-| `McBuddy/neoforge` | handshake, channel learning (debug), skipped packets (trace) |
+| `McBuddy/neoforge` | server platform: handshake, channel learning (debug), skipped packets (trace); the name stays `neoforge` with `MC_PLATFORM=vanilla` or `paper` |
+| `McBuddy/journal` | the [event journal](./journal): write and rollup failures, retention, summaries |
 | `McBuddy/<brain>` | brains log under their own name (e.g. `McBuddy/npc`) |
 | `fleet` | fleet messages between bots (debug) |
 | `golemkit` | CLI and process-level messages |
@@ -103,7 +104,11 @@ logging:
   maxSizeMb: 50
 ```
 
-Precedence: environment → [fleet file](/guide/running#a-fleet) → CLI flags.
+Precedence: environment, then the [fleet file](/guide/running#a-fleet) `logging:` block (or a
+[profile](./profiles)'s `logging:` when it runs on its own), then CLI flags.
+
+`MC_LOG_*` in `.env` only take effect when Node is started with `--env-file-if-exists=.env`,
+as the just recipes do; see [.env](/reference/cli#env).
 
 ## CLI flags
 
@@ -132,8 +137,8 @@ in pretty/plain and stay structured in JSON.
 
 ## Secrets
 
-Values of environment variables whose names end in `KEY`, `TOKEN`, `SECRET` or `PASSWORD` are
-replaced with `***` in every output, console and files.
+Values (8 characters or longer) of environment variables whose names end in `KEY`, `TOKEN`,
+`SECRET` or `PASSWORD` are replaced with `***` in every output, console and files.
 
 ## Crashes
 
