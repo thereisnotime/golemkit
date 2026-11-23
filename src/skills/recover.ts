@@ -6,7 +6,8 @@
 // behaviour runs it right after a respawn. Decisions are pure in recoverPlan.ts.
 import type { Bot } from 'mineflayer'
 import { defineSkill, defineAction, z, ok, fail, travel, isHostile, checkAborted, fmtPos, itemName, type Agent, type ActionResult } from '../core/index.ts'
-import { pickupNearby } from './pickup.ts'
+import { pickupNearby, droppedItemName } from './pickup.ts'
+import { vec } from './world.ts'
 import { equipGear } from './gear.ts'
 import { equipBestWeapon } from './combat.ts'
 import { gearNow } from './ranged.ts'
@@ -30,6 +31,9 @@ interface RecoverState {
 }
 
 const states = new WeakMap<Agent, RecoverState>()
+/** Longest pickup round at the spot: drops it can't reach in this time stay behind. */
+const PICKUP_MS = 90_000
+const GEAR = /_(sword|axe|pickaxe|shovel|hoe|helmet|chestplate|leggings|boots)$|^(shield|bow|crossbow|trident|totem_of_undying)$/
 
 function state (agent: Agent): RecoverState {
   let s = states.get(agent)
@@ -145,7 +149,8 @@ export function markHandled (d: OwnDeath, why: string): void {
 function waterAbove (bot: Bot, at: Pos3): number | null {
   let n = 0
   for (let dy = 0; dy < 40; dy++) {
-    const b = bot.blockAt?.({ x: at.x, y: at.y + dy, z: at.z } as any)
+    let b: ReturnType<Bot['blockAt']> = null
+    try { b = bot.blockAt(vec(bot, at.x, at.y + dy, at.z)) } catch { return null }
     if (!b) return dy === 0 ? null : n
     if (b.name !== 'water' && b.name !== 'bubble_column' && !(b as { getProperties?: () => any }).getProperties?.()?.waterlogged) return n
     n++
@@ -211,14 +216,22 @@ export async function recoverTrip (agent: Agent, bot: Bot, d: OwnDeath, signal: 
       checkAborted(signal)
       if (!why && dist3(bot.entity.position, at) > radius) why = `couldn't get there: ${(e as Error).message}`
     }
-    for (let round = 0; round < 3 && !why; round++) {
-      checkAborted(signal)
-      if (bot.inventory.emptySlotCount() === 0) break
-      const any = bot.nearestEntity(e => e.name === 'item' && e.position.distanceTo(bot.entity.position) <= radius)
-      if (!any) break
-      try {
-        await pickupNearby(bot, trip, { radius, maxMs: Math.max(5000, Math.min(30_000, deadline - Date.now())) })
-      } catch { checkAborted(signal) }
+    // its own things first (tools and armour lead the list), then whatever else lies there
+    const names = [...new Set(d.lost.map(i => i.name))].sort((a, b) => Number(!GEAR.test(a)) - Number(!GEAR.test(b)))
+    const pickupUntil = Math.min(deadline, Date.now() + PICKUP_MS)
+    // drops scatter and drift (out of a pit, down a slope, in water): a second round looks further out from the spot
+    for (const r of [radius, radius + 8]) {
+      for (const item of [...names, undefined]) {
+        if (why || Date.now() > pickupUntil) break
+        checkAborted(signal)
+        if (bot.inventory.emptySlotCount() === 0) break
+        const there = bot.nearestEntity(e => e.name === 'item' && dist3(e.position, at) <= r && (!item || droppedItemName(e) === item))
+        if (!there) continue
+        try {
+          const reach = Math.min(32, Math.max(radius, Math.ceil(there.position.distanceTo(bot.entity.position)) + 2))
+          await pickupNearby(bot, trip, { radius: reach, ...(item ? { item } : {}), maxMs: Math.max(3000, Math.min(15_000, pickupUntil - Date.now())) })
+        } catch { checkAborted(signal) }
+      }
     }
   } finally {
     clearInterval(timer)

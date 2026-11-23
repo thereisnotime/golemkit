@@ -75,7 +75,7 @@ export const recoverDrops = defineBehavior({
       } else if (dec.do === 'wait') {
         waitUntil = now + dec.retryMs
         if (dec.why !== lastWhy) log.info(`recover_drops: waiting: ${dec.why}`)
-      }
+      } else log.debug(`recover_drops: going back: ${dec.why}`)
       lastWhy = dec.why
       return { d, dec }
     }
