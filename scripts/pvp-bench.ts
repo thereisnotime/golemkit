@@ -3,6 +3,7 @@
 // pvp-fight.ts) and the other the old fight loop (fightTarget, tactics off), or both the same.
 //   node scripts/pvp-bench.ts [x z] [--rounds 6] [--match new-old|mirror|old-old] [--kit iron|diamond]
 //        [--no-bow] [--totem] [--apples 2] [--round-s 120] [--radius 14] [--tag run] [--scout] [--cleanup] [--force]
+//        [--commands]   (owner commands over whispers instead of duels)
 // The DIRECTOR (default ClaudeTest, an op) only uses /tp, /give, /clear, /effect, /kill (drops),
 // /spawnpoint and /gamemode on the test accounts; never gamerules or time. Before logging in it
 // pings the server and stops if the director is online already; before every round it checks
