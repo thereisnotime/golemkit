@@ -142,8 +142,8 @@ export function startFor (x: number, z: number, rep: number, seed: number, sprea
 // ---- the test bot's profile ----
 
 /**
- * A profile's settings made safe for a test bot far from home: owners become the director (help
- * whispers go there, not to the real owner), follow_owner and bodyguard are off, no trips to
+ * A profile's settings made safe for a test bot far from home (the script sets its owner to a
+ * test account, so help whispers never reach the real owner): follow_owner and bodyguard are off, no trips to
  * configured farms, chests or the village (foodPlaces, settings.storage), no public chat from
  * keep_spawn_bed asking players to sleep or from idle_antics, no context pack (it would share the
  * real bot's MEMORY.md and hooks), and no LLM settings unless `llm` is kept.
@@ -198,6 +198,7 @@ export const METRICS: [string, string, boolean | null][] = [
   ['failures', 'failures', false],
   ['stuckLoopCount', 'stuck loops', false],
   ['distance', 'distance', null],
+  ['helpAsks', 'help asks', false],
   ['whispers', 'whispers', null],
   ['disconnects', 'disconnects', false]
 ]

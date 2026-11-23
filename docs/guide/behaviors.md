@@ -1179,8 +1179,9 @@ or chests) and its home at the start, and runs for `--days` x 20 real minutes. T
 and the gamerules are never touched: the in-game time at start and end is recorded instead, so
 a run that starts at dusk is a harder run.
 
-The profile is adapted for a test bot: its owner is the director (so any help whispers go there,
-not to you), `follow_owner` and `bodyguard` are off, `keep_fed` has no `foodPlaces` and there is
+The profile is adapted for a test bot: its owner is SurviveOwner, a second test account parked
+in spectator mode 40 blocks above the start for the run (help asks and whispers go there, not to
+you or to public chat; asks are only sent when an owner is online), `follow_owner` and `bodyguard` are off, `keep_fed` has no `foodPlaces` and there is
 no `settings.storage` (no trips to the village or to Pax's pantry), `keep_spawn_bed` doesn't ask
 players to sleep and `idle_antics` doesn't chat, and no context pack is loaded (it would share
 Pax's MEMORY.md and hooks). `--llm` keeps the profile's LLM brain (its own variant and login).
@@ -1201,7 +1202,7 @@ bread; iron: iron tools, shield, iron armour and 16 bread), `--repeats N` (1), `
 (0: every repeat starts at the same spot; R > 0: repeats after the first start at a point R
 blocks away picked by `--seed`), `--seed` (1), `--profile name` (pax), `--llm`, `--tag`,
 `--terrain-note "text"` (free text stored with the run), `--stuck N` (5: a failure seen more
-than N times is a stuck loop). Accounts come from `SURVIVAL_BOT` and `DIRECTOR`, the data
+than N times is a stuck loop). Accounts come from `SURVIVAL_BOT`, `SURVIVAL_OWNER` and `DIRECTOR`, the data
 directory from `SURVIVAL_BENCH_DIR` (`data/survival-bench`). Ctrl-C ends the run early and
 still cleans up.
 
@@ -1230,6 +1231,7 @@ store stay in `data/survival-bench/runs/<time>-<tag>-<n>/`). What the columns me
 | failures, failuresBy | failed actions, by caller and action (`behaviors:find_food`) |
 | stuckLoops | the same failure, numbers folded, more than `--stuck` times: a behaviour retrying something that won't work |
 | distance, maxFromStart, minY | blocks walked (sampled every 2 s, teleports left out), farthest from the start, lowest y |
+| helpAsks, helpReasons, ownerHeard | [help asks](#asking-for-help) it sent (journal `help` events) and why; lines the owner account received |
 | whispers, chatLines, said | whispers and public lines it sent, the first 20 of them |
 | disconnects, maxLagS | sessions lost during the run (kicks, timeouts), and the longest event-loop stall |
 | playersNear | other players it saw within 200 blocks (a run with company isn't a clean run) |

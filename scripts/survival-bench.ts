@@ -12,7 +12,9 @@
 // blocks from the world spawn, the fortress, the village and every online player, finds the
 // surface near --start, then with the bot online but brainless: survival mode, clears its
 // inventory, full health and food, teleports it there, sets its spawnpoint there (deaths respawn
-// at the start, not at world spawn), and gives --kit. The bot then runs with a fresh data dir
+// at the start, not at world spawn), and gives --kit. SurviveOwner, a second test account, is the
+// bot's owner for the run: parked in spectator mode 40 blocks above the start, so help asks and
+// whispers reach it instead of public chat or the real owner. The bot then runs with a fresh data dir
 // (no remembered places, trees or chests), home set at the start, for --days x 20 real minutes.
 // Nothing changes the time or gamerules: the in-game time at start and end is recorded.
 // Afterwards the director removes the blocks the bot placed (exact positions, noted as it placed
@@ -51,6 +53,8 @@ const STUCK = Number(opt('stuck', '5'))
 
 const BOT = process.env.SURVIVAL_BOT || 'SurviveTest'
 const DIRECTOR = process.env.DIRECTOR || 'ClaudeTest'
+/** The bot's owner during the run: online (spectator, above the start) so help asks and whispers go to it, not to public chat. */
+const OWNER = process.env.SURVIVAL_OWNER || 'SurviveOwner'
 const DATA = process.env.SURVIVAL_BENCH_DIR || 'data/survival-bench'
 const RESULTS = join(DATA, 'results.jsonl')
 const PENDING = join(DATA, 'pending-cleanup.json')
@@ -105,7 +109,11 @@ async function waitDirectorFree (watcher: Agent, maxMin = 30): Promise<void> {
   const until = Date.now() + maxMin * 60_000
   let said = false
   while (Date.now() < until) {
-    if (!watcher.bot?.players?.[DIRECTOR]) return
+    if (!watcher.bot?.players?.[DIRECTOR]) {
+      // another script may be about to log in too: look again after a random pause
+      await pause(2000 + Math.random() * 6000)
+      if (!watcher.bot?.players?.[DIRECTOR]) return
+    }
     if (!said) { log(`${DIRECTOR} is online (another script?), waiting for it to leave`); said = true }
     await pause(15_000)
   }
@@ -124,8 +132,14 @@ async function director (): Promise<Director> {
       if (/Unknown|Incorrect|Expected|Could not|^Unable/i.test(m)) log(`server: ${m}`)
     })
   })
+  let lost = false
+  agent.on('sessionEnd', reason => { lost = true; log(`${DIRECTOR} lost its session: ${reason}`) })
   await connect(agent)
-  const cmd = async (c: string) => { const ok = await agent.command(c); if (!ok) log(`command refused: ${c}`); await pause(250) }
+  // kicked (someone else logged in as the director): stop here; the pending clean-up stays for the next try
+  const cmd = async (c: string) => {
+    if (lost) throw new Error(`${DIRECTOR} was disconnected (another login?)`)
+    const ok = await agent.command(c); if (!ok) log(`command refused: ${c}`); await pause(250)
+  }
   const ask = async (c: string, re: RegExp) => {
     replies.length = 0
     await cmd(c)
@@ -262,6 +276,10 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
   // the bot online without brains while it is set up, so it doesn't act before it is at the start
   const watcher = new Agent(brainless, server, { username: BOT, dataDir: join(DATA, 'watcher') })
   await connect(watcher)
+  const owner = new Agent(brainless, server, { username: OWNER, dataDir: join(DATA, 'owner') })
+  const heard: string[] = []
+  owner.on('chat', m => { if (m.from === BOT) { heard.push(m.message); log(`${OWNER} heard${m.whisper ? ' (whisper)' : ''}: ${m.message}`) } })
+  await connect(owner)
   await waitDirectorFree(watcher)
   let d = await director()
   let start: { x: number, y: number, z: number }
@@ -270,7 +288,7 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
     // players: everyone online but the bench accounts must be 300+ blocks from the start
     const players: { name: string, distance: number | null }[] = []
     for (const name of Object.keys(d.agent.bot.players)) {
-      if (name === DIRECTOR || name === BOT) continue
+      if (name === DIRECTOR || name === BOT || name === OWNER) continue
       const p = await playerPos(d, name)
       const distance = p && /overworld/.test(p.dim) ? Math.round(Math.hypot(p.x - wantX, p.z - wantZ)) : null
       players.push({ name, distance })
@@ -296,10 +314,13 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
     await d.cmd(`/effect give ${BOT} minecraft:saturation 2 10`)
     await d.cmd(`/spawnpoint ${BOT} ${start.x} ${start.y} ${start.z}`)
     for (const k of KITS[KIT] ?? []) { const [item, n] = k.split(' '); await d.cmd(`/give ${BOT} minecraft:${item} ${n ?? 1}`) }
+    await d.cmd(`/gamemode spectator ${OWNER}`)
+    await d.cmd(`/tp ${OWNER} ${start.x + 0.5} ${start.y + 40} ${start.z + 0.5}`)
     await pause(3000)
     await d.cmd(`/tp ${DIRECTOR} ${start.x + 0.5} ${start.y + 60} ${start.z + 0.5}`)
   } catch (e) {
     await watcher.stop().catch(() => {})
+    await owner.stop().catch(() => {})
     throw e
   } finally {
     await d.stop() // offline during the run: the account is shared
@@ -314,7 +335,7 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
   const runDir = join(DATA, 'runs', `${new Date().toISOString().replace(/[:.]/g, '-')}-${RUN_TAG}-${rep + 1}`)
   mkdirSync(runDir, { recursive: true })
   const { def, settings, canDig } = await botDefinition()
-  const agent = new Agent(def, server, { username: BOT, dataDir: runDir, owners: [DIRECTOR], canDig, settings })
+  const agent = new Agent(def, server, { username: BOT, dataDir: runDir, owners: [OWNER], canDig, settings })
   setHome(agent, { x: start.x, y: start.y, z: start.z })
 
   const vitalsS: VitalSample[] = []
@@ -353,7 +374,7 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
       const at = Date.now()
       deathsAt.push(at)
       life++
-      const p = b.entity?.position
+      const p = b.entity?.position?.clone()
       if (p) pending.deaths.push([Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)])
       savePending(pending)
       setTimeout(() => {
@@ -405,7 +426,7 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
       if (alive) { path.push({ x: p.x, z: p.z, life }); minY = Math.min(minY, Math.floor(p.y)) }
       tierMax = Math.max(tierMax, toolTier(b.inventory.items().map((i: any) => i.name)))
       for (const [name, pl] of Object.entries(b.players as Record<string, any>)) {
-        if (name === BOT || name === DIRECTOR || !pl.entity) continue
+        if (name === BOT || name === DIRECTOR || name === OWNER || !pl.entity) continue
         const dist = Math.round(pl.entity.position.distanceTo(p))
         playersNear[name] = Math.min(playersNear[name] ?? Infinity, dist)
       }
@@ -424,6 +445,7 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
   measuring = false
   savePending(pending)
   await agent.stop().catch(() => {})
+  await owner.stop().catch(() => {})
   await pause(3000)
 
   // the journal: what it gathered, its own death records and placed counts
@@ -435,6 +457,8 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
   const broken: Record<string, number> = {}
   for (const e of inRun.filter(e => e.type === 'block_broken')) for (const [n, c] of Object.entries(e.data.blocks as Record<string, number>)) broken[n] = (broken[n] ?? 0) + c
   const journalDeaths = inRun.filter(e => e.type === 'death')
+  // help asks (npc askHelp, keep_fed when starving): recorded whether or not an owner was online to get them
+  const helpAsks = inRun.filter(e => e.type === 'help' && e.data.status !== 'sorted').map(e => `${e.data.behavior ?? '?'}: ${e.data.reason ?? e.data.text ?? ''}`.slice(0, 160))
   for (let i = 0; i < deathCauses.length; i++) if (deathCauses[i]!.cause === 'unknown' && journalDeaths[i]?.data.cause) deathCauses[i]!.cause = journalDeaths[i].data.cause
 
   // spawn point and clean-up (the director comes back)
@@ -462,6 +486,8 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
     failures: failures.length, failuresBy, stuckLoops: loops,
     distance: Math.round(pathLength(path)), maxFromStart: Math.round(Math.max(0, ...path.map(p => Math.hypot(p.x - start.x, p.z - start.z)))), minY,
     disconnects: kicks, maxLagS: Math.round(maxLagMs / 100) / 10,
+    helpAsks: helpAsks.length, helpReasons: helpAsks.slice(0, 10),
+    ownerHeard: heard.length,
     whispers: whispers.length, chatLines: chatOut.length - whispers.length, said: chatOut.slice(0, 20).map(m => (m.to ? `(w ${m.to}) ` : '') + m.message),
     playersNear: Object.fromEntries(Object.entries(playersNear).filter(([, dist]) => dist < 200)),
     placed: Object.keys(pending.placed).length, placedJournal, removed: clean.removed, placedGone: clean.gone, notRemoved: clean.changed,
