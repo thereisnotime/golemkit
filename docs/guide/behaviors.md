@@ -962,6 +962,59 @@ behaviors:
 LLM or a player uses it directly; `stay=true` keeps the bot in bed until the morning.
 `observe()` shows `respawnPoint` once it is known.
 
+## Death drops: recover_drops
+
+Pax used to lose its whole kit on every death. `recover_drops` goes back for it. In vanilla
+everything the bot carried drops where it died and despawns 6000 ticks (5 minutes) later;
+lava and the void destroy it at once. The `recovery` skill keeps a snapshot of what the bot
+carries (armour and offhand included: the server empties the inventory just before the death
+event) and records each death: position, dimension, the hostiles within 8 blocks by type and
+count, day or night, and whether the spot had open sky. The cause, killer and recent damage
+come from the [death report](/guide/journal) (`deathCause`).
+
+Right after the respawn (once the report is in), the pure `recoverDecision`
+(`src/skills/recoverPlan.ts`) answers go, wait or skip, checking in this order:
+
+| check | result |
+|---|---|
+| nothing carried, or the inventory came back (keepInventory) | skip |
+| died in lava (or lava was the last damage), in the void or below the world | skip, the drops are gone |
+| died in another dimension than the respawn (Nether, End) | skip |
+| more than `maxWaterDepth` water above the spot (when the chunk is loaded) | skip |
+| farther than `maxDistance`, or the walk (distance x 1.3 at 4.3 blocks/s) plus `marginSeconds` is longer than the time left | skip |
+| killed by a player who is online (`avoidPlayerKillers`) | skip |
+| the mobs at the spot need more gear than it has | wait, or skip when there is no time left to wait |
+| night, gear under `nightGear` and farther than `nightMaxDistance` | wait, or skip |
+
+The mobs to expect are what the bot sees at the spot now when it is within 48 blocks, else the
+report's hostiles plus the killer (a creeper that blew it up is gone). They count as threat
+points: zombie 1, skeleton and creeper 1.5, witch and enderman 2, vindicator 2.5, piglin brute
+4; a warden, ravager, evoker or wither is never worth it. Undead under open sky count a quarter
+by day (they burn); night adds a point for fresh spawns. Up to `freeThreat` (1) is fine with any
+gear; above that it needs a gear score (`gearScore` from ranged safety: 15 naked at full health,
+about 72 in iron with a shield and a sword) of 15 + `gearPerThreat` (12) per point. So a bot
+killed by 3 skeletons in a cave (4.5 points, 69 needed) waits while it is naked and goes in
+iron.
+
+On go it runs `recover_items` at score 72: above chores, food and stay_safe's night trip home
+(70), below water (78), mobs (80) and low health (88+), so it starts right after the respawn.
+The trip sprints there in legs (`travel`) and gives up when the drops would despawn before it
+arrives, at `giveUpHealth` or less, or when the mobs around the spot (within 24 blocks of it)
+need more gear than it has. It picks up its own things within `radius` (tools and armour first,
+then the rest, then anything else lying there; a second round 8 blocks further out for drops
+that scattered or drifted; 90 seconds at most), wears the best armour, takes the best weapon in hand, goes home and tells the owner:
+"got back 23 of 31 items: stone sword, 20 cobblestone, ...; still missing iron pickaxe". A
+skip is told too ("lost 31 items where I died: my things burned in lava"). One recovery per
+death: a trip cut short by a fight or a danger can start again (three trips at most) while the
+decision still says go.
+
+Without the behaviour, `!recover_items` (or the LLM) does the same trip on request;
+`force=true` goes even when it looks too dangerous or too far, never for drops that are gone.
+observe shows `myDrops` (items, where, seconds left) until the trip is done.
+
+Item ages only advance while a player keeps the chunk loaded, so the 5 minutes are the worst
+case; the decision assumes them.
+
 ## Asking for help
 
 A behaviour that keeps failing only backs off longer (60 s doubling to 15 min for the chores)
@@ -1189,6 +1242,27 @@ Looks after food on its own, climbing a ladder when hungry (or hurt and too hung
 | `foodPlaces` | list | `[]` | known farms and villages to go to for food (preferred over the far search rings) |
 | `breed` | boolean | `true` | breed animals near home between meals when it has their food (wheat: cows, sheep; seeds: chickens; carrots: pigs) |
 | `report` | boolean | `true` | when food is critical (6 or less) or every ring came up empty and nothing works, whisper the owner how far it looked and what would help (at most once an hour) |
+
+### `recover_drops`
+
+*survival · priority behavior (35) · needs `recover_items` · uses `go_home` when present*
+
+After a death, goes back for the dropped things before they despawn (5 minutes): only when they can still be had (not lava, void, deep water or another dimension, close enough for the time left at walking speed) and the spot is safe enough for its gear (the killer and the hostiles reported there; night counts). Waits while it isn't, gives up when the despawn gets close, it gets hurt badly or the spot is a danger zone; picks the items up, puts armour and weapon back on, goes home and says what came back ("got back 23 of 31 items: stone sword, ..."). Once per death, right after the respawn, below immediate safety.
+
+| option | type | default | description |
+|---|---|---|---|
+| `maxDistance` | number (16..2000) | `400` | farthest death spot worth a trip, in blocks |
+| `marginSeconds` | number (5..120) | `30` | seconds to have left on arrival for picking up (walking speed estimate) |
+| `giveUpHealth` | number (0..19) | `8` | turn back at or below this health |
+| `nightMaxDistance` | number (0..2000) | `48` | at night with poor gear, only spots this close |
+| `nightGear` | number (0..100) | `40` | gear score (15 naked, about 72 in iron with shield and sword) from which night trips are fine |
+| `freeThreat` | number (0..10) | `1` | threat points (zombie 1, skeleton 1.5, witch 2) fine with any gear |
+| `gearPerThreat` | number (0..50) | `12` | gear score needed per threat point above that |
+| `avoidPlayerKillers` | boolean | `true` | don't go back where a player killed it |
+| `maxWaterDepth` | number (0..64) | `8` | more water than this above the spot: give up |
+| `radius` | number (2..24) | `10` | pick up drops this close to the spot |
+| `goHome` | boolean | `true` | go home afterwards |
+| `announce` | boolean | `true` | tell the owner what came back (or why not) |
 
 ### `bodyguard`
 

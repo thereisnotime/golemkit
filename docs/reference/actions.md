@@ -10,7 +10,7 @@ scopeNote: "Generated from the skills: most are Minecraft; the journal and confi
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-27 skills, 113 actions.
+28 skills, 114 actions.
 
 ## blueprint-library
 
@@ -960,6 +960,23 @@ Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines
 | `kinds` | array |  |  | tool kinds to upgrade; default pickaxe, axe, shovel, sword |
 | `prospect` | boolean |  | `true` | when no iron ore is in sight, dig a staircase and strip mine to look for some |
 | `safe` | boolean |  | `true` | safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground |
+
+## recovery
+
+Getting your own things back after a death (recover_items).
+
+### `recover_items`
+
+After your own death: walk back to where you died, pick up your dropped things before they despawn (5 minutes), put the armour and weapon back on, and say what came back ("got back 23 of 31 items: stone sword, ..."). Refuses when the drops are lost (lava, void, another dimension, too far for the time left) or the spot is too dangerous; force=true goes anyway.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `force` | boolean |  | `false` | go even when it looks too dangerous or too far |
+| `give_up_health` | number (0..19) |  | `8` | turn back at or below this health |
+| `radius` | number (2..24) |  | `10` | pick up drops this close to the spot |
+| `max_distance` | number (16..2000) |  |  | farthest death spot worth a trip (default 400) |
 
 ## roads
 

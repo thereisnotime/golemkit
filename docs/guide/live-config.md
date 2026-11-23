@@ -126,6 +126,9 @@ change how long it lies in bed at night and whether it asks the others to sleep
 ([respawn point](./behaviors#respawn-point-keep-spawn-bed)), or `!behavior_configure light_home target=4 maxTorches=24`
 to change how bright it keeps home and its farms and how many torches it puts down a run
 ([spawn-proofing](./behaviors#spawn-proofing-light-home)).
+`!behavior_configure recover_drops maxDistance=200 giveUpHealth=10` changes how far it goes
+back for its things after a death and when it turns back, `!behavior_disarm recover_drops`
+turns it off ([death drops](./behaviors#death-drops-recover-drops)).
 
 ## How it works
 
