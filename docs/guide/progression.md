@@ -13,9 +13,14 @@ it took and what was left behind.
 
 ```mermaid
 flowchart TD
-  START(["empty inventory"]) --> LOGS["fell a tree<br/>logs → planks, sticks"]
+  START(["empty inventory"]) --> CHEST["logs or planks<br/>from its own chests"]
+  CHEST -->|none| LOGS["fell a tree<br/>logs → planks, sticks"]
+  CHEST --> WP
+  LOGS -->|"no tree in 32"| NEED(["wood need:<br/>chop_wood_loop<br/>searches wider"])
   LOGS --> WP["wooden pickaxe<br/>(+ crafting table)"]
-  WP --> COB["mine cobblestone<br/>3 per pickaxe/axe,<br/>1 shovel, 2 sword"]
+  WP --> SW["wooden sword<br/>(no cobblestone yet,<br/>wood to spare)"]
+  WP --> COB
+  SW --> COB["mine cobblestone<br/>3 per pickaxe/axe,<br/>1 shovel, 2 sword"]
   COB --> STONE["stone tools"]
   STONE --> FURN["furnace<br/>8 cobblestone"]
   STONE --> ORE{"iron ore seen?"}
@@ -36,7 +41,8 @@ flowchart TD
   classDef vari fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef inst fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
   class START,STOPS,STOPI cmd
-  class LOGS,WP,COB,STONE prof
+  class LOGS,WP,COB,STONE,CHEST,SW prof
+  class NEED inst
   class FURN,RAW,SMELT,PLANKS,CHAR,IRON vari
   class ORE,FUEL,DIA,DT inst
 ```
@@ -46,6 +52,29 @@ in `src/skills/progression.ts`. It returns one step (`craft`, `gather`, `craft_f
 `smelt`, `creative_get`) or nothing, and is unit tested. A step it can't do (no iron ore seen)
 ends the plan, so the bot stops at the best tier it can reach and says so. In creative mode it
 takes the tools with `creative_get` and never gathers.
+
+Tool kinds go pickaxe, sword, axe, shovel at every tier: combat (the techniques, `defend`,
+bodyguard) assumes a sword, so the stone sword comes right after the stone pickaxe, and a bot
+with no sword and no cobblestone makes a wooden one first when the wood also covers the sticks
+for every stone tool still to come.
+
+### Short of wood
+
+Recipes take planks of one kind: two spruce planks make sticks, one oak and one spruce plank
+make nothing. The planner counts wood that way (`usablePlankUnits`: a lone plank of a kind no
+log in the inventory turns into counts for nothing), and `ensureSticks` / `ensureTool` top up
+one kind from the logs (`plankTopUp`). Before that fix Pax looped for hours on "could not make
+sticks for a stone pickaxe" while carrying spruce logs, because it held 1 oak and 1 spruce plank
+and counted them as the 2 planks the sticks needed.
+
+When the next step needs logs, `upgrade_tools` first takes logs (then planks of one kind) out of
+the bot's own chests within 48 blocks (the ones it placed and `storage.chests` from the profile,
+those known to hold wood first), then fells a tree within 32 blocks. If neither works the step
+fails with "needs wood: ..." and `data.need = 'wood'`. `keep_tools_upgraded` then sets the `wood`
+need on the blackboard, which makes `chop_wood_loop` run at a higher score (38) and search
+further out (see [the wood ladder](#the-wood-ladder)). Its failure back-off has a retry key, the
+usable wood it holds: as soon as that changes (a tree felled, the owner hands over logs) the
+back-off ends and the upgrade runs again, instead of waiting out 60, 120, 240... seconds.
 
 ## Where it runs
 
@@ -69,6 +98,33 @@ stands where the bottom log was, cuts everything in reach, pillars one block (di
 or one of the logs) and repeats, and digs the pillar again on the way down. After a short wait
 for drops to land it sweeps the area, breaks the natural leaf under any drop caught in a tree
 and sweeps again. The result says how many logs reached the inventory and, if any didn't, why.
+
+### The wood ladder
+
+`chop_tree` alone looks `radius` blocks around the bot (32 by default). With `rings` (the
+`chop_wood_loop` default is 32, 64, 128, 250) it works like the food ladder: trees it remembers
+first, nearest first, then the smallest ring no recent empty search covered. Rings up to 64 are
+a scan of what is loaded around the bot; wider rings are a scouting trip, a spiral of waypoints
+out to the ring that looks for a natural tree at every stop, and the bot walks back to where it
+started after felling a tree more than 48 blocks away. The decision is the pure
+`nextTreeStep` in `src/skills/treePlan.ts`.
+
+- Natural trees only (at least 3 natural leaves), never in protected areas, never in or across
+  a remembered danger zone (core `dangerMemory`); saplings are replanted as before.
+- Trees seen around every felled tree and on scouting trips are remembered in storage
+  (`woodcutting.treeSpots`, a spot per 24 blocks, at most 24) and journalled as `found` events.
+  A spot found without a tree is left alone for 30 minutes.
+- An empty ring is remembered for 20 minutes (`woodcutting.searches`), so the next run starts one
+  ring further out instead of failing at 32 blocks every 15 minutes. A scouting trip cut short
+  (night, low health, stuck three legs in a row, the 10 minute limit) is not counted as empty.
+- When every ring came up empty it fails with when it will look again.
+
+Set the rings per bot in the profile, e.g. Pax:
+
+```yaml
+behaviors:
+  chop_wood_loop: { enabled: false, rings: [32, 64, 128, 250] }
+```
 
 **Stone.** Pathing to buried stone is slow on a loaded server ("Took to long to decide path to
 goal!"). `collect stone`/`cobblestone` and `gather_materials` mine the stone in reach, then the

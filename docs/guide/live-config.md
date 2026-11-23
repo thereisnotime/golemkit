@@ -90,7 +90,8 @@ In a profile, the `reflexes.*` values go under `reflexes:` and the `combat.*` va
 in [Movement, protection and combat](/concepts/world#skilled-player-techniques).
 
 Behaviours have their own live commands: `!behavior_arm`, `!behavior_configure`,
-`!behavior_disarm` (see [Behaviours](./behaviors)).
+`!behavior_disarm` (see [Behaviours](./behaviors)), e.g. `!behavior_configure chop_wood_loop`
+with `rings` to change how far it looks for trees.
 
 ## How it works
 

@@ -1142,7 +1142,7 @@ Felling trees.
 
 ### `chop_tree`
 
-Fell the nearest natural tree (any wood type): cut the logs it can reach, pick up the drops and plant a sapling. Crafts a wooden axe first if there is none and the inventory has the wood. Needs digging enabled. For "get N planks/logs" or materials for a build, prefer gather_materials, which chops as many trees as needed.
+Fell the nearest natural tree (any wood type): cut the logs it can reach, pick up the drops and plant a sapling. With rings it widens the search (remembered tree spots, then ring by ring, with a trip out and back) instead of giving up. Crafts a wooden axe first if there is none and the inventory has the wood. Needs digging enabled. For "get N planks/logs" or materials for a build, prefer gather_materials, which chops as many trees as needed.
 
 *aliases: `chop`*
 
@@ -1151,6 +1151,7 @@ Fell the nearest natural tree (any wood type): cut the logs it can reach, pick u
 | `radius` | number (4..64) |  | `32` | how far to look for a tree, in blocks |
 | `replant` | boolean |  | `true` | plant a sapling of the same kind afterwards if the bot has one |
 | `make_axe` | boolean |  | `true` | craft a wooden axe first when there is none and there is wood for it |
+| `rings` | array |  |  | look further out when there is no tree close: remembered tree spots first, then these rings (e.g. [32, 64, 128, 250]); rings past 64 are a scouting trip out and back, by day |
 
 ## worldedit
 

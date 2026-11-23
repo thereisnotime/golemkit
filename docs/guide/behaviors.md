@@ -774,6 +774,21 @@ seeds, leading them to the farm first, never past `maxHerd`). It works by day, n
 hungry (keep_fed's job), and only in survival. `farm_loop` can tend the same field with
 `place: farm:1`.
 
+## Wood: chop_wood_loop and keep_tools_upgraded
+
+`chop_wood_loop` fells trees through the wood ladder (`chop_tree` with `rings`, default 32, 64,
+128 and 250 blocks): remembered tree spots first, then rings that widen, with a scouting trip out
+and back for the rings past 64, skipping protected areas and remembered danger zones. Details in
+[tool progression](/guide/progression#the-wood-ladder).
+
+`keep_tools_upgraded` takes wood from the bot's own chests when the next tool needs some. When
+there is none there and no tree within 32 blocks, it sets the `wood` need on the blackboard:
+`chop_wood_loop` then scores 38 instead of 30 (and runs even with `keep` logs in stock) until it
+brings wood back, which clears the need. A behaviour can give the NPC controller a `retryKey`; a
+failed behaviour whose key changes ends its failure back-off early (at least 10 s after the
+failure). `keep_tools_upgraded` uses the usable wood it holds, so it retries as soon as the wood
+is there.
+
 ## Capabilities
 
 A behaviour lists the actions it `requires`; if the bot lacks one it is skipped with a
@@ -1000,12 +1015,13 @@ Tends fields: every few minutes, when enough crops are ripe within the radius, h
 
 *work · priority npc (20) · needs `chop_tree`, digging*
 
-Keeps a stock of wood: by day, while it has fewer than `keep` logs (4 planks count as one), it fells trees nearby, away from spawn and protected areas, and replants. Needs digging enabled.
+Keeps a stock of wood: by day, while it has fewer than `keep` logs (4 planks count as one), it fells trees, away from spawn, protected areas and remembered danger zones, and replants. With no tree close it goes to trees it remembers, then searches wider rings (a trip out and back). It also runs, at a higher score, when keep_tools_upgraded is stuck for wood. Needs digging enabled.
 
 | option | type | default | description |
 |---|---|---|---|
 | `keep` | integer (1..512) | `16` | logs to keep in stock |
-| `radius` | number (4..64) | `32` | how far to look for trees |
+| `radius` | number (4..64) | `32` | how far to look for trees when rings is empty |
+| `rings` | list | `[32,64,128,250]` | search rings when no tree is close, smallest first; rings past 64 blocks are scouting trips; [] = only radius |
 | `spawnClearance` | number (0..256) | `48` | never chop within this distance of the world spawn |
 | `replant` | boolean | `true` | plant saplings afterwards |
 
@@ -1039,7 +1055,7 @@ Places torches on dark ground around home (or a remembered place) so mobs do not
 
 *work · priority npc (20) · needs `upgrade_tools` · uses `craft` when present*
 
-Keeps tools usable and moving up the tiers when the bot is idle: re-crafts a worn or broken pickaxe/axe/shovel/sword, makes stone tools as soon as it can mine 3 cobblestone, then a furnace, iron (smelted with coal or charcoal) and diamond tools, up to `upTo`. Gathering steps need digging enabled.
+Keeps tools usable and moving up the tiers when the bot is idle: re-crafts a worn or broken pickaxe/axe/shovel/sword, makes stone tools as soon as it can mine 3 cobblestone, then a furnace, iron (smelted with coal or charcoal) and diamond tools, up to `upTo`. A sword comes right after the pickaxe (wooden while there is no cobblestone). Short of wood it takes logs or planks from its own chests nearby, otherwise it raises a wood need that chop_wood_loop picks up, and retries as soon as the wood is there. Gathering steps need digging enabled.
 
 | option | type | default | description |
 |---|---|---|---|
