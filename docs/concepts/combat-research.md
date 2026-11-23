@@ -745,7 +745,7 @@ to the sections above:
 | Spacing and reach, strafing | about 3 blocks while charging, circle at that range, back off inside 2.4; zig-zag approach against a drawn bow |
 | Axe vs sword | the axe against shield carriers (disables a raised shield 5 s, loses less to armour), the sword otherwise; an immediate axe hit on a raised shield, charged or not |
 | Shield | up for arrows on course, a drawn bow, and in reach while our own hit is more than 5 ticks from charged; down to hit |
-| Totem of Undying, golden apples | totem into the offhand and an apple at 10 health (PvP bursts are bigger than mob hits) |
+| Totem of Undying, golden apples | totem into the offhand at 10 health and an apple at 12 (PvP bursts are bigger than mob hits: an axe crit takes 7 to 9 through iron) |
 | Healing behind cover | retreat to heal when low with nothing to heal and losing, back at 14 or 4 more than them |
 | Bow | 12 to 40 blocks with velocity lead (`aimArrow`), not into a raised shield or at someone closing faster than a draw |
 | Ender pearls | the enemy's pearl or teleport (8+ blocks in a sample) ends the chase when it lands past half the chase limit |

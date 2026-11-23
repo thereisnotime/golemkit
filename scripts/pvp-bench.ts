@@ -310,6 +310,7 @@ async function main (): Promise<void> {
       try {
         await checkPlayersFar()
         for (const ag of [dir, a, b]) { if (!live(ag)) await waitLive(ag, 120_000) }
+        const sessions = drops
         if (![dir, a, b].every(live)) throw new Error('a test account is offline')
         await clearMobs()
         setup(a, B, role(round, A) === 'new')
@@ -331,18 +332,23 @@ async function main (): Promise<void> {
         b.setToggle('combat.pvp', 'targets')
         let lastLog = 0
         let lastClear = Date.now()
-      let clearing: Promise<void> = Promise.resolve()
-        const sessions = drops
+        let clearing: Promise<void> = Promise.resolve()
+        let clearBusy = false
         while (Date.now() - start < ROUND_S * 1000 && deathAt.size === 0) {
           await pause(250)
           if (Date.now() - lastLog > 10_000) { lastLog = Date.now(); log(`  ${state(a)} || ${state(b)}`) }
-          if (Date.now() - lastClear > 8000) { lastClear = Date.now(); clearing = clearMobs() }
+          if (Date.now() - lastClear > 8000 && !clearBusy) {
+            lastClear = Date.now()
+            clearBusy = true
+            clearing = clearMobs().finally(() => { clearBusy = false })
+          }
         }
-        await clearing
-      const reconnected = drops !== sessions
+        // the first death ends the round: both off before anything else (the mob clean-up can take seconds)
         measuring = false
         a.setToggle('combat.pvp', 'off')
         b.setToggle('combat.pvp', 'off')
+        await clearing
+        const reconnected = drops !== sessions || (![a, b].every(live) && deathAt.size === 0)
         const loser = [...deathAt.keys()][0] ?? null
         const winner = loser ? (loser === A ? B : A) : null
         const row = {

@@ -359,8 +359,8 @@ position samples, their health:
   hit is more than 5 ticks (the raise delay) from charged; down a tick before it hits;
 - bow at 12 to 40 blocks with arrows, with lead from arrow physics, unless they block or close in
   faster than a draw takes; melee once close;
-- sustain: a totem into the offhand at 10 health, a golden apple at 10 (when they're not on it)
-  or at 6, back off to heal when low with nothing to heal with and losing, then come back at 14
+- sustain: a totem into the offhand at 10 health, a golden apple at 12 (stepping back while it
+  eats), back off to heal when low with nothing to heal with and losing, then come back at 14
   health or 4 more than theirs; normal food when they're 10+ blocks away;
 - terrain: never stands with a drop or lava behind (sidesteps to the safe side, or presses
   forward when boxed in), doesn't follow into liquid and stops at the chase limit.

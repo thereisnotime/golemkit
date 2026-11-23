@@ -172,9 +172,9 @@ export type Sustain = 'totem' | 'apple' | 'eat' | 'retreat' | null
 
 /**
  * What to do about health this tick, most urgent first: a totem into the offhand at 10 or less
- * (PvP damage comes in bursts: crits of 9+), a golden apple at 10 or less (when the enemy isn't
- * on us, or at 6 or less whatever), back off when low with nothing to heal and losing, and
- * normal food when they are well away.
+ * (PvP damage comes in bursts: an axe crit takes 7 to 9 through iron), a golden apple at 12 or
+ * less (bench: bots died at 7 to 9 health with apples left when it waited for 6), back off when
+ * low with nothing to heal and losing, and normal food when they are well away.
  */
 export function pvpSustain (s: {
   health: number, enemyDist: number, hasTotem: boolean, totemInOffhand: boolean, hasApple: boolean, sinceAppleMs: number,
@@ -182,7 +182,7 @@ export function pvpSustain (s: {
 }): Sustain {
   if (s.health <= 0) return null
   if (s.hasTotem && !s.totemInOffhand && s.health <= 10) return 'totem'
-  if (s.hasApple && s.sinceAppleMs > 6000 && (s.health <= 6 || (s.health <= 10 && s.enemyDist > 3.5))) return 'apple'
+  if (s.hasApple && s.sinceAppleMs > 6000 && s.health <= 12) return 'apple'
   if (s.health <= 6 && !s.hasApple && !s.totemInOffhand && s.odds < 1.2) return 'retreat'
   if (s.enemyDist > 10 && s.hasFood && s.food < 18 && s.health < 20) return 'eat'
   return null

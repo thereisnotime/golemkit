@@ -219,14 +219,14 @@ test('ranged: bow at range unless they block or close in, melee up close', () =>
   assert.equal(pvpRange({ ...s, dist: 12, closing: 6 }), 'melee', 'sprinting at us')
 })
 
-test('sustain: totem and apple at 10, retreat when losing with nothing, food when far', () => {
+test('sustain: totem at 10, apple at 12, retreat when losing with nothing, food when far', () => {
   const s = { health: 20, enemyDist: 3, hasTotem: true, totemInOffhand: false, hasApple: true, sinceAppleMs: 1e9, hasFood: true, food: 20, odds: 1 }
   assert.equal(pvpSustain(s), null)
   assert.equal(pvpSustain({ ...s, health: 10 }), 'totem')
-  assert.equal(pvpSustain({ ...s, health: 10, totemInOffhand: true }), null, 'enemy on us at 10: keep fighting')
-  assert.equal(pvpSustain({ ...s, health: 10, totemInOffhand: true, enemyDist: 6 }), 'apple')
-  assert.equal(pvpSustain({ ...s, health: 6, totemInOffhand: true }), 'apple')
-  assert.equal(pvpSustain({ ...s, health: 6, totemInOffhand: true, sinceAppleMs: 2000 }), null)
+  assert.equal(pvpSustain({ ...s, health: 12, hasTotem: false }), 'apple')
+  assert.equal(pvpSustain({ ...s, health: 13, hasTotem: false }), null)
+  assert.equal(pvpSustain({ ...s, health: 10, totemInOffhand: true }), 'apple')
+  assert.equal(pvpSustain({ ...s, health: 6, totemInOffhand: true, sinceAppleMs: 2000 }), null, 'the last one is still working')
   assert.equal(pvpSustain({ ...s, health: 5, hasTotem: false, hasApple: false }), 'retreat')
   assert.equal(pvpSustain({ ...s, health: 5, hasTotem: false, hasApple: false, odds: 2 }), null, 'winning anyway')
   assert.equal(pvpSustain({ ...s, health: 16, hasTotem: false, enemyDist: 20, food: 12 }), 'eat')
