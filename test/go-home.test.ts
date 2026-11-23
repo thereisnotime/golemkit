@@ -86,6 +86,7 @@ test('needsHome: starts beyond homeRange, keeps going until arriveRange, more sl
   assert.equal(needsHome(10, { ...base, sinceArrivedMs: 1000 }), false, 'just got home: a chore 10 blocks out is fine')
   assert.equal(needsHome(12.5, { ...base, sinceArrivedMs: 1000 }), true)
   assert.equal(needsHome(10, { ...base, sinceArrivedMs: HOME_SETTLE_MS }), true)
+  assert.equal(needsHome(4.2, { ...base, running: true, sinceArrivedMs: 1000 }), false, 'go_home just succeeded: no new trip at the arrive edge')
 })
 
 test('go_home back-off: 60 s, doubling, capped', () => {

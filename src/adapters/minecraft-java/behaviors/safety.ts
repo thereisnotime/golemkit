@@ -80,9 +80,11 @@ export function newHomeTrips (): HomeTrips {
  * going until within arriveRange. Pure, exported for tests.
  */
 export function needsHome (offset: number, o: { homeRange: number, arriveRange: number, running: boolean, sinceArrivedMs: number }): boolean {
+  // just arrived (go_home said so): trust it even mid-run, or a spot right at the edge of
+  // arriveRange sends it home again every second
+  if (o.sinceArrivedMs < HOME_SETTLE_MS) return offset > o.homeRange + HOME_SETTLE_SLACK
   if (o.running) return offset > o.arriveRange
-  const leave = o.sinceArrivedMs < HOME_SETTLE_MS ? o.homeRange + HOME_SETTLE_SLACK : o.homeRange
-  return offset > leave
+  return offset > o.homeRange
 }
 
 /** The range stay_safe passes to go_home. */
