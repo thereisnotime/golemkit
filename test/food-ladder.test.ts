@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  planFood, nextRing, recordSearch, dryWaypoint, scoutWaypoints, RING_MEMORY_MS, STEP_PAUSE_MS,
+  planFood, nextRing, recordSearch, dryWaypoint, scoutWaypoints, riskyRing, RING_MEMORY_MS, STEP_PAUSE_MS,
   type FoodWorld, type FoodStepOptions, type SearchRecord
 } from '../src/skills/foodPlan.ts'
 import { ringsFor } from '../src/adapters/minecraft-java/behaviors/keepFed.ts'
@@ -214,4 +214,38 @@ test('farm chore: a full-size farm with empty cells and no seeds goes for seeds'
   const w: any = { night: false, danger: false, food: 15, seeds: 0, grass: true, hasFarm: true, farmDistance: 20, farmWork: 0, farmSeedsWanted: 50, farmSize: 9, farmTarget: 9, canStartFarm: true, canBreed: false, paused: {}, now: 1 }
   const c = farmChore(w, { growFarm: true, startFarm: true, breed: true, minSeeds: 8, farmAbove: 14, tendRange: 128 } as any)
   assert.equal(c?.chore, 'seeds')
+})
+
+// Pax, 23 Nov 2026: food 12, stone tools, no armour (gear about 25), its farm replanted and growing.
+// The ladder widened to 120 blocks, it met three skeletons out there and died.
+test('risky rings: poor gear and food not urgent keep it near home', () => {
+  const pax: FoodWorld = { ...bare, food: 12, gear: 25, hasFarm: true, farmGrowing: 5, farmWork: 0, searches: [empty(48, 2)] }
+  const d = planFood(pax, opts)
+  assert.notEqual(d.step, 'scout', 'no 120-block trip at food 12 with stone tools')
+  assert.match(d.reason, /gear 25 is under 40/)
+  assert.ok(d.retryMs >= 3 * MIN, 'waits for the crops instead of retrying in 20 s')
+  // the near ring is fine
+  assert.equal(planFood({ ...pax, searches: [] }, opts).step, 'scout')
+  assert.equal(planFood({ ...pax, searches: [] }, opts).radius, 48)
+  // farm work to do: it tends the farm instead
+  assert.equal(planFood({ ...pax, farmWork: 6, seeds: 6 }, opts).step, 'plant')
+  // hungry enough, geared, starving, or the rule off: it goes
+  assert.equal(planFood({ ...pax, food: 8 }, opts).radius, 120)
+  assert.equal(planFood({ ...pax, gear: 50 }, opts).radius, 120)
+  assert.equal(planFood({ ...pax, starving: true }, opts).radius, 120)
+  assert.equal(planFood({ ...pax, gear: undefined }, opts).radius, 120, 'no gear reading: the old ladder')
+  assert.equal(planFood(pax, { ...opts, scoutGear: 0 }).radius, 120)
+  assert.equal(planFood(pax, { ...opts, scoutHungerAt: 12 }).radius, 120)
+  assert.equal(planFood(pax, { ...opts, riskyRingsFrom: 120 }).radius, 120)
+  // bread from the harvest still comes first
+  assert.equal(planFood({ ...pax, canBake: true }, opts).step, 'bread')
+})
+
+test('risky rings: the rule on its own', () => {
+  assert.equal(riskyRing(48, { gear: 10, food: 14 }), null, 'the near ring is never risky')
+  assert.match(riskyRing(120, { gear: 10, food: 14 })!, /not scouting 120 blocks out/)
+  assert.equal(riskyRing(120, { gear: 10, food: 8 }), null)
+  assert.equal(riskyRing(120, { gear: 40, food: 14 }), null)
+  assert.equal(riskyRing(120, { food: 14 }), null)
+  assert.equal(riskyRing(250, { gear: 39, food: 9 }, { scoutGear: 40, scoutHungerAt: 8 }) !== null, true)
 })

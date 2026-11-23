@@ -19,12 +19,13 @@ import {
 } from '../../../skills/food.ts'
 import {
   rankSpots, seedCount, planFood, nextRing, recordSearch, breedPlan, foodDanger, farmChore, chorePause, rankFoodPlaces, placeSource,
-  BREED_FOOD, STEP_PAUSE_MS, SEEDS_RETRY_MS, TRIP_PAUSE_MS, DEFAULT_RINGS, FAR_RINGS_FROM,
+  BREED_FOOD, STEP_PAUSE_MS, SEEDS_RETRY_MS, TRIP_PAUSE_MS, DEFAULT_RINGS, FAR_RINGS_FROM, RISKY_RINGS_FROM, SCOUT_GEAR, SCOUT_HUNGER_AT,
   type FoodStep, type FoodWorld, type FoodDecision, type SearchRecord, type FoodChore, type ChoreWorld, type FoodPlace
 } from '../../../skills/foodPlan.ts'
 import { farmWorkCount, type FarmWork } from '../../../skills/farmPlan.ts'
 import { inDangerZone } from '../../../skills/food-danger.ts'
-import { rangedSituation } from '../../../skills/ranged.ts'
+import { rangedSituation, gearNow } from '../../../skills/ranged.ts'
+import { gearScore } from '../../../skills/ranged-plan.ts'
 import { wornArmorPoints } from '../../../skills/gear.ts'
 import { escorting } from '../../../skills/bodyguard.ts'
 import { rangedDanger } from './safety.ts'
@@ -130,6 +131,9 @@ const options = z.object({
   scout: z.boolean().default(true).describe('when nothing is in range, search further out (find_food), one ring wider each time a ring comes up empty'),
   rings: z.array(z.number().min(32).max(1024)).max(8).default([...DEFAULT_RINGS]).describe('search rings around home, smallest first: close, wider, wide, then far ones (by day only, after known food places)'),
   farRingsFrom: z.number().min(32).max(1024).default(FAR_RINGS_FROM).describe('rings wider than this are far: searched by day only, and only after a trip to a known food place'),
+  scoutGear: z.number().min(0).max(100).default(SCOUT_GEAR).describe('gear score (armour, shield, weapon, bow, health; stone tools and no armour score about 25) from which searching rings wider than riskyRingsFrom is fine at any food level; 0 = no gear rule'),
+  scoutHungerAt: z.number().min(0).max(20).default(SCOUT_HUNGER_AT).describe('with gear under scoutGear, rings wider than riskyRingsFrom are searched only when food is at or below this; until then it uses its farm, bakes, waits for crops'),
+  riskyRingsFrom: z.number().min(16).max(1024).default(RISKY_RINGS_FROM).describe('rings wider than this count as risky trips for the gear rule'),
   ringMemoryMinutes: z.number().min(1).max(240).default(20).describe('remember an empty ring this long before searching it again'),
   scoutRadius: z.number().min(32).max(1024).optional().describe('old single search radius; when set it caps the rings'),
   scoutAtNight: z.boolean().default(false).describe('also make far trips (searching, known spots, its farm) at night'),
@@ -359,6 +363,7 @@ export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
     apples: agent.getAction('forage') && agent.canDig ? appleLeaves(bot, pos, 16, 8).length : 0,
     canBreed,
     danger: !!senseDanger(agent, bot),
+    gear: (() => { try { return gearScore(gearNow(bot, agent)) } catch { return undefined } })(),
     searches: m.searches,
     paused: m.paused,
     lastReportAt: m.lastReportAt,
@@ -742,6 +747,9 @@ export const keepFed = defineBehavior({
             if (d.step === 'scout') { tried.add('scout'); delete m.paused.spot; delete m.paused.hunt; saveMemory(agent, m) }
             if (d.step === 'spot') { tried.add('scout'); tried.add('spot') }
             if (['seeds', 'plant', 'breed', 'forage', 'report', 'trip'].includes(d.step)) tried.add(d.step)
+          } else if (/^(replaced|preempted)$/.test(r.message)) {
+            // a reflex took the body (eating, a fight): the step didn't fail (no pause), it gets another go once the body is back
+            break
           } else {
             tried.add(d.step)
             const pause = d.step === 'seeds' && (r.data as { grassLeft?: boolean } | undefined)?.grassLeft ? SEEDS_RETRY_MS : STEP_PAUSE_MS[d.step]

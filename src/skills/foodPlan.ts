@@ -386,7 +386,8 @@ export function dryWaypoint (center: XZ, w: XZ, wet: (p: XZ) => boolean | null):
  * knows, to searching wider and wider, to growing its own food:
  *   inventory: eat, cook, bread
  *   known:     withdraw (chest), harvest (crops in range), farm (its own, ripe or due), spot, hunt
- *   search:    scout (find_food) one ring wider than the last empty one (rings beyond 250 by day only)
+ *   search:    scout (find_food) one ring wider than the last empty one (rings beyond 250 by day only;
+ *              rings beyond 48 with poor gear only when food is 8 or less: riskyRing)
  *   trip:      walk to a known farm or village far away, harvest, bake, eat, come back
  *              (before the far rings, and when every ring is empty)
  *   farm:      plant (fill its farm), seeds (break grass), start_farm, breed, forage (stopgap)
@@ -464,6 +465,8 @@ export interface FoodWorld {
   canBreed?: boolean
   /** Hostiles close by: no far trips now. */
   danger?: boolean
+  /** Its gear score against mobs (gearScore: armour, shield, weapon, bow, health; 0-100). Unknown: no gear rule. */
+  gear?: number
   /** Recent find_food runs, newest last. */
   searches?: readonly SearchRecord[]
   /** Steps that failed recently, with the time until which they are left alone (epoch ms). */
@@ -497,6 +500,12 @@ export interface FoodStepOptions {
   rings?: readonly number[]
   /** Rings wider than this are far: searched by day only, even with scoutAtNight, and a known place comes first (default 250). */
   farRingsFrom?: number
+  /** Rings wider than this are risky trips: with gear under scoutGear only when food is at or below scoutHungerAt (default 48). */
+  riskyRingsFrom?: number
+  /** Gear score (gearScore) from which risky rings are fine whatever the food (default 40; 0 turns the gear rule off). */
+  scoutGear?: number
+  /** Food at or below this makes risky rings worth it even with poor gear (default 8). */
+  scoutHungerAt?: number
   /** Trips to known food places (default true; without a knownPlace there is nothing to go to anyway). */
   trips?: boolean
   /** How long an empty ring is remembered (default 20 minutes). */
@@ -537,6 +546,27 @@ export const DEFAULT_RINGS = [48, 120, 250, 400, 600] as const
 /** Rings beyond this are far ones (day only, after known places). */
 export const FAR_RINGS_FROM = 250
 export const RING_MEMORY_MS = 20 * 60_000
+/** Rings wider than this take the bot far from home: with poor gear only when hungry enough. */
+export const RISKY_RINGS_FROM = 48
+/** Gear score from which a far ring is fine at any food level (stone tools and no armour score about 25; iron armour and a sword about 50; a shield adds 20). */
+export const SCOUT_GEAR = 40
+/** Food at or below this makes a far ring worth it whatever the gear. */
+export const SCOUT_HUNGER_AT = 8
+
+/**
+ * Why a search ring is too risky for now, or null: a ring wider than riskyRingsFrom, a gear score
+ * under scoutGear and food above scoutHungerAt (not urgent yet). Starving bots and unknown gear
+ * always may go. Seen live: Pax at food 12 with stone tools and no armour scouted 120 blocks out
+ * and died to three skeletons, with crops growing on its farm at home.
+ */
+export function riskyRing (ring: number, w: Pick<FoodWorld, 'gear' | 'food' | 'starving'>, o: Pick<FoodStepOptions, 'riskyRingsFrom' | 'scoutGear' | 'scoutHungerAt'> = {}): string | null {
+  const wanted = o.scoutGear ?? SCOUT_GEAR
+  if (w.gear === undefined || wanted <= 0 || w.starving) return null
+  if (ring <= (o.riskyRingsFrom ?? RISKY_RINGS_FROM)) return null
+  const food = w.food ?? 20
+  if (food <= (o.scoutHungerAt ?? SCOUT_HUNGER_AT) || w.gear >= wanted) return null
+  return `food ${food}/20 is not urgent and gear ${Math.round(w.gear)} is under ${wanted}: not scouting ${ring} blocks out yet`
+}
 
 /**
  * The search ring to try next: the smallest one that no recent empty search covered (an empty
@@ -639,6 +669,8 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   else if (w.danger) searchBlocked = 'hostiles near'
   else if (!ring) searchBlocked = `every ring out to ${Math.max(...rings)} came up empty in the last ${Math.round((o.ringMemoryMs ?? RING_MEMORY_MS) / 60_000)} min`
   else if (!ok('scout')) searchBlocked = 'already scouted this run'
+  const risky = !searchBlocked && ring ? riskyRing(ring.radius, w, o) : null
+  if (risky) searchBlocked = risky
   if (!searchBlocked && ring) {
     if (farRing && place) return trip()
     const pick = fallback && w.seeds !== undefined && seeds < minSeeds ? minSeeds - seeds : 0
@@ -673,10 +705,11 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   // nothing now: when to look again
   let retryMs = RETRY.idle
   let why = searchBlocked ? `nothing to do (${searchBlocked})` : 'nothing to do'
-  if (ring && dayOrBold && !(farRing && w.night) && !w.danger && o.scout && w.canScout) retryMs = RETRY.soon // a wider ring is still open
+  if (ring && dayOrBold && !(farRing && w.night) && !w.danger && o.scout && w.canScout && !risky) retryMs = RETRY.soon // a wider ring is still open
   else if (w.night && (!o.scoutAtNight || farRing || !!w.knownPlace)) { retryMs = RETRY.night; why += ', waiting for day' }
   else if (w.danger) { retryMs = RETRY.danger; why += ', waiting for the mobs to go' }
   else if (w.hasFarm && (w.farmGrowing ?? 0) > 0) { retryMs = RETRY.growing; why += `, ${w.farmGrowing} crops growing` }
+  else if (risky) retryMs = RETRY.growing // food drops slowly: look again in a few minutes
   else if (critical) retryMs = RETRY.critical
   return { step: null, rung: null, reason: why, retryMs }
 }
