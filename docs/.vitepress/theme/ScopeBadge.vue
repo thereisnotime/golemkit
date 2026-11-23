@@ -7,7 +7,7 @@ import { useData, withBase } from 'vitepress'
 const SCOPES: Record<string, { label: string, tip: string }> = {
   core: { label: 'Game-agnostic', tip: 'Nothing here depends on Minecraft: it belongs to the core that every game adapter shares.' },
   minecraft: { label: 'Minecraft-specific', tip: 'Built on Mineflayer and Minecraft rules (blocks, items, mobs). It moves to the Minecraft Java adapter in the split.' },
-  neoforge: { label: 'NeoForge-specific', tip: 'Only matters on NeoForge servers: the mod handshake and wire formats in src/core/neoforge/.' },
+  neoforge: { label: 'NeoForge-specific', tip: 'Only matters on NeoForge servers: the mod handshake and wire formats in src/adapters/minecraft-java/platforms/neoforge/.' },
   mixed: { label: 'Mixed', tip: 'A game-agnostic mechanism with Minecraft-specific parts.' }
 }
 
