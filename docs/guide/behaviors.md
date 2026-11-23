@@ -574,6 +574,63 @@ How to read it:
 - Skeletons: more kills for less damage each. Kill counts here depend on the ranged reflex hiding
   rather than fighting, so they swing a lot between runs (2 to 9 per run).
 
+## PvP
+
+PvP is a [setting](../concepts/world#pvp), not a behaviour: `combat.pvp` is `off` by default and
+only owners change it, live, with `!pvp <mode>`, `!config_set combat.pvp <mode>` or "pax pvp
+<mode>". The reflexes do the rest: `defend_player` when a player hits the bot or its guarded
+player (any mode but `off`), `pvp_engage` when an allowed player comes within 16 blocks in the
+attacking modes.
+
+| Mode | Fights |
+|---|---|
+| `off` | nobody |
+| `defend` | a player who hits it or the player it guards, until they stop or run |
+| `revenge` | `defend`, plus grudges: whoever killed or attacked the bot, an owner or the guarded player, for 30 min or one kill |
+| `targets` | the players on `combat.targets` ("pax attack Bob", `!attack_player Bob`), plus grudges |
+| `all` | every player in range, plus everything above |
+
+Safety rails: owners, `combat.friends` and creative or spectator players are never fought in
+any mode, and never get a grudge or a place on the list; players in protected areas are left
+alone in the attacking modes (`combat.spareProtected`); a gear check skips fights the bot would
+lose badly (`combat.pvpMinOdds`); chases stop at 48 blocks or 30 s out of sight. "pax stop",
+`!stop` or `!pvp off` from an owner ends every fight and hunt at once, and `stop` drops an
+attacking mode to `off`. Mode changes and new grudges are whispered to the owners online; nothing
+goes to public chat unless `combat.taunts` is on. Pax's profile doesn't set `combat.pvp`, so it is
+`off` until its owner changes it. `!pvp` (or `!pvp_list`, `!grudges`) shows the mode, targets,
+grudges with the minutes left, and hunts. `!hunt_player Bob` ("pax hunt Bob") walks to where Bob
+was last seen and fights him, giving up after `combat.huntMinutes` (10).
+
+### PvP benchmark: `just pvp-bench`
+
+`scripts/pvp-bench.ts` duels two test bots, PvpA and PvpB (`PVP_A`, `PVP_B`), with the same kit:
+iron sword, iron axe, shield, iron armour, a bow with 16 arrows, 2 golden apples and 8 steak
+(`--kit diamond`, `--no-bow`, `--totem`, `--apples N`). ClaudeTest directs with /tp, /give, /clear,
+/effect, /kill (drops, and hostile mobs within 64 blocks of the arena, since a night-time
+creeper decides a duel) and /spawnpoint only: no gamerules, no time. Before logging in it pings
+the server and stops if ClaudeTest or a test bot is already online; before every round it checks
+that every other player is 300+ blocks from the arena, and the arena is 300+ blocks from spawn,
+the fortress and the village. Each bot gets `combat.pvp targets` with the other bot as its only
+target, ClaudeTest as its owner, every other online player as a friend and no grudges.
+
+A round: both healed and given the kit, put 2 x `min(5, radius - 3)` blocks apart, switched on
+together; it ends at the first death or after `--round-s` (120). `--match new-old` (default) runs
+the PvP tactics on one side and the old fight loop (`combat.pvpTactics` off, the mob loop
+`defend_player` used before) on the other, swapping sides every round; `mirror` runs both new.
+Counted per side: wins, deaths, health it took off the other (golden apples heal, so it can pass
+20), health lost, hits, crits (hits while falling) and the winner's time to kill. A round in
+which any test account reconnected is dropped. Results append to `data/pvp-bench/results.jsonl`;
+at the end the accounts are cleared, the drops killed and the spawnpoints put back to the world
+spawn.
+
+```sh
+just pvp-bench --scout                           # check the arena and everyone's distance
+just pvp-bench 1259 438 --radius 8 --rounds 8    # new vs old, sides swapped every round
+just pvp-bench 1259 438 --radius 8 --rounds 4 --match mirror
+```
+
+<!-- pvp-bench:results -->
+
 ## Food: keep_fed, the food ladder and farm_setup
 
 `keep_fed` climbs a ladder when the bot is hungry: what it carries, then sources it knows,

@@ -94,7 +94,7 @@ behind an adapter interface, so the core, brains and intents don't depend on Min
 | NPC mode when the LLM quota runs out | ✅ | default routine: 🚧 [daily-routine](openspec/changes/daily-routine/proposal.md) |
 | Reflexes and combat (weapons, shields, crits, creepers) | ✅ | |
 | Combat techniques (W-tap, sweeps, shield timing, totem, golden apples, water bucket, enderman gaze, chokepoints) | ✅ | `combat.*` toggles, benchmarked in [behaviours](docs/guide/behaviors.md); notes in [combat research](docs/concepts/combat-research.md) |
-| Fighting back against players (`combat.pvp defend`) | 🧪 | off by default; never owners or `combat.friends` |
+| PvP modes (`combat.pvp`: off, defend, revenge, targets, all) with PvP tactics | 🧪 | off by default, owners only, kill switch; never owners, `combat.friends`, creative players or protected areas; bot-vs-bot numbers in [behaviours](docs/guide/behaviors.md#pvp-benchmark-just-pvp-bench) |
 | Ranged defence (cover, shooting back) and danger zones | ✅ | `ranged_defense` reflex and stay_safe; spots where archers or a patrol were seen are avoided for a few minutes |
 | Bodyguard | ✅ | intercepts mobs and pulls aggro off its player; a third fewer hits in the [mob-wave benchmark](docs/guide/behaviors.md); 🚧 [bodyguard-coexistence](openspec/changes/bodyguard-coexistence/proposal.md), [guard-bench-modes](openspec/changes/guard-bench-modes/proposal.md) |
 | Food ladder (search rings, trips to known food places, seeds, a farm that grows to 9x9) | ✅ | `keep_fed` in [behaviours](docs/guide/behaviors.md) |
@@ -196,6 +196,7 @@ Positional args follow the parameter order, `key=value` works too (`!follow dist
 `!sleep` `!wake` `!pillar` `!climb_out` `!bunker` `!inventory` `!drop [item|all] [count]`
 `!equip <item>` `!collect <block> [count]` `!feed_player [player]` `!last_death` `!goto_death`
 `!pos` `!hp` `!say <text>` `!look_at [player]` `!jump` `!config_set <key> <value>`
+`!pvp [mode]` `!attack_player <player>` `!spare_player <player>` `!hunt_player <player>` `!pvp_list`
 
 It also fights back when hit, eats when hungry, respawns and reconnects. Bots with the
 intents brain understand the same requests in plain chat ("follow me", "come here"); say

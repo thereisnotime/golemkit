@@ -113,10 +113,10 @@ async function main (): Promise<void> {
 
   /** Every other online player: distance to the arena (null when the server didn't say). */
   const others = () => Object.keys(dir.bot.players).filter(n => !TEST_ACCOUNTS.has(n.toLowerCase()))
-  const distanceOf = async (p: string): Promise<number | null> => {
+  const distanceOf = async (p: string, tries = 2): Promise<number | null> => {
     replies.length = 0
     await cmd(`/data get entity ${p} Pos`)
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 60; i++) {
       const line = replies.find(r => r.includes(p) || /No entity was found/i.test(r))
       if (line) {
         const m = /\[(-?[\d.]+)d, (-?[\d.]+)d, (-?[\d.]+)d\]/.exec(line)
@@ -124,9 +124,10 @@ async function main (): Promise<void> {
       }
       await pause(250)
     }
-    return null
+    return tries > 1 ? distanceOf(p, tries - 1) : null
   }
   const checkPlayersFar = async () => {
+    if (!live(dir)) throw new Error('director not connected')
     for (const p of others()) {
       const d = await distanceOf(p)
       log(`${p}: ${d === null ? 'unknown' : `${Math.round(d)} blocks from the arena`}`)
@@ -277,52 +278,64 @@ async function main (): Promise<void> {
     let drops = 0
     for (const ag of [dir, a, b]) ag.on('session', () => { drops++ })
     const rounds: any[] = []
+    let retries = 0
     for (let round = 0; round < ROUNDS; round++) {
-      await checkPlayersFar()
-      for (const ag of [dir, a, b]) { if (!live(ag)) await waitLive(ag, 120_000) }
-      if (![dir, a, b].every(live)) throw new Error('a test account is offline')
-      await clearMobs()
-      setup(a, B, role(round, A) === 'new')
-      setup(b, A, role(round, B) === 'new')
-      await cmd(`/execute positioned ${X} ${spawnY} ${Z} run kill @e[type=item,distance=..60]`)
-      await cmd(`/execute positioned ${X} ${spawnY} ${Z} run kill @e[type=arrow,distance=..60]`)
-      for (const p of [A, B]) await kit(p)
-      await cmd(`/tp ${A} ${X - GAP + 0.5} ${spawnY} ${Z + 0.5} -90 0`)
-      await cmd(`/tp ${B} ${X + GAP + 0.5} ${spawnY} ${Z + 0.5} 90 0`)
-      await pause(1500)
-      for (const ag of [a, b]) await step(ag, 'gear_up')
-      await pause(1000)
-      log(`== round ${round + 1}: ${A} ${role(round, A)}, ${B} ${role(round, B)} | ${state(a)} || ${state(b)}`)
-      for (const s of stats.values()) Object.assign(s, freshSide())
-      deathAt.clear()
-      measuring = true
-      const start = Date.now()
-      a.setToggle('combat.pvp', 'targets')
-      b.setToggle('combat.pvp', 'targets')
-      let lastLog = 0
-      let lastClear = Date.now()
-      const sessions = drops
-      while (Date.now() - start < ROUND_S * 1000 && deathAt.size === 0) {
-        await pause(250)
-        if (Date.now() - lastLog > 10_000) { lastLog = Date.now(); log(`  ${state(a)} || ${state(b)}`) }
-        if (Date.now() - lastClear > 8000) { lastClear = Date.now(); void clearMobs() }
+      try {
+        await checkPlayersFar()
+        for (const ag of [dir, a, b]) { if (!live(ag)) await waitLive(ag, 120_000) }
+        if (![dir, a, b].every(live)) throw new Error('a test account is offline')
+        await clearMobs()
+        setup(a, B, role(round, A) === 'new')
+        setup(b, A, role(round, B) === 'new')
+        await cmd(`/execute positioned ${X} ${spawnY} ${Z} run kill @e[type=item,distance=..60]`)
+        await cmd(`/execute positioned ${X} ${spawnY} ${Z} run kill @e[type=arrow,distance=..60]`)
+        for (const p of [A, B]) await kit(p)
+        await cmd(`/tp ${A} ${X - GAP + 0.5} ${spawnY} ${Z + 0.5} -90 0`)
+        await cmd(`/tp ${B} ${X + GAP + 0.5} ${spawnY} ${Z + 0.5} 90 0`)
+        await pause(1500)
+        for (const ag of [a, b]) await step(ag, 'gear_up')
+        await pause(1000)
+        log(`== round ${round + 1}: ${A} ${role(round, A)}, ${B} ${role(round, B)} | ${state(a)} || ${state(b)}`)
+        for (const s of stats.values()) Object.assign(s, freshSide())
+        deathAt.clear()
+        measuring = true
+        const start = Date.now()
+        a.setToggle('combat.pvp', 'targets')
+        b.setToggle('combat.pvp', 'targets')
+        let lastLog = 0
+        let lastClear = Date.now()
+        const sessions = drops
+        while (Date.now() - start < ROUND_S * 1000 && deathAt.size === 0) {
+          await pause(250)
+          if (Date.now() - lastLog > 10_000) { lastLog = Date.now(); log(`  ${state(a)} || ${state(b)}`) }
+          if (Date.now() - lastClear > 8000) { lastClear = Date.now(); void clearMobs() }
+        }
+        const reconnected = drops !== sessions
+        measuring = false
+        a.setToggle('combat.pvp', 'off')
+        b.setToggle('combat.pvp', 'off')
+        const loser = [...deathAt.keys()][0] ?? null
+        const winner = loser ? (loser === A ? B : A) : null
+        const row = {
+          tag: RUN_TAG, at: new Date().toISOString(), void: reconnected, match: MATCH, kit: KIT, bow: BOW, totem: TOTEM, apples: APPLES, round: round + 1,
+          winner, winnerRole: winner ? role(round, winner) : null, ttkS: loser ? Math.round((deathAt.get(loser)! - start) / 100) / 10 : null,
+          sides: [A, B].map(p => ({ player: p, role: role(round, p), ...stats.get(p)! }))
+        }
+        if (reconnected) log('a test account reconnected during the round: not counted')
+        else rounds.push(row)
+        appendFileSync(`${DATA}/results.jsonl`, JSON.stringify(row) + '\n')
+        log(`round ${round + 1}: ${winner ? `${winner} (${role(round, winner)}) won in ${row.ttkS} s` : 'no kill'} | ${JSON.stringify(row.sides)}`)
+        await pause(3000) // respawn
+      } catch (e) {
+        // the server dropped every connection at once twice in testing: wait, then play the round again
+        if (++retries > 5 || !/not connected|offline/.test(String((e as Error)?.message ?? e))) throw e
+        measuring = false
+        log(`round ${round + 1} interrupted (${(e as Error).message}); waiting for the accounts and playing it again`)
+        for (const ag of [a, b]) { try { if (live(ag)) ag.setToggle('combat.pvp', 'off') } catch {} }
+        for (const ag of [dir, a, b]) await waitLive(ag, 180_000)
+        await pause(5000)
+        round--
       }
-      const reconnected = drops !== sessions
-      measuring = false
-      a.setToggle('combat.pvp', 'off')
-      b.setToggle('combat.pvp', 'off')
-      const loser = [...deathAt.keys()][0] ?? null
-      const winner = loser ? (loser === A ? B : A) : null
-      const row = {
-        tag: RUN_TAG, at: new Date().toISOString(), void: reconnected, match: MATCH, kit: KIT, bow: BOW, totem: TOTEM, apples: APPLES, round: round + 1,
-        winner, winnerRole: winner ? role(round, winner) : null, ttkS: loser ? Math.round((deathAt.get(loser)! - start) / 100) / 10 : null,
-        sides: [A, B].map(p => ({ player: p, role: role(round, p), ...stats.get(p)! }))
-      }
-      if (reconnected) log('a test account reconnected during the round: not counted')
-      else rounds.push(row)
-      appendFileSync(`${DATA}/results.jsonl`, JSON.stringify(row) + '\n')
-      log(`round ${round + 1}: ${winner ? `${winner} (${role(round, winner)}) won in ${row.ttkS} s` : 'no kill'} | ${JSON.stringify(row.sides)}`)
-      await pause(3000) // respawn
     }
     // ---- summary per role ----
     const agg: Record<string, Side & { wins: number, ttk: number[] }> = {}
