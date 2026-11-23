@@ -68,10 +68,10 @@ combat: { pvp: defend }
 reflexes: { retreatBelo: 3 }
 server: { hots: a }
 llm: { anyExtra: 1, goals: { maxTurn: 3 } }
-settings: { combat: { pvp: defend, crit: true }, free: 1 }
+settings: { combat: { pvp: defend, crit: true }, mining: { gear: armour, safeDeph: 4 }, free: 1 }
 behaviors: { keep_fed: { x: 1 } }
 `)
-  assert.deepEqual(unknownProfileKeys(raw), ['combat', 'reflexes.retreatBelo', 'server.hots', 'llm.goals.maxTurn', 'settings.combat.crit'])
+  assert.deepEqual(unknownProfileKeys(raw), ['combat', 'reflexes.retreatBelo', 'server.hots', 'llm.goals.maxTurn', 'settings.combat.crit', 'settings.mining.safeDeph'])
   const seen: string[] = []
   const off = subscribeLogs(e => { if (e.level === 'warn') seen.push(e.msg) })
   try {

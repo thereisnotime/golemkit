@@ -11,7 +11,8 @@ import { craftItem, smeltItem } from './crafting.ts'
 import { collectBlocks } from './gather.ts'
 import { fellTree } from './woodcutting.ts'
 import { takeWoodFromOwnChests, fmtTally } from './containers.ts'
-import { mineStone } from './mining.ts'
+import { mineStone, miningState, depthOk, type MiningState } from './mining.ts'
+import { notReadyText, shieldWouldDo } from './minePlan.ts'
 import { creativeGet } from './mods.ts'
 import { plankFuel } from './materials.ts'
 import { loadBlueprints } from './blueprint.ts'
@@ -27,8 +28,10 @@ export const ARMOUR: Record<string, number> = { iron_helmet: 5, iron_chestplate:
 export interface Nearby {
   /** Natural stone it could mine within a short walk (exposed or a staircase away). Default true. */
   stone?: boolean
-  /** Iron ore seen within range. */
+  /** Iron ore seen within range that it may go for (safe mining: shallow, or it is ready to go deep). */
   ironOre?: boolean
+  /** Iron ore seen only deeper than mining.safeDepth while not ready (a cave trip it shouldn't make). */
+  ironOreDeep?: boolean
   /** Coal ore seen within range. */
   coalOre?: boolean
   /** Diamond ore seen within range. */
@@ -57,6 +60,8 @@ export interface UpgradeOptions {
   armour?: boolean
   /** No iron ore in sight: dig a staircase and strip to look for some. Default false. */
   prospect?: boolean
+  /** Safe mining readiness (settings.mining): not ready means no prospecting and no deep ore; shieldFirst turns the first iron ingot into a shield. */
+  mining?: { ready: boolean, shieldFirst?: boolean }
 }
 
 // the sword right after the pickaxe: combat (techniques, defend, bodyguard) assumes one
@@ -142,7 +147,7 @@ export function nextToolUpgrade (inv: Record<string, number>, nearby: Nearby, ga
   const wantIron = kinds.filter(k => TIER_RANK[heldTier(inv, k)]! < 3)
   const armour = opts.armour ? Object.keys(ARMOUR).filter(a => !inv[a]) : []
   if ((wantIron.length || armour.length) && TIER_RANK[heldTier(inv, 'pickaxe')]! >= 2) {
-    const step = ironStep(inv, nearby, wantIron, armour, trees, stoneNear, !!opts.prospect)
+    const step = ironStep(inv, nearby, wantIron, armour, trees, stoneNear, !!opts.prospect && opts.mining?.ready !== false, !!opts.mining?.shieldFirst)
     if (step) return step
   }
   if (upTo === 'iron') return null
@@ -158,8 +163,10 @@ export function nextToolUpgrade (inv: Record<string, number>, nearby: Nearby, ga
   return null
 }
 
-function ironStep (inv: Record<string, number>, nearby: Nearby, kinds: ToolKind[], armour: string[], trees: boolean, stoneNear: boolean, prospect: boolean): UpgradeStep | null {
+function ironStep (inv: Record<string, number>, nearby: Nearby, kinds: ToolKind[], armour: string[], trees: boolean, stoneNear: boolean, prospect: boolean, shieldFirst: boolean): UpgradeStep | null {
   const ingots = inv.iron_ingot ?? 0
+  // safe mining wants a shield or armour before going deep: the first ingot (and 6 planks) is a shield
+  if (shieldFirst && ingots >= 1 && !inv.shield && usablePlankUnits(inv) >= 6) return { do: 'craft', item: 'shield', kind: 'armour', tier: 'iron', why: 'a shield before mining deep' }
   const k = kinds.find(k => TOOL_SHAPE[k].head <= ingots)
   if (k) return { do: 'craft', item: `iron_${k}`, kind: k, tier: 'iron', why: 'iron ingots' }
   if (!kinds.length) {
@@ -213,24 +220,32 @@ export function isCheapStep (s: UpgradeStep): boolean {
 
 type Ctx = Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>
 
-function seen (ctx: Ctx, names: string[], radius: number, exposedOnly = false): boolean {
+function seen (ctx: Ctx, names: string[], radius: number, exposedOnly = false, accept?: (p: { x: number, y: number, z: number }) => boolean): boolean {
   const { bot } = ctx
   const ids = names.map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
   if (!ids.length) return false
-  const found = bot.findBlocks({ matching: ids, maxDistance: radius, count: exposedOnly ? 64 : 1 })
+  const found = bot.findBlocks({ matching: ids, maxDistance: radius, count: exposedOnly || accept ? 64 : 1 })
+    .filter(p => !accept || accept(p))
   if (!exposedOnly) return found.length > 0
   // findBlocks also sees ore buried deep in loaded chunks; only ore with an open face is worth a trip
   return found.some(p => [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]
     .some(([dx, dy, dz]) => /^(air|cave_air|water)$/.test(bot.blockAt(p.offset(dx!, dy!, dz!))?.name ?? '')))
 }
 
-/** What is around, for nextToolUpgrade. Ore counts when it has an open face within 24 blocks (caves, cliffs, our tunnels). */
-export function senseNearby (ctx: Ctx): Nearby {
+/**
+ * What is around, for nextToolUpgrade. Ore counts when it has an open face within 24 blocks
+ * (caves, cliffs, our tunnels) and, under safe mining while not ready, is no deeper than
+ * mining.safeDepth (deeper ore shows up as ironOreDeep instead).
+ */
+export function senseNearby (ctx: Ctx, mining: MiningState = miningState(ctx.bot, ctx.agent.settings)): Nearby {
+  const ok = (p: { x: number, y: number, z: number }) => depthOk(ctx.bot, mining, p)
+  const iron = seen(ctx, ['iron_ore', 'deepslate_iron_ore'], 24, true, ok)
   return {
     stone: seen(ctx, ['stone', 'deepslate'], 32),
-    ironOre: seen(ctx, ['iron_ore', 'deepslate_iron_ore'], 24, true),
-    coalOre: seen(ctx, ['coal_ore', 'deepslate_coal_ore'], 24, true),
-    diamondOre: seen(ctx, ['diamond_ore', 'deepslate_diamond_ore'], 24, true),
+    ironOre: iron,
+    ...(!iron && !mining.readiness.ready && mining.s.safe && seen(ctx, ['iron_ore', 'deepslate_iron_ore'], 24, true) ? { ironOreDeep: true } : {}),
+    coalOre: seen(ctx, ['coal_ore', 'deepslate_coal_ore'], 24, true, ok),
+    diamondOre: seen(ctx, ['diamond_ore', 'deepslate_diamond_ore'], 24, true, ok),
     furnace: seen(ctx, ['furnace'], 16),
     craftingTable: seen(ctx, ['crafting_table'], 16),
     trees: true
@@ -248,7 +263,7 @@ function describe (s: UpgradeStep): string {
 }
 
 /** Runs one step. Returns ok/fail with what happened. */
-export async function runUpgradeStep (ctx: Ctx, s: UpgradeStep): Promise<ActionResult> {
+export async function runUpgradeStep (ctx: Ctx, s: UpgradeStep, safe = true): Promise<ActionResult> {
   const { bot, signal } = ctx
   switch (s.do) {
     case 'creative_get': {
@@ -268,10 +283,10 @@ export async function runUpgradeStep (ctx: Ctx, s: UpgradeStep): Promise<ActionR
     }
     case 'gather': {
       if (s.item === 'logs') return getWood(ctx, s.count)
-      if (s.item === 'cobblestone') return mineStone(ctx, Math.max(1, s.count))
-      if (s.item === 'raw_iron') return collectOre(ctx, ['iron_ore', 'deepslate_iron_ore'], s.count, 'raw_iron')
-      if (s.item === 'coal') return collectOre(ctx, ['coal_ore', 'deepslate_coal_ore'], s.count, 'coal')
-      return collectOre(ctx, ['diamond_ore', 'deepslate_diamond_ore'], s.count, 'diamond')
+      if (s.item === 'cobblestone') return mineStone(ctx, Math.max(1, s.count), { safe })
+      if (s.item === 'raw_iron') return collectOre(ctx, ['iron_ore', 'deepslate_iron_ore'], s.count, 'raw_iron', safe)
+      if (s.item === 'coal') return collectOre(ctx, ['coal_ore', 'deepslate_coal_ore'], s.count, 'coal', safe)
+      return collectOre(ctx, ['diamond_ore', 'deepslate_diamond_ore'], s.count, 'diamond', safe)
     }
   }
 }
@@ -293,21 +308,32 @@ async function getWood (ctx: Ctx, logs: number): Promise<ActionResult> {
   return fail(`needs wood: ${r.message}, and no wood in my chests nearby${chest.notes.length ? ` (${chest.notes.join('; ')})` : ''}`, { need: 'wood' })
 }
 
-async function collectOre (ctx: Ctx, blocks: string[], n: number, item: string): Promise<ActionResult> {
+async function collectOre (ctx: Ctx, blocks: string[], n: number, item: string, safe = true): Promise<ActionResult> {
   let last: ActionResult = fail(`no ${blocks[0]} nearby`)
+  const m = miningState(ctx.bot, ctx.agent.settings)
+  const mining: MiningState = safe ? m : { ...m, s: { ...m.s, safe: false } }
   for (const b of blocks) {
-    if (!seen(ctx, [b], 32, true)) continue
-    last = await collectBlocks(ctx, b, n)
+    if (!seen(ctx, [b], 32, true, p => depthOk(ctx.bot, mining, p))) continue
+    last = await collectBlocks(ctx, b, n, { safe })
     if (last.ok) return last
   }
   // none with an open face: prospect with a staircase down and a strip (ores beside it are mined)
   if (item === 'raw_iron' || item === 'coal') {
-    return mineStone(ctx, n, { item, sources: blocks, minDepth: item === 'raw_iron' ? 16 : 6, maxSteps: 64 })
+    if (mining.s.safe && !mining.readiness.ready) return fail(`${notReadyText(mining.readiness)}; no ${blocks[0]} within ${mining.s.safeDepth} blocks of the surface`, { notReady: true, need: mining.readiness.need })
+    return mineStone(ctx, n, { item, sources: blocks, minDepth: item === 'raw_iron' ? 16 : 6, maxSteps: 64, safe })
   }
   return last
 }
 
+/** The planner's view of safe mining: ready, and whether a shield would close the gear gap. Ready when safe mining is off. */
+export function miningGate (m: MiningState, safe = true): { ready: boolean, shieldFirst: boolean } {
+  if (!safe || !m.s.safe) return { ready: true, shieldFirst: false }
+  return { ready: m.readiness.ready, shieldFirst: shieldWouldDo(m.kit, m.s) }
+}
+
 export interface UpgradeRun extends UpgradeOptions {
+  /** Apply safe mining (settings.mining). Default true. */
+  safe?: boolean
   /** Only cheap steps (see isCheapStep). */
   cheapOnly?: boolean
   /** Most steps in one go. Default 12. */
@@ -325,18 +351,31 @@ export async function upgradeTools (ctx: Ctx, opts: UpgradeRun = {}): Promise<Ac
   let need: string | undefined
   const tiersBefore = toolSummary(inventoryCounts(bot), opts.kinds ?? DEFAULT_KINDS)
   let lastKey = ''
+  let notReady = false
   for (let i = 0; i < (opts.maxSteps ?? 12); i++) {
     checkAborted(ctx.signal)
     const inv = inventoryCounts(bot)
-    const step = nextToolUpgrade(inv, senseNearby(ctx), bot.game?.gameMode, opts)
-    if (!step) break
+    const m = miningState(bot, agent.settings)
+    const nearby = senseNearby(ctx, m)
+    const planOpts: UpgradeOptions = { ...opts, mining: miningGate(m, opts.safe !== false) }
+    const step = nextToolUpgrade(inv, nearby, bot.game?.gameMode, planOpts)
+    if (!step) {
+      // stuck only because it isn't fit to go underground: say so (and what to fix) instead of "nothing to do"
+      const wouldDig = planOpts.mining && !planOpts.mining.ready ? nextToolUpgrade(inv, { ...nearby, ironOre: nearby.ironOre || nearby.ironOreDeep }, bot.game?.gameMode, { ...opts, mining: { ready: true } }) : null
+      if (wouldDig?.do === 'gather') {
+        notReady = true
+        notes.push(`${notReadyText(m.readiness)}; would ${describe(wouldDig)} but that means going deeper than ${m.s.safeDepth} blocks`)
+        need = m.readiness.need
+      }
+      break
+    }
     if (opts.cheapOnly && !isCheapStep(step)) { notes.push(`next would be to ${describe(step)}`); break }
     if (step.do === 'gather' && !agent.canDig) { notes.push(`would ${describe(step)} but digging is disabled`); break }
     const key = JSON.stringify(step) + JSON.stringify(inv)
     if (key === lastKey) { notes.push(`no progress on: ${describe(step)}`); break }
     lastKey = key
     log.debug('upgrade step', { step: describe(step) })
-    const r = await runUpgradeStep(ctx, step).catch(e => { checkAborted(ctx.signal); return fail((e as Error).message) })
+    const r = await runUpgradeStep(ctx, step, opts.safe !== false).catch(e => { checkAborted(ctx.signal); return fail((e as Error).message) })
     if (!r.ok) {
       notes.push(`${describe(step)} failed: ${r.message}`)
       need = (r.data as { need?: string } | undefined)?.need
@@ -348,6 +387,7 @@ export async function upgradeTools (ctx: Ctx, opts: UpgradeRun = {}): Promise<Ac
   const changed = tiersAfter !== tiersBefore
   const msg = `${done.length ? done.join('; ') : 'nothing to upgrade right now'}${notes.length ? ` (${notes.join('; ')})` : ''}; tools: ${tiersAfter}`
   if (!needsSurvival(bot) && !done.length) return ok(msg)
+  if (notReady && !done.length) return fail(msg, { changed, tools: tiersAfter, notReady: true, ...(need ? { need } : {}) })
   return done.length || !notes.some(n => /failed/.test(n)) ? ok(msg, { changed, tools: tiersAfter, ...(need ? { need } : {}) }) : fail(msg, { changed, tools: tiersAfter, ...(need ? { need } : {}) })
 }
 
@@ -373,15 +413,17 @@ const upgradeAction = defineAction({
   name: 'upgrade_tools',
   description: 'Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> ' +
     'smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, axe, shovel and sword, armour optionally. ' +
-    'Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). In creative it just takes the tools.',
+    'Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). Safe mining: without a weapon, food (and a shield or armour if mining.gear asks) ' +
+    'it only takes ore near the surface and says "not ready to mine: ..." instead of going into caves. In creative it just takes the tools.',
   params: z.object({
     up_to: z.enum(['stone', 'iron', 'diamond']).default('iron').describe('highest tier to aim for'),
     armour: z.boolean().default(false).describe('also make iron armour once iron tools are done'),
     kinds: z.array(z.enum(['pickaxe', 'axe', 'shovel', 'sword', 'hoe'])).optional().describe('tool kinds to upgrade; default pickaxe, axe, shovel, sword'),
-    prospect: z.boolean().default(true).describe('when no iron ore is in sight, dig a staircase and strip mine to look for some')
+    prospect: z.boolean().default(true).describe('when no iron ore is in sight, dig a staircase and strip mine to look for some'),
+    safe: z.boolean().default(true).describe('safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground')
   }),
   longRunning: true,
-  run: (ctx, { up_to, armour, kinds, prospect }) => upgradeTools(ctx, { upTo: up_to, armour, kinds, prospect, maxSteps: 30 })
+  run: (ctx, { up_to, armour, kinds, prospect, safe }) => upgradeTools(ctx, { upTo: up_to, armour, kinds, prospect, safe, maxSteps: 30 })
 })
 
 export const progressionSkill = () => defineSkill({

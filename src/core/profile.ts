@@ -199,13 +199,14 @@ const HINTS: Record<string, string> = {
   bot: 'the key is variant:'
 }
 
-/** settings.combat keys the code reads (the combat.* feature toggles). */
-const COMBAT_KEYS = new Set(TOGGLES.filter(t => t.key.startsWith('combat.')).map(t => t.key.slice('combat.'.length)))
+/** settings.combat / settings.mining keys the code reads (the combat.* and mining.* feature toggles). */
+const toggleKeys = (group: string) => new Set(TOGGLES.filter(t => t.key.startsWith(`${group}.`)).map(t => t.key.slice(group.length + 1)))
+const CHECKED_SETTINGS: Record<string, Set<string>> = { combat: toggleKeys('combat'), mining: toggleKeys('mining') }
 
 /**
  * Keys in `raw` that `schema` doesn't declare (zod strips them without a word), as dotted paths.
  * Records are not looked into, passthrough objects only for their declared keys, strict objects
- * not at all (zod fails on those); settings.combat is checked against the combat toggles.
+ * not at all (zod fails on those); settings.combat and settings.mining are checked against their toggles.
  */
 export function unknownProfileKeys (raw: unknown, schema: z.ZodType = ProfileSchema, path = ''): string[] {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
@@ -227,9 +228,11 @@ export function unknownProfileKeys (raw: unknown, schema: z.ZodType = ProfileSch
         else out.push(...unknownProfileKeys(v, def.shape[k], key))
       }
       if (path === '') {
-        const combat = (raw as { settings?: { combat?: unknown } }).settings?.combat
-        if (combat && typeof combat === 'object' && !Array.isArray(combat)) {
-          out.push(...Object.keys(combat).filter(k => !COMBAT_KEYS.has(k)).map(k => `settings.combat.${k}`))
+        for (const [group, keys] of Object.entries(CHECKED_SETTINGS)) {
+          const sub = (raw as { settings?: Record<string, unknown> }).settings?.[group]
+          if (sub && typeof sub === 'object' && !Array.isArray(sub)) {
+            out.push(...Object.keys(sub).filter(k => !keys.has(k)).map(k => `settings.${group}.${k}`))
+          }
         }
       }
       return out

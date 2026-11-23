@@ -5,21 +5,30 @@
 // never straight down, nothing next to lava or water, a solid floor under every step,
 // nothing loaded-unknown, nothing protected, only natural blocks. The planning is pure and
 // unit tested (planStep, digHazard); mineStone runs it.
+// Safe mining (settings.mining, minePlan.ts): below mining.safeDepth only when ready (weapon,
+// food, gear), never break into a cave pocket, a torch every few steps, and abandon the dig and
+// go back up the staircase when health or the odds turn underground.
 import type { Bot } from 'mineflayer'
 import type { ActionContext, ActionResult } from '../core/index.ts'
-import { ok, fail, goals, checkAborted, fmtPos } from '../core/index.ts'
+import { ok, fail, goals, checkAborted, fmtPos, isHostile } from '../core/index.ts'
 import { digBlock, DigRefusedError, gotoWithin, vec } from './world.ts'
-import { ensureTool, equipFor, inventoryCounts, toolTier, bestToolIn, harvestProblem, dropWatch } from './toolkit.ts'
+import { ensureTool, equipFor, inventoryCounts, toolTier, bestToolIn, harvestProblem, dropWatch, ensureSticks } from './toolkit.ts'
 
 /** Digging gives nothing (wrong tool, full inventory...): stop and say why instead of mining on. */
 export class NothingDropsError extends Error {}
 import { isNaturalBlock } from './blueprint.ts'
 import { pickupNearby } from './pickup.ts'
 import { perMinute, makeRoom } from './efficiency.ts'
+import { craftItem } from './crafting.ts'
+import { wornArmorPoints } from './gear.ts'
+import {
+  miningSettings, miningReadiness, notReadyText, surfaceAbove, caveHazard, torchDue, torchCrafts,
+  undergroundRetreat, isUnderground, depthAllowed, targetDepth, type MiningSettings, type Kit, type Readiness
+} from './minePlan.ts'
 
 export interface P { x: number, y: number, z: number }
-/** What the planner needs to know about a block; null when the chunk is not loaded. */
-export type BlockLook = (p: P) => { name: string, solid: boolean } | null
+/** What the planner needs to know about a block; null when the chunk is not loaded. `sky` is the sky light when known. */
+export type BlockLook = (p: P) => { name: string, solid: boolean, sky?: number } | null
 
 const LIQUID = /^(water|lava|flowing_water|flowing_lava|bubble_column)$/
 const FALLING = /^(sand|red_sand|gravel|suspicious_sand|suspicious_gravel)$/
@@ -77,7 +86,7 @@ export interface StepPlan {
  * feet in direction dir. Never digs straight down: the bot always moves forward. Returns the
  * plan, or the reason the step is unsafe. `allowed` filters protected or non-natural blocks.
  */
-export function planStep (at: BlockLook, feet: P, dir: { x: number, z: number }, down: boolean, allowed: (p: P, name: string) => boolean = () => true, wide = false): StepPlan | string {
+export function planStep (at: BlockLook, feet: P, dir: { x: number, z: number }, down: boolean, allowed: (p: P, name: string) => boolean = () => true, wide = false, caves?: { belowY: number, tunnel: Set<string> }): StepPlan | string {
   const front = add(feet, dir.x, 0, dir.z)
   const stand = down ? add(front, 0, -1, 0) : front
   // top first: the space above the new spot, the bot's own head height ahead, then the feet spot
@@ -93,6 +102,11 @@ export function planStep (at: BlockLook, feet: P, dir: { x: number, z: number },
   }
   const s = standHazard(at, stand)
   if (s) return s
+  // safe mining: don't open the tunnel into a cave or an air pocket below the surface
+  if (caves) {
+    const c = caveHazard(at, dig.filter(p => !AIR.test(at(p)?.name ?? 'air')), stand, new Set([...open, ...caves.tunnel]), caves.belowY)
+    if (c) return c
+  }
   const side: P[] = []
   if (wide && !down) {
     const perp = [{ x: dir.z, z: -dir.x }, { x: -dir.z, z: dir.x }]
@@ -102,6 +116,7 @@ export function planStep (at: BlockLook, feet: P, dir: { x: number, z: number },
         const b = at(p)
         if (!b || AIR.test(b.name) || !b.solid || !allowed(p, b.name)) continue
         if (digHazard(at, p, new Set([...open, ...side.map(key)]))) continue
+        if (caves && caveHazard(at, [p], stand, new Set([...open, ...side.map(key), ...caves.tunnel]), caves.belowY)) continue
         side.push(p)
       }
     }
@@ -123,7 +138,89 @@ type Ctx = Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>
 function lookFor (bot: Bot): BlockLook {
   return (p) => {
     const b = bot.blockAt(vec(bot, p.x, p.y, p.z))
-    return b ? { name: b.name, solid: b.boundingBox === 'block' } : null
+    return b ? { name: b.name, solid: b.boundingBox === 'block', ...(typeof (b as any).skyLight === 'number' ? { sky: (b as any).skyLight } : {}) } : null
+  }
+}
+
+/** What the bot carries that matters for going underground. */
+export function kitOf (bot: Bot): Kit {
+  const items = bot.inventory.items()
+  const foods = (bot.registry as any).foodsByName ?? {}
+  const BAD = /^(rotten_flesh|spider_eye|poisonous_potato|pufferfish|suspicious_stew|chorus_fruit)$/
+  const off = bot.inventory.slots[45]?.name
+  return {
+    weapon: items.some(i => /_(sword|axe)$/.test(i.name)),
+    food: items.filter(i => foods[i.name] && !BAD.test(i.name)).reduce((n, i) => n + i.count, 0),
+    armour: wornArmorPoints(bot),
+    shield: off === 'shield' || items.some(i => i.name === 'shield'),
+    torches: items.filter(i => i.name === 'torch').reduce((n, i) => n + i.count, 0)
+  }
+}
+
+export interface MiningState {
+  s: MiningSettings
+  kit: Kit
+  readiness: Readiness
+  /** The surface over the bot (its feet when the sky is open). */
+  surface: number
+}
+
+/** Settings, kit, readiness and the surface level for this bot right now. */
+export function miningState (bot: Bot, settings: Record<string, unknown>): MiningState {
+  const s = miningSettings(settings.mining)
+  const kit = kitOf(bot)
+  const feet = bot.entity.position.floored()
+  return { s, kit, readiness: miningReadiness(kit, s), surface: surfaceAbove(lookFor(bot), { x: feet.x, y: feet.y, z: feet.z }) }
+}
+
+/**
+ * May the bot go for a block at p under settings.mining: always when ready (or safe mining is
+ * off), otherwise only when it is at most safeDepth below the bot's surface and under at most
+ * safeDepth blocks of ground.
+ */
+export function depthOk (bot: Bot, m: MiningState, p: P): boolean {
+  if (!m.s.safe || m.readiness.ready) return true
+  if (m.surface - p.y > m.s.safeDepth) return false
+  const over = surfaceAbove(lookFor(bot), p, m.s.safeDepth + 1)
+  return depthAllowed(targetDepth(m.surface, p, over), false, m.s)
+}
+
+/** Underground (real cover overhead, little sky light) and the hostiles close by, for undergroundRetreat. */
+export function undergroundNow (bot: Bot, radius: number): { underground: boolean, hostiles: number } {
+  const feet = bot.entity.position.floored()
+  let cover = 0
+  for (let dy = 2; dy <= 24; dy++) {
+    const b = bot.blockAt(feet.offset(0, dy, 0))
+    if (!b) break
+    if (b.boundingBox === 'block' && !/leaves|_log$|glass/.test(b.name)) cover++
+  }
+  const head = bot.blockAt(feet.offset(0, 1, 0)) as any
+  const me = bot.entity.position
+  const hostiles = Object.values(bot.entities).filter(e => e !== bot.entity && isHostile(e) && e.position.distanceTo(me) <= radius && Math.abs(e.position.y - me.y) < 8).length
+  return { underground: isUnderground(cover, typeof head?.skyLight === 'number' ? head.skyLight : undefined), hostiles }
+}
+
+/** Has (or crafts) a torch and puts it on the tunnel floor at `spot` (an air block with a solid floor). */
+async function placeTorch (bot: Bot, signal: AbortSignal, spot: P): Promise<boolean> {
+  let torch = bot.inventory.items().find(i => i.name === 'torch')
+  if (!torch) {
+    if (torchCrafts(inventoryCounts(bot)) < 1) return false
+    if (!(bot.inventory.items().some(i => i.name === 'stick')) && !await ensureSticks(bot, signal, 1).catch(() => false)) return false
+    const r = await craftItem(bot, signal, 'torch', 1).catch(() => null)
+    if (!r?.ok) return false
+    torch = bot.inventory.items().find(i => i.name === 'torch')
+    if (!torch) return false
+  }
+  const floor = bot.blockAt(vec(bot, spot.x, spot.y - 1, spot.z))
+  const here = bot.blockAt(vec(bot, spot.x, spot.y, spot.z))
+  if (!floor || floor.boundingBox !== 'block' || !here || !AIR.test(here.name)) return false
+  try {
+    await bot.equip(torch, 'hand')
+    await bot.placeBlock(floor, vec(bot, 0, 1, 0))
+    return true
+  } catch {
+    checkAborted(signal)
+    return /torch/.test(bot.blockAt(vec(bot, spot.x, spot.y, spot.z))?.name ?? '')
   }
 }
 
@@ -141,6 +238,8 @@ export interface MineOptions {
   returnUp?: boolean
   /** Keep the staircase going down at least this far before the strip (prospecting for ore). Default 0. */
   minDepth?: number
+  /** Apply settings.mining (readiness depth cap, caves, torches, retreat). Default true. */
+  safe?: boolean
 }
 
 /**
@@ -163,6 +262,9 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
   const pickTier = () => toolTier(bestToolIn(Object.keys(inventoryCounts(bot)), 'pickaxe') ?? '', 'pickaxe')
   const allowed = (p: P, name: string) => !agent.protectedAreas.isProtected(p) && (isNaturalBlock(name) || AIR.test(name))
   let broken = 0
+  let retreat = ''
+  let notReady = false
+  let lit = 0
   let yielded = 0 // source blocks broken: drops reach the inventory a moment later, so count these too
   let stopped = ''
   const got = () => have() - start
@@ -220,13 +322,17 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
   }
 
   try {
+    // safe mining: depth cap when not ready, cave checks, torches, retreat
+    const ms = miningState(bot, agent.settings)
+    const safety = opts.safe !== false && ms.s.safe
+    const cap = safety && !ms.readiness.ready ? ms.surface - ms.s.safeDepth : -Infinity
     // 1. stone already in reach (never the column under our own feet), then exposed stone close by
     const feet0 = bot.entity.position.floored()
     const ids = [...sources].map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
     const candidates = () => bot.findBlocks({ matching: ids, maxDistance: 12, count: 128 })
       .map(v => ({ x: v.x, y: v.y, z: v.z }))
       .filter(p => !(p.x === Math.floor(bot.entity.position.x) && p.z === Math.floor(bot.entity.position.z) && p.y < bot.entity.position.y))
-      .filter(p => allowed(p, at(p)?.name ?? '') && !digHazard(at, p) && NEIGHBOURS.some(([dx, dy, dz]) => AIR.test(at(add(p, dx, dy, dz))?.name ?? 'x')))
+      .filter(p => p.y >= cap && allowed(p, at(p)?.name ?? '') && !digHazard(at, p) && NEIGHBOURS.some(([dx, dy, dz]) => AIR.test(at(add(p, dx, dy, dz))?.name ?? 'x')))
     let pathFails = 0
     while (progress() < count && pathFails < 2) {
       checkAborted(signal)
@@ -255,7 +361,12 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
     let feet: P = bot.entity.position.floored()
     const startY = feet.y
     const minY = Math.max(startY - 20, typeof (bot.game as any)?.minY === 'number' ? (bot.game as any).minY + 6 : -58)
-    let dir = DIRS.map(d => ({ d, plan: planStep(at, feet, d, true, allowed) })).find(x => typeof x.plan !== 'string')?.d ?? DIRS[0]!
+    const tunnel = new Set<string>()
+    const caves = safety ? { belowY: ms.surface - 1, tunnel } : undefined
+    let sinceTorch = 0
+    let noTorches = false
+    let torchesPlaced = 0
+    let dir = DIRS.map(d => ({ d, plan: planStep(at, feet, d, true, allowed, false, caves) })).find(x => typeof x.plan !== 'string')?.d ?? DIRS[0]!
     let steps = 0
     let turns = 0
     let reachedStone = false
@@ -272,11 +383,22 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
       }
       if (bot.inventory.emptySlotCount() === 0) await makeRoom(bot, 2, new Set([item]))
       if (bot.inventory.emptySlotCount() === 0) { stopped = 'inventory full'; break }
+      if (safety) {
+        const u = undergroundNow(bot, ms.s.hostileRadius)
+        const why = undergroundRetreat({ underground: u.underground || feet.y < ms.surface - 3, health: bot.health, hostiles: u.hostiles }, ms.s)
+        if (why) { retreat = why; stopped = `abandoned the dig and headed back up: ${why}`; break }
+      }
       reachedStone ||= inStoneLayer(at, feet, dir)
-      const down = (!reachedStone || feet.y > startY - (opts.minDepth ?? 0)) && feet.y > minY
-      let plan = planStep(at, feet, dir, down, allowed, !down)
+      const wantDown = (!reachedStone || feet.y > startY - (opts.minDepth ?? 0)) && feet.y > minY
+      if (wantDown && feet.y <= cap) {
+        notReady = true
+        stopped = `${notReadyText(ms.readiness)} (staying within ${ms.s.safeDepth} blocks of the surface)`
+        break
+      }
+      const down = wantDown
+      let plan = planStep(at, feet, dir, down, allowed, !down, caves)
       if (typeof plan === 'string' && down) {
-        const flat = planStep(at, feet, dir, false, allowed, true)
+        const flat = planStep(at, feet, dir, false, allowed, true, caves)
         if (typeof flat !== 'string') plan = flat
       }
       if (typeof plan === 'string') {
@@ -310,19 +432,27 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
         stopped = `couldn't step to ${fmtPos(plan.stand)}`
         break
       }
+      const prev = feet
       feet = bot.entity.position.floored()
       steps++
+      for (const p of [...plan.dig, feet, add(feet, 0, 1, 0)]) tunnel.add(key(p))
+      // light the tunnel behind us: mobs don't spawn in it and the way back is visible
+      sinceTorch++
+      if (safety && !noTorches && feet.y < ms.surface - 2 && torchDue(sinceTorch, ms.s, (bot.blockAt(vec(bot, feet.x, feet.y, feet.z)) as any)?.light)) {
+        if (await placeTorch(bot, signal, prev)) { sinceTorch = 0; torchesPlaced++ } else noTorches = !bot.inventory.items().some(i => i.name === 'torch') && torchCrafts(inventoryCounts(bot)) < 1
+      }
       for (const p of plan.side) {
         if (progress() >= count) break
         if (digHazard(at, p, new Set([key(feet), key(add(feet, 0, 1, 0))]))) continue
-        try { await breakAt(p) } catch (e) { checkAborted(signal); if (e instanceof NothingDropsError) throw e }
+        try { if (await breakAt(p)) tunnel.add(key(p)) } catch (e) { checkAborted(signal); if (e instanceof NothingDropsError) throw e }
       }
       await oresNear([feet, add(feet, 0, 1, 0)])
     }
+    lit = torchesPlaced
     if (!stopped && progress() < count && steps >= (opts.maxSteps ?? 48)) stopped = `stopped after ${steps} steps`
-    // drops land in the tunnel; one short sweep for the ones that didn't fly to us
-    await pickupNearby(bot, signal, { radius: 8, maxMs: 10_000 })
-    if (opts.returnUp !== false && feet0.y - bot.entity.position.y > 2) {
+    // drops land in the tunnel; one short sweep for the ones that didn't fly to us (not when fleeing)
+    if (!retreat) await pickupNearby(bot, signal, { radius: 8, maxMs: 10_000 })
+    if ((opts.returnUp !== false || retreat) && feet0.y - bot.entity.position.y > 2) {
       await gotoWithin(bot, new goals.GoalNear(feet0.x, feet0.y, feet0.z, 1), signal, 30_000).catch(e => { checkAborted(signal); log.debug('mine: no way back up', { error: (e as Error).message }) })
     }
   } catch (e) {
@@ -330,10 +460,11 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
     stopped = (e as Error).message
   }
   const ms = Date.now() - t0
-  const rate = `${broken} blocks in ${Math.round(ms / 1000)}s, ${perMinute(broken, ms)}/min${toolsMade.length ? `; pickaxe broke, ${toolsMade.join(', ')}` : ''}`
-  log.info('mined', { item, got: got(), wanted: count, broken, perMin: perMinute(broken, ms) })
-  if (got() >= count) return ok(`${toolNote}mined ${got()} ${item} (${rate})`, { got: got(), broken, ms })
-  if (got() > 0) return ok(`${toolNote}mined ${got()} of ${count} ${item} (${rate}); stopped: ${stopped || 'ran out of stone'}`, { got: got(), broken, ms })
-  return fail(`${toolNote}mined no ${item} (${rate}): ${stopped || 'no stone found'}`, { got: 0, broken, ms })
+  const rate = `${broken} blocks in ${Math.round(ms / 1000)}s, ${perMinute(broken, ms)}/min${lit ? `, ${lit} torch${lit === 1 ? '' : 'es'} placed` : ''}${toolsMade.length ? `; pickaxe broke, ${toolsMade.join(', ')}` : ''}`
+  log.info('mined', { item, got: got(), wanted: count, broken, perMin: perMinute(broken, ms), ...(retreat ? { retreat } : {}) })
+  const extra = { ...(retreat ? { retreat } : {}), ...(notReady ? { notReady: true } : {}) }
+  if (got() >= count) return ok(`${toolNote}mined ${got()} ${item} (${rate})`, { got: got(), broken, ms, ...extra })
+  if (got() > 0) return ok(`${toolNote}mined ${got()} of ${count} ${item} (${rate}); stopped: ${stopped || 'ran out of stone'}`, { got: got(), broken, ms, ...extra })
+  return fail(`${toolNote}mined no ${item} (${rate}): ${stopped || 'no stone found'}`, { got: 0, broken, ms, ...extra })
 }
 

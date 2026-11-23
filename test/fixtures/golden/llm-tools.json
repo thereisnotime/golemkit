@@ -2436,7 +2436,7 @@
     },
     {
       "name": "upgrade_tools",
-      "description": "Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, axe, shovel and sword, armour optionally. Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). In creative it just takes the tools. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "description": "Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, axe, shovel and sword, armour optionally. Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). Safe mining: without a weapon, food (and a shield or armour if mining.gear asks) it only takes ore near the surface and says \"not ready to mine: ...\" instead of going into caves. In creative it just takes the tools. (Long-running: starts in the background and keeps going until stopped or replaced.)",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2472,6 +2472,11 @@
           "prospect": {
             "default": true,
             "description": "when no iron ore is in sight, dig a staircase and strip mine to look for some",
+            "type": "boolean"
+          },
+          "safe": {
+            "default": true,
+            "description": "safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground",
             "type": "boolean"
           }
         }
@@ -5590,7 +5595,7 @@
     },
     {
       "name": "upgrade_tools",
-      "description": "Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, axe, shovel and sword, armour optionally. Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). In creative it just takes the tools. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "description": "Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, axe, shovel and sword, armour optionally. Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). Safe mining: without a weapon, food (and a shield or armour if mining.gear asks) it only takes ore near the surface and says \"not ready to mine: ...\" instead of going into caves. In creative it just takes the tools. (Long-running: starts in the background and keeps going until stopped or replaced.)",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5626,6 +5631,11 @@
           "prospect": {
             "default": true,
             "description": "when no iron ore is in sight, dig a staircase and strip mine to look for some",
+            "type": "boolean"
+          },
+          "safe": {
+            "default": true,
+            "description": "safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground",
             "type": "boolean"
           }
         }

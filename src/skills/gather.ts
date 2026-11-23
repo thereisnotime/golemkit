@@ -3,7 +3,8 @@ import { defineSkill, defineAction, z, ok, fail, goals, goto, travel, checkAbort
 import { digBlock, DigRefusedError, gotoWithin } from './world.ts'
 import { ensureTool, equipFor, minTierFor, needsTool, toolKindFor, harvestProblem, dropWatch } from './toolkit.ts'
 import { pickupNearby } from './pickup.ts'
-import { mineStone } from './mining.ts'
+import { mineStone, miningState, depthOk } from './mining.ts'
+import { notReadyText } from './minePlan.ts'
 import { autoUpgrade } from './progression.ts'
 import { perMinute } from './efficiency.ts'
 
@@ -25,7 +26,7 @@ function exitPoint (agent: any, pos: { x: number, z: number }): { x: number, z: 
  * once if everything nearby is protected. Blocks that drop nothing by hand (stone, ores) get
  * a pickaxe of the right tier first, crafted if the inventory allows.
  */
-export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>, block: string, count: number): Promise<ActionResult> {
+export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>, block: string, count: number, opts: { safe?: boolean } = {}): Promise<ActionResult> {
   if (!agent.canDig) return fail('digging is disabled for this bot')
   const type = bot.registry.blocksByName[block]
   if (!type) return fail(`unknown block ${block}`)
@@ -59,6 +60,10 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
   let got = 0
   let nothing = '' // digging that gives nothing: why
   const watch = dropWatch(bot)
+  // safe mining: not ready (weapon, food, gear) means nothing deeper than mining.safeDepth (no cave trips)
+  const m0 = miningState(bot, agent.settings)
+  const mining = opts.safe === false ? { ...m0, s: { ...m0.s, safe: false } } : m0
+  let tooDeep = 0
   let refusals = 0
   let misses = 0
   let leftZone = false
@@ -67,7 +72,9 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
     checkAborted(signal)
     const found = bot.findBlocks({ matching: matchIds, maxDistance: 48, count: 256 })
     // Cheapest first: blocks already in reach at or above our feet (no pathing at all), then exposed ones (air next to them: reachable without long dig-paths), then buried.
-    const candidates = found.map(p => bot.blockAt(p)).filter((b): b is NonNullable<typeof b> => !!b && allowed(b.position))
+    const near = found.map(p => bot.blockAt(p)).filter((b): b is NonNullable<typeof b> => !!b && allowed(b.position))
+    const candidates = near.filter(b => depthOk(bot, mining, b.position))
+    tooDeep = near.length - candidates.length
     const exposed = (b: { position: any }) => [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]
       .some(([dx, dy, dz]) => { const n = bot.blockAt(b.position.offset(dx, dy, dz)); return !n || n.boundingBox === 'empty' })
     const feetY = Math.floor(bot.entity.position.y)
@@ -76,7 +83,7 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
       candidates.find(exposed) ?? candidates[0]
     if (!target) {
       // Everything around is protected (or we're standing in a protected zone): walk out once and look again.
-      const out = !leftZone && (found.length || agent.protectedAreas.isProtected(bot.entity.position)) ? exitPoint(agent, bot.entity.position) : null
+      const out = !leftZone && (found.length > tooDeep || agent.protectedAreas.isProtected(bot.entity.position)) ? exitPoint(agent, bot.entity.position) : null
       if (!out) break
       leftZone = true
       log.debug('leaving protected area to collect', { to: `${out.x} ${out.z}` })
@@ -116,6 +123,7 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
   log.debug('collected', { block, got, picked, perMin: perMinute(got, Date.now() - t0) })
   if (got) return ok(`${toolNote}collected ${got} ${block}${got < count ? ` (wanted ${count})` : ''}${rate}`)
   if (refusals) return fail(`every ${block} I tried is in a protected area; tell me where digging is allowed`)
+  if (tooDeep && !skip.size) return fail(`${block} only deeper than ${mining.s.safeDepth} blocks below the surface (${tooDeep} seen) and ${notReadyText(mining.readiness)}`, { notReady: true, need: mining.readiness.need })
   if (skip.size) return fail(`found ${block} but couldn't get to any of it (${skip.size} tried: paths timed out or blocked); try from another spot`)
   return fail(`no ${block} I'm allowed to dig within 48 blocks`)
 }

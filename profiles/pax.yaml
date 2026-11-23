@@ -46,6 +46,13 @@ retry:
 reflexes:
   retreatBelow: 0             # stand its ground: always fight back, never back off
   waterFightAbove: 0
+settings:
+  # Safe mining (docs/guide/progression.md#safe-mining). Pax died at y 10 with stone tools, no
+  # armour and no torches after upgrade_tools walked it into a cave for iron. Now it only goes
+  # deeper than 8 blocks with a weapon, 4+ food and a shield or armour (the first iron ingot from
+  # surface ore becomes a shield), and underground it climbs out at 12 health or with 2 hostiles
+  # close, whatever reflexes.retreatBelow says.
+  mining: { gear: shield_or_armour, minFood: 4, retreatBelow: 12, retreatHostiles: 2 }
 # Behaviours that run on their own between LLM turns (docs/guide/behaviors.md). Pax or ${MC_OWNER:-Robin}
 # can arm more at runtime (behavior_arm / !behavior_arm follow_owner); those changes persist.
 behaviors:

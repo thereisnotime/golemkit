@@ -5,6 +5,9 @@
 // an arrow or bolt on course for the bot, a hit from range, or a shooter in range looking at it,
 // and picks shoot back / shield up / cover / back off by health and gear. It preempts whatever
 // job runs (scouting for food, chopping), which resumes afterwards.
+// Underground (settings.mining): at mining.retreatBelow health or with mining.retreatHostiles
+// hostiles close, it climbs out (climb_out) instead of standing to fight, whatever
+// reflexes.retreatBelow says; a melee mob right on it still gets fought (keepClimbing).
 import { defineBrain, PRIORITY, nearestHostile, isHostile, FLYING, needsSurvival } from '../../../core/index.ts'
 import { bestFood, isClimbingOut, keepClimbing } from '../../../skills/survival.ts'
 import { isRangedMob } from '../../../skills/weapons.ts'
@@ -18,6 +21,8 @@ import { wornArmorPoints } from '../../../skills/gear.ts'
 import { clutchInputs, extinguishInputs, hasWaterBucket, burning } from '../../../skills/clutch.ts'
 import { totemSwap, retreatPointless, retreatReason } from '../../../skills/techniques.ts'
 import { pvpAllowed } from '../../../skills/defense.ts'
+import { undergroundNow } from '../../../skills/mining.ts'
+import { miningSettings, undergroundRetreat } from '../../../skills/minePlan.ts'
 
 export interface ReflexOptions {
   selfDefense?: boolean
@@ -140,6 +145,26 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         return keepClimbing({ dist: Math.hypot(q.x - p.x, q.z - p.z), dy: q.y - p.y, ranged: isRangedMob(mob.name) || FLYING.has(mob.name ?? ''), creeper: mob.name === 'creeper' })
       }
 
+      // ---- underground and losing: climb out instead of standing to fight ----
+      let climbTriedAt = 0
+      let escaping = false
+      const undergroundEscape = (): boolean => {
+        if (!cfg().selfDefense || !needsSurvival(bot) || !bot.entity || bot.health <= 0 || escaping) return false
+        const cur = agent.currentAction?.name ?? ''
+        if (cur === 'climb_out' || cur === 'bunker' || cur === 'water_bucket' || isClimbingOut(bot) || !agent.getAction('climb_out') || !agent.canDig) return false
+        if (Date.now() - climbTriedAt < 15_000) return false
+        const s = miningSettings(agent.settings.mining)
+        if (!s.safe) return false
+        const u = undergroundNow(bot, s.hostileRadius)
+        const why = undergroundRetreat({ underground: u.underground, health: bot.health, hostiles: u.hostiles }, s)
+        if (!why) return false
+        climbTriedAt = Date.now()
+        escaping = true
+        agent.log.info(`underground retreat: ${why}, climbing out`)
+        void agent.act('climb_out', {}, { caller, priority: PRIORITY.reflex }).finally(() => { escaping = false })
+        return true
+      }
+
       // ---- ranged: something is shooting at us ----
       let rangedTriedAt = 0
       const rangedCheck = () => {
@@ -205,6 +230,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         }
         if (mob.name === 'warden') { if (cur !== 'retreat' && agent.getAction('retreat')) void reflex('retreat', true); return }
         if (climbingAway(mob)) return
+        if (undergroundEscape()) return
         // a shooter out of reach: the ranged reflex picks shoot back / shield / cover / back off by health and gear
         if (cfg().rangedDefense && isShooter(mob.name, mob.heldItem?.name) && mob.position.distanceTo(bot.entity.position) > 4 && agent.getAction('ranged_defense')) {
           if (cur !== 'ranged_defense' && !(cur === 'protect' && bot.health > 6)) { rangedTriedAt = Date.now(); void reflex('ranged_defense', true) }
@@ -244,6 +270,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         const { selfDefense, autoEat, eatBelow, retreatBelow } = cfg()
         // Low health with a hostile close by: get away even before the next hit.
         const mob = selfDefense ? nearestHostile(bot, bot.entity.position, 6) : null
+        if (mob && undergroundEscape()) return
         const climbing = climbingAway(mob)
         if (mob && !climbing && !FLYING.has(mob.name ?? '') && !fastMob(mob) && bot.health > 0 && bot.health <= retreatBelow && agent.currentAction?.name !== 'retreat' && agent.getAction('retreat')) {
           void reflex('retreat')
