@@ -21,6 +21,7 @@ import { TOGGLES, findToggle, parseToggleValue, getPath, expandPaths, deepMerge,
 import { resolveHumanize, typingDelayMs, styleLine, between, type HumanizeOptions } from './humanize.ts'
 import type { UsageSnapshot } from '../llm/usage.ts'
 import { Journal } from './journal/journal.ts'
+import type { DeathReport } from './journal/deathReport.ts'
 import { supports, type GameAdapter, type GameClient, type AdapterEvents, type Capability } from './adapter.ts'
 // The default game until profiles pick one (game-adapters phase 4).
 import { minecraftJava } from '../adapters/minecraft-java/adapter.ts'
@@ -198,6 +199,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
         ...(s.building ? { building: s.building } : {}),
         ...(s.reflexes ? { reflexes: pick(s.reflexes, ['selfDefense', 'autoEat', 'eatBelow', 'retreatBelow', 'waterFightAbove', 'rangedDefense']) } : {}),
         ...(s.combat ? { combat: s.combat } : {}),
+        ...(s.mining ? { mining: s.mining } : {}),
         ...(s.humanize?.enabled !== undefined ? { humanize: s.humanize.enabled } : {})
       },
       changedInGame: Object.keys(this.overrides()),
@@ -205,6 +207,9 @@ export class Agent extends TypedEmitter<AgentEvents> {
       howToChange: 'owners: !config_list / !config_set <key> <value>; behaviours: !behavior_configure'
     }
   }
+
+  /** The last death's cause report (adapter `deathCause`), shown in observe for 10 minutes. */
+  lastDeathReport: (DeathReport & { at: number }) | null = null
 
   /** Effective settings: profile/variant values with in-game overrides (config_set) on top. */
   get settings (): Record<string, unknown> {
@@ -606,7 +611,11 @@ export class Agent extends TypedEmitter<AgentEvents> {
       currentAction: this.currentAction ? { name: this.currentAction.name, params: this.currentAction.params } : null,
       players: o.players,
       nearby: o.nearby.map(e => ({ name: e.name, type: e.type, distance: Math.round(e.distance), position: fmtPos(e.position) })),
-      inventory: o.inventory
+      inventory: o.inventory,
+      // the facts about a death in the last 10 minutes, so nobody has to guess what killed it
+      ...(this.lastDeathReport && Date.now() - this.lastDeathReport.at < 600_000
+        ? { lastDeath: { cause: this.lastDeathReport.cause, detail: this.lastDeathReport.summary, secondsAgo: Math.round((Date.now() - this.lastDeathReport.at) / 1000) } }
+        : {})
     }
     const bot = this.adapter.client as GameClient
     for (const part of [...this.skills, ...this.brains]) {
@@ -738,6 +747,10 @@ export class Agent extends TypedEmitter<AgentEvents> {
         const p = adapter.self()?.position
         this.log.info('died', p ? { at: fmtPos(p) } : undefined)
         this.stopActions('died')
+      })
+      on('deathCause', (r) => {
+        this.lastDeathReport = { ...r, at: Date.now() }
+        this.log.info(`death cause: ${r.summary}`)
       })
       on('kicked', (reason) => this.log.warn(`kicked: ${reason}`))
       on('error', (e) => this.log.warn(`error: ${e.message}`))

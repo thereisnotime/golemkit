@@ -19,6 +19,7 @@ import { watchRefusedDigs } from './refusals.ts'
 import { holdStill, fidget } from './humanize.ts'
 import { inDanger } from './danger.ts'
 import { JournalCapture } from './journal-capture.ts'
+import { watchDeaths } from './deaths.ts'
 import './types.ts'
 
 type EventName = keyof AdapterEvents
@@ -119,6 +120,12 @@ export class MinecraftJavaAdapter implements GameAdapter {
       try { this.sessionCleanups.push(this.capture.session(bot)) } catch (e) { agent.log.warn(`journal: ${(e as Error).message}`) }
       for (const fn of [...this.spawnFns]) fn()
     })
+    // before the agent's listeners: the action holding the body is still set at the death event
+    const unwatch = watchDeaths(bot, agent, r => {
+      if (this.bot !== bot) return
+      for (const s of this.subs.filter(x => x.event === 'deathCause')) { try { s.fn(r) } catch (e) { agent.log.warn(`deathCause: ${(e as Error).message}`) } }
+    })
+    bot.once('end', unwatch)
     for (const s of this.subs) this.bind(s, bot)
   }
 
@@ -168,6 +175,7 @@ export class MinecraftJavaAdapter implements GameAdapter {
       case 'hurt': add('entityHurt', (e: unknown) => { if (e === bot.entity) fn(bot.health) }); break
       case 'health': add('health', () => fn(bot.health, bot.food)); break
       case 'death': add('death', () => fn()); break
+      case 'deathCause': break // emitted by watchDeaths (connect)
       case 'respawn': add('spawn', () => fn()); break
       case 'playerJoined': add('playerJoined', (p: { username: string }) => { if (p.username !== bot.username) fn(p.username) }); break
       case 'playerLeft': add('playerLeft', (p: { username: string }) => { if (p.username !== bot.username) fn(p.username) }); break

@@ -3,6 +3,7 @@
 // connection and everything game-specific. Minecraft Java is src/adapters/minecraft-java.
 // See docs/concepts/adapters.md.
 import type { Agent } from './agent.ts'
+import type { DeathReport } from './journal/deathReport.ts'
 
 /**
  * What an adapter can do. Actions and behaviours list the ones they need (`requires`) and an
@@ -122,6 +123,8 @@ export type AdapterEvents = {
   /** Health or food changed. */
   health: (health: number, food: number) => void
   death: () => void
+  /** Why the bot died, once known (the server's death message, recent damage), shortly after `death`. */
+  deathCause: (report: DeathReport) => void
   /** Respawned in the same session (after a death or a dimension change). */
   respawn: () => void
   playerJoined: (name: string) => void

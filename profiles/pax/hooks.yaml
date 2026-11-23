@@ -21,8 +21,8 @@ hooks:
   - id: death-report
     on: death
     do:
-      - whisper: { to: owners, text: "I died at {pos}. {drops}" }
-      - remember: { text: "died at {pos}", about: deaths }
+      - whisper: { to: owners, text: "I died at {pos}: {cause}. {drops}" }
+      - remember: { text: "died at {pos}: {deathDetail}", about: deaths }
 
   - id: greet-owner
     on: playerJoined

@@ -7,7 +7,7 @@
 // LLM (30) and NPC loops (20), below player commands (50) and reflexes (60). A hook step can
 // set its own priority (npc | llm | player | number). Chat goes through agent.say/whisper.
 import type { Agent } from '../core/index.ts'
-import { defineBrain, fmtPos } from '../core/index.ts'
+import { defineBrain, fmtPos, onDeathReport } from '../core/index.ts'
 import { Memory } from '../llm/memory.ts'
 import { contextFor, disposeContext, onLlmBudgetExhausted } from '../context/handle.ts'
 import { HookEngine, parseDuration, type HookHost, type HookState } from '../context/hooks.ts'
@@ -109,12 +109,15 @@ export const hooksBrain = (opts: HooksBrainOptions = {}) => {
         } catch {}
       }
       const carryTimer = setInterval(countItems, 2000)
-      const onDeath = () => {
-        const p = game.self()?.position
+      // fires once the cause is known (the server's death message, recent damage), a moment after the death
+      const offDeath = onDeathReport(game, (r, p) => {
         const pos = p ? fmtPos(p) : 'unknown position'
         const drops = carried > 0 ? `My stuff (${carried} items) should still be there for 5 minutes.` : 'I had nothing on me.'
-        run(engine.emit({ type: 'death', vars: { pos, deathPos: pos, drops } }))
-      }
+        run(engine.emit({
+          type: 'death',
+          vars: { pos, deathPos: pos, drops, cause: r.cause, killer: r.killer ?? r.recentDamage[0] ?? 'unknown', deathDetail: r.summary, deathMessage: r.message ?? r.cause }
+        }))
+      })
       const onJoin = (player: string) => {
         if (Date.now() - spawnedAt < 10_000) return // the list is replayed on spawn
         run(engine.emit({ type: 'playerJoined', player }))
@@ -123,7 +126,6 @@ export const hooksBrain = (opts: HooksBrainOptions = {}) => {
       game.on('respawn', onRespawn)
       game.on('health', onHealth)
       game.on('hurt', onHurt)
-      game.on('death', onDeath)
       game.on('playerJoined', onJoin)
       game.on('playerLeft', onLeave)
       const timers = engine.list.filter(h => h.on === 'timer').map(h => setInterval(() => run(engine.emit({ type: 'timer', hookId: h.id })), parseDuration(h.every)))
@@ -133,7 +135,7 @@ export const hooksBrain = (opts: HooksBrainOptions = {}) => {
         game.off('respawn', onRespawn)
         game.off('health', onHealth)
         game.off('hurt', onHurt)
-        game.off('death', onDeath)
+        offDeath()
         game.off('playerJoined', onJoin)
         game.off('playerLeft', onLeave)
         for (const t of timers) clearInterval(t)

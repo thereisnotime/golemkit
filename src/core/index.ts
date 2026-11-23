@@ -28,7 +28,8 @@ export {
   Journal, resolveJournalConfig, fleetQuery, parseDeathMessage, parseAdvancement, parseRange,
   fmtEvent, fmtSection, fmtRollup, fmtCounts, ago, buildDayRollup, buildSection, ITEM_DESPAWN_MS, JOURNAL_TYPES,
   type JournalEvent, type JournalQuery, type JournalConfig, type JournalType, type DeathView, type DayRollup,
-  type RollupSection, type PeriodSummary, type DeathInfo
+  type RollupSection, type PeriodSummary, type DeathInfo,
+  DeathCauseTracker, buildDeathReport, describeDeath, causeFromMessage, onDeathReport, type DeathReport, type DeathContext
 } from './journal/index.ts'
 export {
   KNOWN_CAPABILITIES, supports,

@@ -6,7 +6,7 @@
 //
 //   brains: [commandBrain(), reflexes(), llmBrain({ provider: 'claude-subscription' })]
 import type { Agent } from '../core/index.ts'
-import { defineBrain, defineAction, noParams, ok, fail } from '../core/index.ts'
+import { defineBrain, defineAction, noParams, ok, fail, onDeathReport } from '../core/index.ts'
 import type { Price } from '../llm/pricing.ts'
 import { sumBuckets, fmtTotals, type UsageBucket } from '../llm/usage.ts'
 import { createProvider } from '../llm/providers/index.ts'
@@ -193,7 +193,8 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
         lastHurt = Date.now()
         rt.onEvent('hurt', `you got hurt, health now ${Math.round(health)}/20`)
       }
-      const onDeath = () => rt.onEvent('death', 'you died and respawned')
+      // the facts (server death message, who hurt it, what it was doing) so the model reports instead of guessing
+      const offDeath = onDeathReport(game, (r) => rt.onEvent('death', `you died and respawned. Cause, from the server and the damage log: ${r.summary}. Report this cause as it is; don't guess another one`))
       const onJoin = (player: string) => {
         // The player list is replayed on spawn; only count real joins.
         if (Date.now() - spawnedAt < 10_000) return
@@ -201,7 +202,6 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
       }
       const onLeave = (player: string) => { rt.onEvent('playerLeft', `${player} left the game`, player) }
       game.on('hurt', onHurt)
-      game.on('death', onDeath)
       game.on('playerJoined', onJoin)
       game.on('playerLeft', onLeave)
 
@@ -212,7 +212,7 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
 
       return () => {
         game.off('hurt', onHurt)
-        game.off('death', onDeath)
+        offDeath()
         game.off('playerJoined', onJoin)
         game.off('playerLeft', onLeave)
         if (timer) clearInterval(timer)
