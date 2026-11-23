@@ -4,7 +4,7 @@
 import type { Bot } from 'mineflayer'
 import { z, needsSurvival, itemName } from '../../../core/index.ts'
 import { defineBehavior } from '../../../brains/behaviors/types.ts'
-import { nextToolUpgrade, senseNearby, type Nearby } from '../../../skills/progression.ts'
+import { nextToolUpgrade, senseNearby, heldTier, type Nearby } from '../../../skills/progression.ts'
 import { inventoryCounts, toolTier, usablePlankUnits, type ToolKind } from '../../../skills/toolkit.ts'
 
 /** Blackboard need set while upgrade_tools is stuck for wood; chop_wood_loop scores higher for it. */
@@ -49,6 +49,7 @@ export const keepToolsUpgraded = defineBehavior({
   create (o, { agent }) {
     let sensed: { at: number, nearby: Nearby } | null = null
     let lastNeed: string | undefined
+    let quietAt = 0
     const nearby = (bot: Bot, now: number): Nearby => {
       if (!sensed || now - sensed.at > o.senseSeconds * 1000) {
         sensed = { at: now, nearby: senseNearby({ bot, agent, signal: new AbortController().signal, log: agent.log }) }
@@ -59,8 +60,16 @@ export const keepToolsUpgraded = defineBehavior({
       if (!bot.entity || !needsSurvival(bot)) return null
       const worn = wornTools(bot, o.minDurability)
       if (worn.length) return { worn: worn[0]! }
-      const step = nextToolUpgrade(inventoryCounts(bot), nearby(bot, now), bot.game?.gameMode, { upTo: o.upTo, armour: o.armour })
-      if (!step || (step.do === 'gather' && !agent.canDig)) return null
+      const inv = inventoryCounts(bot)
+      const step = nextToolUpgrade(inv, nearby(bot, now), bot.game?.gameMode, { upTo: o.upTo, armour: o.armour })
+      if (!step || (step.do === 'gather' && !agent.canDig)) {
+        if (now - quietAt > 300_000) {
+          quietAt = now
+          const tools = KINDS.map(k => `${k} ${heldTier(inv, k)}`).join(', ')
+          agent.log.child('behaviors').debug(`keep_tools_upgraded: nothing to do (${step ? `${step.do} ${'item' in step ? step.item : ''} needs digging` : 'no next step'}; ${tools}; wood ${usablePlankUnits(inv)}, cobble ${inv.cobblestone ?? 0})`)
+        }
+        return null
+      }
       return { step }
     }
     return {
