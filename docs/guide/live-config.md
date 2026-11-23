@@ -62,6 +62,13 @@ can't change their own.
 | `mining.retreatHostiles` | 0–20 | underground: climb out when this many hostiles are within 8 blocks (default 2, 0 = never) |
 | `mining.torches` | on/off | light tunnels, crafting torches from coal or charcoal and sticks (default on) |
 | `mining.torchEvery` | 1–64 | a torch every this many tunnel steps (default 8) |
+| `askHelp.enabled` | on/off | when a behaviour keeps failing the same way, tell the owners once what it was trying, why it fails and what would help ([asking for help](./behaviors#asking-for-help); default off) |
+| `askHelp.failures` | 1–100 | failures of the same kind before it asks (default 3) |
+| `askHelp.minutes` | 0–1440 | ...spread over at least this many minutes (default 10) |
+| `askHelp.maxPerHour` | 0–60 | help messages per hour at most, over all behaviours (default 3) |
+| `askHelp.tell` | owners / say | whisper the owners who are online, or public chat |
+| `askHelp.thanks` | on/off | say "sorted, thanks" once when something it asked about works again (default off) |
+| `askHelp.llm` | on/off | let the LLM brain know it asked (no extra turn unless `triggers.events.stuck`; default on) |
 | `humanize.enabled` | on/off | player-like reaction and typing delays |
 | `humanize.typoRate` | 0–1 | chance of a typo per message |
 | `humanize.lowercase` | on/off | write chat in lower case |

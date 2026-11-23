@@ -4,6 +4,8 @@
 import type { z } from 'zod'
 import { PRIORITY, type Agent, type Capability } from '../../core/index.ts'
 import type { Behavior, NpcHook } from '../npc/index.ts'
+import type { Failure, HelpText } from '../npc/help.ts'
+import type { NpcContext } from '../npc/types.ts'
 
 /** Priority levels a behaviour can run at (mapped to PRIORITY.idle / npc / behavior). */
 export type BehaviorLevel = 'idle' | 'npc' | 'behavior'
@@ -51,6 +53,13 @@ export interface BehaviorDefinition<S extends z.ZodObject = z.ZodObject> {
   prepare? (options: z.infer<S>, ctx: { agent: Agent, player?: string }): z.infer<S>
   /** Builds the scored behaviour for these options. */
   create? (options: z.infer<S>, env: BehaviorEnv): BehaviorBody
+  /** What it is trying to do, in a few words, for help requests ("upgrade my tools"). The body's own goal wins. */
+  goal?: string
+  /**
+   * What would help when it keeps failing the same way (settings.askHelp): a short text such as
+   * "a few logs or planks in my chest", null when the behaviour reports it itself. The body's own help wins.
+   */
+  help? (ctx: NpcContext | undefined, failure: Failure): HelpText | null | undefined
   /** A per-tick hook instead of (or besides) a behaviour, e.g. greetings in chat. */
   hook? (options: z.infer<S>, env: BehaviorEnv): NpcHook
 }

@@ -540,7 +540,7 @@
         "type": "object",
         "properties": {
           "type": {
-            "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn; or deaths, chat, items, blocks, players, combat, connections, food, finds",
+            "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
             "type": "string"
           },
           "since": {
@@ -3699,7 +3699,7 @@
         "type": "object",
         "properties": {
           "type": {
-            "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn; or deaths, chat, items, blocks, players, combat, connections, food, finds",
+            "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
             "type": "string"
           },
           "since": {

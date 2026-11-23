@@ -4,10 +4,12 @@
 // See docs/guide/npc-brain.md.
 import { defineBrain, defineAction, noParams, ok, fail, type Agent } from '../../core/index.ts'
 import { NpcController, INTERRUPT_ACTION, type NpcOptions } from './controller.ts'
+import { helpDesk } from './help.ts'
 
 export { NpcController, INTERRUPT_ACTION, type NpcOptions, type BehaviorStats } from './controller.ts'
 export { Blackboard, type Needs, type Facts, type BlackboardOptions } from './blackboard.ts'
 export { decide, best, failureCooldown, flipCooldown, isFlip, type Decision, type Scored, type SelectOptions } from './select.ts'
+export { HelpDesk, helpDesk, helpMessage, normalizeReason, resolveHelpOptions, HELP_DEFAULTS, type HelpOptions, type HelpAsk, type HelpText, type Failure, type HelpSource, type HelpAgent } from './help.ts'
 export { NpcYield, type Behavior, type BehaviorContext, type NpcContext, type NpcHook } from './types.ts'
 export * from './behaviors/index.ts'
 
@@ -53,6 +55,10 @@ export const npcBrain = (opts: NpcOptions) => {
         c.stop('session ended')
         if (controller === c) controller = null
       }
+    },
+    observe (agent) {
+      const asked = helpDesk(agent).observeView(Date.now())
+      return asked.length ? { askedForHelp: asked } : {}
     },
     stop () {
       controller?.stop('stopped')

@@ -8,7 +8,7 @@
 //
 // See docs/guide/behaviors.md.
 import { defineBrain, type Agent } from '../../core/index.ts'
-import { NpcController, INTERRUPT_ACTION, type SelectOptions, type BlackboardOptions } from '../npc/index.ts'
+import { NpcController, INTERRUPT_ACTION, helpDesk, type SelectOptions, type BlackboardOptions } from '../npc/index.ts'
 import type { Caller } from '../../core/index.ts'
 import { defineAction, noParams, ok } from '../../core/index.ts'
 import { BehaviorRegistry } from './registry.ts'
@@ -145,7 +145,9 @@ export const behaviorsBrain = (opts: BehaviorsBrainOptions = {}) => {
     observe (agent) {
       const rt = runtimeFor(agent)
       if (!rt) return {}
-      return { behaviors: { armed: rt.armed().map(a => a.name), running: rt.controller?.current ?? null } }
+      // what it asked the owners for help with lately (settings.askHelp), so an LLM knows it is waiting
+      const asked = helpDesk(agent).observeView(Date.now())
+      return { behaviors: { armed: rt.armed().map(a => a.name), running: rt.controller?.current ?? null }, ...(asked.length ? { askedForHelp: asked } : {}) }
     },
     stop (agent) {
       runtimeFor(agent)?.controller?.stop('stopped')

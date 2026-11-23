@@ -77,6 +77,20 @@ export const ProfileSchema = z.object({
   selfAware: z.boolean().optional(),
   /** While the LLM is paused (quota/budget): false, or { arm: { behaviour: options } } (default: chop_wood_loop, deposit_when_full). */
   npcMode: z.union([z.literal(false), z.object({ arm: z.record(z.string(), z.record(z.string(), z.unknown())) })]).optional(),
+  /** Ask the owners for help when a behaviour keeps failing the same way: true/false or options. Lands in settings.askHelp. See docs/guide/behaviors.md#asking-for-help. */
+  askHelp: z.union([z.boolean(), z.object({
+    enabled: z.boolean().optional(),
+    failures: z.number().int().min(1).max(100).optional(),
+    minutes: z.number().min(0).max(1440).optional(),
+    forgetMinutes: z.number().min(1).optional(),
+    perReasonMinutes: z.number().min(1).optional(),
+    maxPerHour: z.number().int().min(0).max(60).optional(),
+    tell: z.enum(['owners', 'say']).optional(),
+    llm: z.boolean().optional(),
+    thanks: z.boolean().optional(),
+    quietHours: z.tuple([z.number().min(0).max(24), z.number().min(0).max(24)]).optional(),
+    observeMinutes: z.number().min(1).max(1440).optional()
+  }).strict()]).optional(),
   persona: z.string().optional(),
   server: z.object({
     host: z.string().optional(),
@@ -254,6 +268,7 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (profile.respectBuilds !== undefined) settings.respectBuilds = profile.respectBuilds
   if (profile.selfAware !== undefined) settings.selfAware = profile.selfAware
   if (profile.npcMode !== undefined) settings.npcMode = profile.npcMode
+  if (profile.askHelp !== undefined) settings.askHelp = { ...(settings.askHelp as object | undefined), ...(typeof profile.askHelp === 'boolean' ? { enabled: profile.askHelp } : profile.askHelp) }
   settings.profileName = name   // so the bot can tell which profile it is (observe: profile)
   if (profile.llm) settings.llm = { ...(settings.llm as object | undefined), ...profile.llm }
   if (profile.intents) {

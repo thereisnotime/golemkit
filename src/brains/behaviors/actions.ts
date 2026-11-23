@@ -104,7 +104,9 @@ export const behaviorStatus = defineAction({
     })
     const run = s.running ? `running ${s.running} ${s.runningFor}s` : 'running nothing'
     const paused = s.paused ? `, backing off ${s.paused.seconds}s for ${s.paused.by ?? '?'}` : ''
-    return ok(`armed: ${armed.join('; ')} | ${run}${paused}`, s)
+    const asked = (s as { askedForHelp?: { behavior: string, reason: string, minutesAgo: number, sorted: boolean }[] }).askedForHelp ?? []
+    const help = asked.length ? ` | asked for help: ${asked.map(a => `${a.behavior} (${a.reason}, ${a.minutesAgo}m ago${a.sorted ? ', sorted' : ''})`).join('; ')}` : ''
+    return ok(`armed: ${armed.join('; ')} | ${run}${paused}${help}`, s)
   }
 })
 

@@ -32,7 +32,8 @@ import { rangedDanger } from './safety.ts'
 import { pickFuel } from '../../../skills/crafting.ts'
 import { knownContainers, configuredChests } from '../../../skills/containers.ts'
 import { getPlaces, sameDimension } from '../../../skills/navigation.ts'
-import { dist, hostilesNear, ownerTarget } from './util.ts'
+import { dist, hostilesNear } from './util.ts'
+import { helpDesk } from '../../../brains/npc/help.ts'
 
 /** Raw food -> what cooking makes of it. */
 export const COOKED: Record<string, string> = {
@@ -627,14 +628,14 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
     case 'forage':
       return ctx.act('forage', { radius: FORAGE_RANGE, kinds: canSmeltKelp(bot) ? ['berries', 'kelp'] : ['berries'], ...(d.apples ? { apples: true } : {}) })
     case 'report': {
-      let owner: { name: string } | null = null
-      try { owner = ownerTarget(agent, bot) } catch {}
       const text = foodReportText({ food: bot.food, searchedTo: d.radius, seeds: seedCount(invOf(bot)), hasFarm: getFarms(agent).length > 0, reason: d.reason })
-      if (owner && bot.players?.[owner.name]) agent.whisper(owner.name, text); else agent.say(text)
+      // through the shared help desk (settings.askHelp): same hourly limits and journal as the other
+      // behaviours' help requests, so the owner isn't told twice; nobody online: say it in chat
+      const asked = helpDesk(agent).ask({ behavior: 'keep_fed', reason: 'no food', key: 'no food', goal: 'find food', help: 'food, seeds or 2 animals', text, fallbackSay: true }, Date.now())
       const m = memory(agent)
       m.lastReportAt = Date.now()
       saveMemory(agent, m)
-      return { ok: true, message: 'told the owner I am starving' }
+      return { ok: true, message: asked ? 'told the owner I am starving' : 'starving, already told the owner' }
     }
   }
 }
@@ -695,6 +696,9 @@ export const keepFed = defineBehavior({
     return {
       failureCooldownMs: 10_000,
       maxFailureCooldownMs: 10_000,
+      goal: 'keep myself fed',
+      // with `report` on, the ladder's own starving report asks (through the same help desk)
+      help: () => o.report ? null : 'some food in my chest, seeds or 2 animals',
       score ({ bot, bb, current }) {
         if (!needsSurvival(bot)) return 0 // creative/spectator: no hunger
         const food = typeof bot.food === 'number' ? bot.food : 20

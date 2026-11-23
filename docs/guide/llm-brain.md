@@ -213,10 +213,14 @@ llmBrain({
     ownersOnly: true,     // agent.isOwner(): --owners / MC_OWNERS, empty = everyone
     playerCooldownMs: 2500,
     tickMs: 0,            // autonomous check-in every N ms while idle
-    events: { hurt: false, death: true, playerJoined: false }
+    events: { hurt: false, death: true, playerJoined: false, stuck: false }
   }
 })
 ```
+
+`stuck`: a behaviour asked the owners for help ([asking for help](./behaviors#asking-for-help)).
+The request always goes into the model's memory, so the next turn knows about it; `stuck: true`
+also starts a turn of its own (off by default: no extra model call).
 
 The `death` event waits for the cause (the server's death message, at most a few seconds) and
 hands the model the facts: "slain by Zombie (server: ...); hurt by creeper, zombie in the last

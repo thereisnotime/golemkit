@@ -46,6 +46,19 @@ export interface ActionInfo {
   player?: string
 }
 
+/** What askHelp / helpSorted carry (the HelpAsk of brains/npc/help.ts). */
+export interface HelpEventInfo {
+  behavior: string
+  reason: string
+  goal: string
+  help: string | null
+  text: string
+  failures: number
+  at: number
+  to: string[]
+  [k: string]: unknown
+}
+
 export type AgentEvents = {
   /** New session, bot spawned and skills/brains set up. */
   session: (bot: GameClient) => void
@@ -64,6 +77,10 @@ export type AgentEvents = {
   stopped: () => void
   /** A setting was changed in game (config_set / config_reset); key is the dotted path or '*'. */
   settingsChanged: (key: string) => void
+  /** A behaviour kept failing the same way and asked its owners for help (brains/npc/help.ts, settings.askHelp). */
+  askHelp: (ask: HelpEventInfo) => void
+  /** A behaviour it had asked for help about works again. */
+  helpSorted: (ask: HelpEventInfo) => void
   /** The server changed this bot's game mode (survival/creative/adventure/spectator). */
   gameModeChanged: (mode: string, previous: string) => void
 }

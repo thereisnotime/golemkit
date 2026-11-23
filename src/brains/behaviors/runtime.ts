@@ -81,7 +81,12 @@ export class BehaviorRuntime {
         const env = { agent: this.agent }
         if (def.create) {
           const body = def.create(entry.options, env)
-          behaviors.push({ ...body, name: def.name, priority: this.priorityOf(def, entry.options), requires: [...(def.requires ?? []), ...(body.requires ?? [])] })
+          const help = body.help ?? def.help
+          const goal = body.goal ?? def.goal
+          behaviors.push({
+            ...body, name: def.name, priority: this.priorityOf(def, entry.options), requires: [...(def.requires ?? []), ...(body.requires ?? [])],
+            ...(goal ? { goal } : {}), ...(help ? { help } : {})
+          })
         }
         if (def.hook) hooks.push(def.hook(entry.options, env))
       } catch (e) {
@@ -125,6 +130,7 @@ export class BehaviorRuntime {
       running: cs?.behavior ?? null,
       runningFor: cs?.runningFor ?? 0,
       paused: cs?.paused ?? null,
+      ...(cs?.askedForHelp ? { askedForHelp: cs.askedForHelp } : {}),
       connected: !!c
     }
   }

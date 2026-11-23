@@ -52,6 +52,9 @@ export function fmtEvent (e: JournalEvent, now = Date.now()): string {
     case 'connect': body = `connected${at}`; break
     case 'disconnect': body = `disconnected: ${cut(d.reason, 80)}`; break
     case 'llm_turn': body = `LLM turn ${d.trigger ? `(${d.trigger}) ` : ''}${d.inputTokens}/${d.outputTokens} tokens${d.ok === false ? ', failed' : ''}`; break
+    case 'help': body = d.status === 'sorted'
+      ? `${d.behavior} works again (asked for help ${d.minutes ?? '?'}m before)`
+      : `asked ${(d.to ?? []).join(', ') || 'nobody'} for help with ${d.behavior}: ${cut(d.reason, 70)}${d.help ? `; needs ${cut(d.help, 60)}` : ''}`; break
     case 'journal_dropped': body = `(${d.count} ${d.type} events not recorded, over the per-minute cap)`; break
     case 'rollup': body = `day summary ${d.date}: ${d.text}`; break
     default: body = `${e.type} ${cut(JSON.stringify(d), 80)}`

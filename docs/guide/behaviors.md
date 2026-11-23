@@ -919,6 +919,86 @@ behaviors:
 LLM or a player uses it directly; `stay=true` keeps the bot in bed until the morning.
 `observe()` shows `respawnPoint` once it is known.
 
+## Asking for help
+
+A behaviour that keeps failing only backs off longer (60 s doubling to 15 min for the chores)
+and would loop for hours: Pax ran `keep_tools_upgraded` about 80 times on "could not make
+sticks", `chop_wood_loop` said "no natural tree within 32 blocks" all afternoon and `stay_safe`'s
+`go_home` kept hitting "No path to the goal". With `askHelp` on, the bot tells its owners once
+instead:
+
+```
+[Pax -> Robin] Stuck trying to upgrade my tools: could not make sticks for a stone pickaxe (5 tries over 23 min). A few logs or planks in my chest would help.
+```
+
+How it works (`src/brains/npc/help.ts`, game-agnostic, one help desk per bot shared by every
+NPC controller):
+
+- Every failed run goes to the desk with its message. Failures are grouped per behaviour and
+  per normalized reason: numbers, coordinates, anything in brackets and everything after the
+  first `;` are dropped, so "no natural tree within 32 blocks" and "... within 64 blocks" are
+  one kind. Yields and aborts don't count; a success clears the behaviour's failures. A kind
+  with no new failure for `forgetMinutes` starts over.
+- After `failures` failures of one kind spread over at least `minutes` minutes, it asks once:
+  what it was trying (the behaviour's `goal`), the last failure, how often and how long, and
+  what would help (the behaviour's `help` hook), or "Any idea?" without a hint.
+- `tell: owners` whispers every owner who is online; nobody online means no message yet, the
+  next failure tries again. `tell: say` uses public chat.
+- Rate limits: one ask per behaviour and reason per `perReasonMinutes` (60), no second reason
+  for a behaviour whose ask is still open, `maxPerHour` (3) in total, nothing during
+  `quietHours`. What was sent is kept in storage, so a restart doesn't ask again.
+- When the behaviour succeeds again the ask is marked sorted (journal); with `thanks: true` the
+  same people get "sorted: upgrade my tools works again, thanks".
+- Every ask is a `help` [journal](/guide/journal) event (`!events type=help`), `observe` shows
+  `askedForHelp` for `observeMinutes` (60), and `!npc_status` / `!behavior_status` list it.
+- The agent emits `askHelp` and `helpSorted`. The [LLM brain](/guide/llm-brain) puts them in its
+  memory (no model call); `triggers.events.stuck: true` starts a turn for it.
+
+```yaml
+askHelp: true                                   # defaults below
+askHelp:
+  enabled: true
+  failures: 3          # failures of one kind...
+  minutes: 10          # ...spread over at least this long
+  forgetMinutes: 120   # a kind quiet this long starts over
+  perReasonMinutes: 60 # one ask per behaviour and reason this often
+  maxPerHour: 3        # over all behaviours
+  tell: owners         # owners (whisper those online) | say (public chat)
+  llm: true            # emit askHelp / helpSorted for the LLM brain
+  thanks: false        # "sorted, thanks" once when it works again
+  quietHours: [23, 7]  # local hours without asks (default none)
+  observeMinutes: 60   # how long observe shows an ask
+```
+
+Off by default; an options map turns it on unless it says `enabled: false`. Pax's profile turns
+it on. `!config_set askHelp.enabled false` (and `failures`, `minutes`, `maxPerHour`, `tell`,
+`thanks`, `llm`) change it live.
+
+### Help hooks
+
+A behaviour (or its definition) can say what it is trying and what would help:
+
+```ts
+{
+  goal: 'keep a stock of wood',
+  help: (ctx, failure) => /tree/.test(failure.reason) ? 'a few logs in my chest' : undefined,
+  // or return { help, goal, tried }; null = "I report this myself", no ask
+}
+```
+
+`failure` has `behavior`, `key` (the normalized reason), `reason` (the last message), `messages`
+(up to 3 distinct ones), `count`, `firstAt`, `lastAt`. The stock behaviours get their goals and
+hints from one table (`src/adapters/minecraft-java/behaviors/help.ts`): logs or planks for sticks,
+coal, cobblestone, iron or a kit to mine deeper for `keep_tools_upgraded`; logs or a forest for
+`chop_wood_loop`; a path or door into home for `stay_safe`, `return_home` and `sleep_at_night`;
+a bed, a chest, seeds or 2 animals, water, torches for the others; and "a clear path (or a door)"
+for path failures of any behaviour.
+
+`keep_fed` has its own starving report (`report: true`, about how far it searched). It goes
+through the same desk: shared limits and journal, so the owner never gets both, and it still
+works with `askHelp` off (then it is limited to once an hour, falling back to public chat when no
+owner is online).
+
 ## Capabilities
 
 A behaviour lists the actions it `requires`; if the bot lacks one it is skipped with a

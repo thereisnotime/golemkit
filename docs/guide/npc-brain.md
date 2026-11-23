@@ -125,6 +125,10 @@ const fishAtDawn: Behavior = {
   and `ctx.signal`. When another caller takes the body, `ctx.act` throws and the brain backs
   off; you don't need to handle it. Return an action result, a string, nothing (success) or
   `false` (failure).
+- `goal` and `help(ctx, failure)` (optional): what it is trying to do in a few words, and
+  what would help when it keeps failing the same way. With `settings.askHelp` on, the
+  controller whispers the owners once after repeated failures of one kind; see
+  [asking for help](./behaviors#asking-for-help).
 - Prefer bounded actions over long-running ones (`goto_player` in a loop rather than
   `follow`), so the brain gets the slot back.
 

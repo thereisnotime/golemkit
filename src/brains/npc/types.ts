@@ -1,6 +1,7 @@
 // Types shared by the NPC brain and its behaviours.
 import type { Agent, ActionResult, Logger, GameClient } from '../../core/index.ts'
 import type { Blackboard } from './blackboard.ts'
+import type { Failure, HelpText } from './help.ts'
 
 /** What every scoring function sees. Cheap to build, rebuilt each tick. */
 export interface NpcContext {
@@ -61,6 +62,14 @@ export interface Behavior {
    * armed keep_fed at PRIORITY.behavior (35) still runs while an LLM (30) holds the body.
    */
   priority?: number
+  /** What it is trying to do, in a few words ("upgrade my tools"), for help requests. Default: the name. */
+  goal?: string
+  /**
+   * When it keeps failing the same way and asks its owners for help (settings.askHelp), what
+   * would help: "a few logs or planks in my chest". Return null when the behaviour reports this
+   * itself (keep_fed's starving report), undefined for no hint. See docs/guide/behaviors.md#asking-for-help.
+   */
+  help? (ctx: NpcContext | undefined, failure: Failure): HelpText | null | undefined
 }
 
 /** Runs every tick before scoring: updates custom needs, or does cheap side effects (chat). */

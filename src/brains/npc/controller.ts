@@ -7,6 +7,7 @@ import {
 import { getHome, setHome } from '../../skills/navigation.ts'
 import { Blackboard, type BlackboardOptions } from './blackboard.ts'
 import { decide, failureCooldown, flipCooldown, isFlip, type Scored, type SelectOptions } from './select.ts'
+import { helpDesk, type HelpDesk } from './help.ts'
 import { NpcYield, type Behavior, type BehaviorContext, type NpcContext, type NpcHook } from './types.ts'
 
 /** Internal no-op action the brain runs to cut its own in-flight action short. */
@@ -31,6 +32,8 @@ export interface NpcOptions extends SelectOptions, BlackboardOptions {
   autoHome?: boolean
   /** Clock, for tests. */
   now?: () => number
+  /** Where repeated failures are escalated (settings.askHelp). Default: the agent's shared desk. */
+  help?: HelpDesk
 }
 
 const DEFAULT_BACKOFF: Record<Caller['kind'], number> = { player: 20000, brain: 20000, reflex: 3000, system: 10000 }
@@ -96,6 +99,7 @@ export class NpcController {
   private readonly caller: Caller
   private readonly backoff: Record<Caller['kind'], number>
   private readonly stats = new Map<string, Stats>()
+  readonly help: HelpDesk
   private running: RunningEntry | null = null
   private pausedUntil = 0
   /** Behaviours at or below this priority stay paused until pausedUntil. */
@@ -116,6 +120,7 @@ export class NpcController {
     this.caller = { kind: 'brain', name: this.name }
     this.backoff = { ...DEFAULT_BACKOFF, ...opts.backoffMs }
     this.bb = new Blackboard(agent, opts)
+    this.help = opts.help ?? helpDesk(agent)
     if (Array.isArray(opts.behaviors)) this.checkNames(opts.behaviors)
     this.behaviors()
     const self = agent.adapter.self()
@@ -422,12 +427,15 @@ export class NpcController {
         st.failKey = undefined
         if (!signal.aborted) st.flips = 0 // a run that finished by itself, not one cut short
         st.cooldownUntil = end + (behavior.cooldownMs ?? 0)
+        try { this.help.success(name, end) } catch (e) { this.log.debug(`help: ${(e as Error).message}`) }
       } else if (outcome === 'fail') {
         st.failures++
         const cd = failureCooldown(st.failures, behavior.failureCooldownMs ?? 5000, behavior.maxFailureCooldownMs ?? 120000)
         st.cooldownUntil = end + cd
         try { st.failKey = behavior.retryKey?.(this.context(end)) } catch { st.failKey = undefined }
         this.log.debug(`${name} failed (${detail}), cooling down ${Math.round(cd / 1000)}s`)
+        // the same failure over and over: tell the owners once (settings.askHelp)
+        try { this.help.failure(behavior, detail, end, this.context(end)) } catch (e) { this.log.debug(`help: ${(e as Error).message}`) }
       }
       st.last = `${outcome}: ${detail}`
       st.lastAt = end
@@ -454,6 +462,7 @@ export class NpcController {
       cooldowns: Object.fromEntries([...this.stats].filter(([, s]) => s.cooldownUntil > now)
         .map(([n, s]) => [n, Math.ceil((s.cooldownUntil - now) / 1000)])),
       last: Object.fromEntries([...this.stats].filter(([, s]) => s.last).map(([n, s]) => [n, s.last])),
+      ...(this.help.recent(now).length ? { askedForHelp: this.help.observeView(now) } : {}),
       ...this.bb.toJSON()
     }
   }
@@ -466,11 +475,13 @@ export class NpcController {
     const needs = Object.entries(s.needs as Record<string, number>).filter(([, v]) => v > 0)
       .map(([k, v]) => `${k} ${v}`).join(', ')
     const paused = s.paused as { seconds: number, by: string | null } | null
+    const asked = (s.askedForHelp as { behavior: string, reason: string, minutesAgo: number, sorted: boolean }[] | undefined) ?? []
     return [
       `doing ${s.behavior ?? 'nothing'}${s.behavior ? ` (${s.runningFor}s)` : ''}`,
       paused ? `backing off ${paused.seconds}s for ${paused.by ?? '?'}` : '',
       `scores: ${scores || 'none'}`,
       `needs: ${needs || 'none'}`,
+      asked.length ? `asked for help: ${asked.map(a => `${a.behavior} (${a.reason}, ${a.minutesAgo}m ago${a.sorted ? ', sorted' : ''})`).join('; ')}` : '',
       s.isNight ? 'night' : 'day'
     ].filter(Boolean).join(' | ')
   }

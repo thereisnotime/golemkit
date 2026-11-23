@@ -3,7 +3,7 @@ import { loadDotEnvOnce } from './definition.ts'
 // Load .env before any variant or script reads process.env, also when Node wasn't started with
 // --env-file. Variables already set in the environment win.
 loadDotEnvOnce()
-export { Agent, type AgentEvents, type ChatMessage, type ActionInfo, type ActOptions, type ActionCatalogEntry } from './agent.ts'
+export { Agent, type AgentEvents, type HelpEventInfo, type ChatMessage, type ActionInfo, type ActOptions, type ActionCatalogEntry } from './agent.ts'
 export {
   defineAction, noParams, ok, fail, sleep, checkAborted, ActionAbortedError, PRIORITY,
   type ActionDef, type ActionContext, type ActionResult, type Caller

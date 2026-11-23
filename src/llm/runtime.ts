@@ -30,6 +30,8 @@ export interface TriggerOptions extends ChatTriggerOptions {
     hurt?: boolean
     death?: boolean
     playerJoined?: boolean
+    /** A behaviour asked the owners for help (settings.askHelp). Default false: it only goes into memory, no extra model call. */
+    stuck?: boolean
   }
   /** Minimum gap between chat turns for the same player; faster messages are merged into the next turn. Default 2500 ms. */
   playerCooldownMs?: number
@@ -506,7 +508,7 @@ export class LlmRuntime {
   }
 
   /** Something happened in the world. Recorded in memory; starts a turn if that event is enabled. */
-  onEvent (event: 'hurt' | 'death' | 'playerJoined' | 'playerLeft', detail: string, player?: string): void {
+  onEvent (event: 'hurt' | 'death' | 'playerJoined' | 'playerLeft' | 'stuck', detail: string, player?: string): void {
     this.memory.push({ kind: 'event', text: detail })
     const enabled = (this.opts.triggers?.events as Record<string, boolean | undefined> | undefined)?.[event]
     if (enabled) this.enqueue({ kind: 'event', event, detail, player })

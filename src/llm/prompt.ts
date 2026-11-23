@@ -7,7 +7,7 @@ import { fmtEvent } from './memory.ts'
 export type Trigger =
   | { kind: 'chat', from: string, message: string, whisper: boolean, /** false for overheard chat (listen: 'all') */ addressed?: boolean }
   | { kind: 'tick', reason: string }
-  | { kind: 'event', event: 'hurt' | 'death' | 'playerJoined' | 'playerLeft' | 'actionDone', detail: string, player?: string }
+  | { kind: 'event', event: 'hurt' | 'death' | 'playerJoined' | 'playerLeft' | 'actionDone' | 'stuck', detail: string, player?: string }
   /** Continuation of the active goal (goals.ts): after an action ended, an idle re-check, a reconnect, or a guardrail stop. */
   | { kind: 'goal', reason: GoalTriggerReason, detail?: string, player?: string }
 

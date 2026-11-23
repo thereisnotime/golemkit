@@ -178,6 +178,9 @@ export const llmBrain = (opts: LlmBrainOptions = {}) => {
       agent.on('chat', msg => rt.onChat(msg))
       agent.on('settingsChanged', () => rt.applySettings(fromSettings(agent)))
       agent.on('actionEnd', (info, result) => rt.onActionEnd(info, result))
+      // a behaviour asked the owners for help (settings.askHelp): the model sees it next turn; a turn of its own only with triggers.events.stuck
+      agent.on('askHelp', ask => rt.onEvent('stuck', `your ${ask.behavior} behaviour keeps failing (${ask.reason}) and you asked ${ask.to.join(', ') || 'nobody'} for help: "${ask.text}". Don't repeat the request; help yourself if you can`))
+      agent.on('helpSorted', ask => rt.onEvent('stuck', `${ask.behavior} works again (you had asked for help: ${ask.reason})`))
     },
 
     session (agent) {

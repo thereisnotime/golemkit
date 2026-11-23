@@ -40,6 +40,10 @@ llm:
     maxTurns: 80              # turns on its own before it checks back with ${MC_OWNER:-Robin} (big builds need many)
     timeoutMin: 120           # minutes on its own before it checks back
     maxSameFailures: 3        # same failure this often: stop and ask
+# Stuck for a while (same failure 3 times over 10+ minutes, e.g. "could not make sticks", "no natural
+# tree within 32 blocks", "No path to the goal"): whisper ${MC_OWNER:-Robin} once what it was trying, why it
+# fails and what would help, instead of looping for hours. Once per reason an hour, 3 an hour at most.
+askHelp: { enabled: true, failures: 3, minutes: 10, maxPerHour: 3 }
 building: library             # library | creative | ask: reuse a saved blueprint, design one, or let ${MC_OWNER:-Robin} pick
 retry:
   actions: { goto: 1, chop_tree: 1 }
