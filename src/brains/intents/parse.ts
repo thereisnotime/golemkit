@@ -433,7 +433,12 @@ const RULES: Rule[] = [
   { re: /^(find|locate|look for|search for|seek|track down|where is|where are|where can i find|scout for|scout|go find|go look for|show me|take me to|lead me to|is there|are there|any) (me |us )?(the nearest |the closest |nearest |closest |a |an |the |some |any )?([a-z0-9_ ]{2,40}?)( nearby| near here| around| around here| close by| close)?( within (\d+)( blocks)?)?( and (bring|get|grab|fetch) (it|them|some)( back| to me| here)?)?$/, build: (m, ctx) => {
     const target = m[4]!.trim()
     if (/^(you|yourself|me|us|it|them|this|that|out)$/.test(target)) return null
-    if (m[1] === 'where is' || m[1] === 'where are') { if (/^(you|pax|my stuff|everyone)$/.test(target)) return null }
+    if (m[1] === 'where is' || m[1] === 'where are') {
+      if (/^(you|pax|my stuff|everyone)$/.test(target)) return null
+      // "where's my iron": something stored, answered from container memory
+      const mine = /^(my|our) ([a-z0-9_ ]{2,40})$/.exec(target)
+      if (mine && !m[5] && !m[7] && !m[9]) return ({ intent: 'find', args: { target: mine[2]!.trim().replace(/\s+/g, '_'), stored: true } })
+    }
     if ((m[1] === 'is there' || m[1] === 'are there' || m[1] === 'any') && !m[5]) return null // "is there a way..." chat
     void ctx
     return ({ intent: 'find', args: { target: target.replace(/\s+/g, '_'), ...(m[7] ? { radius: Number(m[7]) } : {}), ...(m[9] ? { bring: true } : {}) } })

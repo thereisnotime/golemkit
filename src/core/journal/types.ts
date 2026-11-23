@@ -11,6 +11,8 @@ export const JOURNAL_TYPES = [
   'food_spot', 'farm_started', 'found',
   'connect', 'disconnect',
   'llm_turn',
+  /** Container memory (settings.inventoryMemory): a container's contents differ from what the bot remembered / it is gone or another block. */
+  'container_changed', 'container_gone',
   /** A behaviour asked the owners for help, or it works again (settings.askHelp). */
   'help',
   /** Written by the journal itself when a type hit its per-minute cap. */

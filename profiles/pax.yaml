@@ -60,6 +60,12 @@ settings:
   # Pantry in the room by home (placed by the owner's OK on 2026-11-23): keep_fed walks over and
   # looks inside when it has no food, so it works after a restart too.
   storage: { chests: [[559, 69, -47]] }
+  # Container memory (docs/guide/search.md#container-memory): what it saw in chests survives a
+  # restart; a sighting older than a day is only a hint and is re-checked on the spot. By day it
+  # looks into its own and the pantry chest near home once an hour, whispers ${MC_OWNER:-Robin} when the
+  # pantry is down to fewer than 8 food items, and grumbles (once per chest every 3 h) when someone
+  # raids, moves or breaks one of its chests.
+  inventoryMemory: { enabled: true, maxAgeHours: 24, refreshMinutes: 60, indexOwn: true, radius: 48, lowFood: 8, grumble: true, grumbleTo: owners }
   # Trips (docs/guide/behaviors.md#trips). Two deaths on 2026-11-23 were starving trips: food search
   # out to 120 and 250 blocks, food 12 -> 0 in six minutes, then shot and drowned. Before a trip a
   # behaviour starts it takes food from the pantry up to 8 items, holds a weapon and needs 12 health;
@@ -102,6 +108,7 @@ behaviors:
   # after a hostile shows up there, torches so every spot a mob could spawn on has light 8+;
   # coal, else charcoal from logs; only places, never breaks anything; remembers its own torches.
   light_home: { radius: 24, farmRadius: 14, target: 8, maxTorches: 12 }
+  check_storage: { max: 3 }   # with settings.inventoryMemory.indexOwn: looks into its chests near home now and then
   anti_afk: { afterSeconds: 45 }   # small look/swing/hop so idle-kick servers don't drop it
 # Plain-language commands without the LLM (docs/guide/intents.md): "pax follow me", "pax chop some
 # wood". first = simple requests are handled directly (no tokens), everything else goes to the LLM.

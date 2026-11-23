@@ -30,7 +30,7 @@ import { wornArmorPoints } from '../../../skills/gear.ts'
 import { escorting } from '../../../skills/bodyguard.ts'
 import { rangedDanger } from './safety.ts'
 import { pickFuel } from '../../../skills/crafting.ts'
-import { knownContainers, configuredChests } from '../../../skills/containers.ts'
+import { knownContainers, configuredChests, sameContainer } from '../../../skills/containers.ts'
 import { getPlaces, sameDimension } from '../../../skills/navigation.ts'
 import { dist, hostilesNear } from './util.ts'
 import { helpDesk } from '../../../brains/npc/help.ts'
@@ -115,7 +115,7 @@ function pantryToCheck (bot: Bot, agent: Agent, now = Date.now()): { x: number, 
   const seen = knownContainers(agent)
   return configuredChests(agent)
     .filter(c => dist(c, pos) <= PANTRY_RANGE && now - (checked?.get(`${c.x} ${c.y} ${c.z}`) ?? 0) > PANTRY_RECHECK_MS)
-    .filter(c => !seen.some(k => k.x === c.x && k.y === c.y && k.z === c.z && now - k.at < PANTRY_RECHECK_MS))
+    .filter(c => !seen.some(k => sameContainer(k, c) && now - k.at < PANTRY_RECHECK_MS))
     .sort((a, b) => dist(a, pos) - dist(b, pos))[0] ?? null
 }
 

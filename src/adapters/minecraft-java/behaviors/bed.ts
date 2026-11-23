@@ -7,7 +7,7 @@ import { z, needsSurvival, type Agent } from '../../../core/index.ts'
 import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import { getHome, sameDimension } from '../../../skills/navigation.ts'
 import { inventoryCounts } from '../../../skills/toolkit.ts'
-import { knownContainers, ownChests, configuredChests } from '../../../skills/containers.ts'
+import { knownContainers, knownAt, ownChests, configuredChests } from '../../../skills/containers.ts'
 import { huntRefusal } from '../../../skills/combat.ts'
 import { getSpawn, checkSpawnBed, ownBedsNear, spawnBedState, shearable } from '../../../skills/bed.ts'
 import {
@@ -44,7 +44,7 @@ function chestsNearHome (agent: Agent, home: { x: number, z: number }, range: nu
   const own = [...ownChests(agent), ...configuredChests(agent)]
   return own
     .filter(p => Math.hypot(p.x - home.x, p.z - home.z) <= range)
-    .map(p => ({ ...p, contents: seen.find(c => c.x === p.x && c.y === p.y && c.z === p.z)?.contents ?? {} }))
+    .map(p => ({ ...p, contents: knownAt(seen, p)?.contents ?? {} }))
 }
 
 function sheepCounts (bot: Bot, radius: number, spare: number, agent: Agent): { shearable: number, huntable: number } {

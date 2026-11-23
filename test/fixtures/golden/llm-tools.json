@@ -540,7 +540,7 @@
         "type": "object",
         "properties": {
           "type": {
-            "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
+            "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
             "type": "string"
           },
           "since": {
@@ -1014,6 +1014,51 @@
             "type": "number"
           }
         }
+      }
+    },
+    {
+      "name": "check_chests",
+      "description": "Look inside its own chests (ones it placed) and the configured ones (settings.storage.chests) near home that it has not looked into lately, so what it remembers is right again: notes items taken or added, chests moved or broken, and says when the pantry runs low. Never opens anyone else's chest.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "radius": {
+            "default": 48,
+            "description": "chests within this many blocks of home",
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 256
+          },
+          "max": {
+            "default": 3,
+            "description": "chests to look into this time",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "all": {
+            "default": false,
+            "description": "also chests it looked into lately",
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "name": "where_stored",
+      "description": "Say where an item is stored, from what the bot remembers seeing in chests and barrels: position and how long ago it looked (\"12 iron_ingot in the chest at 559 69 -47, seen 2 h ago\"). Older sightings are marked as maybe changed. bring_item fetches it from its own chests.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "string",
+            "minLength": 1,
+            "description": "item name or a word of it, e.g. iron, bread, oak_log"
+          }
+        },
+        "required": [
+          "item"
+        ]
       }
     },
     {
@@ -3850,7 +3895,7 @@
         "type": "object",
         "properties": {
           "type": {
-            "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
+            "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
             "type": "string"
           },
           "since": {
@@ -4324,6 +4369,51 @@
             "type": "number"
           }
         }
+      }
+    },
+    {
+      "name": "check_chests",
+      "description": "Look inside its own chests (ones it placed) and the configured ones (settings.storage.chests) near home that it has not looked into lately, so what it remembers is right again: notes items taken or added, chests moved or broken, and says when the pantry runs low. Never opens anyone else's chest.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "radius": {
+            "default": 48,
+            "description": "chests within this many blocks of home",
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 256
+          },
+          "max": {
+            "default": 3,
+            "description": "chests to look into this time",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "all": {
+            "default": false,
+            "description": "also chests it looked into lately",
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "name": "where_stored",
+      "description": "Say where an item is stored, from what the bot remembers seeing in chests and barrels: position and how long ago it looked (\"12 iron_ingot in the chest at 559 69 -47, seen 2 h ago\"). Older sightings are marked as maybe changed. bring_item fetches it from its own chests.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "string",
+            "minLength": 1,
+            "description": "item name or a word of it, e.g. iron, bread, oak_log"
+          }
+        },
+        "required": [
+          "item"
+        ]
       }
     },
     {

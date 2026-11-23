@@ -580,7 +580,7 @@
           "type": "object",
           "properties": {
             "type": {
-              "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
+              "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
               "type": "string"
             },
             "since": {
@@ -2071,7 +2071,7 @@
           "type": "object",
           "properties": {
             "type": {
-              "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
+              "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
               "type": "string"
             },
             "since": {
@@ -2290,6 +2290,8 @@
       "deposit",
       "withdraw",
       "list_container",
+      "check_chests",
+      "where_stored",
       "harvest",
       "plant",
       "till",
@@ -2881,7 +2883,7 @@
           "type": "object",
           "properties": {
             "type": {
-              "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
+              "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
               "type": "string"
             },
             "since": {
@@ -3412,6 +3414,57 @@
               "type": "number"
             }
           }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "check_chests",
+        "description": "Look inside its own chests (ones it placed) and the configured ones (settings.storage.chests) near home that it has not looked into lately, so what it remembers is right again: notes items taken or added, chests moved or broken, and says when the pantry runs low. Never opens anyone else's chest.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "radius": {
+              "default": 48,
+              "description": "chests within this many blocks of home",
+              "type": "integer",
+              "minimum": 4,
+              "maximum": 256
+            },
+            "max": {
+              "default": 3,
+              "description": "chests to look into this time",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "all": {
+              "default": false,
+              "description": "also chests it looked into lately",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
+        "name": "where_stored",
+        "description": "Say where an item is stored, from what the bot remembers seeing in chests and barrels: position and how long ago it looked (\"12 iron_ingot in the chest at 559 69 -47, seen 2 h ago\"). Older sightings are marked as maybe changed. bring_item fetches it from its own chests.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string",
+              "minLength": 1,
+              "description": "item name or a word of it, e.g. iron, bread, oak_log"
+            }
+          },
+          "required": [
+            "item"
+          ]
         },
         "exclusive": false,
         "longRunning": false
@@ -5889,7 +5942,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get (!help <command> for details)"
   },
   "variant:villager": {
     "actions": [
@@ -5936,6 +5989,8 @@
       "deposit",
       "withdraw",
       "list_container",
+      "check_chests",
+      "where_stored",
       "harvest",
       "plant",
       "till",
@@ -6795,6 +6850,57 @@
               "type": "number"
             }
           }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "check_chests",
+        "description": "Look inside its own chests (ones it placed) and the configured ones (settings.storage.chests) near home that it has not looked into lately, so what it remembers is right again: notes items taken or added, chests moved or broken, and says when the pantry runs low. Never opens anyone else's chest.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "radius": {
+              "default": 48,
+              "description": "chests within this many blocks of home",
+              "type": "integer",
+              "minimum": 4,
+              "maximum": 256
+            },
+            "max": {
+              "default": 3,
+              "description": "chests to look into this time",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "all": {
+              "default": false,
+              "description": "also chests it looked into lately",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
+        "name": "where_stored",
+        "description": "Say where an item is stored, from what the bot remembers seeing in chests and barrels: position and how long ago it looked (\"12 iron_ingot in the chest at 559 69 -47, seen 2 h ago\"). Older sightings are marked as maybe changed. bring_item fetches it from its own chests.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string",
+              "minLength": 1,
+              "description": "item name or a word of it, e.g. iron, bread, oak_log"
+            }
+          },
+          "required": [
+            "item"
+          ]
         },
         "exclusive": false,
         "longRunning": false
@@ -9198,7 +9304,7 @@
         "longRunning": true
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items (!help <command> for details)"
   },
   "profile:apprentice": {
     "actions": [
@@ -10470,7 +10576,7 @@
           "type": "object",
           "properties": {
             "type": {
-              "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
+              "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
               "type": "string"
             },
             "since": {
@@ -10689,6 +10795,8 @@
       "deposit",
       "withdraw",
       "list_container",
+      "check_chests",
+      "where_stored",
       "harvest",
       "plant",
       "till",
@@ -11280,7 +11388,7 @@
           "type": "object",
           "properties": {
             "type": {
-              "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
+              "description": "event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck",
               "type": "string"
             },
             "since": {
@@ -11811,6 +11919,57 @@
               "type": "number"
             }
           }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "check_chests",
+        "description": "Look inside its own chests (ones it placed) and the configured ones (settings.storage.chests) near home that it has not looked into lately, so what it remembers is right again: notes items taken or added, chests moved or broken, and says when the pantry runs low. Never opens anyone else's chest.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "radius": {
+              "default": 48,
+              "description": "chests within this many blocks of home",
+              "type": "integer",
+              "minimum": 4,
+              "maximum": 256
+            },
+            "max": {
+              "default": 3,
+              "description": "chests to look into this time",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "all": {
+              "default": false,
+              "description": "also chests it looked into lately",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": false
+      },
+      {
+        "name": "where_stored",
+        "description": "Say where an item is stored, from what the bot remembers seeing in chests and barrels: position and how long ago it looked (\"12 iron_ingot in the chest at 559 69 -47, seen 2 h ago\"). Older sightings are marked as maybe changed. bring_item fetches it from its own chests.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string",
+              "minLength": 1,
+              "description": "item name or a word of it, e.g. iron, bread, oak_log"
+            }
+          },
+          "required": [
+            "item"
+          ]
         },
         "exclusive": false,
         "longRunning": false
@@ -14288,6 +14447,6 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get (!help <command> for details)"
   }
 }

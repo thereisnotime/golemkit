@@ -213,9 +213,9 @@ const HINTS: Record<string, string> = {
   bot: 'the key is variant:'
 }
 
-/** settings.combat / settings.mining / settings.trips keys the code reads (the combat.*, mining.* and trips.* feature toggles). */
+/** settings.combat / mining / trips / inventoryMemory keys the code reads (the combat.*, mining.*, trips.* and inventoryMemory.* feature toggles). */
 const toggleKeys = (group: string) => new Set(TOGGLES.filter(t => t.key.startsWith(`${group}.`)).map(t => t.key.slice(group.length + 1)))
-const CHECKED_SETTINGS: Record<string, Set<string>> = { combat: toggleKeys('combat'), mining: toggleKeys('mining'), trips: toggleKeys('trips') }
+const CHECKED_SETTINGS: Record<string, Set<string>> = { combat: toggleKeys('combat'), mining: toggleKeys('mining'), trips: toggleKeys('trips'), inventoryMemory: toggleKeys('inventoryMemory') }
 
 /**
  * Keys in `raw` that `schema` doesn't declare (zod strips them without a word), as dotted paths.

@@ -22,7 +22,7 @@ import { mineStone } from './mining.ts'
 import { upgradeTools } from './progression.ts'
 import { toolTier, bestToolIn } from './toolkit.ts'
 import { CROPS, isMature, plantOn } from './farming.ts'
-import { withdraw as withdrawAction, knownContainers, CONTAINER_RE, ownChests, configuredChests, OWN_CHESTS_KEY } from './containers.ts'
+import { withdraw as withdrawAction, knownContainers, knownAt, CONTAINER_RE, ownChests, configuredChests, OWN_CHESTS_KEY } from './containers.ts'
 import { moddedNames } from './mods.ts'
 import { offLimits, spawnOf, surfaceAt, topY, isNight, inOwnFarm, getFoodSpots } from './food.ts'
 import {
@@ -780,8 +780,10 @@ function chestCandidates (agent: Agent, bot: Bot, item: string): { pos: Pos, kno
     .filter((p, i) => own.findIndex(q => q.x === p.x && q.y === p.y && q.z === p.z) === i)
     .filter(p => Math.hypot(p.x - here.x, p.y - here.y, p.z - here.z) <= 96)
     .map(p => {
-      const s = seen.find(c => c.x === p.x && c.y === p.y && c.z === p.z)
-      return { pos: p, known: s ? (s.contents[item] ?? 0) : null }
+      const s = knownAt(seen, p)
+      // an old sighting without the item is only a hint: still worth a look
+      const n = s ? (s.contents[item] ?? 0) : null
+      return { pos: p, known: s && s.freshness !== 'fresh' && !n ? null : n }
     })
     .filter(c => c.known === null || c.known > 0)
     .sort((a, b) => (b.known ?? 0.5) - (a.known ?? 0.5))

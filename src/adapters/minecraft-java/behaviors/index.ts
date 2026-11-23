@@ -13,6 +13,7 @@ import { keepSpawnBed } from './bed.ts'
 import { withStockHelp } from './help.ts'
 import { lightHome } from './light.ts'
 import { recoverDrops } from './recover.ts'
+import { checkStorage } from './storage.ts'
 
 export { keepFed, nextFoodStep, isHungry, senseFood, COOKED, type FoodStep, type FoodWorld, type FoodStepOptions } from './keepFed.ts'
 export { staySafe, avoidMobs, assessDanger } from './safety.ts'
@@ -27,13 +28,14 @@ export { keepSpawnBed } from './bed.ts'
 export { stockHelp, stockGoal, withStockHelp } from './help.ts'
 export { lightHome } from './light.ts'
 export { recoverDrops, RECOVER_SCORE } from './recover.ts'
+export { checkStorage, lowReportDue } from './storage.ts'
 
 export function defaultBehaviors (): BehaviorDefinition<any>[] {
   return withStockHelp([
     staySafe, avoidMobs, keepFed, recoverDrops,
     bodyguard, guardOwner, guardArea, followOwner,
     sleepAtNightBehavior, returnHome, keepSpawnBed, depositWhenFull,
-    farmSetup, farmLoop, chopWoodLoop, collectDrops, lightArea, lightHome, keepToolsUpgraded,
+    farmSetup, farmLoop, chopWoodLoop, collectDrops, lightArea, lightHome, keepToolsUpgraded, checkStorage,
     greetPlayersBehavior, wanderBehavior, idleLook, idleAntics, antiAfk
   ])
 }

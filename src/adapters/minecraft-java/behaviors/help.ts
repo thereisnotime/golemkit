@@ -46,7 +46,8 @@ const STOCK: Record<string, { goal: string, hints: Hint[], fallback?: string }> 
   follow_owner: { goal: 'follow you', hints: [[/path|reach|far|see/, 'you coming closer, or a path to where you are']] },
   guard_owner: { goal: 'guard you', hints: [[/path|reach|far|see/, 'you coming closer, or a path to where you are']] },
   bodyguard: { goal: 'guard you', hints: [[/path|reach|far|see/, 'you coming closer, or a path to where you are']] },
-  guard_area: { goal: 'guard the area', hints: [] }
+  guard_area: { goal: 'guard the area', hints: [] },
+  check_storage: { goal: 'keep track of my chests', hints: [[/open|chest|loaded/, 'a clear way to my chests near home']] }
 }
 
 /** The "what would help" text for a stock behaviour's failure, or undefined. */

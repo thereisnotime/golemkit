@@ -12,7 +12,7 @@ import {
   type Agent, type ActionContext, type ActionResult, type Caller, type Logger,
   type TripSettings, type TripKind, type TripKit, type TripSample, type TripPrep, type Trip
 } from '../core/index.ts'
-import { takeFoodFromOwnChests, knownContainers, ownChests, configuredChests } from './containers.ts'
+import { takeFoodFromOwnChests, knownContainers, knownAt, ownChests, configuredChests } from './containers.ts'
 import { getHome, sameDimension } from './navigation.ts'
 
 const BAD_FOOD = new Set(['rotten_flesh', 'spider_eye', 'poisonous_potato', 'pufferfish', 'suspicious_stew', 'chorus_fruit'])
@@ -74,8 +74,9 @@ function pantryFood (bot: Bot, agent: Agent): { items: number, unseen: number } 
   let items = 0
   let unseen = 0
   for (const p of own) {
-    const c = seen.find(k => k.x === p.x && k.y === p.y && k.z === p.z)
-    if (!c) { unseen++; continue }
+    const c = knownAt(seen, p)
+    // an old sighting (container memory) is a hint: worth a look, not food to count on
+    if (!c || c.freshness !== 'fresh') { unseen++; continue }
     for (const [n, v] of Object.entries(c.contents)) if (foodPoints(bot, n)) items += v
   }
   return { items, unseen }

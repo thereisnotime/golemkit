@@ -388,6 +388,12 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
         return
       }
       case 'find': {
+        // "where's my iron": from what it remembers seeing in chests; nothing known falls through to a search only when asked to bring it
+        if (a.stored && has('where_stored')) {
+          const r = await act('where_stored', { item: String(a.target) })
+          const fetchable = r.ok && (r.data as { fetchable?: boolean } | undefined)?.fetchable && has('bring_item')
+          return reply(r.ok ? `${r.message}${fetchable ? ` (say "bring me ${String(a.target).replace(/_/g, ' ')}" and I fetch it)` : ''}` : r.message)
+        }
         if (!has('find_target')) return reply("find_target isn't available here yet")
         await run('find_target', { target: String(a.target), ...(a.radius ? { radius: a.radius } : {}), ...(a.bring ? { bring: true } : {}) }, `looking for ${a.target}`)
         return
