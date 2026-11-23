@@ -25,6 +25,12 @@
       "ranged_defense (internal)",
       "water_bucket (internal)",
       "defend_player (internal)",
+      "pvp_engage (internal)",
+      "pvp",
+      "attack_player",
+      "spare_player",
+      "hunt_player",
+      "pvp_list",
       "eat",
       "sleep",
       "wake",
@@ -75,7 +81,7 @@
       },
       {
         "name": "stop",
-        "description": "Stop whatever the bot is doing.",
+        "description": "Stop whatever the bot is doing. Also the PvP kill switch: ends every fight with a player and every hunt, and an attacking PvP mode (revenge, targets, all) goes off.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -386,6 +392,96 @@
               "type": "boolean"
             }
           }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "pvp",
+        "description": "PvP mode (owners only): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "defend",
+                "revenge",
+                "targets",
+                "all"
+              ]
+            }
+          }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "attack_player",
+        "description": "Put a player on the PvP target list (owners only): attacked on sight from now on (switches PvP to targets mode if needed). Never owners or friends.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "spare_player",
+        "description": "Take a player off the PvP target list and forgive any grudge against them, ending a fight or hunt with them.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "hunt_player",
+        "description": "Hunt a player down (owners only): put them on the target list, go where they were last seen and fight them. Gives up after combat.huntMinutes; \"stop\" or \"pvp off\" ends it.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
+        "name": "pvp_list",
+        "description": "Show the PvP mode, the target list, grudges (revenge: who, why, minutes left) and hunts.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
         },
         "exclusive": false,
         "longRunning": false
@@ -799,7 +895,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !scene_start !scene_stop !scene_status !scene_list (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !scene_start !scene_stop !scene_status !scene_list (!help <command> for details)"
   },
   "variant:apprentice": {
     "actions": [
@@ -823,6 +919,12 @@
       "ranged_defense (internal)",
       "water_bucket (internal)",
       "defend_player (internal)",
+      "pvp_engage (internal)",
+      "pvp",
+      "attack_player",
+      "spare_player",
+      "hunt_player",
+      "pvp_list",
       "eat",
       "sleep",
       "wake",
@@ -867,7 +969,7 @@
       },
       {
         "name": "stop",
-        "description": "Stop whatever the bot is doing.",
+        "description": "Stop whatever the bot is doing. Also the PvP kill switch: ends every fight with a player and every hunt, and an attacking PvP mode (revenge, targets, all) goes off.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -1111,6 +1213,96 @@
               "type": "boolean"
             }
           }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "pvp",
+        "description": "PvP mode (owners only): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "defend",
+                "revenge",
+                "targets",
+                "all"
+              ]
+            }
+          }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "attack_player",
+        "description": "Put a player on the PvP target list (owners only): attacked on sight from now on (switches PvP to targets mode if needed). Never owners or friends.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "spare_player",
+        "description": "Take a player off the PvP target list and forgive any grudge against them, ending a fight or hunt with them.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "hunt_player",
+        "description": "Hunt a player down (owners only): put them on the target list, go where they were last seen and fight them. Gives up after combat.huntMinutes; \"stop\" or \"pvp off\" ends it.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
+        "name": "pvp_list",
+        "description": "Show the PvP mode, the target list, grudges (revenge: who, why, minutes left) and hunts.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
         },
         "exclusive": false,
         "longRunning": false
@@ -1496,7 +1688,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip (!help <command> for details)"
   },
   "variant:buddy": {
     "actions": [
@@ -1524,6 +1716,12 @@
       "ranged_defense (internal)",
       "water_bucket (internal)",
       "defend_player (internal)",
+      "pvp_engage (internal)",
+      "pvp",
+      "attack_player",
+      "spare_player",
+      "hunt_player",
+      "pvp_list",
       "eat",
       "sleep",
       "wake",
@@ -1566,7 +1764,7 @@
       },
       {
         "name": "stop",
-        "description": "Stop whatever the bot is doing.",
+        "description": "Stop whatever the bot is doing. Also the PvP kill switch: ends every fight with a player and every hunt, and an attacking PvP mode (revenge, targets, all) goes off.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -1877,6 +2075,96 @@
               "type": "boolean"
             }
           }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "pvp",
+        "description": "PvP mode (owners only): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "defend",
+                "revenge",
+                "targets",
+                "all"
+              ]
+            }
+          }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "attack_player",
+        "description": "Put a player on the PvP target list (owners only): attacked on sight from now on (switches PvP to targets mode if needed). Never owners or friends.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "spare_player",
+        "description": "Take a player off the PvP target list and forgive any grudge against them, ending a fight or hunt with them.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "hunt_player",
+        "description": "Hunt a player down (owners only): put them on the target list, go where they were last seen and fight them. Gives up after combat.huntMinutes; \"stop\" or \"pvp off\" ends it.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
+        "name": "pvp_list",
+        "description": "Show the PvP mode, the target list, grudges (revenge: who, why, minutes left) and hunts.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
         },
         "exclusive": false,
         "longRunning": false
@@ -2232,7 +2520,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player (!help <command> for details)"
   },
   "variant:companion": {
     "actions": [
@@ -2260,6 +2548,12 @@
       "ranged_defense (internal)",
       "water_bucket (internal)",
       "defend_player (internal)",
+      "pvp_engage (internal)",
+      "pvp",
+      "attack_player",
+      "spare_player",
+      "hunt_player",
+      "pvp_list",
       "eat",
       "sleep",
       "wake",
@@ -2378,7 +2672,7 @@
       },
       {
         "name": "stop",
-        "description": "Stop whatever the bot is doing.",
+        "description": "Stop whatever the bot is doing. Also the PvP kill switch: ends every fight with a player and every hunt, and an attacking PvP mode (revenge, targets, all) goes off.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -2689,6 +2983,96 @@
               "type": "boolean"
             }
           }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "pvp",
+        "description": "PvP mode (owners only): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "defend",
+                "revenge",
+                "targets",
+                "all"
+              ]
+            }
+          }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "attack_player",
+        "description": "Put a player on the PvP target list (owners only): attacked on sight from now on (switches PvP to targets mode if needed). Never owners or friends.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "spare_player",
+        "description": "Take a player off the PvP target list and forgive any grudge against them, ending a fight or hunt with them.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "hunt_player",
+        "description": "Hunt a player down (owners only): put them on the target list, go where they were last seen and fight them. Gives up after combat.huntMinutes; \"stop\" or \"pvp off\" ends it.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
+        "name": "pvp_list",
+        "description": "Show the PvP mode, the target list, grudges (revenge: who, why, minutes left) and hunts.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
         },
         "exclusive": false,
         "longRunning": false
@@ -5942,7 +6326,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get (!help <command> for details)"
   },
   "variant:villager": {
     "actions": [
@@ -5966,6 +6350,12 @@
       "ranged_defense (internal)",
       "water_bucket (internal)",
       "defend_player (internal)",
+      "pvp_engage (internal)",
+      "pvp",
+      "attack_player",
+      "spare_player",
+      "hunt_player",
+      "pvp_list",
       "eat",
       "sleep",
       "wake",
@@ -6074,7 +6464,7 @@
       },
       {
         "name": "stop",
-        "description": "Stop whatever the bot is doing.",
+        "description": "Stop whatever the bot is doing. Also the PvP kill switch: ends every fight with a player and every hunt, and an attacking PvP mode (revenge, targets, all) goes off.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -6318,6 +6708,96 @@
               "type": "boolean"
             }
           }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "pvp",
+        "description": "PvP mode (owners only): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "defend",
+                "revenge",
+                "targets",
+                "all"
+              ]
+            }
+          }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "attack_player",
+        "description": "Put a player on the PvP target list (owners only): attacked on sight from now on (switches PvP to targets mode if needed). Never owners or friends.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "spare_player",
+        "description": "Take a player off the PvP target list and forgive any grudge against them, ending a fight or hunt with them.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "hunt_player",
+        "description": "Hunt a player down (owners only): put them on the target list, go where they were last seen and fight them. Gives up after combat.huntMinutes; \"stop\" or \"pvp off\" ends it.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
+        "name": "pvp_list",
+        "description": "Show the PvP mode, the target list, grudges (revenge: who, why, minutes left) and hunts.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
         },
         "exclusive": false,
         "longRunning": false
@@ -9304,7 +9784,7 @@
         "longRunning": true
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items (!help <command> for details)"
   },
   "profile:apprentice": {
     "actions": [
@@ -9328,6 +9808,12 @@
       "ranged_defense (internal)",
       "water_bucket (internal)",
       "defend_player (internal)",
+      "pvp_engage (internal)",
+      "pvp",
+      "attack_player",
+      "spare_player",
+      "hunt_player",
+      "pvp_list",
       "eat",
       "sleep",
       "wake",
@@ -9372,7 +9858,7 @@
       },
       {
         "name": "stop",
-        "description": "Stop whatever the bot is doing.",
+        "description": "Stop whatever the bot is doing. Also the PvP kill switch: ends every fight with a player and every hunt, and an attacking PvP mode (revenge, targets, all) goes off.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -9616,6 +10102,96 @@
               "type": "boolean"
             }
           }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "pvp",
+        "description": "PvP mode (owners only): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "defend",
+                "revenge",
+                "targets",
+                "all"
+              ]
+            }
+          }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "attack_player",
+        "description": "Put a player on the PvP target list (owners only): attacked on sight from now on (switches PvP to targets mode if needed). Never owners or friends.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "spare_player",
+        "description": "Take a player off the PvP target list and forgive any grudge against them, ending a fight or hunt with them.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "hunt_player",
+        "description": "Hunt a player down (owners only): put them on the target list, go where they were last seen and fight them. Gives up after combat.huntMinutes; \"stop\" or \"pvp off\" ends it.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
+        "name": "pvp_list",
+        "description": "Show the PvP mode, the target list, grudges (revenge: who, why, minutes left) and hunts.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
         },
         "exclusive": false,
         "longRunning": false
@@ -10001,7 +10577,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip (!help <command> for details)"
   },
   "profile:example": {
     "actions": [
@@ -10029,6 +10605,12 @@
       "ranged_defense (internal)",
       "water_bucket (internal)",
       "defend_player (internal)",
+      "pvp_engage (internal)",
+      "pvp",
+      "attack_player",
+      "spare_player",
+      "hunt_player",
+      "pvp_list",
       "eat",
       "sleep",
       "wake",
@@ -10071,7 +10653,7 @@
       },
       {
         "name": "stop",
-        "description": "Stop whatever the bot is doing.",
+        "description": "Stop whatever the bot is doing. Also the PvP kill switch: ends every fight with a player and every hunt, and an attacking PvP mode (revenge, targets, all) goes off.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -10382,6 +10964,96 @@
               "type": "boolean"
             }
           }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "pvp",
+        "description": "PvP mode (owners only): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "defend",
+                "revenge",
+                "targets",
+                "all"
+              ]
+            }
+          }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "attack_player",
+        "description": "Put a player on the PvP target list (owners only): attacked on sight from now on (switches PvP to targets mode if needed). Never owners or friends.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "spare_player",
+        "description": "Take a player off the PvP target list and forgive any grudge against them, ending a fight or hunt with them.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "hunt_player",
+        "description": "Hunt a player down (owners only): put them on the target list, go where they were last seen and fight them. Gives up after combat.huntMinutes; \"stop\" or \"pvp off\" ends it.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
+        "name": "pvp_list",
+        "description": "Show the PvP mode, the target list, grudges (revenge: who, why, minutes left) and hunts.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
         },
         "exclusive": false,
         "longRunning": false
@@ -10737,7 +11409,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player (!help <command> for details)"
   },
   "profile:pax": {
     "actions": [
@@ -10765,6 +11437,12 @@
       "ranged_defense (internal)",
       "water_bucket (internal)",
       "defend_player (internal)",
+      "pvp_engage (internal)",
+      "pvp",
+      "attack_player",
+      "spare_player",
+      "hunt_player",
+      "pvp_list",
       "eat",
       "sleep",
       "wake",
@@ -10883,7 +11561,7 @@
       },
       {
         "name": "stop",
-        "description": "Stop whatever the bot is doing.",
+        "description": "Stop whatever the bot is doing. Also the PvP kill switch: ends every fight with a player and every hunt, and an attacking PvP mode (revenge, targets, all) goes off.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -11194,6 +11872,96 @@
               "type": "boolean"
             }
           }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "pvp",
+        "description": "PvP mode (owners only): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "defend",
+                "revenge",
+                "targets",
+                "all"
+              ]
+            }
+          }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "attack_player",
+        "description": "Put a player on the PvP target list (owners only): attacked on sight from now on (switches PvP to targets mode if needed). Never owners or friends.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "spare_player",
+        "description": "Take a player off the PvP target list and forgive any grudge against them, ending a fight or hunt with them.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "hunt_player",
+        "description": "Hunt a player down (owners only): put them on the target list, go where they were last seen and fight them. Gives up after combat.huntMinutes; \"stop\" or \"pvp off\" ends it.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "player": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "player"
+          ]
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
+        "name": "pvp_list",
+        "description": "Show the PvP mode, the target list, grudges (revenge: who, why, minutes left) and hunts.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
         },
         "exclusive": false,
         "longRunning": false
@@ -14447,6 +15215,6 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get (!help <command> for details)"
   }
 }

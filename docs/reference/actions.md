@@ -10,7 +10,7 @@ scopeNote: "Generated from the skills: most are Minecraft; the journal and confi
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-28 skills, 116 actions.
+28 skills, 122 actions.
 
 ## blueprint-library
 
@@ -303,7 +303,7 @@ Use a water bucket: land a long fall in water placed just before the ground, or 
 
 ### `defend_player`
 
-Fight back against a player who attacked this bot (or the player it guards), only with combat.pvp set to defend; stops as soon as they stop attacking or run. Never owners or friends, and never starts a fight (used by reflexes).
+Fight back against a player who attacked this bot (or the player it guards), with combat.pvp set to anything but off; stops as soon as they stop attacking or run. Never owners or friends, and never starts a fight (used by reflexes).
 
 *internal*
 
@@ -311,6 +311,64 @@ Fight back against a player who attacked this bot (or the player it guards), onl
 |---|---|---|---|---|
 | `player` | string | yes |  | the attacking player |
 | `protect` | string |  |  | the player the bot guards, whose attackers count too |
+
+### `pvp_engage`
+
+Attack a player the PvP mode allows (revenge, targets or all; never owners, friends, creative players). Started by the reflexes.
+
+*internal*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `player` | string | yes |  |  |
+
+### `pvp`
+
+PvP mode (owners only): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `mode` | `off` \| `defend` \| `revenge` \| `targets` \| `all` |  |  |  |
+
+### `attack_player`
+
+Put a player on the PvP target list (owners only): attacked on sight from now on (switches PvP to targets mode if needed). Never owners or friends.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `player` | string | yes |  |  |
+
+### `spare_player`
+
+Take a player off the PvP target list and forgive any grudge against them, ending a fight or hunt with them.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `player` | string | yes |  |  |
+
+### `hunt_player`
+
+Hunt a player down (owners only): put them on the target list, go where they were last seen and fight them. Gives up after combat.huntMinutes; "stop" or "pvp off" ends it.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `player` | string | yes |  |  |
+
+### `pvp_list`
+
+Show the PvP mode, the target list, grudges (revenge: who, why, minutes left) and hunts.
+
+*non-exclusive · aliases: `grudges`*
+
+No parameters.
 
 ## config
 
@@ -1187,7 +1245,7 @@ No parameters.
 
 ### `stop`
 
-Stop whatever the bot is doing.
+Stop whatever the bot is doing. Also the PvP kill switch: ends every fight with a player and every hunt, and an attacking PvP mode (revenge, targets, all) goes off.
 
 *non-exclusive*
 
