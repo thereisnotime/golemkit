@@ -69,6 +69,7 @@ classDiagram
 | `villager` | self-sufficient NPC (needs, routines, chores) | |
 | `actor` | performs [scenes](/guide/scenes) with other actors | used by `fleets/scenes.example.yaml` |
 | `companion` | LLM companion that talks and acts | `pax` (Sonnet 5.5, subscription token, obeys Robin) |
+| `apprentice` | [self-improving NPC](/guide/self-improver): runs its own program, rewrites it with one LLM call when an owner teaches it | `apprentice` |
 
 ## How a name is resolved
 
@@ -110,6 +111,10 @@ flowchart TD
 
 `settings` and `settings.llm` merge one level deep, so a profile can change just the model
 and keep the variant's other LLM options.
+
+Two exceptions: CLI flags (`--username`, `--owners`, `--dig`) only exist for `run`, so in a
+fleet the entry is the top layer; and for the server, a profile's `server:` block wins over the
+fleet's `servers:` entry, which in turn fills its gaps from the environment.
 
 ## When to make what
 

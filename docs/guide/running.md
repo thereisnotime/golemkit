@@ -11,22 +11,32 @@ just run <bot> [flags]
 just run buddy --username Helper --owners Robin,friend --dig
 ```
 
-`<bot>` is a file in `variants/` (`variants/buddy.ts` or `variants/buddy/index.ts`) or a path to one.
-Flags override the bot definition for this instance:
+`<bot>` is a [profile](./profiles) (`profiles/<name>.yaml` or `.yml`) or, if there is none by
+that name, a variant in `variants/` (`variants/buddy.ts` or `variants/buddy/index.ts`) or a path
+to one. Flags override the profile and the bot definition for this instance:
 
 | flag | meaning |
 |---|---|
 | `--username`, `-u` | Minecraft username |
 | `--owners a,b` | only these players may command it |
 | `--dig` | let it break blocks (pathfinding through walls, `collect`) |
-| `--host`, `--port` | server, overriding `.env` |
+| `--host`, `--port` | server, overriding `.env` and the profile's `server:` |
 
-`just dev <bot>` restarts the bot when you save a file.
+Logging flags (`-v`, `-q`, `-l`, `--log-format`, `--log-file`, `--log-dir`) are listed in the
+[CLI reference](/reference/cli#node-src-cli-ts). `just dev <bot>` restarts the bot when you save a file.
+
+The server comes from `MC_HOST`, `MC_PORT`, `MC_AUTH`, `MC_VERSION` and `MC_PLATFORM`
+(defaults `localhost`, `25565`, `offline`, `1.21.1`, `neoforge`), then the profile's `server:`
+block, then `--host`/`--port`. `MC_PLATFORM` is `neoforge`, `vanilla` or `paper`; it is not
+detected from the server. The NeoForge platform also connects to vanilla servers, it just has
+nothing to answer there.
 
 ## A fleet
 
-A [fleet](/concepts/architecture#fleets-and-multiple-servers) file runs many bots in one process. Copy `fleets/example.yaml` to `fleet.yaml` (it's
-gitignored) and run `just fleet`.
+A [fleet](/concepts/architecture#fleets-and-multiple-servers) file runs many bots in one process. `just fleet <name>` runs
+`fleets/<name>.yaml` (or `.yml`), or any file path; without a name it runs `fleets/example.yaml`.
+For a private fleet, copy `fleets/example.yaml` to `fleet.yaml` (it's gitignored) and run
+`just fleet fleet.yaml`.
 
 ```yaml
 servers:
@@ -47,9 +57,21 @@ bots:
     settings: { home: [100, 64, -20] }
 ```
 
-Per-bot keys: `bot`, `server`, `username`, `count`, `owners`, `canDig`, `settings`.
-`defaults` applies to every entry. A single top-level `server:` block (no `servers:`) also
-works for one-server fleets.
+Per-bot keys: `profile` or `variant` (`bot` is the older name for `variant`), `server`,
+`username`, `count`, `owners`, `canDig`, `settings`. `defaults` (`server`, `owners`, `canDig`,
+`settings`) applies to every entry; the entry's own keys win. With `count` above 1 a `username`
+gets a number suffix. A single top-level `server:` block (no `servers:`) also works for
+one-server fleets.
+
+Server keys: `host`, `port`, `auth`, `version`, `platform`, `staggerMs`. Anything a server
+leaves out comes from the environment (and `--host`/`--port`). The top-level `staggerMs`
+(default 5000) applies to servers without their own. A top-level `logging:` block sets
+[logging](./logging#in-a-fleet-file) for the whole process. Fleet files expand `${VAR}` and
+`${VAR:-default}` like [profiles](./profiles#personal-values-from-the-environment).
+
+For a `profile:` entry, the fleet's `owners`, `canDig`, `username` and `settings` override the
+profile, while the profile's own `server:` block, if it has one, overrides the fleet's server
+for that bot. `--username`, `--owners` and `--dig` only apply to `run`, not to fleets.
 
 ## Several servers
 
