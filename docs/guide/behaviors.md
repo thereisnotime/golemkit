@@ -692,9 +692,9 @@ flowchart TB
   cover (`stay_safe`'s `ranged` danger), 3 or more hostiles within 6 blocks, mobs near while
   at 8 health or less, or standing in a remembered danger zone. `find_food` drops waypoints
   in a danger zone or whose way out from home passes through one. The zones are the ones the
-  [ranged reflex](#ranged-safety) remembers, read through a small adapter
-  (`src/skills/food-danger.ts`, `useDangerZones`) that `src/skills/ranged.ts` registers when it
-  loads; without the ranged skill nothing counts as a zone.
+  [ranged reflex](#ranged-safety) remembers, read from the agent's core danger memory
+  (`src/core/danger.ts`) through `src/skills/food-danger.ts`, whichever skills are loaded.
+  `hunt`'s reach check reads them the same way.
 - **6 · critical:** at food 6 or less with nothing left to try it tells its owner once (a
   whisper, at most every 10 minutes) and does nothing risky; `stay_safe` keeps it out of
   trouble.

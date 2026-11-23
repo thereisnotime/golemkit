@@ -199,7 +199,7 @@ forage SHALL pick ripe sweet berries, SHALL cut kelp only from the shore (at mos
 - **THEN** keep_fed does not break leaves
 
 ### Requirement: Shared danger signals
-keep_fed SHALL treat as danger stay_safe's ranged danger (shooters calling for cover), 3 or more hostiles within 6 blocks, hostiles within 10 blocks at 8 health or less, and standing in a remembered danger zone. find_food SHALL NOT walk towards a waypoint in a remembered danger zone or whose straight way from the centre passes through one, and keep_fed SHALL NOT go to a remembered food spot inside one. Without a registered danger-zone helper no place counts as a zone.
+keep_fed SHALL treat as danger stay_safe's ranged danger (shooters calling for cover), 3 or more hostiles within 6 blocks, hostiles within 10 blocks at 8 health or less, and standing in a remembered danger zone. find_food SHALL NOT walk towards a waypoint in a remembered danger zone or whose straight way from the centre passes through one, and keep_fed SHALL NOT go to a remembered food spot inside one. These checks SHALL read the agent's core danger memory directly, whether or not the combat or ranged skills are loaded, and each check SHALL read it once.
 
 #### Scenario: Two zombies at a distance
 - **WHEN** two zombies are 6 blocks away and health is full

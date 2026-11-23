@@ -1,28 +1,27 @@
-// Remembered danger zones, as keep_fed and find_food see them. The zones themselves belong to
-// the safety code (an `isInDanger(pos)` helper); this adapter keeps the food code from
-// depending on where that lives. Until a check is registered nothing counts as a zone.
-// To switch over, call useDangerZones(isInDanger) where the helper is defined, or import it
-// here directly once it exists.
-import type { Agent } from '../core/index.ts'
+// Remembered danger zones, as keep_fed, find_food and hunt see them. The zones live in the core
+// danger memory (core/danger.ts, one per agent); the ranged reflex and others write them, and
+// this reads them whatever skills are loaded. Tests can swap the check with useDangerZones.
+import { dangerMemory, type Agent } from '../core/index.ts'
 import { crossesDanger, type XZ } from './foodPlan.ts'
 
 export type DangerZoneCheck = (pos: { x: number, y?: number, z: number }, agent?: Agent) => boolean
 
-let check: DangerZoneCheck | null = null
+/** The default check: the agent's core danger memory. No agent, no zones. */
+export const dangerZoneCheck: DangerZoneCheck = (pos, agent) => !!agent && !!dangerMemory(agent).isInDanger(pos)
 
-/** Registers the shared danger-zone test (null to clear it, e.g. in tests). */
+let check: DangerZoneCheck = dangerZoneCheck
+
+/** Replaces the danger-zone test (tests); null puts the default back. */
 export function useDangerZones (fn: DangerZoneCheck | null): void {
-  check = fn
+  check = fn ?? dangerZoneCheck
 }
 
 /** True when `pos` lies in a remembered danger zone. Never throws. */
 export function inDangerZone (agent: Agent | undefined, pos: { x: number, y?: number, z: number }): boolean {
-  if (!check) return false
   try { return !!check(pos, agent) } catch { return false }
 }
 
 /** True when the straight way from `from` to `to` passes through a remembered danger zone. */
 export function wayThroughDanger (agent: Agent | undefined, from: XZ, to: XZ): boolean {
-  if (!check) return false
   return crossesDanger(from, to, p => inDangerZone(agent, p))
 }

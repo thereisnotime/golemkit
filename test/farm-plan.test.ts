@@ -178,7 +178,7 @@ test('crossesDanger and the danger-zone adapter: no search towards a remembered 
   const zone = (p: { x: number, z: number }) => Math.hypot(p.x - 60, p.z) < 10
   assert.equal(crossesDanger({ x: 0, z: 0 }, { x: 120, z: 0 }, zone), true, 'east goes through it')
   assert.equal(crossesDanger({ x: 0, z: 0 }, { x: 0, z: 120 }, zone), false, 'south is clear')
-  assert.equal(inDangerZone(undefined, { x: 60, z: 0 }), false, 'no helper registered: nothing is a zone')
+  assert.equal(inDangerZone(undefined, { x: 60, z: 0 }), false, 'no agent: no memory, nothing is a zone')
   useDangerZones(p => zone(p))
   try {
     assert.equal(inDangerZone(undefined, { x: 60, z: 0 }), true)

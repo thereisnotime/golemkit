@@ -3,7 +3,7 @@
 // village farm, go back to known food spots, hunt (sparing a herd), scout further out, and
 // as a last resort start a farm. The decision is a pure function (nextFoodStep) so it is
 // unit-tested without a server.
-import { needsSurvival, fmtPos, dangerMemory } from '../../../core/index.ts'
+import { needsSurvival, fmtPos } from '../../../core/index.ts'
 import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
 import { z, type Agent, type ActionResult } from '../../../core/index.ts'
@@ -226,13 +226,12 @@ export function knownFoodPlaces (agent: Agent, o: Pick<O, 'foodPlaces'>): FoodPl
 /** Known food places worth a trip from here, best first. */
 function tripPlaces (agent: Agent, bot: Bot, o: O): ReturnType<typeof rankFoodPlaces> {
   if (!o.trips || !agent.getAction('goto')) return []
-  const danger = dangerMemory(agent)
   return rankFoodPlaces(knownFoodPlaces(agent, o), bot.entity.position, {
     minDistance: Math.max(48, o.radius),
     maxDistance: o.tripRange,
     dim: bot.game?.dimension,
     paused: memory(agent).trips ?? {},
-    inDanger: p => inDangerZone(agent, p) || !!danger.isInDanger(p)
+    inDanger: p => inDangerZone(agent, p)
   })
 }
 

@@ -70,9 +70,8 @@ test('danger zones: a kill clears the zone, memory per owner with a clock', () =
   assert.ok(m instanceof DangerMemory)
 })
 
-test('find_food skips a zone remembered by the ranged code', async () => {
-  // importing ranged.ts registers the shared check with the food adapter
-  const { dangerZoneCheck } = await import('../src/skills/ranged.ts')
+test('find_food skips a remembered zone without the ranged/combat skills loaded', async () => {
+  // this file never imports ranged.ts or combat.ts: food-danger reads the core memory itself
   const { inDangerZone, wayThroughDanger, useDangerZones } = await import('../src/skills/food-danger.ts')
   const { scoutWaypoints } = await import('../src/skills/foodPlan.ts')
   const agent: any = {}
@@ -88,5 +87,10 @@ test('find_food skips a zone remembered by the ranged code', async () => {
     assert.ok(wps.length > 0)
     assert.ok(wps.every((w: any) => Math.hypot(w.x - 60, w.z) > 32), 'no waypoint inside the zone')
     assert.ok(!wps.some((w: any) => w.x > 90 && Math.abs(w.z) < 10), 'none straight past it either')
-  } finally { useDangerZones(dangerZoneCheck) }
+    // a test override, then null puts the core memory back
+    useDangerZones(() => false)
+    assert.equal(inDangerZone(agent, { x: 60, z: 0 }), false)
+    useDangerZones(null)
+    assert.equal(inDangerZone(agent, { x: 60, z: 0 }), true)
+  } finally { useDangerZones(null) }
 })

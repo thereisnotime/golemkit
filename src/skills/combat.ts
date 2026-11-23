@@ -1,9 +1,9 @@
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
 import type { ActionContext } from '../core/index.ts'
-import { defineSkill, defineAction, z, noParams, ok, fail, goals, fmtPos, gotoTimed, playerEntity, nearestHostile, isHostile, FLYING, sleep, checkAborted, dangerMemory, reachMovements } from '../core/index.ts'
+import { defineSkill, defineAction, z, noParams, ok, fail, goals, fmtPos, gotoTimed, playerEntity, nearestHostile, isHostile, FLYING, sleep, checkAborted, reachMovements } from '../core/index.ts'
 import { vec } from './world.ts'
-import { inDangerZone } from './food-danger.ts'
+import { inDangerZone, wayThroughDanger } from './food-danger.ts'
 import { reachEffort, digIntoLiquid, SCAFFOLD_BLOCKS } from './reachPlan.ts'
 import { pickupNearby } from './pickup.ts'
 import { isRangedMob, weaponFlags, type WeaponFlags } from './weapons.ts'
@@ -448,8 +448,6 @@ async function reachAnimal (ctx: ActionContext, target: Entity): Promise<{ kille
   const name = target.name ?? 'animal'
   const p = target.position
   const me = bot.entity.position
-  const danger = dangerMemory(agent)
-  const inDanger = (q: { x: number, y?: number, z: number }) => !!danger.isInDanger(q) || inDangerZone(agent, q)
   const at = (x: number, y: number, z: number) => bot.blockAt(vec(bot, Math.floor(x), Math.floor(y), Math.floor(z)))?.name
   const feet = [at(p.x, p.y, p.z), at(p.x, p.y - 1, p.z)]
   const liquidAt = feet.includes('lava') ? 'lava' as const : feet.includes('water') ? 'water' as const : null
@@ -460,7 +458,7 @@ async function reachAnimal (ctx: ActionContext, target: Entity): Promise<{ kille
     distance: p.distanceTo(me),
     dy: p.y - me.y,
     protectedTarget: !!agent.protectedAreas?.isProtected(p),
-    dangerTarget: inDanger(p) || !!danger.crosses(me, p),
+    dangerTarget: inDangerZone(agent, p) || wayThroughDanger(agent, me, p),
     liquidAt
   })
   if (!decision.ok) return { killed: false, note: `the ${name} at ${fmtPos(p)}: ${decision.reason}` }
@@ -472,8 +470,8 @@ async function reachAnimal (ctx: ActionContext, target: Entity): Promise<{ kille
   const restore = reachMovements(bot, {
     ...decision.budget,
     scaffold: SCAFFOLD_BLOCKS,
-    forbidden: q => !!agent.protectedAreas?.isProtected(q) || inDanger(q),
-    avoidStep: q => inDanger(q),
+    forbidden: q => !!agent.protectedAreas?.isProtected(q) || inDangerZone(agent, q),
+    avoidStep: q => inDangerZone(agent, q),
     unsafeBreak: q => digIntoLiquid([at(q.x, q.y - 1, q.z), at(q.x, q.y - 2, q.z)])
   })
   let why = ''
