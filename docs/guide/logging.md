@@ -107,8 +107,8 @@ logging:
 Precedence: environment, then the [fleet file](/guide/running#a-fleet) `logging:` block (or a
 [profile](./profiles)'s `logging:` when it runs on its own), then CLI flags.
 
-`MC_LOG_*` in `.env` only take effect when Node is started with `--env-file-if-exists=.env`,
-as the just recipes do; see [.env](/reference/cli#env).
+`MC_LOG_*` in `.env` apply with or without `--env-file-if-exists=.env`: the logger loads `.env`
+before it reads them; see [.env](/reference/cli#env).
 
 ## CLI flags
 

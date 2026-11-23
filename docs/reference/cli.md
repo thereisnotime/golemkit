@@ -72,6 +72,5 @@ The `run`, `dev`, `fleet`, `probe`, `chat-test` and live-test recipes start Node
 flag. Either way, variables already set in the shell win over `.env`. The file is optional:
 every server setting has a default (`.env.example` lists them).
 
-One catch: the `MC_LOG_*` variables are read when the logger module loads, before core loads
-`.env`, so they only take effect from `.env` when Node gets the `--env-file-if-exists` flag (as
-the just recipes do) or when they are set in the shell.
+The logger loads `.env` itself before it reads `MC_LOG_*` and collects the secrets to redact,
+so those work from `.env` too, with or without the flag.

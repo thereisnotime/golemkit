@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseLevelSpec, levelFor, createLogger, configureLogging, recentLogs, subscribeLogs } from '../src/core/log.ts'
@@ -69,4 +70,18 @@ test('per-bot files, json file format, redaction and rotation', () => {
     configureLogging({ level: 'info', format: 'pretty', maxSizeMb: 20, maxFiles: 5, fileFormat: 'plain' })
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+test('.env in the working directory applies to the logger with plain `node src/cli.ts`', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'golemkit-env-'))
+  try {
+    writeFileSync(join(dir, '.env'), 'MC_LOG_FORMAT=json\nMC_TEST_SECRET=zz-not-a-real-secret\n')
+    const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('MC_') && k !== 'NO_COLOR'))
+    const r = spawnSync(process.execPath, [join(import.meta.dirname, '..', 'src', 'cli.ts'), 'run', 'zz-not-a-real-secret'], { cwd: dir, env, encoding: 'utf8' })
+    const line = (r.stdout + r.stderr).trim().split('\n').find(l => l.includes('"level"'))
+    assert.ok(line, `expected a JSON log line, got: ${r.stdout}${r.stderr}`)
+    const entry = JSON.parse(line)
+    assert.equal(entry.level, 'error')
+    assert.ok(!line.includes('zz-not-a-real-secret'), 'secret from .env is redacted')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 })

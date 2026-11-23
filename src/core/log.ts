@@ -13,6 +13,7 @@
 // configureLogging() from code.
 import { openSync, writeSync, closeSync, renameSync, statSync, mkdirSync, existsSync, unlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { loadDotEnvOnce } from './definition.ts'
 
 export const LEVELS = { trace: 5, debug: 10, info: 20, warn: 30, error: 40, silent: 100 } as const
 export type Level = keyof typeof LEVELS
@@ -81,6 +82,9 @@ const DEFAULT_CONFIG: LogConfig = {
   redact: []
 }
 
+// .env first: this module is evaluated before index.ts runs its own loadDotEnvOnce(), and the
+// level, format and redacted secrets are read from the environment right here.
+loadDotEnvOnce()
 let config: LogConfig = { ...DEFAULT_CONFIG, ...loggingFromEnv() }
 let rules = parseLevelSpec(config.level)
 let generation = 0
