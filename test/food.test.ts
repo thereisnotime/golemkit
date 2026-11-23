@@ -269,7 +269,7 @@ test('farm_setup and the new keep_fed options validate and coerce from chat', ()
 
 // ------------------------------------------------------------------ keep_fed run with scouting
 
-test('keep_fed: nothing in range, searches close, wider, wide, finds nothing, starts a farm and says so', async () => {
+test('keep_fed: nothing in range, searches close, wider, wide, then far, finds nothing, starts a farm and says so', async () => {
   const inv = [{ name: 'wheat_seeds', count: 5, type: mcData.itemsByName.wheat_seeds.id }]
   const pos: any = { x: 0, y: 64, z: 0, distanceTo: () => 0, offset: () => pos, floored: () => pos, clone: () => ({ set: () => pos }) }
   const bot: any = {
@@ -296,13 +296,47 @@ test('keep_fed: nothing in range, searches close, wider, wide, finds nothing, st
   const o = defaultBehaviorRegistry().validate('keep_fed', {})
   const b = keepFed.create!((o as any).options, { agent })
   const r: any = await b.run({ agent, bot, bb: { needs: { hunger: 0.6 } }, log: createLogger('t'), now: 0, current: null, signal: new AbortController().signal, act, wait: async () => {} } as any)
-  assert.deepEqual(calls, ['find_food', 'find_food', 'find_food', 'start_farm'])
-  assert.deepEqual(params.slice(0, 3).map(p => [p.radius, p.minRadius, p.seeds]), [[48, 0, 3], [120, 48, 3], [250, 120, 3]],
+  assert.deepEqual(calls, ['find_food', 'find_food', 'find_food', 'find_food', 'find_food', 'start_farm'])
+  assert.deepEqual(params.slice(0, 5).map(p => [p.radius, p.minRadius, p.seeds]), [[48, 0, 3], [120, 48, 3], [250, 120, 3], [400, 250, 3], [600, 400, 3]],
     'each ring only after the smaller one came up empty; picks up the 3 seeds it lacks on the way')
   assert.equal(r.ok, false)
   assert.match(r.message, /still hungry \(food 8\/20\)/)
   assert.match(r.message, /scouted 180 blocks east/)
   assert.match(r.message, /started a 9x9 wheat farm at 5 63 5/)
+})
+
+test('keep_fed: after the 250 ring it walks to a known village (foodPlaces) before the far rings', async () => {
+  const inv = [{ name: 'wheat_seeds', count: 5, type: mcData.itemsByName.wheat_seeds.id }]
+  const pos: any = { x: 0, y: 64, z: 0, distanceTo: () => 0, offset: () => pos, floored: () => pos, clone: () => ({ set: () => pos }) }
+  const bot: any = {
+    food: 8, health: 12, entity: { position: pos }, registry: mcData, time: { timeOfDay: 2000 }, game: { dimension: 'minecraft:overworld' },
+    inventory: { items: () => inv, emptySlotCount: () => 30 }, entities: {}, findBlock: () => null, findBlocks: () => []
+  }
+  const actions = ['eat', 'hunt', 'smelt', 'craft', 'harvest', 'goto', 'find_food', 'start_farm']
+  const calls: string[] = []
+  const params: any[] = []
+  const agent: any = {
+    canDig: true,
+    getAction: (n: string) => actions.includes(n) ? { name: n } : undefined,
+    protectedAreas: { isProtected: () => false },
+    storage: { get: (_k: string, fb: unknown) => fb, set: () => {} }
+  }
+  const act = async (name: string, p: any = {}): Promise<ActionResult> => {
+    calls.push(name)
+    params.push(p)
+    if (name === 'find_food') return fail('scouted, no animals or village crops; stopped: walked 24 legs')
+    if (name === 'goto') return ok(`arrived at ${p.x} 70 ${p.z}`)
+    if (name === 'harvest') return ok('harvested 20 crops, replanted 20')
+    return fail('unexpected')
+  }
+  const o = defaultBehaviorRegistry().validate('keep_fed', { startFarm: false, foodPlaces: [{ name: 'village', x: -2770, z: 1090, crops: ['wheat', 'carrots'] }] })
+  assert.ok(o.ok)
+  const b = keepFed.create!((o as any).options, { agent })
+  const r: any = await b.run({ agent, bot, bb: { needs: { hunger: 0.6 } }, log: createLogger('t'), now: 0, current: null, signal: new AbortController().signal, act, wait: async () => {} } as any)
+  assert.deepEqual(calls.slice(0, 5), ['find_food', 'find_food', 'find_food', 'goto', 'harvest'])
+  assert.deepEqual(params[3], { x: -2770, z: 1090 }, 'no y: travel to the surface there')
+  assert.deepEqual(params.filter((_p, i) => calls[i] === 'find_food').map(p => p.radius), [48, 120, 250, 400, 600], 'the far rings still come after the trip')
+  assert.match(r.message, /trip to village \(2977 blocks away, wheat, carrots\): harvested 20 crops/)
 })
 
 test('scouting at low health: allowed when nothing is around, stopped with mobs near', async () => {

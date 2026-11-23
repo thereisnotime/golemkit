@@ -3,7 +3,7 @@
 // village farm, go back to known food spots, hunt (sparing a herd), scout further out, and
 // as a last resort start a farm. The decision is a pure function (nextFoodStep) so it is
 // unit-tested without a server.
-import { needsSurvival, fmtPos } from '../../../core/index.ts'
+import { needsSurvival, fmtPos, dangerMemory } from '../../../core/index.ts'
 import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
 import { z, type Agent, type ActionResult } from '../../../core/index.ts'
@@ -15,11 +15,12 @@ import { HUNTABLE, herdSurplus } from '../../../skills/combat.ts'
 import { CROPS, isMature } from '../../../skills/farming.ts'
 import {
   animalsAround, ownFarmRipe, villageCrops, getFarms, nearestFarm, saveFarm, getFoodSpots, forgetEmptySpot, farmStatus, ripeBerries,
-  shoreKelp, appleLeaves, canSmeltKelp, farmWorkFor, type Farm
+  shoreKelp, appleLeaves, canSmeltKelp, farmWorkFor, breakableGrass, type Farm
 } from '../../../skills/food.ts'
 import {
-  rankSpots, seedCount, planFood, nextRing, recordSearch, breedPlan, foodDanger, farmChore, BREED_FOOD, STEP_PAUSE_MS, CHORE_PAUSE_MS,
-  type FoodStep, type FoodWorld, type FoodDecision, type SearchRecord, type FoodChore, type ChoreWorld
+  rankSpots, seedCount, planFood, nextRing, recordSearch, breedPlan, foodDanger, farmChore, chorePause, rankFoodPlaces, placeSource,
+  BREED_FOOD, STEP_PAUSE_MS, SEEDS_RETRY_MS, TRIP_PAUSE_MS, DEFAULT_RINGS, FAR_RINGS_FROM,
+  type FoodStep, type FoodWorld, type FoodDecision, type SearchRecord, type FoodChore, type ChoreWorld, type FoodPlace
 } from '../../../skills/foodPlan.ts'
 import { farmWorkCount, type FarmWork } from '../../../skills/farmPlan.ts'
 import { inDangerZone } from '../../../skills/food-danger.ts'
@@ -29,7 +30,7 @@ import { escorting } from '../../../skills/bodyguard.ts'
 import { rangedDanger } from './safety.ts'
 import { pickFuel } from '../../../skills/crafting.ts'
 import { knownContainers } from '../../../skills/containers.ts'
-import { getPlaces } from '../../../skills/navigation.ts'
+import { getPlaces, sameDimension } from '../../../skills/navigation.ts'
 import { dist, hostilesNear, ownerTarget } from './util.ts'
 
 /** Raw food -> what cooking makes of it. */
@@ -100,9 +101,10 @@ const options = z.object({
   radius: z.number().min(4).max(64).default(32).describe('how far to look for crops and animals'),
   places: z.boolean().default(true).describe('go back to remembered food spots (food:animals, food:village_farm)'),
   scout: z.boolean().default(true).describe('when nothing is in range, search further out (find_food), one ring wider each time a ring comes up empty'),
-  rings: z.array(z.number().min(32).max(512)).max(6).default([48, 120, 250]).describe('search rings around home, smallest first: close, wider, wide'),
+  rings: z.array(z.number().min(32).max(1024)).max(8).default([...DEFAULT_RINGS]).describe('search rings around home, smallest first: close, wider, wide, then far ones (by day only, after known food places)'),
+  farRingsFrom: z.number().min(32).max(1024).default(FAR_RINGS_FROM).describe('rings wider than this are far: searched by day only, and only after a trip to a known food place'),
   ringMemoryMinutes: z.number().min(1).max(240).default(20).describe('remember an empty ring this long before searching it again'),
-  scoutRadius: z.number().min(32).max(512).optional().describe('old single search radius; when set it caps the rings'),
+  scoutRadius: z.number().min(32).max(1024).optional().describe('old single search radius; when set it caps the rings'),
   scoutAtNight: z.boolean().default(false).describe('also make far trips (searching, known spots, its farm) at night'),
   startFarm: z.boolean().default(true).describe('farm fallback: with no proper food source (all rings empty), gather seeds, start a farm near home, plant and use it'),
   minSeeds: z.number().int().min(1).max(64).default(8).describe('seeds to have before starting a farm (picked up while searching, or by breaking grass)'),
@@ -110,7 +112,19 @@ const options = z.object({
   farmSize: z.number().int().min(3).max(9).default(9).describe('side of the square its farm grows towards around the water block'),
   seedReserve: z.number().int().min(0).max(32).default(4).describe('seeds kept for replanting: the farm only grows with seeds beyond these'),
   farmAbove: z.number().min(1).max(20).default(14).describe('food at or above this is not urgent: farm work may come before a long search'),
-  seedRange: z.number().min(8).max(160).default(96).describe('how far to look for grass to break for seeds between meals'),
+  seedRange: z.number().min(8).max(128).default(96).describe('how far to look for grass to break for seeds (it works outwards patch by patch)'),
+  seedMinutes: z.number().min(1).max(10).default(4).describe('how long one seed-gathering run may break grass before it stops'),
+  trips: z.boolean().default(true).describe('go to known food places far away (foodPlaces, its farms, found:/food: places): walk there by day, harvest and replant, bake, eat, come back'),
+  tripRange: z.number().min(64).max(10_000).default(4000).describe('known food places further away than this are not worth a trip'),
+  foodPlaces: z.array(z.object({
+    name: z.string().optional().describe('label for logs and chat'),
+    place: z.string().optional().describe('a remembered place name (e.g. farm:1) instead of coordinates'),
+    x: z.number().optional(),
+    y: z.number().optional(),
+    z: z.number().optional(),
+    dim: z.string().optional(),
+    crops: z.array(z.string()).optional().describe('what grows there (wheat, carrots, potatoes)')
+  })).default([]).describe('known farms and villages to go to for food (preferred over the far search rings)'),
   breed: z.boolean().default(true).describe('breed animals near home between meals when it has their food (wheat: cows, sheep; seeds: chickens; carrots: pigs)'),
   report: z.boolean().default(true).describe('when food is critical (6 or less) and nothing works, tell the owner (at most every 10 minutes)')
 })
@@ -119,7 +133,7 @@ type O = z.infer<typeof options>
 
 /** The rings to search, capped by the old scoutRadius option when a profile still sets it. */
 export function ringsFor (o: { rings: number[], scoutRadius?: number }): number[] {
-  const rings = (o.rings.length ? [...o.rings] : [48, 120, 250]).sort((a, b) => a - b)
+  const rings = (o.rings.length ? [...o.rings] : [...DEFAULT_RINGS]).sort((a, b) => a - b)
   if (o.scoutRadius === undefined) return rings
   const capped = rings.filter(r => r < o.scoutRadius!)
   return [...capped, o.scoutRadius]
@@ -138,7 +152,7 @@ const stepOptions = (o: O) => ({
 const isNightTime = (bot: Bot) => { const t = bot.time?.timeOfDay ?? 0; return (bot as { thunderState?: number }).thunderState! > 0 || (t >= 12_542 && t <= 23_459) }
 
 /** What keep_fed remembers between runs (agent.storage, so a restart doesn't rescan empty rings). */
-interface LadderMemory { searches: SearchRecord[], paused: Partial<Record<FoodStep, number>>, lastReportAt: number, chores?: Partial<Record<FoodChore, number>> }
+interface LadderMemory { searches: SearchRecord[], paused: Partial<Record<FoodStep, number>>, lastReportAt: number, chores?: Partial<Record<FoodChore, number>>, trips?: Record<string, number> }
 const MEMORY_KEY = 'foodLadder'
 const memories = new WeakMap<Agent, LadderMemory>()
 function memory (agent: Agent): LadderMemory {
@@ -146,7 +160,7 @@ function memory (agent: Agent): LadderMemory {
   if (!m) {
     const st = (agent as { storage?: Agent['storage'] }).storage
     const saved = st?.get<Partial<LadderMemory>>(MEMORY_KEY, {}) ?? {}
-    m = { searches: saved.searches ?? [], paused: saved.paused ?? {}, lastReportAt: saved.lastReportAt ?? 0, chores: saved.chores ?? {} }
+    m = { searches: saved.searches ?? [], paused: saved.paused ?? {}, lastReportAt: saved.lastReportAt ?? 0, chores: saved.chores ?? {}, trips: saved.trips ?? {} }
     memories.set(agent, m)
   }
   return m
@@ -186,6 +200,40 @@ function breedHere (agent: Agent, bot: Bot, inv: Record<string, number>, keepSee
   const pos = bot.entity.position
   if (home && Math.hypot(home.x - pos.x, home.z - pos.z) > 64) return false
   return !!breedPlan(animalsAround(agent, bot, pos, 24, Object.keys(BREED_FOOD)).adults, inv, { keepSeeds })
+}
+
+/** Every known food place: the profile's foodPlaces, its own farms, and remembered found:/food:/farm: places. */
+export function knownFoodPlaces (agent: Agent, o: Pick<O, 'foodPlaces'>): FoodPlace[] {
+  const places = getPlaces(agent)
+  const out: FoodPlace[] = []
+  for (const f of o.foodPlaces ?? []) {
+    const named = f.place ? places[f.place.toLowerCase()] ?? places[f.place] : undefined
+    const x = f.x ?? named?.x
+    const z = f.z ?? named?.z
+    if (x === undefined || z === undefined) continue
+    const y = f.y ?? named?.y
+    const dim = f.dim ?? named?.dimension
+    out.push({ name: f.name ?? f.place ?? `${x} ${z}`, x, z, ...(y !== undefined ? { y } : {}), ...(dim ? { dim } : {}), source: 'config', ...(f.crops ? { crops: f.crops } : {}) })
+  }
+  for (const f of getFarms(agent)) out.push({ name: f.name, x: f.x, y: f.y + 1, z: f.z, ...(f.dim ? { dim: f.dim } : {}), source: 'farm', crops: [f.crop] })
+  for (const [name, p] of Object.entries(places)) {
+    const source = placeSource(name)
+    if (source) out.push({ name, x: p.x, y: p.y, z: p.z, ...(p.dimension ? { dim: p.dimension } : {}), source })
+  }
+  return out
+}
+
+/** Known food places worth a trip from here, best first. */
+function tripPlaces (agent: Agent, bot: Bot, o: O): ReturnType<typeof rankFoodPlaces> {
+  if (!o.trips || !agent.getAction('goto')) return []
+  const danger = dangerMemory(agent)
+  return rankFoodPlaces(knownFoodPlaces(agent, o), bot.entity.position, {
+    minDistance: Math.max(48, o.radius),
+    maxDistance: o.tripRange,
+    dim: bot.game?.dimension,
+    paused: memory(agent).trips ?? {},
+    inDanger: p => inDangerZone(agent, p) || !!danger.isInDanger(p)
+  })
 }
 
 /** Reads the world into a FoodWorld. */
@@ -247,10 +295,8 @@ export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
     ? rankSpots(getFoodSpots(agent), ['animals', 'village_farm'], Date.now(), pos, bot.game?.dimension)
       .find(s => Math.hypot(s.x - pos.x, s.z - pos.z) <= farRange * 1.5 && !inDangerZone(agent, s))
     : undefined
-  const grass = () => {
-    const ids = ['short_grass', 'grass', 'tall_grass', 'fern'].map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
-    return !!bot.findBlock({ matching: ids, maxDistance: 32 })
-  }
+  let grassSeen: boolean | undefined
+  const grass = () => (grassSeen ??= breakableGrass(agent, bot, Math.min(o.seedRange, 64)).length > 0)
   const inv: Record<string, number> = {}
   for (const i of items) inv[i.name] = (inv[i.name] ?? 0) + i.count
   const seeds = seedCount(inv)
@@ -290,6 +336,7 @@ export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
     searches: m.searches,
     paused: m.paused,
     lastReportAt: m.lastReportAt,
+    knownPlace: (() => { const p = tripPlaces(agent, bot, o)[0]; return p ? { name: p.name, distance: Math.round(p.distance) } : null })(),
     now: Date.now()
   }
 }
@@ -300,9 +347,8 @@ export function senseChores (agent: Agent, bot: Bot, o: O): ChoreWorld {
   const inv = invOf(bot)
   const farm = nearestFarm(agent, bot)
   const near = farm && agent.getAction('tend_farm') ? nearFarmWork(agent, bot, o, 128) : null
-  const grassIds = ['short_grass', 'grass', 'tall_grass', 'fern'].map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
-  // grass near the bot or the farm: around a worked base the closest grass is often further than 32 blocks
-  const grass = !!agent.canDig && !!agent.getAction('gather_seeds') && !!bot.findBlock?.({ matching: grassIds, maxDistance: o.seedRange ?? 96 })
+  // grass it may break near the bot: around a worked base the closest grass is often further than 32 blocks, and often protected
+  const grass = !!agent.canDig && !!agent.getAction('gather_seeds') && !!bot.findBlocks && breakableGrass(agent, bot, o.seedRange ?? 96).length > 0
   return {
     food: typeof bot.food === 'number' ? bot.food : 20,
     night: isNightTime(bot),
@@ -336,7 +382,7 @@ async function doChore (ctx: BehaviorContext, chore: FoodChore, o: O): Promise<A
       const farm = nearestFarm(agent, bot)
       const work = farm ? nearFarmWork(agent, bot, o, 128)?.work : undefined
       const want = work ? work.seedsWanted : o.minSeeds - seedCount(invOf(bot))
-      return ctx.act('gather_seeds', { count: Math.max(2, Math.min(32, want)), radius: o.seedRange ?? 96, maxMinutes: 3 })
+      return ctx.act('gather_seeds', { count: Math.max(2, Math.min(32, want)), radius: Math.min(128, o.seedRange ?? 96), maxMinutes: o.seedMinutes })
     }
     case 'breed':
       return ctx.act('breed', { keepSeeds: o.minSeeds })
@@ -350,6 +396,70 @@ async function atFarm (ctx: BehaviorContext, farm: Farm, then: () => Promise<Act
     if (!there.ok) return { ok: false, message: `couldn't get to ${farm.name}: ${there.message}` }
   }
   return then()
+}
+
+/**
+ * The trip rung: walk to the best known food place (any distance, on the surface), harvest ripe
+ * crops there and replant, hunt what may be hunted, pick up seeds, bake and eat, then come back
+ * home. The place is left alone for a while afterwards (longer when it had nothing).
+ */
+async function foodTrip (ctx: BehaviorContext, o: O): Promise<ActionResult> {
+  const { bot, agent } = ctx
+  const place = tripPlaces(agent, bot, o)[0]
+  if (!place) return { ok: false, message: 'no known food place to go to' }
+  const m = memory(agent)
+  const pause = (ms: number) => { m.trips = { ...(m.trips ?? {}), [place.name]: Date.now() + ms }; saveMemory(agent, m) }
+  const has = (n: string) => bot.inventory.items().filter(i => i.name === n).reduce((s, i) => s + i.count, 0)
+  const label = `${place.name} (${Math.round(place.distance)} blocks away${place.crops?.length ? `, ${place.crops.join(', ')}` : ''})`
+  ctx.log.debug(`keep_fed trip: going to ${label}`, { place: place.name, distance: Math.round(place.distance) })
+  const there = await ctx.act('goto', { x: place.x, ...(place.y !== undefined ? { y: place.y } : {}), z: place.z })
+  if (!there.ok) { pause(TRIP_PAUSE_MS.empty); return { ok: false, message: `couldn't get to ${label}: ${there.message}` } }
+  const got: string[] = []
+  const pos = () => bot.entity.position
+  if (o.harvest && agent.getAction('harvest')) {
+    // the owner listed it, or it is its own farm: harvest the field; elsewhere only crops by a village
+    if (place.source === 'config' || place.source === 'farm' || o.anyCrops) {
+      const r = await ctx.act('harvest', { radius: 32, max: 96 })
+      if (r.ok) got.push(r.message)
+    } else {
+      for (let i = 0; i < 3; i++) {
+        const v = villageCrops(bot, pos(), 32)[0]
+        if (!v) break
+        const r = await ctx.act('harvest', { radius: 10, max: 32, x: v.x, y: v.y, z: v.z })
+        if (!r.ok) break
+        got.push(r.message)
+      }
+    }
+  }
+  if (o.hunt && agent.getAction('hunt')) {
+    const keep = o.keepBreeders ? o.keepAtLeast : 0
+    const seen = animalsAround(agent, bot, pos(), 32, o.animals)
+    if (Object.values(herdSurplus(seen.adults, keep)).some(n => n > 0)) {
+      const r = await ctx.act('hunt', { count: 3, radius: 32, keepAtLeast: keep })
+      if (r.ok) got.push(r.message)
+    }
+  }
+  // seeds for its own farm: wheat harvests bring some; break a little grass when short
+  if (agent.canDig && agent.getAction('gather_seeds') && seedCount(invOf(bot)) < o.minSeeds && breakableGrass(agent, bot, 32).length) {
+    const r = await ctx.act('gather_seeds', { count: o.minSeeds - seedCount(invOf(bot)), radius: 32, maxMinutes: 2 })
+    if (r.ok) got.push(r.message)
+  }
+  if (has('wheat') >= 3 && agent.getAction('craft')) {
+    const r = await ctx.act('craft', { item: 'bread', count: Math.floor(has('wheat') / 3) })
+    if (r.ok) got.push(r.message)
+  }
+  if (bot.food < o.until && bestFood(bot) && bestFood(bot)?.name !== 'chicken') await ctx.act('eat')
+  pause(got.length ? TRIP_PAUSE_MS.ok : TRIP_PAUSE_MS.empty)
+  // come back home (its farm and base are there)
+  let back = ''
+  const home = getHome(agent)
+  if (home && sameDimension(bot, home) && Math.hypot(home.x - pos().x, home.z - pos().z) > 64) {
+    const r = await ctx.act('goto', { x: home.x, y: home.y, z: home.z })
+    back = r.ok ? '; back home' : `; couldn't get back home: ${r.message}`
+  }
+  return got.length
+    ? { ok: true, message: `trip to ${label}: ${got.join('; ')}${back}` }
+    : { ok: false, message: `went to ${label}: nothing ripe or huntable there now${back}` }
 }
 
 async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<ActionResult> {
@@ -441,8 +551,10 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
       const farm = nearestFarm(agent, bot)
       const work = farm ? nearFarmWork(agent, bot, o, 256)?.work : undefined
       const want = Math.max(o.minSeeds - seedCount(invOf(bot)), work?.seedsWanted ?? (farm ? (farmStatus(bot, farm)?.empty ?? 0) - seedCount(invOf(bot)) : 0))
-      return ctx.act('gather_seeds', { count: Math.max(2, Math.min(32, want)), radius: o.seedRange ?? 96 })
+      return ctx.act('gather_seeds', { count: Math.max(2, Math.min(32, want)), radius: Math.min(128, o.seedRange ?? 96), maxMinutes: o.seedMinutes })
     }
+    case 'trip':
+      return foodTrip(ctx, o)
     case 'start_farm':
       return ctx.act('start_farm', { seeds: o.minSeeds })
     case 'plant': {
@@ -493,7 +605,8 @@ export const keepFed = defineBehavior({
   category: 'survival',
   description: 'Looks after food on its own, climbing a ladder when hungry (or hurt and too hungry to heal): eat, cook or bake what it carries; ' +
     'take food from known chests, its own or a village farm, remembered spots, animals in range (sparing breeders); search close, ' +
-    'then wider, then wide (picking up seeds on the way); with no proper source start a farm near home, plant it and use it, ' +
+    'then wider, then wide (picking up seeds on the way); before the far rings (by day only) walk to a known farm or village, harvest, bake, eat and come back; ' +
+    'with no proper source start a farm near home, plant it and use it, ' +
     'foraging berries, kelp (dried in a furnace) and, when desperate, apples meanwhile; when starving and nothing works, tell the owner and stay safe. ' +
     'Between meals it starts, replants, re-tills and grows its farm and breeds animals near home. Arm it so you never starve between turns.',
   options,
@@ -552,8 +665,9 @@ export const keepFed = defineBehavior({
           choreRunning = true
           let r: ActionResult
           try { r = await doChore(ctx, c.chore, o) } finally { choreRunning = false }
-          const pause = CHORE_PAUSE_MS[c.chore]
-          m.chores = { ...(m.chores ?? {}), [c.chore]: Date.now() + (r.ok ? pause.ok : pause.fail) }
+          // a seeds run that came back short with grass still around is bad luck, not a dead end: try again soon
+          const grassLeft = (r.data as { grassLeft?: boolean } | undefined)?.grassLeft
+          m.chores = { ...(m.chores ?? {}), [c.chore]: Date.now() + chorePause(c.chore, r.ok, { grassLeft }) }
           saveMemory(agent, m)
           ctx.log.debug(`keep_fed chore ${c.chore}: ${r.message}`, { chore: c.chore, ok: r.ok })
           // a chore that didn't work is paused on its own; it is not a keep_fed failure
@@ -573,7 +687,7 @@ export const keepFed = defineBehavior({
           ctx.log.debug(`keep_fed ladder: rung=${d.rung} step=${d.step} (${d.reason})`, { rung: d.rung, step: d.step, food: ctx.bot.food, ...(d.radius ? { radius: d.radius } : {}) })
           const r = await doStep(ctx, d, o)
           ctx.log.debug(`keep_fed ${d.step}: ${r.message}`, { step: d.step, ok: r.ok })
-          if (['farm', 'spot', 'scout', 'start_farm', 'seeds', 'plant', 'report'].includes(d.step) && r.message) notes.push(r.message)
+          if (['farm', 'spot', 'scout', 'trip', 'hunt', 'start_farm', 'seeds', 'plant', 'report'].includes(d.step) && r.message) notes.push(r.message)
           if (d.step === 'scout') {
             const why = String((r.data as { reason?: string } | undefined)?.reason ?? r.message)
             if (r.ok || !CUT_SHORT.test(why)) m.searches = recordSearch(m.searches, { radius: d.radius ?? 0, at: Date.now(), found: r.ok })
@@ -589,10 +703,10 @@ export const keepFed = defineBehavior({
             // a new sighting: going there and hunting are worth trying again even if they failed a minute ago
             if (d.step === 'scout') { tried.add('scout'); delete m.paused.spot; delete m.paused.hunt; saveMemory(agent, m) }
             if (d.step === 'spot') { tried.add('scout'); tried.add('spot') }
-            if (['seeds', 'plant', 'breed', 'forage', 'report'].includes(d.step)) tried.add(d.step)
+            if (['seeds', 'plant', 'breed', 'forage', 'report', 'trip'].includes(d.step)) tried.add(d.step)
           } else {
             tried.add(d.step)
-            const pause = STEP_PAUSE_MS[d.step]
+            const pause = d.step === 'seeds' && (r.data as { grassLeft?: boolean } | undefined)?.grassLeft ? SEEDS_RETRY_MS : STEP_PAUSE_MS[d.step]
             if (pause) { m.paused = { ...m.paused, [d.step]: Date.now() + pause }; saveMemory(agent, m) }
             // an empty ring: try the next one in the same run (the ladder widens), unless it was cut short
             if (d.step === 'scout' && !CUT_SHORT.test(r.message) && nextRing(m.searches, so.rings, Date.now(), so.ringMemoryMs)) tried.delete('scout')

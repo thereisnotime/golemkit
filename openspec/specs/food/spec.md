@@ -1,12 +1,12 @@
 # food Specification
 
 ## Purpose
-How keep_fed gets a hungry bot fed: an escalating ladder from what it carries, to sources it knows, to searches that widen ring by ring, to a farm of its own, with an honest report when nothing works. The decision is the pure `planFood` in `src/skills/foodPlan.ts`.
+How keep_fed gets a hungry bot fed: an escalating ladder from what it carries, to sources it knows, to searches that widen ring by ring, to trips to known farms and villages far away, to a farm of its own, with an honest report when nothing works. The decision is the pure `planFood` in `src/skills/foodPlan.ts`.
 
 ## Requirements
 
 ### Requirement: Ladder order
-keep_fed SHALL try, in order: eating ready food, cooking raw food (fuel and a furnace nearby, carried or craftable), baking bread, eating safe raw food; then a known food chest, ripe crops in range (its own or a village's), its own farm when ripe or due, a remembered food spot, animals in range beyond the breeders; then, when food is not urgent, farm work (see Parallel farming); then a search; then the farm fallback; then the critical report. A step that fails SHALL be skipped for the rest of the run and the next one tried.
+keep_fed SHALL try, in order: eating ready food, cooking raw food (fuel and a furnace nearby, carried or craftable), baking bread, eating safe raw food; then a known food chest, ripe crops in range (its own or a village's), its own farm when ripe or due, a remembered food spot, animals in range beyond the breeders; then, when food is not urgent, farm work (see Parallel farming); then a search (with a trip to a known food place before the far rings); then the farm fallback; then the critical report. A step that fails SHALL be skipped for the rest of the run and the next one tried.
 
 #### Scenario: Food in the bag
 - **WHEN** the bot is hungry and carries bread while animals are in range
@@ -17,7 +17,7 @@ keep_fed SHALL try, in order: eating ready food, cooking raw food (fuel and a fu
 - **THEN** keep_fed harvests the farm before searching or hunting further out
 
 ### Requirement: Widening search rings
-keep_fed SHALL search the smallest ring of `rings` (default 48, 120, 250 blocks around home) that no empty search covered within `ringMemoryMinutes` (default 20). An empty search SHALL cover every ring up to its radius. A wider search SHALL skip the rings a smaller one walked. A search cut short by night or mobs SHALL NOT be remembered as empty. Search records SHALL persist in agent storage.
+keep_fed SHALL search the smallest ring of `rings` (default 48, 120, 250, 400, 600 blocks around home) that no empty search covered within `ringMemoryMinutes` (default 20). Rings wider than `farRingsFrom` (default 250) SHALL only be searched by day, even with `scoutAtNight`. An empty search SHALL cover every ring up to its radius. A wider search SHALL skip the rings a smaller one walked. A search cut short by night or mobs SHALL NOT be remembered as empty. Search records SHALL persist in agent storage.
 
 #### Scenario: First search
 - **WHEN** nothing is in range and no ring was searched recently
@@ -30,6 +30,63 @@ keep_fed SHALL search the smallest ring of `rings` (default 48, 120, 250 blocks 
 #### Scenario: Memory runs out
 - **WHEN** every ring came up empty more than 20 minutes ago
 - **THEN** keep_fed searches the 48 ring again
+
+#### Scenario: Past the wide ring
+- **WHEN** the 250 ring came up empty, no known food place is left to visit and it is day
+- **THEN** the next search has radius 400, and after that one comes up empty, 600
+
+#### Scenario: Far ring at night
+- **WHEN** the 250 ring came up empty, it is night and scoutAtNight is on
+- **THEN** keep_fed does not search the 400 ring and waits for day
+
+### Requirement: Trips to known food places
+With `trips` on, keep_fed SHALL take a trip to the best known food place, by day and out of danger, when the next ring is a far one or every ring came up empty. Known places SHALL be the profile's `foodPlaces` (coordinates or a remembered place name, with optional crops), its own farms, and remembered `found:<crop>`, `found:village`, `food:village_farm` and `food:animals` places. The pure `rankFoodPlaces` SHALL order them by distance divided by a trust weight (listed places and own farms 1.5, crop fields 1.2, villages 1, animals 0.6) and SHALL leave out places in another dimension, in a remembered danger zone, closer than `radius`, further than `tripRange` (default 4000) or visited recently. On a trip it SHALL walk there on the surface, harvest ripe crops and replant (the whole field for listed places and its own farms, otherwise only crops by a village), hunt animals beyond the breeders, gather a few seeds when short, bake bread, eat, and walk back home. A visited place SHALL be left alone for 20 minutes, 45 when it had nothing or could not be reached.
+
+#### Scenario: Village before the far rings
+- **WHEN** rings 48, 120 and 250 came up empty by day and the profile lists the village near -2770 1090
+- **THEN** keep_fed walks to the village, harvests and replants, bakes and eats, and walks back home before it searches the 400 ring
+
+#### Scenario: Village had nothing
+- **WHEN** the trip found nothing ripe or huntable
+- **THEN** the village is left alone for 45 minutes and keep_fed searches the 400 ring next
+
+#### Scenario: No trips at night
+- **WHEN** every ring came up empty and it is night
+- **THEN** keep_fed does not set off for a known food place
+
+#### Scenario: Trusted place first
+- **WHEN** a listed village is 400 blocks away and a remembered field (found:wheat) 300 blocks away
+- **THEN** the field comes first (300 / 1.2 = 250 against 400 / 1.5 = 267)
+
+### Requirement: Seed gathering
+gather_seeds SHALL keep breaking the nearest grass it may break, working outwards up to its radius from where it started, until it has the seeds it wants, its time limit runs out (keep_fed: `seedMinutes`, default 4), the breakable grass runs out, a break budget of about 24 blocks per seed (48 to 400) is used, or 12 grass blocks in a row can't be reached. Grass in protected areas or near the world spawn SHALL be skipped without hiding grass further out. After each break it SHALL walk over the drops next to the broken block. Its result SHALL say how many grass blocks it broke, how many seeds it got of how many wanted, and why it stopped. A seeds chore or step that came back short while breakable grass is still in reach SHALL be paused 3 minutes instead of the usual pause.
+
+#### Scenario: No seed in the first 18 grass
+- **WHEN** gather_seeds wants 5 seeds and has broken 18 grass in 108 s with no seed, and grass is still around
+- **THEN** it keeps breaking grass
+
+#### Scenario: Nearest grass protected
+- **WHEN** the nearest 64 grass blocks lie inside a protected base and more grass lies further out within the radius
+- **THEN** gather_seeds breaks the grass further out instead of saying there is none
+
+#### Scenario: Short run, grass left
+- **WHEN** a seeds chore got 1 of 5 seeds when its time ran out and breakable grass is still in reach
+- **THEN** the seeds chore is offered again after 3 minutes, not 20
+
+### Requirement: Reaching animals
+When hunt can't get to an animal on foot (and `reach` is on, the default), it SHALL try once more with the budget from the pure `reachEffort`: up to 16 scaffolding blocks it carries (dirt, cobblestone and other stone, planks) for bridges and, for an animal above it, a pillar, and digging through or down when digging is allowed, within 45 seconds. It SHALL refuse, and say why, for an animal in a protected area or a remembered danger zone, by lava, more than 48 blocks away or more than 24 blocks above or below, or when it may neither dig nor place (or has no blocks and may not dig). While trying, the pathfinder SHALL NOT break or place in a protected area or danger zone, SHALL NOT walk through a danger zone, and SHALL NOT break a block with water or lava under it. An animal it still can't reach SHALL be left alone for 5 minutes and the hunt result SHALL say what it tried.
+
+#### Scenario: Chicken across a gap
+- **WHEN** a chicken is 20 blocks away across a ravine, the bot carries 30 dirt and the pathfinder finds no way on foot
+- **THEN** hunt bridges with at most 16 dirt and kills the chicken
+
+#### Scenario: Chicken deep in a cave
+- **WHEN** a chicken is 51 blocks below the bot
+- **THEN** hunt does not dig down to it, leaves it alone for 5 minutes and says it is 51 blocks below (more than 24)
+
+#### Scenario: Animal in a protected area
+- **WHEN** the only animal in range stands in a protected area
+- **THEN** hunt places and digs nothing there and says it is in a protected area
 
 ### Requirement: Work while searching
 While searching, find_food SHALL stop as soon as huntable animals (beyond the breeders) or a village farm come into view and remember the spot, SHALL note water, and when keep_fed asks for seeds SHALL break grass next to its path (no detours) until it has them. A waypoint over water or lava SHALL be replaced by dry ground closer in or a little round the ring, and SHALL only be skipped when every nearby candidate is known to be wet.

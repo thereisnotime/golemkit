@@ -194,7 +194,7 @@ test('keep_fed ladder options validate and coerce from chat', async () => {
   assert.ok(reg.validate('keep_fed', c).ok)
   const d = reg.validate('keep_fed', {})
   assert.ok(d.ok)
-  assert.deepEqual((d.options as any).rings, [48, 120, 250])
+  assert.deepEqual((d.options as any).rings, [48, 120, 250, 400, 600])
   assert.equal((d.options as any).keepBreeders, true)
   assert.ok(!reg.validate('keep_fed', { rings: [5000] }).ok)
 })

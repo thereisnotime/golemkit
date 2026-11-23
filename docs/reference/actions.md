@@ -266,6 +266,7 @@ Hunt passive animals (cow, pig, sheep, chicken, rabbit, mooshroom) for food and 
 | `radius` | number (4..64) |  | `24` | how far to look, in blocks |
 | `pens` | boolean |  | `false` | also hunt animals inside fences (only your own farm) |
 | `keepAtLeast` | integer (0..32) |  | `0` | leave at least this many adults of each kind alive (sustainable herd) |
+| `reach` | boolean |  | `true` | when an animal is out of reach on foot, bridge, pillar (up to 16 blocks of dirt, cobblestone or planks) or dig to it, never in protected areas or danger zones |
 
 ### `gear_up`
 
@@ -493,14 +494,14 @@ Scout for food beyond what is in sight: first known food spots, then an expandin
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `radius` | number (32..512) |  | `200` | how far from home to scout, in blocks |
+| `radius` | number (32..1024) |  | `200` | how far from home to scout, in blocks |
 | `atNight` | boolean |  | `false` | also scout at night (dangerous) |
 | `animals` | array |  | `["cow","pig","sheep","chicken","rabbit","mooshroom"]` | animals that count as food |
 | `crops` | boolean |  | `true` | village farms (crops with villagers nearby) count as food too |
 | `maxMinutes` | number (1..30) |  | `8` | give up after this long |
 | `keepAtLeast` | integer (0..32) |  | `0` | only count animals above this many adults of a kind (a herd to spare) |
 | `from` | `home` \| `here` |  | `"home"` | centre of the search: home (when set) or where the bot stands |
-| `minRadius` | number (0..512) |  | `0` | skip rings at or inside this radius (an earlier, smaller search covered them) |
+| `minRadius` | number (0..1024) |  | `0` | skip rings at or inside this radius (an earlier, smaller search covered them) |
 | `seeds` | integer (0..64) |  | `0` | pick up this many seeds on the way by breaking grass next to the path (for a farm later) |
 
 ### `start_farm`
@@ -537,7 +538,7 @@ Look after its own farm (farm:1, farm:2...): put the water back if it is gone (w
 
 ### `gather_seeds`
 
-Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. Skips protected areas and the world spawn. Needs digging enabled.
+Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. Needs digging enabled.
 
 *long-running*
 

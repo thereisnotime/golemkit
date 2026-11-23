@@ -12,7 +12,7 @@ import { huntRefusal, inPen, herdSurplus, unreachableAnimals, HUNTABLE, type Hun
 import { CROPS, isMature, plantOn, TILLABLE } from './farming.ts'
 import { getHome, getPlaces, setPlace, sameDimension, reachDryLand, type Place } from './navigation.ts'
 import { digBlock, DigRefusedError, findItem, countItem, placeAt, reachBlock, vec, within, gotoWithin } from './world.ts'
-import { pickupNearby } from './pickup.ts'
+import { pickupNearby, droppedItemName } from './pickup.ts'
 import { climbOut, roofAbove } from './survival.ts'
 import { ensureTool } from './toolkit.ts'
 import { collectBlocks } from './gather.ts'
@@ -20,7 +20,7 @@ import { craftItem, pickFuel } from './crafting.ts'
 import { planFarmWork, farmWorkCount, oddSize, type FarmCell, type FarmGrid, type FarmWork } from './farmPlan.ts'
 import { inDangerZone, wayThroughDanger } from './food-danger.ts'
 import {
-  scoutWaypoints, scoutStopReason, nextWaypoint, sectorsText, compass, sectorOf, mergeSpot, markSpotEmpty, rankSpots, dryWaypoint,
+  seedStopReason, seedLimits, scoutWaypoints, scoutStopReason, nextWaypoint, sectorsText, compass, sectorOf, mergeSpot, markSpotEmpty, rankSpots, dryWaypoint,
   chooseFarmSite, plotLayout, pickFarmSeed, seedCount, breedPlan, BREED_FOOD, DEFAULT_SCOUT_LIMITS,
   type FoodSpot, type FoodSpotKind, type CellKind, type SiteCandidate, type Pos, type Waypoint
 } from './foodPlan.ts'
@@ -370,14 +370,14 @@ const findFood = defineAction({
     'out to `radius` blocks, by day, avoiding water, lava and protected areas, until it sees huntable animals or a village farm. ' +
     'Remembers what it finds as places (food:animals, food:village_farm, food:water). Does not hunt; use hunt or keep_fed after.',
   params: z.object({
-    radius: z.number().min(32).max(512).default(200).describe('how far from home to scout, in blocks'),
+    radius: z.number().min(32).max(1024).default(200).describe('how far from home to scout, in blocks'),
     atNight: z.boolean().default(false).describe('also scout at night (dangerous)'),
     animals: z.array(z.enum(HUNTABLE)).default([...HUNTABLE]).describe('animals that count as food'),
     crops: z.boolean().default(true).describe('village farms (crops with villagers nearby) count as food too'),
     maxMinutes: z.number().min(1).max(30).default(8).describe('give up after this long'),
     keepAtLeast: z.number().int().min(0).max(32).default(0).describe('only count animals above this many adults of a kind (a herd to spare)'),
     from: z.enum(['home', 'here']).default('home').describe('centre of the search: home (when set) or where the bot stands'),
-    minRadius: z.number().min(0).max(512).default(0).describe('skip rings at or inside this radius (an earlier, smaller search covered them)'),
+    minRadius: z.number().min(0).max(1024).default(0).describe('skip rings at or inside this radius (an earlier, smaller search covered them)'),
     seeds: z.number().int().min(0).max(64).default(0).describe('pick up this many seeds on the way by breaking grass next to the path (for a farm later)')
   }),
   longRunning: true,
@@ -582,34 +582,116 @@ export function siteAt (agent: Agent, bot: Bot, water: Vec3, size: number, from:
   return { water: { x: water.x, y: water.y, z: water.z }, cells, around, distance: Math.hypot(water.x - from.x, water.z - from.z) }
 }
 
+const GRASS = ['short_grass', 'grass', 'tall_grass', 'fern', 'large_fern']
+const grassIds = (bot: Bot) => GRASS.map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
+
+/**
+ * Grass it may break for seeds within `radius` of `center` (default: the bot), nearest first:
+ * not protected, not near the world spawn, not in `skip`. Looks at many candidates, since the
+ * nearest few dozen are often all inside a protected base.
+ */
+export function breakableGrass (agent: Agent, bot: Bot, radius: number, o: { clearance?: number, skip?: ReadonlySet<string>, center?: { x: number, z: number }, count?: number } = {}): Block[] {
+  const ids = grassIds(bot)
+  if (!ids.length) return []
+  const center = o.center
+  const out: Block[] = []
+  for (const p of bot.findBlocks({ matching: ids, maxDistance: radius, count: 1024 })) {
+    if (o.skip?.has(p.toString())) continue
+    if (center && Math.hypot(p.x - center.x, p.z - center.z) > radius) continue
+    if (offLimits(agent, bot, p, o.clearance ?? 48)) continue
+    const b = bot.blockAt(p)
+    if (b) out.push(b)
+    if (out.length >= (o.count ?? 1)) break
+  }
+  return out
+}
+
+export interface SeedRun {
+  broken: number
+  /** Seeds that ended up in the inventory. */
+  seeds: number
+  /** Seed drops seen next to broken grass, and how many of those it walked over. */
+  dropped: number
+  picked: number
+  /** Why it stopped (seedStopReason). */
+  stopped: string
+  /** Breakable grass still in range when it stopped. */
+  grassLeft: boolean
+  ms: number
+}
+
+const isSeedItem = (name: string | null) => !!name && /^(wheat_seeds|beetroot_seeds|carrot|potato)$/.test(name)
+
+/**
+ * Walks over the drops lying next to a block it just broke (seeds pop out up to a block or two
+ * away and are only picked up by walking onto them). Returns the seed drops it saw.
+ */
+async function collectDropsAt (bot: Bot, pos: Vec3, signal: AbortSignal, seen: Set<number>): Promise<number> {
+  await sleep(350, signal) // the item entity and its metadata arrive a moment after the break
+  let seeds = 0
+  const near = () => Object.values(bot.entities).filter(e => e.name === 'item' && !seen.has(e.id) && e.position.distanceTo(pos.offset(0.5, 0.5, 0.5)) <= 3)
+  for (const drop of near()) {
+    seen.add(drop.id)
+    if (isSeedItem(droppedItemName(drop))) seeds++
+    if (!bot.entities[drop.id]) continue
+    try {
+      const p = drop.position
+      await gotoWithin(bot, new goals.GoalNear(p.x, p.y, p.z, 0.5), signal, 5000)
+      await sleep(200, signal)
+    } catch (e) { checkAborted(signal) }
+  }
+  return seeds
+}
+
+/**
+ * Breaks grass for seeds until it has `want` more, time runs out (maxMs), the breakable grass
+ * within `maxDistance` of where it started runs out, or the break budget is used (seedStopReason).
+ * The nearest grass goes first, so it works outwards patch by patch. Drops next to each broken
+ * block are walked over right away, and once more at the end.
+ */
 export async function breakPlantsFor (ctx: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>, want: number, clearance: number, maxMs = 4 * 60_000,
-  maxDistance = 64, maxBroken = 120): Promise<{ broken: number, seeds: number }> {
+  maxDistance = 64, maxBroken?: number): Promise<SeedRun> {
   const { bot, agent, signal, log } = ctx
-  const ids = ['short_grass', 'grass', 'tall_grass', 'fern', 'large_fern'].map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
+  const t0 = Date.now()
   const before = seedCount(inventory(bot))
-  const until = Date.now() + maxMs
+  const start = { x: bot.entity.position.x, z: bot.entity.position.z }
+  const limits = { ...seedLimits(want, maxMs), ...(maxBroken !== undefined ? { maxBroken } : {}) }
   const skip = new Set<string>()
+  const seenDrops = new Set<number>()
   let broken = 0
-  while (seedCount(inventory(bot)) - before < want && Date.now() < until && broken < maxBroken) {
+  let dropped = 0
+  let failsInRow = 0
+  let stopped: string | null = null
+  let next: Block | undefined
+  const got = () => seedCount(inventory(bot)) - before
+  while (true) {
     checkAborted(signal)
-    const target = bot.findBlocks({ matching: ids, maxDistance, count: 64 })
-      .map(p => bot.blockAt(p)).find(b => b && !skip.has(b.position.toString()) && !offLimits(agent, bot, b.position, clearance))
-    if (!target) break
+    next = breakableGrass(agent, bot, maxDistance, { clearance, skip, center: start })[0]
+    stopped = seedStopReason({ got: got(), want, broken, elapsedMs: Date.now() - t0, grassLeft: !!next, failsInRow }, limits)
+    if (stopped || !next) break
+    const target = next
     try {
       await reachBlock(bot, target.position, signal, 2, 15_000)
       await digBlock(bot, target, signal)
       broken++
+      failsInRow = 0
     } catch (e) {
       checkAborted(signal)
       if (e instanceof DigRefusedError) agent.markProtected(target.position)
       skip.add(target.position.toString())
+      failsInRow++
       continue
     }
-    if (broken % 6 === 0) await pickupNearby(bot, signal, { radius: 6, maxMs: 6000 }).catch(() => 0)
+    skip.add(target.position.toString())
+    dropped += await collectDropsAt(bot, target.position, signal, seenDrops).catch(e => { checkAborted(signal); return 0 })
   }
+  // anything still lying around (a drop that rolled away, or arrived late)
   await pickupNearby(bot, signal, { radius: 8, maxMs: 10_000 }).catch(() => 0)
-  log.debug('broke plants for seeds', { broken, seeds: seedCount(inventory(bot)) - before })
-  return { broken, seeds: seedCount(inventory(bot)) - before }
+  const seeds = got()
+  const grassLeft = !!breakableGrass(agent, bot, maxDistance, { clearance, skip, center: start })[0]
+  const run: SeedRun = { broken, seeds, dropped, picked: Math.min(dropped, seeds), stopped: stopped ?? 'no more grass I may break in range', grassLeft, ms: Date.now() - t0 }
+  log.debug('broke plants for seeds', { broken, seeds, dropped, stopped: run.stopped, grassLeft })
+  return run
 }
 
 /** Gets a hoe: one in the inventory, crafted from what's there, or crafted after chopping a couple of logs. */
@@ -1006,6 +1088,7 @@ const tendFarm = defineAction({
 const gatherSeeds = defineAction({
   name: 'gather_seeds',
   description: 'Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. ' +
+    'Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. ' +
     'Skips protected areas and the world spawn. Needs digging enabled.',
   params: z.object({
     count: z.number().int().min(1).max(64).default(10).describe('seeds to get'),
@@ -1018,8 +1101,11 @@ const gatherSeeds = defineAction({
     if (!ctx.agent.canDig) return fail('I need digging enabled to break grass')
     const got = await breakPlantsFor(ctx, p.count, p.spawnClearance, p.maxMinutes * 60_000, p.radius)
     const total = seedCount(inventory(ctx.bot))
-    if (!got.broken) return fail(`no grass I may break within ${p.radius} blocks (have ${total} seeds)`)
-    return got.seeds > 0 ? ok(`broke ${got.broken} grass for ${got.seeds} seeds (have ${total})`, { seeds: got.seeds, total }) : fail(`broke ${got.broken} grass but no seeds dropped (have ${total})`)
+    const data = { seeds: got.seeds, total, broken: got.broken, dropped: got.dropped, grassLeft: got.grassLeft, stopped: got.stopped }
+    if (!got.broken) return fail(`no grass I may break within ${p.radius} blocks (have ${total} seeds)`, data)
+    const drops = got.dropped === got.seeds ? '' : `, ${got.dropped} seed drop${got.dropped === 1 ? '' : 's'} seen`
+    const text = `broke ${got.broken} grass in ${Math.round(got.ms / 1000)}s for ${got.seeds} of ${p.count} seeds${drops} (have ${total}); stopped: ${got.stopped}`
+    return got.seeds > 0 ? ok(text, data) : fail(text, data)
   }
 })
 

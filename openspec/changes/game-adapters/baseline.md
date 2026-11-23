@@ -168,3 +168,17 @@ Within run-to-run variance: the ranges overlap (phase 0 hits 27-35, phase 3 14-2
 runs of each at 27), the difference in mean hits is under two pooled standard deviations with
 three runs a side (Welch t about 1.9, not significant), and bot deaths, bot hits and kills are
 the same. No sign of a regression.
+
+## Golden updates after phase 3
+
+`feat/food-reach` (keep_fed food fixes) changed action schemas on purpose, so
+`action-catalogs.json` and `llm-tools.json` were rewritten with `UPDATE_GOLDEN=1`:
+
+- `hunt` has a new `reach` parameter (boolean, default true): bridge, pillar or dig to an
+  animal the pathfinder can't reach on foot, within a 16-block budget.
+- `find_food`: `radius` and `minRadius` go up to 1024 (from 512), for the 400 and 600 rings.
+- `gather_seeds`: the description says it keeps going until it has the seeds, the time is up
+  or the grass runs out.
+
+Nothing else in the goldens changed; `observe.json`, `intent-decisions.json` and
+`replay-events.json` are identical.

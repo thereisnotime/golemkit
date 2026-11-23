@@ -386,15 +386,17 @@ export function dryWaypoint (center: XZ, w: XZ, wet: (p: XZ) => boolean | null):
  * knows, to searching wider and wider, to growing its own food:
  *   inventory: eat, cook, bread
  *   known:     withdraw (chest), harvest (crops in range), farm (its own, ripe or due), spot, hunt
- *   search:    scout (find_food) one ring wider than the last empty one
+ *   search:    scout (find_food) one ring wider than the last empty one (rings beyond 250 by day only)
+ *   trip:      walk to a known farm or village far away, harvest, bake, eat, come back
+ *              (before the far rings, and when every ring is empty)
  *   farm:      plant (fill its farm), seeds (break grass), start_farm, breed, forage (stopgap)
  *   critical:  report (tell the owner once, stay safe)
  */
 export type FoodStep =
   | 'eat' | 'cook' | 'bread' | 'withdraw' | 'harvest' | 'farm' | 'spot' | 'hunt'
-  | 'scout' | 'seeds' | 'start_farm' | 'plant' | 'breed' | 'forage' | 'report'
+  | 'scout' | 'trip' | 'seeds' | 'start_farm' | 'plant' | 'breed' | 'forage' | 'report'
 
-export type FoodRung = 'inventory' | 'known' | 'search' | 'farm' | 'critical'
+export type FoodRung = 'inventory' | 'known' | 'search' | 'trip' | 'farm' | 'critical'
 
 /** One find_food run: how far it went out and whether it found food. */
 export interface SearchRecord {
@@ -468,6 +470,8 @@ export interface FoodWorld {
   paused?: Partial<Record<FoodStep, number>>
   /** When it last told the owner it is starving (epoch ms). */
   lastReportAt?: number
+  /** The best known food place worth a trip (rankFoodPlaces' first), or null. */
+  knownPlace?: { name: string, distance: number } | null
   /** Clock for the time-based rules (epoch ms); default Date.now(). */
   now?: number
 }
@@ -489,8 +493,12 @@ export interface FoodStepOptions {
   startFarm?: boolean
   /** Beyond this distance a trip counts as far (no far trips at night). */
   radius?: number
-  /** Search rings, smallest first (default [48, 120, 250]). */
+  /** Search rings, smallest first (default [48, 120, 250, 400, 600]). */
   rings?: readonly number[]
+  /** Rings wider than this are far: searched by day only, even with scoutAtNight, and a known place comes first (default 250). */
+  farRingsFrom?: number
+  /** Trips to known food places (default true; without a knownPlace there is nothing to go to anyway). */
+  trips?: boolean
   /** How long an empty ring is remembered (default 20 minutes). */
   ringMemoryMs?: number
   /** Seeds to have before starting a farm; fewer, with grass near, means gather first (default 8). */
@@ -525,7 +533,9 @@ export interface FoodDecision {
   retryMs: number
 }
 
-export const DEFAULT_RINGS = [48, 120, 250] as const
+export const DEFAULT_RINGS = [48, 120, 250, 400, 600] as const
+/** Rings beyond this are far ones (day only, after known places). */
+export const FAR_RINGS_FROM = 250
 export const RING_MEMORY_MS = 20 * 60_000
 
 /**
@@ -556,6 +566,7 @@ export const STEP_PAUSE_MS: Record<FoodStep, number> = {
   spot: 0, // each spot carries its own empty-visit pause (a new sighting must not wait)
   hunt: 2 * 60_000,
   scout: 0, // the search records decide
+  trip: 0, // each place carries its own pause (TRIP_PAUSE_MS)
   seeds: 10 * 60_000,
   start_farm: 15 * 60_000,
   plant: 10 * 60_000,
@@ -614,20 +625,29 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
     if (!w.hasFarm && w.canStartFarm && seeds >= minSeeds && ok('start_farm')) return d('start_farm', 'farm', `food ${food}/20 is not urgent and it has ${seeds} seeds: starting a farm alongside`)
   }
 
-  // 3. search, one ring wider than the last empty one
+  // 3. search, one ring wider than the last empty one. Rings past farRingsFrom are far: by day
+  // only (even with scoutAtNight), and a known farm or village is visited first.
   const rings = o.rings?.length ? o.rings : DEFAULT_RINGS
+  const farFrom = o.farRingsFrom ?? FAR_RINGS_FROM
   const ring = nextRing(w.searches ?? [], rings, now, o.ringMemoryMs ?? RING_MEMORY_MS)
+  const farRing = !!ring && ring.radius > farFrom
+  const place = o.trips !== false && w.knownPlace && !w.night && !w.danger && ok('trip') ? w.knownPlace : null
+  const trip = () => d('trip', 'trip', `${ring ? `before searching ${ring.radius} blocks out` : 'every ring came up empty'}: known food place ${place!.name} ${Math.round(place!.distance)} blocks away`)
   let searchBlocked = ''
   if (!o.scout || !w.canScout) searchBlocked = 'scouting is off'
-  else if (!dayOrBold) searchBlocked = 'night or a storm'
+  else if (!dayOrBold || (farRing && w.night)) searchBlocked = farRing && dayOrBold ? `night: the ${ring!.radius} ring is searched by day only` : 'night or a storm'
   else if (w.danger) searchBlocked = 'hostiles near'
   else if (!ring) searchBlocked = `every ring out to ${Math.max(...rings)} came up empty in the last ${Math.round((o.ringMemoryMs ?? RING_MEMORY_MS) / 60_000)} min`
   else if (!ok('scout')) searchBlocked = 'already scouted this run'
   if (!searchBlocked && ring) {
+    if (farRing && place) return trip()
     const pick = fallback && w.seeds !== undefined && seeds < minSeeds ? minSeeds - seeds : 0
     return d('scout', 'search', ring.covered ? `nothing within ${ring.covered} blocks, widening to ${ring.radius}` : `nothing in range, searching ${ring.radius} blocks out`,
       { radius: ring.radius, minRadius: ring.covered, keepAtLeast: keep, ...(pick ? { seeds: pick } : {}) })
   }
+
+  // 4. every ring empty (or the search is blocked): a known farm or village further away is real food
+  if (place && (!ring || farRing)) return trip()
 
   // 5. no proper source: grow food (and use stopgaps while it grows). A search that just found
   // food is a source: the next run goes back to it instead of farming.
@@ -653,8 +673,8 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   // nothing now: when to look again
   let retryMs = RETRY.idle
   let why = searchBlocked ? `nothing to do (${searchBlocked})` : 'nothing to do'
-  if (ring && dayOrBold && !w.danger && o.scout && w.canScout) retryMs = RETRY.soon // a wider ring is still open
-  else if (w.night && !o.scoutAtNight) { retryMs = RETRY.night; why += ', waiting for day' }
+  if (ring && dayOrBold && !(farRing && w.night) && !w.danger && o.scout && w.canScout) retryMs = RETRY.soon // a wider ring is still open
+  else if (w.night && (!o.scoutAtNight || farRing || !!w.knownPlace)) { retryMs = RETRY.night; why += ', waiting for day' }
   else if (w.danger) { retryMs = RETRY.danger; why += ', waiting for the mobs to go' }
   else if (w.hasFarm && (w.farmGrowing ?? 0) > 0) { retryMs = RETRY.growing; why += `, ${w.farmGrowing} crops growing` }
   else if (critical) retryMs = RETRY.critical
@@ -746,6 +766,19 @@ export const CHORE_PAUSE_MS: Record<FoodChore, { ok: number, fail: number }> = {
   seeds: { ok: 8 * 60_000, fail: 20 * 60_000 },
   breed: { ok: 6 * 60_000, fail: 15 * 60_000 }
 }
+/** A seeds run that came back short while breakable grass is still around: try again soon (seeds drop 1 in 8, a short run is bad luck). */
+export const SEEDS_RETRY_MS = 3 * 60_000
+
+/**
+ * How long to leave a chore alone after it ran. A failed seeds run with breakable grass still
+ * in reach is paused only briefly: with a 1 in 8 drop, coming back empty is mostly luck.
+ */
+export function chorePause (chore: FoodChore, ok: boolean, o: { grassLeft?: boolean } = {}): number {
+  const p = CHORE_PAUSE_MS[chore]
+  if (ok) return p.ok
+  if (chore === 'seeds' && o.grassLeft) return SEEDS_RETRY_MS
+  return p.fail
+}
 
 /**
  * Food work to do between meals, or null: tend and grow its farm when there is work it can do,
@@ -773,5 +806,117 @@ export function farmChore (w: ChoreWorld, o: ChoreOptions): { chore: FoodChore, 
     }
   }
   if (o.breed && w.canBreed && ok('breed')) return { chore: 'breed', reason: 'a pair near home and food for them' }
+  return null
+}
+
+// ------------------------------------------------------------------ seed gathering
+
+export interface SeedProgress {
+  /** Seeds picked up so far, and how many are wanted. */
+  got: number
+  want: number
+  broken: number
+  elapsedMs: number
+  /** Breakable grass still in range (not protected, not skipped). */
+  grassLeft: boolean
+  /** Grass blocks in a row it couldn't reach or break. */
+  failsInRow: number
+}
+
+export interface SeedLimits {
+  maxMs: number
+  maxBroken: number
+  maxFailsInRow: number
+}
+
+/** Grass to break at most for `want` seeds: about 8 per seed, with room for bad luck. */
+export function seedBreakBudget (want: number): number {
+  return Math.max(48, Math.min(400, Math.ceil(want) * 24))
+}
+
+export function seedLimits (want: number, maxMs = 4 * 60_000): SeedLimits {
+  return { maxMs, maxBroken: seedBreakBudget(want), maxFailsInRow: 12 }
+}
+
+/**
+ * Why gather_seeds should stop now, or null to keep breaking grass. It stops when it has the
+ * seeds it wants, when time runs out, when the grass in range runs out, at the break budget, or
+ * when grass keeps being out of reach. A few broken blocks with no seed is no reason to stop.
+ */
+export function seedStopReason (p: SeedProgress, l: SeedLimits): string | null {
+  if (p.got >= p.want) return `got the ${p.want} seeds I wanted`
+  if (p.elapsedMs >= l.maxMs) return `time is up (${Math.round(l.maxMs / 60_000)} min)`
+  if (!p.grassLeft) return 'no more grass I may break in range'
+  if (p.broken >= l.maxBroken) return `broke ${p.broken} grass, my limit for ${p.want} seeds`
+  if (p.failsInRow >= l.maxFailsInRow) return `couldn't reach ${p.failsInRow} grass blocks in a row`
+  return null
+}
+
+// ------------------------------------------------------------------ known food places
+
+/** Where a known food place came from: the profile, its own farms, a found:* place, a food:* place or spot. */
+export type FoodPlaceSource = 'config' | 'farm' | 'crops' | 'village' | 'animals'
+
+export interface FoodPlace {
+  name: string
+  x: number
+  y?: number
+  z: number
+  dim?: string
+  source: FoodPlaceSource
+  /** Crops grown there, when known (wheat, carrots, potatoes). */
+  crops?: string[]
+}
+
+/** How much a source is trusted: the effective distance is the real one divided by this. */
+export const PLACE_WEIGHT: Record<FoodPlaceSource, number> = { config: 1.5, farm: 1.5, crops: 1.2, village: 1, animals: 0.6 }
+/** Pause after a trip: empty or unreachable, and after a good harvest (crops take a while to grow back). */
+export const TRIP_PAUSE_MS = { empty: 45 * 60_000, ok: 20 * 60_000 }
+
+export interface FoodPlaceRules {
+  /** Places this close are what the harvest/hunt steps see already (default 48). */
+  minDistance?: number
+  /** Further than this is no trip (default 4000). */
+  maxDistance?: number
+  dim?: string
+  /** Per-place pause (name -> until, epoch ms). */
+  paused?: Record<string, number>
+  now?: number
+  /** True when a place lies in a remembered danger zone. */
+  inDanger? (p: XZ): boolean
+}
+
+/**
+ * Known food places worth a trip, best first: same dimension, not paused, not in a danger zone,
+ * between minDistance and maxDistance away. Places within 48 blocks of each other are one (the
+ * more trusted one stays). Order: distance divided by the source's weight, so a configured
+ * village or its own farm wins over a found field of about the same distance.
+ */
+export function rankFoodPlaces (places: readonly FoodPlace[], from: XZ, r: FoodPlaceRules = {}): (FoodPlace & { distance: number })[] {
+  const now = r.now ?? Date.now()
+  const min = r.minDistance ?? 48
+  const max = r.maxDistance ?? 4000
+  const ok = places
+    .filter(p => !r.dim || !p.dim || p.dim === r.dim)
+    .filter(p => !((r.paused?.[p.name] ?? 0) > now))
+    .filter(p => !r.inDanger?.(p))
+    .map(p => ({ ...p, distance: Math.hypot(p.x - from.x, p.z - from.z) }))
+    .filter(p => p.distance >= min && p.distance <= max)
+    .sort((a, b) => a.distance / PLACE_WEIGHT[a.source] - b.distance / PLACE_WEIGHT[b.source])
+  const out: (FoodPlace & { distance: number })[] = []
+  for (const p of ok) {
+    const twin = out.find(q => Math.hypot(q.x - p.x, q.z - p.z) <= 48)
+    if (!twin) out.push(p)
+    else if (!twin.crops && p.crops) twin.crops = p.crops
+  }
+  return out
+}
+
+/** Which named places are food places: found:<crop>, found:village, food:village_farm, food:animals. */
+export function placeSource (name: string): FoodPlaceSource | null {
+  if (/^found:(wheat|carrots?|potato(es)?|beetroots?|wheat_seeds|beetroot_seeds)$/.test(name)) return 'crops'
+  if (name === 'found:village' || name === 'food:village_farm') return name === 'food:village_farm' ? 'crops' : 'village'
+  if (name === 'food:animals' || name === 'found:animals') return 'animals'
+  if (/^farm:/.test(name)) return 'farm'
   return null
 }

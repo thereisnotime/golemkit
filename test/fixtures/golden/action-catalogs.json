@@ -361,6 +361,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 32
+            },
+            "reach": {
+              "default": true,
+              "description": "when an animal is out of reach on foot, bridge, pillar (up to 16 blocks of dirt, cobblestone or planks) or dig to it, never in protected areas or danger zones",
+              "type": "boolean"
             }
           }
         },
@@ -1073,6 +1078,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 32
+            },
+            "reach": {
+              "default": true,
+              "description": "when an animal is out of reach on foot, bridge, pillar (up to 16 blocks of dirt, cobblestone or planks) or dig to it, never in protected areas or danger zones",
+              "type": "boolean"
             }
           }
         },
@@ -1778,6 +1788,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 32
+            },
+            "reach": {
+              "default": true,
+              "description": "when an animal is out of reach on foot, bridge, pillar (up to 16 blocks of dirt, cobblestone or planks) or dig to it, never in protected areas or danger zones",
+              "type": "boolean"
             }
           }
         },
@@ -2570,6 +2585,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 32
+            },
+            "reach": {
+              "default": true,
+              "description": "when an animal is out of reach on foot, bridge, pillar (up to 16 blocks of dirt, cobblestone or planks) or dig to it, never in protected areas or danger zones",
+              "type": "boolean"
             }
           }
         },
@@ -3388,7 +3408,7 @@
               "description": "how far from home to scout, in blocks",
               "type": "number",
               "minimum": 32,
-              "maximum": 512
+              "maximum": 1024
             },
             "atNight": {
               "default": false,
@@ -3451,7 +3471,7 @@
               "description": "skip rings at or inside this radius (an earlier, smaller search covered them)",
               "type": "number",
               "minimum": 0,
-              "maximum": 512
+              "maximum": 1024
             },
             "seeds": {
               "default": 0,
@@ -3572,7 +3592,7 @@
       },
       {
         "name": "gather_seeds",
-        "description": "Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. Skips protected areas and the world spawn. Needs digging enabled.",
+        "description": "Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. Needs digging enabled.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -5782,6 +5802,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 32
+            },
+            "reach": {
+              "default": true,
+              "description": "when an animal is out of reach on foot, bridge, pillar (up to 16 blocks of dirt, cobblestone or planks) or dig to it, never in protected areas or danger zones",
+              "type": "boolean"
             }
           }
         },
@@ -6407,7 +6432,7 @@
               "description": "how far from home to scout, in blocks",
               "type": "number",
               "minimum": 32,
-              "maximum": 512
+              "maximum": 1024
             },
             "atNight": {
               "default": false,
@@ -6470,7 +6495,7 @@
               "description": "skip rings at or inside this radius (an earlier, smaller search covered them)",
               "type": "number",
               "minimum": 0,
-              "maximum": 512
+              "maximum": 1024
             },
             "seeds": {
               "default": 0,
@@ -6591,7 +6616,7 @@
       },
       {
         "name": "gather_seeds",
-        "description": "Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. Skips protected areas and the world spawn. Needs digging enabled.",
+        "description": "Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. Needs digging enabled.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -8670,6 +8695,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 32
+            },
+            "reach": {
+              "default": true,
+              "description": "when an animal is out of reach on foot, bridge, pillar (up to 16 blocks of dirt, cobblestone or planks) or dig to it, never in protected areas or danger zones",
+              "type": "boolean"
             }
           }
         },
@@ -9375,6 +9405,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 32
+            },
+            "reach": {
+              "default": true,
+              "description": "when an animal is out of reach on foot, bridge, pillar (up to 16 blocks of dirt, cobblestone or planks) or dig to it, never in protected areas or danger zones",
+              "type": "boolean"
             }
           }
         },
@@ -10167,6 +10202,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 32
+            },
+            "reach": {
+              "default": true,
+              "description": "when an animal is out of reach on foot, bridge, pillar (up to 16 blocks of dirt, cobblestone or planks) or dig to it, never in protected areas or danger zones",
+              "type": "boolean"
             }
           }
         },
@@ -10985,7 +11025,7 @@
               "description": "how far from home to scout, in blocks",
               "type": "number",
               "minimum": 32,
-              "maximum": 512
+              "maximum": 1024
             },
             "atNight": {
               "default": false,
@@ -11048,7 +11088,7 @@
               "description": "skip rings at or inside this radius (an earlier, smaller search covered them)",
               "type": "number",
               "minimum": 0,
-              "maximum": 512
+              "maximum": 1024
             },
             "seeds": {
               "default": 0,
@@ -11169,7 +11209,7 @@
       },
       {
         "name": "gather_seeds",
-        "description": "Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. Skips protected areas and the world spawn. Needs digging enabled.",
+        "description": "Get seeds for a farm by breaking grass and ferns nearby (wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. Needs digging enabled.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",

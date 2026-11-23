@@ -460,7 +460,8 @@ How to read it:
 ## Food: keep_fed, the food ladder and farm_setup
 
 `keep_fed` climbs a ladder when the bot is hungry: what it carries, then sources it knows,
-then searches that widen ring by ring, then a farm of its own. Between meals it looks after
+then searches that widen ring by ring, then a trip to a known farm or village far away, then
+the far rings, then a farm of its own. Between meals it looks after
 that farm (replant, re-till, grow it) and breeds animals near home, so the farm is there long
 before the searches run dry. The choice is the pure
 `planFood(world, options, tried)` in `src/skills/foodPlan.ts`, which returns the rung, the
@@ -487,6 +488,9 @@ flowchart TB
   R3 -- "48 → 120 → 250" --> SC["find_food on that ring<br/>4 · on the way: seeds from<br/>grass, note animals + water"]
   SC -- "found animals<br/>or crops" --> R2
   SC -- "empty: remember<br/>the ring" --> R3
+  R3 -- "next ring is 400+<br/>and a known food<br/>place (by day)" --> TRIP["3b · trip: walk to the farm<br/>or village, harvest + replant,<br/>hunt, seeds, bake, eat,<br/>come back home"]
+  TRIP -- "empty: place left<br/>alone 45 min" --> R3
+  R3 -- "400 → 600<br/>(by day only)" --> SC
   R3 -- "all empty, night,<br/>or danger" --> R5{"5 · farm fallback"}
   R5 --> FARM["tend_farm · gather seeds ·<br/>start_farm near home ·<br/>breed · forage berries,<br/>kelp (apples if critical)"]
   FARM --> W(["wait by rung:<br/>20 s next ring · 45 s mobs ·<br/>3 min crops growing ·<br/>2 min at night · 5 min idle"])
@@ -494,6 +498,7 @@ flowchart TB
   EAT -.-> H
   KNOWN -.-> H
   GROW -.-> H
+  TRIP -.-> H
   FED(["fed: between meals<br/>tend · grow · seeds ·<br/>start_farm · breed near home"]) -.-> GROW
 
   classDef trig fill:#f1f5f9,stroke:#475569,color:#0f172a
@@ -505,7 +510,7 @@ flowchart TB
   class H,W,FED trig
   class R1,R2,R2B,R3,R5 ask
   class EAT,KNOWN near
-  class SC far
+  class SC,TRIP far
   class FARM,GROW grow
   class REP stop
 ```
@@ -523,16 +528,35 @@ flowchart TB
   `farmAbove`, default 14, which happens while it eats back up to `until`) and nothing in
   rung 2 applies, it tends its farm when there is work it can do, or starts one when it has
   `minSeeds`, before setting off on a long search. Hungrier than that, food comes first.
-- **3 · search:** `find_food` on the smallest ring in `rings` (default 48, 120, 250 blocks around
-  home) that no recent empty search covered. An empty 120 search also covers the 48 ring, a
+- **3 · search:** `find_food` on the smallest ring in `rings` (default 48, 120, 250, 400, 600
+  blocks around home) that no recent empty search covered. Rings wider than `farRingsFrom`
+  (default 250) are far ones: they are only searched by day (even with `scoutAtNight`), and
+  only after a trip to a known food place (3b), when there is one. An empty 120 search also covers the 48 ring, a
   wider search skips the rings a smaller one walked (`minRadius`), and an empty ring is
   remembered for `ringMemoryMinutes` (default 20) in `agent.storage` key `foodLadder`, so a
   restart doesn't rescan it. A search cut short by night or mobs is not remembered as empty.
   Within one run it moves on to the next ring right away.
+- **3b · trip to a known food place** (`trips`, on by default): before the far rings, and when
+  every ring came up empty, it walks to the best known food place by day, any distance (it
+  travels on the surface, so 3000+ blocks is fine, up to `tripRange`, default 4000). Known
+  places are the profile's `foodPlaces` list (coordinates, or a remembered place name such as
+  `farm:1`, with optional `crops`), its own farms, and remembered places: `found:wheat` /
+  `found:carrot` / `found:potato` / `found:village`, `food:village_farm`, `food:animals`.
+  The pure `rankFoodPlaces` orders them by distance divided by a trust weight (the profile's
+  places and its own farms 1.5, crop fields 1.2, villages 1, animals 0.6), and leaves out
+  places in another dimension, in a remembered danger zone, closer than `radius` (rung 2 sees
+  those), or visited lately. There it harvests ripe crops and replants (the whole field for a
+  listed place or its own farm, otherwise only crops by a village), hunts animals beyond the
+  breeders, breaks a little grass when short of seeds, bakes bread, eats, and walks back home.
+  A place is then left alone for 20 minutes (45 when it had nothing or couldn't be reached).
+  ```
+  keep_fed ladder: rung=trip step=trip (before searching 400 blocks out: known food place village 3518 blocks away)
+  ```
 - **4 · while searching:** it stops walking as soon as animals or a village farm come into
   view (keep_fed then goes there and hunts), notes water for a farm, and when the farm fallback
   is on and it carries fewer than `minSeeds` seeds, breaks grass right next to its path for
-  wheat seeds (no detours, 20 s per stop). A waypoint over water or lava is moved to dry ground
+  wheat seeds (no detours, 20 s per stop). When it finds an animal it then can't walk to (in a
+  cave, across a gap, up a ledge), `hunt` tries harder once, see "Reaching animals" below. A waypoint over water or lava is moved to dry ground
   closer in or a little round the ring; only when everything near it is wet is it skipped.
 - **5 · farm fallback** (`startFarm`, on by default), once every ring came up empty, or the
   search is off or too dangerous: tend its farm (`tend_farm`), get more seeds by breaking
@@ -543,6 +567,28 @@ flowchart TB
   broken for apples (about 1 in 200 leaves) plus apples lying around. When the wheat is ripe,
   rung 2 harvests it and rung 1 bakes the bread. Fishing is not done: there is no fishing
   action yet.
+- **Seed gathering:** `gather_seeds` keeps breaking grass until it has the seeds it wants, its
+  time is up (`seedMinutes`, default 4), the grass it may break within `seedRange` of where it
+  started runs out, or a break budget (about 24 blocks per seed wanted, 48 to 400) is used. It
+  takes the nearest breakable grass each time, so it works outwards patch by patch, and it
+  looks past grass inside protected areas and near the world spawn instead of giving up on the
+  nearest few dozen blocks. After each break it walks over the drops next to the block (seeds
+  only pop out a block or so and are not picked up from 2 blocks away), and once more at the
+  end. The result has the real numbers: `broke 64 grass in 150s for 7 of 10 seeds (have 7);
+  stopped: time is up (4 min)`. A run that comes back short while breakable grass is still
+  around is paused only 3 minutes (a 1 in 8 drop makes that mostly luck), not 20.
+- **Reaching animals:** when `hunt` can't get to an animal on foot, it tries once more with a
+  budget from the pure `reachEffort` (`src/skills/reachPlan.ts`): up to 16 scaffolding blocks
+  (dirt, cobblestone, other stone, planks; never more than it carries) for bridges and, when
+  the animal is above, a pillar, plus digging through or down when digging is allowed, all
+  within 45 seconds. It refuses for animals in protected areas or remembered danger zones, by
+  lava, more than 48 blocks away or more than 24 blocks above or below, and when it may
+  neither dig nor place. While trying, the pathfinder may not break or place in a
+  protected area or danger zone, may not walk through a danger zone, and may not break a block
+  with water or lava under it. If it
+  still can't get there, the animal is left alone for 5 minutes as before and the result says
+  why (`the chicken at 586 13 -64: it is 51 blocks below me (more than 24)`). `hunt
+  reach=false` turns this off.
 - **Farm upkeep and growth:** `tend_farm` reads the farm's square and the pure
   `planFarmWork` (`src/skills/farmPlan.ts`) decides the cells: bare farmland is planted first
   (it dries back to dirt), then trampled dirt inside the farmland's current square is tilled
@@ -679,7 +725,7 @@ Keeps its distance from dangerous mobs (creepers, wardens by default) instead of
 
 *survival · priority behavior (35) · needs `eat` · uses `withdraw`, `harvest`, `hunt`, `smelt`, `craft`, `goto`, `goto_place`, `list_container`, `find_food`, `start_farm`, `tend_farm`, `plant`, `gather_seeds`, `forage`, `breed` when present*
 
-Looks after food on its own, climbing a ladder when hungry (or hurt and too hungry to heal): eat, cook or bake what it carries; take food from known chests, its own or a village farm, remembered spots, animals in range (sparing breeders); search close, then wider, then wide (picking up seeds on the way); with no proper source start a farm near home, plant it and use it, foraging berries, kelp (dried in a furnace) and, when desperate, apples meanwhile; when starving and nothing works, tell the owner and stay safe. Between meals it starts, replants, re-tills and grows its farm and breeds animals near home. Arm it so you never starve between turns.
+Looks after food on its own, climbing a ladder when hungry (or hurt and too hungry to heal): eat, cook or bake what it carries; take food from known chests, its own or a village farm, remembered spots, animals in range (sparing breeders); search close, then wider, then wide (picking up seeds on the way); before the far rings (by day only) walk to a known farm or village, harvest, bake, eat and come back; with no proper source start a farm near home, plant it and use it, foraging berries, kelp (dried in a furnace) and, when desperate, apples meanwhile; when starving and nothing works, tell the owner and stay safe. Between meals it starts, replants, re-tills and grows its farm and breeds animals near home. Arm it so you never starve between turns.
 
 | option | type | default | description |
 |---|---|---|---|
@@ -699,9 +745,10 @@ Looks after food on its own, climbing a ladder when hungry (or hurt and too hung
 | `radius` | number (4..64) | `32` | how far to look for crops and animals |
 | `places` | boolean | `true` | go back to remembered food spots (food:animals, food:village_farm) |
 | `scout` | boolean | `true` | when nothing is in range, search further out (find_food), one ring wider each time a ring comes up empty |
-| `rings` | list | `[48,120,250]` | search rings around home, smallest first: close, wider, wide |
+| `rings` | list | `[48,120,250,400,600]` | search rings around home, smallest first: close, wider, wide, then far ones (by day only, after known food places) |
+| `farRingsFrom` | number (32..1024) | `250` | rings wider than this are far: searched by day only, and only after a trip to a known food place |
 | `ringMemoryMinutes` | number (1..240) | `20` | remember an empty ring this long before searching it again |
-| `scoutRadius` | number (32..512) |  | old single search radius; when set it caps the rings |
+| `scoutRadius` | number (32..1024) |  | old single search radius; when set it caps the rings |
 | `scoutAtNight` | boolean | `false` | also make far trips (searching, known spots, its farm) at night |
 | `startFarm` | boolean | `true` | farm fallback: with no proper food source (all rings empty), gather seeds, start a farm near home, plant and use it |
 | `minSeeds` | integer (1..64) | `8` | seeds to have before starting a farm (picked up while searching, or by breaking grass) |
@@ -709,7 +756,11 @@ Looks after food on its own, climbing a ladder when hungry (or hurt and too hung
 | `farmSize` | integer (3..9) | `9` | side of the square its farm grows towards around the water block |
 | `seedReserve` | integer (0..32) | `4` | seeds kept for replanting: the farm only grows with seeds beyond these |
 | `farmAbove` | number (1..20) | `14` | food at or above this is not urgent: farm work may come before a long search |
-| `seedRange` | number (8..160) | `96` | how far to look for grass to break for seeds between meals |
+| `seedRange` | number (8..128) | `96` | how far to look for grass to break for seeds (it works outwards patch by patch) |
+| `seedMinutes` | number (1..10) | `4` | how long one seed-gathering run may break grass before it stops |
+| `trips` | boolean | `true` | go to known food places far away (foodPlaces, its farms, found:/food: places): walk there by day, harvest and replant, bake, eat, come back |
+| `tripRange` | number (64..10000) | `4000` | known food places further away than this are not worth a trip |
+| `foodPlaces` | list | `[]` | known farms and villages to go to for food (preferred over the far search rings) |
 | `breed` | boolean | `true` | breed animals near home between meals when it has their food (wheat: cows, sheep; seeds: chickens; carrots: pigs) |
 | `report` | boolean | `true` | when food is critical (6 or less) and nothing works, tell the owner (at most every 10 minutes) |
 
