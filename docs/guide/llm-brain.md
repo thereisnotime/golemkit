@@ -218,6 +218,11 @@ llmBrain({
 })
 ```
 
+The `death` event waits for the cause (the server's death message, at most a few seconds) and
+hands the model the facts: "slain by Zombie (server: ...); hurt by creeper, zombie in the last
+seconds; was doing defend; health 8 before the last hit; at 592 10 -60", with an instruction to
+report that cause rather than guess one. `observe` keeps it as `lastDeath` for 10 minutes.
+
 Listen modes (`listen: mention | conversation | all`): `conversation` answers mentions and,
 for `conversationMs` after an exchange, follow-ups without the name. **When the only other
 player online is an owner**, everything they say in public chat counts as addressed (in

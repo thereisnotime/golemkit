@@ -79,6 +79,15 @@ hit the ground too hard while trying to escape Skeleton", "Pax tried to swim in 
 50 [variants](/concepts/variants-profiles)). If none arrives within 3 seconds, the death is still recorded with the last
 damage source as the cause.
 
+The same cause goes beyond the journal: the adapter emits a `deathCause` event with a report
+(the cause in chat form such as "slain by Zombie", the server message, the damage sources of
+the last 15 seconds, hostiles within 8 blocks, the action that held the body, health before
+the last hit, the position). Hooks get it as `{cause}`, `{killer}`, `{deathMessage}` and
+`{deathDetail}` on `death` ([context pack](/guide/context-pack)), the LLM brain's death event
+carries it with an instruction to report it as it is, and `observe` shows it as `lastDeath`
+for 10 minutes. Live, Pax said "died again (zombie...)" after a death the defend reflex logged as
+"died fighting creeper"; the model had guessed, and only the server message said which.
+
 What is never recorded: prompts and LLM responses (only token counts), and secrets. Every
 string goes through the logger's redaction (values of `*KEY`, `*TOKEN`, `*SECRET`,
 `*PASSWORD` environment variables become `***`), and `/login`, `/register` and similar

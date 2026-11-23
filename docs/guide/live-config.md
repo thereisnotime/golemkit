@@ -52,6 +52,16 @@ can't change their own.
 | `combat.chokepoints` | on/off | against 3+ melee mobs with half health or more, fight from a 1-wide gap nearby (default on) |
 | `combat.pvp` | off / defend | `defend`: fight back a player who attacks the bot or the player it guards, stop when they stop or run; never owners or friends (default off) |
 | `combat.friends` | names | players never fought back, even with `combat.pvp defend` (comma separated) |
+| `mining.safe` | on/off | [safe mining](./progression#safe-mining): readiness before going deeper than `mining.safeDepth`, no caves, torches, climb out when losing underground (default on) |
+| `mining.safeDepth` | 0–64 | blocks below the surface it may dig or go for ore without being ready (default 8) |
+| `mining.needWeapon` | on/off | a sword or axe is part of being ready (default on) |
+| `mining.minFood` | 0–64 | food items needed to be ready (default 3) |
+| `mining.gear` | none / shield_or_armour / armour | gear needed to be ready (default none); with shield_or_armour the first iron ingot becomes a shield |
+| `mining.minArmour` | 0–20 | armour points worn that count as armour (default 1) |
+| `mining.retreatBelow` | 0–20 | underground: abandon the dig and climb out at or below this health; separate from `reflexes.retreatBelow` (default 10, 0 = never) |
+| `mining.retreatHostiles` | 0–20 | underground: climb out when this many hostiles are within 8 blocks (default 2, 0 = never) |
+| `mining.torches` | on/off | light tunnels, crafting torches from coal or charcoal and sticks (default on) |
+| `mining.torchEvery` | 1–64 | a torch every this many tunnel steps (default 8) |
 | `humanize.enabled` | on/off | player-like reaction and typing delays |
 | `humanize.typoRate` | 0–1 | chance of a typo per message |
 | `humanize.lowercase` | on/off | write chat in lower case |
@@ -84,8 +94,9 @@ can't change their own.
 | `worldedit.maxBlocks` | number | largest region a WorldEdit action may change (default 50000) |
 | `retry.actions.<action>` | 0–10 | extra attempts after a failed action |
 
-In a profile, the `reflexes.*` values go under `reflexes:` and the `combat.*` values under
-`settings: combat:` (a top-level `combat:` key is ignored with a warning); see
+In a profile, the `reflexes.*` values go under `reflexes:`, the `combat.*` values under
+`settings: combat:` and the `mining.*` values under `settings: mining:` (a top-level `combat:`
+key is ignored with a warning, and unknown keys under either get one); see
 [Reflexes](/concepts/world#reflexes). The techniques behind the `combat.*` toggles are described
 in [Movement, protection and combat](/concepts/world#skilled-player-techniques).
 

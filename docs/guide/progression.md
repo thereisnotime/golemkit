@@ -23,7 +23,7 @@ flowchart TD
   SW --> COB["mine cobblestone<br/>3 per pickaxe/axe,<br/>1 shovel, 2 sword"]
   COB --> STONE["stone tools"]
   STONE --> FURN["furnace<br/>8 cobblestone"]
-  STONE --> ORE{"iron ore seen?"}
+  STONE --> ORE{"iron ore seen?<br/>(deep only when ready,<br/>see safe mining)"}
   ORE -->|no| STOPS(["stays on stone"])
   ORE -->|yes| RAW["mine raw iron<br/>(stone pickaxe)"]
   RAW --> FUEL{"coal?"}
@@ -75,6 +75,67 @@ need on the blackboard, which makes `chop_wood_loop` run at a higher score (38) 
 further out (see [the wood ladder](#the-wood-ladder)). Its failure back-off has a retry key, the
 usable wood it holds: as soon as that changes (a tree felled, the owner hands over logs) the
 back-off ends and the upgrade runs again, instead of waiting out 60, 120, 240... seconds.
+
+## Safe mining
+
+Iron sits underground, and underground is where a bot without armour dies. Pax had fresh stone
+tools, no armour and no torches when `keep_tools_upgraded` sent it after iron ore it could see
+in a cave 60 blocks down. It pathed in, fought a creeper and a zombie at 8 health (its profile
+says stand your ground), died at y 10 and lost everything. Safe mining (`settings.mining`, on by
+default) is the answer; the rules are a pure planner in `src/skills/minePlan.ts`, unit tested.
+
+```mermaid
+flowchart TD
+  ORE{"iron needed"} --> R{"ready?<br/>weapon, food,<br/>gear (mining.gear)"}
+  R -->|yes| ANY["any ore it sees,<br/>staircase prospecting"]
+  R -->|no| SHALLOW{"ore within<br/>safeDepth of<br/>the surface?"}
+  SHALLOW -->|yes| TAKE["mine it"]
+  SHALLOW -->|no| SAY(["not ready to mine:<br/>no shield or armour, food 1/4"])
+  TAKE --> SHIELD["first ingot → shield<br/>(gear: shield_or_armour)"]
+  SHIELD --> R
+  ANY --> DIG["staircase: no caves,<br/>torches, retreat"]
+```
+
+**Ready** means a sword or axe (`needWeapon`), `minFood` food items, and the gear `gear` asks
+for: `none` (default), `shield_or_armour` (a shield, or `minArmour` armour points worn), or
+`armour`. Not ready, the bot only goes for blocks at most `safeDepth` (8) below its surface
+level and under at most that much ground: `senseNearby` counts only that ore as `ironOre`
+(deeper ore is `ironOreDeep`), `collect` skips deeper blocks and says why, and there is no
+staircase prospecting. `upgrade_tools` then fails with "not ready to mine: no shield or armour,
+food 1/4; would get 3 raw_iron ... but that means going deeper than 8 blocks" and `data.need`
+(`weapon`, `food` or `gear`), so `keep_fed` and the other behaviours get their turn.
+`keep_tools_upgraded` doesn't even pick the step (it scores 0 while the only way on is deep), and
+after a not-ready failure its back-off ends as soon as the kit changes. With
+`gear: shield_or_armour` the first iron ingot (from surface ore) becomes a shield before the iron
+pickaxe, which closes the gap.
+
+**Digging** (`mineStone`, the staircase and strip behind cobblestone and prospecting):
+- never below `safeDepth` while not ready; it stops with the not-ready reason instead of digging
+  a flat tunnel in dirt;
+- never into a cave: a block whose neighbour is an air pocket below the surface (not the
+  tunnel itself, not air open to the sky like a ravine wall) and a floor with air under it are
+  unsafe steps, the same as lava or water next to it; it turns, and stops after four turns;
+- a torch every `torchEvery` (8) steps on the floor behind it when the spot is dark, crafted
+  from coal or charcoal and a stick when it has none (`torches: false` turns it off);
+- every step checks health and hostiles: underground at `retreatBelow` (10) health or with
+  `retreatHostiles` (2) hostiles within `hostileRadius` (8), it abandons the dig, skips the drop
+  sweep and walks back up the staircase it came down.
+
+**Underground fights** (reflexes): the same test runs when the bot is hit or a hostile is
+within 6 blocks. Underground (3+ solid blocks overhead and little sky light) and losing, it runs
+`climb_out` instead of `defend`, whatever `reflexes.retreatBelow` says (Pax keeps 0 there and
+still climbs out underground). A melee mob right on it at its level still gets fought
+(`keepClimbing`), and the climb is retried 15 seconds later. Once no hostile is within 6 blocks,
+the reflexes eat to heal below 14 health as before.
+
+All of it is live config (`!config_set mining.gear armour`, see [live config](./live-config)),
+and `upgrade_tools safe=false` or `keep_tools_upgraded { safeMining: false }` skip it for one
+call or one behaviour. Pax sets:
+
+```yaml
+settings:
+  mining: { gear: shield_or_armour, minFood: 4, retreatBelow: 12, retreatHostiles: 2 }
+```
 
 ## Where it runs
 

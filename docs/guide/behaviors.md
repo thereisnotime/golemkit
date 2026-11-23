@@ -1148,7 +1148,7 @@ Places torches on dark ground around home (or a remembered place) so mobs do not
 
 *work · priority npc (20) · needs `upgrade_tools` · uses `craft` when present*
 
-Keeps tools usable and moving up the tiers when the bot is idle: re-crafts a worn or broken pickaxe/axe/shovel/sword, makes stone tools as soon as it can mine 3 cobblestone, then a furnace, iron (smelted with coal or charcoal) and diamond tools, up to `upTo`. A sword comes right after the pickaxe (wooden while there is no cobblestone). Short of wood it takes logs or planks from its own chests nearby, otherwise it raises a wood need that chop_wood_loop picks up, and retries as soon as the wood is there. Gathering steps need digging enabled.
+Keeps tools usable and moving up the tiers when the bot is idle: re-crafts a worn or broken pickaxe/axe/shovel/sword, makes stone tools as soon as it can mine 3 cobblestone, then a furnace, iron (smelted with coal or charcoal) and diamond tools, up to `upTo`. A sword comes right after the pickaxe (wooden while there is no cobblestone). Short of wood it takes logs or planks from its own chests nearby, otherwise it raises a wood need that chop_wood_loop picks up, and retries as soon as the wood is there. Gathering steps need digging enabled. Safe mining: not ready to go underground (no weapon, food, or the shield/armour mining.gear asks for) it only takes ore near the surface and leaves deep ore alone until the kit changes.
 
 | option | type | default | description |
 |---|---|---|---|
@@ -1156,6 +1156,7 @@ Keeps tools usable and moving up the tiers when the bot is idle: re-crafts a wor
 | `minDurability` | number (0..0.9) | `0.1` | replace a tool when less than this share of its durability is left |
 | `armour` | boolean | `false` | also make iron armour once iron tools are done |
 | `senseSeconds` | number (5..600) | `30` | how often to look around for stone and ore (the scan costs CPU) |
+| `safeMining` | boolean | `true` | safe mining (settings.mining): ore deeper than mining.safeDepth only with a weapon, food and the gear mining.gear asks for; no caves, torches, climb out when losing underground |
 
 ### `greet_players`
 

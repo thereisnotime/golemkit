@@ -916,7 +916,7 @@ Tool progression: stone, iron and diamond tools.
 
 ### `upgrade_tools`
 
-Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, axe, shovel and sword, armour optionally. Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). In creative it just takes the tools.
+Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines the cobblestone) -> furnace from 8 cobblestone -> smelt iron (coal, or charcoal made from logs) -> iron tools -> diamond tools if it has diamonds. Covers pickaxe, axe, shovel and sword, armour optionally. Stops at the best tier it can reach and says what is missing (e.g. no iron ore seen). Safe mining: without a weapon, food (and a shield or armour if mining.gear asks) it only takes ore near the surface and says "not ready to mine: ..." instead of going into caves. In creative it just takes the tools.
 
 *long-running*
 
@@ -926,6 +926,7 @@ Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines
 | `armour` | boolean |  | `false` | also make iron armour once iron tools are done |
 | `kinds` | array |  |  | tool kinds to upgrade; default pickaxe, axe, shovel, sword |
 | `prospect` | boolean |  | `true` | when no iron ore is in sight, dig a staircase and strip mine to look for some |
+| `safe` | boolean |  | `true` | safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground |
 
 ## roads
 

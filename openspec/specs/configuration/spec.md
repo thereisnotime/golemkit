@@ -6,7 +6,7 @@ How profiles, fleet files and the environment combine into a running bot's setti
 ## Requirements
 
 ### Requirement: Unknown profile keys are reported
-Loading a profile SHALL log a warning naming the file and the dotted key for every key the profile format does not declare, at the top level and in nested blocks (`reflexes`, `server`, `humanize`, `npcMode`, `llm.goals`, ...), and for keys under `settings.combat` that are not `combat.*` toggles. The profile SHALL still load. Free-form maps (`settings`, `behaviors`, `llm.budget`) and extra `llm` keys SHALL NOT be reported; blocks that are strict (`intents`, `journal`, `context`) keep failing on unknown keys.
+Loading a profile SHALL log a warning naming the file and the dotted key for every key the profile format does not declare, at the top level and in nested blocks (`reflexes`, `server`, `humanize`, `npcMode`, `llm.goals`, ...), and for keys under `settings.combat` and `settings.mining` that are not `combat.*` or `mining.*` toggles. The profile SHALL still load. Free-form maps (`settings`, `behaviors`, `llm.budget`) and extra `llm` keys SHALL NOT be reported; blocks that are strict (`intents`, `journal`, `context`) keep failing on unknown keys.
 
 #### Scenario: Misplaced combat block
 - **WHEN** a profile has `combat: { pvp: defend }` at the top level

@@ -236,8 +236,8 @@ hooks:
   - id: death-report
     on: death
     do:
-      - whisper: { to: owners, text: "I died at {pos}" }
-      - remember: { text: "died at {pos}", about: deaths }
+      - whisper: { to: owners, text: "I died at {pos}: {cause}" }
+      - remember: { text: "died at {pos}: {deathDetail}", about: deaths }
   - id: go-home
     on: chat
     match: "^pax home (\\w+)$"
@@ -250,7 +250,7 @@ hooks:
 | event | fires | filters / extra vars |
 |---|---|---|
 | `spawn` | each session start | |
-| `death` | the bot died | `{pos}` = where it died |
+| `death` | the bot died; fires once the cause is known (the server's death message, at most ~3 s after the death) | `{pos}` = where it died, `{cause}` = what killed it ("slain by Zombie", "drowned", "fell from a high place", from the server message; else the last damage source; else "unknown cause"), `{killer}` (mob or player, or the last damage source), `{deathMessage}` (the server's line), `{deathDetail}` (cause, recent damage sources, hostiles close by, what it was doing, health before the last hit, position), `{drops}` |
 | `playerJoined` / `playerLeft` | a real join/leave (not the replay on spawn) | `{player}` |
 | `chat` | any chat line from someone else | `match` (regex, case-insensitive, groups as `{1}`...), `whisper: true/false`, `{message}` |
 | `hurt` | the bot took damage (debounced 3 s) | `{health}` |
