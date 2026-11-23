@@ -86,6 +86,16 @@ test('testSettings: no trips home, no owner, no public chat, no shared context',
   assert.deepEqual(testSettings({ llm: { model: 'm' } }, true).llm, { model: 'm' })
 })
 
+test('testSettings: arms what NPC mode arms on the real bot (the bench keeps a test owner online)', () => {
+  const b = testSettings({ behaviors: { chop_wood_loop: { enabled: false, rings: [32, 64] } } }).behaviors as Record<string, any>
+  assert.deepEqual(b.chop_wood_loop, { enabled: true, rings: [32, 64] })
+  assert.deepEqual(b.deposit_when_full, { enabled: true })
+  const custom = testSettings({ npcMode: { arm: { farm_loop: { radius: 8 } } } }).behaviors as Record<string, any>
+  assert.deepEqual(custom.farm_loop, { radius: 8, enabled: true })
+  assert.equal(custom.chop_wood_loop, undefined)
+  assert.equal((testSettings({ npcMode: false }).behaviors as Record<string, any>).chop_wood_loop, undefined)
+})
+
 test('start checks: keep-away distances and seeded spread', () => {
   assert.deepEqual(tooClose(1600, 800, KEEP_AWAY), [])
   assert.deepEqual(tooClose(700, 45, KEEP_AWAY).map(p => p.name), ['spawn', 'fortress'])

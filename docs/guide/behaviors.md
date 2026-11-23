@@ -1262,7 +1262,10 @@ How to read it:
 
 - Neither run got a single log: with no tree within 32 blocks, `upgrade_tools` fails ("no natural
   tree within 32 blocks") and nothing else fetches wood while `chop_wood_loop` is off, so the bot
-  ends the day with no tools, no food and no bed.
+  ends the day with no tools, no food and no bed. That was a gap in the bench, not in Pax: the
+  real bot gets `chop_wood_loop` from NPC mode while its owner is away, the bench kept a test owner
+  online. The bench now arms what NPC mode arms (`npcMode.arm`, by default `chop_wood_loop` and
+  `deposit_when_full`), so runs from then on are not comparable with these two.
 - Pre-merge it walked 900 blocks looking for food (sheep, crops) with nothing in hand and died
   three times: drowned twice while scouting by water, shot once by a skeleton at dusk. A 52 s
   event-loop stall in the first minutes cost it one disconnect.

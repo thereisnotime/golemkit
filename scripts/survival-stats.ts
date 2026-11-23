@@ -143,7 +143,8 @@ export function startFor (x: number, z: number, rep: number, seed: number, sprea
 
 /**
  * A profile's settings made safe for a test bot far from home (the script sets its owner to a
- * test account, so help whispers never reach the real owner): follow_owner and bodyguard are off, no trips to
+ * test account, so help whispers never reach the real owner): follow_owner and bodyguard are off, the
+ * behaviours NPC mode arms on the real bot (chop_wood_loop, deposit_when_full) are on, no trips to
  * configured farms, chests or the village (foodPlaces, settings.storage), no public chat from
  * keep_spawn_bed asking players to sleep or from idle_antics, no context pack (it would share the
  * real bot's MEMORY.md and hooks), and no LLM settings unless `llm` is kept.
@@ -163,6 +164,14 @@ export function testSettings (settings: Record<string, unknown>, keepLlm = false
   }
   b.follow_owner = false
   b.bodyguard = false
+  // NPC mode arms these on the real bot while its owner is away (src/brains/behaviors/brain.ts);
+  // the bench keeps a test owner online, so arm them here or the bot never gets wood
+  const npc = (s.npcMode as { arm?: Record<string, Record<string, unknown>> } | false | undefined)
+  if (npc !== false) {
+    for (const [name, o] of Object.entries(npc?.arm ?? { chop_wood_loop: {}, deposit_when_full: {} })) {
+      b[name] = { ...(opts(name) ?? {}), ...o, enabled: true }
+    }
+  }
   const kf = opts('keep_fed')
   if (kf) { delete kf.foodPlaces; b.keep_fed = kf }
   const bed = opts('keep_spawn_bed')
