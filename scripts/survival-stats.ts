@@ -116,6 +116,51 @@ export function aliveSeconds (start: number, end: number, deaths: number[], resp
 // ---- start spot ----
 
 export const KEEP_AWAY: [string, number, number][] = [['spawn', 545, 45], ['fortress', 560, -43], ['village', -2770, 1090]]
+/** Other scripts' test areas: a new start or scenario should be 300+ from these too (a scenario's own spot is one of them). */
+export const TEST_AREAS: [string, number, number][] = [['guard-bench arena', 1250, 445], ['test area 1250 800', 1250, 800], ['test area 1600 445', 1600, 445], ['ice scenario', 1600, 800]]
+
+/** Named starts. `forest` (the default) measures the early game: wood, tools, food, bed. `ice` is the old default (no tree within ~137). */
+export const SCENARIOS: Record<string, { start: [number, number], about: string }> = {
+  forest: { start: [1818, 1318], about: 'forest biome (oak and birch), about 67 natural trees within 32, grass, water a few blocks away, chickens, pigs and sheep in sight' },
+  ice: { start: [1600, 800], about: 'ice and packed ice, no natural tree within ~137 blocks (the default before forest-baseline-2026-11-23)' }
+}
+
+/** What the start looks like, measured by the director before each run. */
+export interface Terrain { biome: string | null, trees: number, grass: number, waterAt: number | null, animals: Record<string, number> }
+
+/**
+ * Natural trees among log positions: logs touching (26 neighbours) are one tree, and a group counts
+ * only when one of its logs has natural leaves next to it (`leafy`), so log piles and wooden houses don't.
+ */
+export function countTrees (logs: { x: number, y: number, z: number, leafy: boolean }[]): number {
+  const key = (x: number, y: number, z: number) => `${x},${y},${z}`
+  const at = new Map(logs.map((l, i) => [key(l.x, l.y, l.z), i]))
+  const seen = new Set<number>()
+  let trees = 0
+  for (let i = 0; i < logs.length; i++) {
+    if (seen.has(i)) continue
+    let leafy = false
+    const queue = [i]
+    seen.add(i)
+    while (queue.length) {
+      const l = logs[queue.pop()!]!
+      if (l.leafy) leafy = true
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
+        const j = at.get(key(l.x + dx, l.y + dy, l.z + dz))
+        if (j !== undefined && !seen.has(j)) { seen.add(j); queue.push(j) }
+      }
+    }
+    if (leafy) trees++
+  }
+  return trees
+}
+
+/** "forest, 14 trees within 32, grass 310, water 18 away, animals: cow 3, sheep 2" */
+export function terrainNote (t: Terrain, radius = 32): string {
+  const animals = Object.entries(t.animals).sort((a, b) => b[1] - a[1]).map(([n, c]) => `${n} ${c}`).join(', ')
+  return [`${t.biome ?? 'unknown biome'}`, `${t.trees} trees within ${radius}`, `grass ${t.grass}`,
+    t.waterAt === null ? 'no water seen' : `water ${t.waterAt} away`, animals ? `animals: ${animals}` : 'no animals seen'].join(', ')
+}
 
 /** Places closer than `min` blocks to x z, with their distance. */
 export function tooClose (x: number, z: number, places: [string, number, number][], min = 300): { name: string, distance: number }[] {

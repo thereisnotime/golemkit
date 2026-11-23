@@ -1,8 +1,9 @@
 // Survival benchmark: a fresh test bot with a real profile's behaviours (Pax's by default, no LLM
 // brain) left alone far from everything for N in-game days, and what happened to it measured.
-//   node scripts/survival-bench.ts [--days 1] [--start 1600,800] [--kit none|stone|iron] [--repeats 1]
-//        [--profile pax] [--llm] [--tag run] [--terrain-note "text"] [--seed 1] [--spread 0]
+//   node scripts/survival-bench.ts [--days 1] [--scenario forest|ice] [--start x,z] [--kit none|stone|iron]
+//        [--repeats 1] [--profile pax] [--llm] [--tag run] [--terrain-note "text"] [--seed 1] [--spread 0]
 //        [--stuck 5] [--minutes M] [--force]
+//   node scripts/survival-bench.ts --survey "x,z x,z ..."           read-only look at candidate starts
 //   node scripts/survival-bench.ts --compare <tagA> <tagB>     before/after table from results.jsonl
 //   node scripts/survival-bench.ts --summary [tag]              table of past runs
 //   node scripts/survival-bench.ts --cleanup                    finish the clean-up of a broken run
@@ -10,7 +11,9 @@
 // DIRECTOR (default ClaudeTest, an op) only does the setup and the clean-up, and is offline in
 // between (it waits while another script has the account online). It checks the start is 300+
 // blocks from the world spawn, the fortress, the village and every online player, finds the
-// surface near --start, then with the bot online but brainless: survival mode, clears its
+// surface near the start (the scenario's, or --start), measures the terrain there (biome, natural
+// trees within 32, grass, nearest water, animals; written to the result as `terrain` and
+// `terrainNote`), then with the bot online but brainless: survival mode, clears its
 // inventory, full health and food, teleports it there, sets its spawnpoint there (deaths respawn
 // at the start, not at world spawn), and gives --kit. SurviveOwner, a second test account, is the
 // bot's owner for the run: parked in spectator mode 40 blocks above the start, so help asks and
@@ -27,9 +30,10 @@ import { pathToFileURL } from 'node:url'
 import { Agent, defineVariant, serverFromEnv, fmtPos, type ActionResult, type BotDefinition } from '../src/core/index.ts'
 import { loadProfile } from '../src/core/profile.ts'
 import { standardSkills, extendedSkills, navigation, modsSkill, setHome } from '../src/skills/index.ts'
+import { isNaturalLeaves } from '../src/skills/woodcutting.ts'
 import { reflexes, behaviorsBrain, commandBrain } from '../src/brains/index.ts'
 import {
-  KEEP_AWAY, aliveSeconds, compareTable, gathered, isFoodName, parseResults, pathLength, startFor, stuckLoops, summaryTable,
+  KEEP_AWAY, SCENARIOS, TEST_AREAS, aliveSeconds, countTrees, terrainNote, type Terrain, compareTable, gathered, isFoodName, parseResults, pathLength, startFor, stuckLoops, summaryTable,
   testSettings, tierName, tooClose, toolTier, vitals, type PosSample, type VitalSample
 } from './survival-stats.ts'
 
@@ -40,7 +44,9 @@ const flag = (name: string) => argv.includes(`--${name}`)
 const opt = (name: string, def: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1]! : def }
 const DAYS = Number(opt('days', '1'))
 const MINUTES = Number(opt('minutes', String(DAYS * 20)))
-const [SX, SZ] = opt('start', '1600,800').split(',').map(Number) as [number, number]
+const SCENARIO = opt('scenario', argv.includes('--start') ? 'custom' : 'forest')
+if (SCENARIO !== 'custom' && !SCENARIOS[SCENARIO]) throw new Error(`no scenario ${SCENARIO} (${Object.keys(SCENARIOS).join(', ')})`)
+const [SX, SZ] = (argv.includes('--start') ? opt('start', '').split(',').map(Number) : SCENARIOS[SCENARIO]!.start) as [number, number]
 const KIT = opt('kit', 'none') as 'none' | 'stone' | 'iron'
 const REPEATS = Number(opt('repeats', '1'))
 const PROFILE = opt('profile', 'pax')
@@ -208,6 +214,77 @@ async function findSurface (d: Director, x: number, z: number): Promise<{ x: num
   return null
 }
 
+const ANIMALS = /^(cow|sheep|pig|chicken|rabbit|horse|donkey|goat|mooshroom|llama|camel)$/
+const TREE_RADIUS = 32
+
+/** Biome, natural trees within 32, grass blocks within 32, nearest open water and animals within `far` of the surface spot. Read-only. */
+function measureTerrain (d: Director, s: { x: number, y: number, z: number }, far = 160): Terrain {
+  const bot = d.agent.bot
+  const v = (x: number, y: number, z: number) => bot.entity.position.clone().set(x, y, z)
+  const point = v(s.x, s.y, s.z)
+  const ids = (re: RegExp) => Object.values(bot.registry.blocksByName).filter((b: any) => re.test(b.name)).map((b: any) => b.id as number)
+  const find = (re: RegExp, maxDistance: number, count: number) => bot.findBlocks({ matching: ids(re), maxDistance, count, point } as any)
+  // block.biome.name is empty on servers that send their biome registry (prismarine-biome keeps the
+  // registry's old array): look the id up in the bot's registry
+  const bid = (bot.blockAt(v(s.x, s.y - 1, s.z)) as any)?.biome?.id
+  const be = bid === undefined ? null : (bot.registry as any).biomes?.[bid]
+  const biome = String(be?.name || '').replace(/^minecraft:/, '') || null
+  const logs = find(/^(?!stripped_).+_log$/, TREE_RADIUS, 3000).map(p => {
+    let leafy = false
+    for (let dx = -1; dx <= 1 && !leafy; dx++) for (let dy = -1; dy <= 1 && !leafy; dy++) for (let dz = -1; dz <= 1 && !leafy; dz++) {
+      const b = bot.blockAt(v(p.x + dx, p.y + dy, p.z + dz))
+      if (b && isNaturalLeaves(b.name, b.getProperties() as Record<string, unknown>)) leafy = true
+    }
+    return { x: p.x, y: p.y, z: p.z, leafy }
+  })
+  const grass = find(/^grass_block$/, TREE_RADIUS, 5000).length
+  // open water: a water block with air above, not a cave aquifer far below the start
+  const water = find(/^water$/, far, 2000).filter(p => p.y >= s.y - 12 && /air$/.test(bot.blockAt(v(p.x, p.y + 1, p.z))?.name ?? ''))
+  const waterAt = water.length ? Math.round(Math.min(...water.map(p => Math.hypot(p.x - s.x, p.z - s.z)))) : null
+  const animals: Record<string, number> = {}
+  for (const e of Object.values(bot.entities) as any[]) {
+    if (!e?.name || !ANIMALS.test(e.name) || Math.hypot(e.position.x - s.x, e.position.z - s.z) > far) continue
+    animals[e.name] = (animals[e.name] ?? 0) + 1
+  }
+  return { biome, trees: countTrees(logs), grass, waterAt, animals }
+}
+
+/** --survey: the director (spectator) looks at each candidate start and prints its terrain. Changes nothing in the world. */
+async function survey (spots: [number, number][]): Promise<void> {
+  const watcher = new Agent(brainless, server, { username: BOT, dataDir: join(DATA, 'watcher') })
+  await connect(watcher)
+  await waitDirectorFree(watcher)
+  const d = await director()
+  const from = d.agent.bot.entity.position.clone()
+  const mode = d.agent.bot.game.gameMode
+  try {
+    const players: { name: string, x: number, z: number }[] = []
+    for (const name of Object.keys(d.agent.bot.players)) {
+      if (name === DIRECTOR || name === BOT || name === OWNER) continue
+      const p = await playerPos(d, name)
+      if (p && /overworld/.test(p.dim)) players.push({ name, x: p.x, z: p.z })
+    }
+    log(`players online: ${players.map(p => `${p.name} at ${Math.round(p.x)} ${Math.round(p.z)}`).join(', ') || 'none in the overworld'}`)
+    await d.cmd(`/gamemode spectator ${DIRECTOR}`)
+    for (const [x, z] of spots) {
+      const near = [...tooClose(x, z, [...KEEP_AWAY, ...TEST_AREAS]), ...tooClose(x, z, players.map(p => [p.name, p.x, p.z] as [string, number, number]))]
+      if (near.length) { log(`${x} ${z}: skipped, ${near.map(n => `${n.distance} from ${n.name}`).join(', ')}`); continue }
+      await d.cmd(`/tp ${DIRECTOR} ${x + 0.5} 180 ${z + 0.5}`)
+      await pause(8000)
+      const s = await findSurface(d, x, z)
+      if (!s) { log(`${x} ${z}: no dry open surface within 24`); continue }
+      await pause(2000)
+      log(`${x} ${z}: surface ${fmtPos(s)}: ${terrainNote(measureTerrain(d, s), TREE_RADIUS)}`)
+    }
+  } finally {
+    await d.cmd(`/tp ${DIRECTOR} ${from.x} ${from.y} ${from.z}`).catch(() => {})
+    await d.cmd(`/gamemode ${mode} ${DIRECTOR}`).catch(() => {})
+    await pause(1000)
+    await watcher.stop().catch(() => {})
+    await d.stop()
+  }
+}
+
 // ---- clean-up ----
 
 interface Pending { bot: string, start: [number, number, number], placed: Record<string, string>, deaths: [number, number, number][], worldSpawn: [number, number, number] | null }
@@ -285,6 +362,7 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
   let d = await director()
   let start: { x: number, y: number, z: number }
   let worldSpawn: [number, number, number] | null = null
+  let terrain: Terrain | null = null
   try {
     // players: everyone online but the bench accounts must be 300+ blocks from the start
     const players: { name: string, distance: number | null }[] = []
@@ -306,7 +384,9 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
     const s = await findSurface(d, wantX, wantZ)
     if (!s) throw new Error(`no dry open surface within 24 blocks of ${wantX} ${wantZ}`)
     start = s
-    log(`start ${fmtPos(start)}`)
+    await pause(2000)
+    terrain = measureTerrain(d, start)
+    log(`start ${fmtPos(start)} (${SCENARIO}): ${terrainNote(terrain, TREE_RADIUS)}`)
     await d.cmd(`/gamemode survival ${BOT}`)
     await d.cmd(`/clear ${BOT}`)
     await d.cmd(`/effect clear ${BOT}`)
@@ -480,7 +560,8 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
   const whispers = chatOut.filter(m => m.to)
   const result = {
     tag: RUN_TAG, repeat: rep + 1, at: new Date(runStart).toISOString(), start: [start.x, start.y, start.z], profile: PROFILE, llm: LLM, kit: KIT,
-    days: DAYS, realMinutes: Math.round((runEnd - runStart) / 6000) / 10, seed: SEED, spread: SPREAD, terrainNote: NOTE, gameStart, gameEnd,
+    days: DAYS, realMinutes: Math.round((runEnd - runStart) / 6000) / 10, seed: SEED, spread: SPREAD, scenario: SCENARIO,
+    terrainNote: NOTE || (terrain ? terrainNote(terrain, TREE_RADIUS) : ''), terrain, gameStart, gameEnd,
     deaths: deathsAt.length, deathCauses, aliveS: aliveSeconds(runStart, runEnd, deathsAt, respawnsAt),
     firstDeathS: deathsAt.length ? Math.round((deathsAt[0]! - runStart) / 1000) : null,
     ...v, toolTierMax: tierMax, toolTier: tierName(tierMax), gathered: gathered(gains, isFoodName), spawnSet, spawnPoint: spawnNow,
@@ -520,6 +601,10 @@ async function main (): Promise<void> {
     const tag = opt('summary', '')
     const rows = (existsSync(RESULTS) ? parseResults(readFileSync(RESULTS, 'utf8')) : []).filter(r => !tag || tag.startsWith('--') || r.tag === tag)
     console.log(summaryTable(rows))
+    return
+  }
+  if (flag('survey')) {
+    await survey(opt('survey', '').trim().split(/\s+/).filter(Boolean).map(p => p.split(',').map(Number) as [number, number]))
     return
   }
   if (flag('cleanup')) {

@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   aliveSeconds, compare, compareTable, failureKey, gathered, metric, parseResults, pathLength, startFor, stat, stuckLoops,
-  summaryTable, testSettings, tooClose, toolTier, vitals, KEEP_AWAY, type RunResult
+  summaryTable, testSettings, tooClose, toolTier, vitals, countTrees, terrainNote, KEEP_AWAY, SCENARIOS, TEST_AREAS, type RunResult
 } from '../scripts/survival-stats.ts'
 
 test('toolTier: best tool among items, armour and other items ignored', () => {
@@ -105,6 +105,21 @@ test('start checks: keep-away distances and seeded spread', () => {
   assert.deepEqual(a, startFor(1600, 800, 1, 1, 200))
   assert.ok(Math.abs(Math.hypot(a.x - 1600, a.z - 800) - 200) < 1)
   assert.notDeepEqual(a, startFor(1600, 800, 2, 1, 200))
+})
+
+test('scenarios: every start is 300+ from the keep-away places, forest also from the other test areas', () => {
+  for (const [, sc] of Object.entries(SCENARIOS)) assert.deepEqual(tooClose(sc.start[0], sc.start[1], KEEP_AWAY), [])
+  const [fx, fz] = SCENARIOS.forest!.start
+  assert.deepEqual(tooClose(fx, fz, TEST_AREAS), [])
+})
+
+test('countTrees: touching logs are one tree, groups without natural leaves are not trees', () => {
+  const trunk = (x: number, z: number, h: number, leafy = true) => Array.from({ length: h }, (_, i) => ({ x, y: 64 + i, z, leafy: leafy && i === h - 1 }))
+  assert.equal(countTrees([]), 0)
+  assert.equal(countTrees([...trunk(0, 0, 5), ...trunk(1, 1, 4), ...trunk(10, 0, 6)]), 2) // a 2x2-ish trunk and a separate tree
+  assert.equal(countTrees([...trunk(0, 0, 5), ...trunk(20, 20, 3, false)]), 1) // log pile
+  assert.equal(terrainNote({ biome: 'forest', trees: 3, grass: 40, waterAt: null, animals: { sheep: 1, cow: 2 } }),
+    'forest, 3 trees within 32, grass 40, no water seen, animals: cow 2, sheep 1')
 })
 
 const run = (tag: string, repeat: number, deaths: number, logs: number, extra: Record<string, unknown> = {}): RunResult =>
