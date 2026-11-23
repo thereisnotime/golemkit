@@ -27,14 +27,14 @@ can't change their own.
 | `canDig` | on/off | may break blocks and tunnel while pathing |
 | `selfAware` | on/off | show the bot its own [variant](/concepts/variants-profiles), profile, model, brains and settings every turn (default on) |
 | `respectBuilds` | on/off | leave blocks that look player-made alone when building (default off: the bot may dig and use anything it needs) |
-| `reflexes.selfDefense` | on/off | fight back when hit |
-| `reflexes.autoEat` | on/off | eat when hungry |
-| `reflexes.eatBelow` | 0–20 | eat when food drops below this |
-| `reflexes.retreatBelow` | 0–20 | back off at or below this health (0 = stand ground) |
-| `reflexes.waterFightAbove` | 0–20 | don't fight mobs in water below this health (0 = always fight) |
-| `combat.adaptiveWeapon` | on/off | best weapon per target (damage × speed, enchantments, one-hit finishers, axe vs shields) |
-| `combat.ranged` | on/off | bow/crossbow for flyers and targets out of reach, if it has arrows |
-| `combat.shield` | on/off | raise a shield against ranged mobs between swings |
+| `reflexes.selfDefense` | on/off | fight back when hit (default on; also gates `combat.pvp defend`) |
+| `reflexes.autoEat` | on/off | eat when hungry (default on) |
+| `reflexes.eatBelow` | 0–20 | eat when food drops below this (default 15) |
+| `reflexes.retreatBelow` | 0–20 | back off at or below this health (0 = stand ground; default 8) |
+| `reflexes.waterFightAbove` | 0–20 | don't fight mobs in water below this health (0 = always fight; default 14) |
+| `combat.adaptiveWeapon` | on/off | best weapon per target (damage × speed, enchantments, one-hit finishers, axe vs shields; default on) |
+| `combat.ranged` | on/off | bow/crossbow for flyers and targets out of reach, if it has arrows (default on) |
+| `combat.shield` | on/off | raise a shield against ranged mobs between swings (default on) |
 | `combat.crits` | on/off | jump and hit while falling for critical hits (×1.5), sprint into the first hit for knockback (default on) |
 | `combat.strafe` | on/off | keep spacing and circle melee mobs between swings, step back after a hit (default on) |
 | `combat.disengageToHeal` | on/off | at 4 health or less with food, back off briefly to eat and fight on; works with `retreatBelow 0` (default on) |
@@ -43,11 +43,11 @@ can't change their own.
 | `combat.sprintReset` | on/off | W-tap: sprint into ground hits for knockback when a crit isn't possible or knockback is worth more (default on) |
 | `combat.sweep` | on/off | with a sword, plain ground hits when mobs bunch around the target, so the sweep hits them all (default on) |
 | `combat.shieldMelee` | on/off | shield up against melee mobs between slow swings, and against a lit creeper it can't outrun; an axe hit is blocked, then the shield is down 5 s (default on) |
-| `combat.totem` | on/off | totem of undying into the offhand at 8 health or less, or in a fall that could kill (default on) |
+| `combat.totem` | on/off | totem of undying into the offhand at 8 health or less, or in a fall that could kill; it stays there until health is above 14 (default on) |
 | `combat.goldenApple` | on/off | eat a golden apple mid-fight at 8 health or less, 12 when surrounded (default on) |
 | `combat.waterClutch` | on/off | water bucket against fall damage and to put out fire, scooped back up (default on) |
 | `combat.endermanGaze` | on/off | never look an enderman in the eyes unless fighting it (default on) |
-| `combat.fightFastMobs` | on/off | at low health keep fighting mobs faster than the bot (vindicators, spiders, ravagers, wolves) instead of backing off (default on) |
+| `combat.fightFastMobs` | on/off | at low health keep fighting mobs faster than the bot (vindicators, ravagers, spiders, wolves, piglin brutes, hoglins) instead of backing off (default on) |
 | `combat.chokepoints` | on/off | against 3+ melee mobs with half health or more, fight from a 1-wide gap nearby (default on) |
 | `combat.pvp` | off / defend | `defend`: fight back a player who attacks the bot or the player it guards, stop when they stop or run; never owners or friends (default off) |
 | `combat.friends` | names | players never fought back, even with `combat.pvp defend` (comma separated) |
@@ -82,6 +82,11 @@ can't change their own.
 | `worldedit.enabled` | on/off | WorldEdit actions: on = the server has it (no detection), off = never; reset = detect (see [WorldEdit](./worldedit.md)) |
 | `worldedit.maxBlocks` | number | largest region a WorldEdit action may change (default 50000) |
 | `retry.actions.<action>` | 0–10 | extra attempts after a failed action |
+
+In a profile, the `reflexes.*` values go under `reflexes:` and the `combat.*` values under
+`settings: combat:` (a top-level `combat:` key is ignored); see
+[Reflexes](/concepts/world#reflexes). The techniques behind the `combat.*` toggles are described
+in [Movement, protection and combat](/concepts/world#skilled-player-techniques).
 
 Behaviours have their own live commands: `!behavior_arm`, `!behavior_configure`,
 `!behavior_disarm` (see [Behaviours](./behaviors)).

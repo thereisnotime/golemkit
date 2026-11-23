@@ -4,14 +4,15 @@ scope: minecraft
 
 # Movement, protection and combat
 
-How bots get around, what they learn about the world, and how they fight. These live in core
-and the standard skills, so every [variant](/concepts/variants-profiles) gets them.
+How bots get around, what they learn about the world, and how they fight. These live in the
+Minecraft Java adapter (`src/adapters/minecraft-java/`: helpers, reflexes) and the standard
+skills, so every [variant](/concepts/variants-profiles) gets them.
 
 ## Long-distance travel
 
 Mineflayer's pathfinder can only plan through chunks the bot has loaded, so a target thousands
-of blocks away used to "arrive" without moving. `travel()` (core helper, used by `goto`) walks
-in legs:
+of blocks away used to "arrive" without moving. `travel()` (in
+`src/adapters/minecraft-java/helpers.ts`, re-exported from core, used by `goto`) walks in legs:
 
 ```mermaid
 flowchart TD
@@ -96,7 +97,7 @@ sequenceDiagram
 | hostile (data says so) | zombie, skeleton, creeper, spider, drowned, witch, ... |
 | also hostile | phantom, ghast, slime, magma_cube, shulker, hoglin, ender_dragon |
 | never targeted | enderman, piglin, zombified_piglin (neutral), evoker_fangs, skeleton/zombie horses |
-| modded | from the [registry sync](/concepts/neoforge#_4-modded-item-and-entity-names); `ars_nouveau:wilden_*` built in, more via `settings.moddedHostile` / `MC_MODDED_HOSTILE` |
+| modded | from the [registry sync](/concepts/neoforge#_4-modded-item-and-entity-names); `ars_nouveau:wilden_*` built in, more via `settings.moddedHostile` / `MC_MODDED_HOSTILE` (NeoForge platform) |
 
 **Flying mobs** (phantom, ghast, vex, blaze, breeze, ...) aren't chased on foot: the bot holds
 position, tracks them and swings when they dive into reach. Reflexes look up to 20 blocks for
@@ -285,7 +286,8 @@ Bots never start fights with players. `combat.pvp` (default `off`) can be set to
 - the bot fights back a player who hits it, or who hits the player it guards while the bodyguard
   is armed, with the same fight loop and techniques (no bow: a player out of reach has backed off);
 - it stops as soon as that player hasn't hit for 5 s, or is more than 10 blocks away;
-- it never fights an owner, a name in `combat.friends`, or a player in creative or spectator.
+- it never fights an owner, a name in `combat.friends`, or a player in creative or spectator,
+  and does nothing with `reflexes.selfDefense` off.
   With no owners configured, nobody counts as an owner here, so set `combat.friends` for the
   people it should always spare.
 
@@ -398,8 +400,10 @@ flowchart TB
   shooter there clears its zone. `find_target` skips scouting waypoints inside a zone or whose
   straight path crosses one, and `chop_tree` (and so `chop_wood_loop` and `gather_materials`)
   skips trees in or past one. `dangerMemory(agent).isInDanger(pos)`, `avoid(points)` and
-  `crosses(a, b)` are there for any job (find_food is the next to use them); the pure `isInDanger`,
-  `avoidZones` and `crossesDanger` take a zone list and a time.
+  `crosses(a, b)` are there for any job; `find_food`, `keep_fed` (search rings and trips to known
+  food places) and `hunt` (reaching an animal) skip spots in a zone or past one too. The pure
+  `isInDanger`, `avoidZones` and `crossesDanger` take a zone list and a time. Zones are kept in
+  memory per agent, not saved, so they are gone after a restart.
 - **Eating**: only out of every shooter's sight with nothing in flight at it (`canEatUnderFire`),
   never standing in the open.
 - **Ghasts** without a bow, and **blazes** without a bow or shield: cover.
@@ -427,12 +431,16 @@ climbs per run before it gives up).
 flowchart TB
   H(["bot got hurt"]) --> M{"hostile within 8<br/>(flyers: 20)?"}
   M -- no --> X(["ignore"])
-  M -- yes --> R{"retreat?<br/>health ≤ retreatBelow, or<br/>mob in water and health<br/>&lt; waterFightAbove<br/>(never for flyers)"}
+  M -- yes --> R{"retreat?<br/>health ≤ retreatBelow, or<br/>mob in water and health<br/>&lt; waterFightAbove<br/>(never for flyers<br/>or fast mobs)"}
   R -- yes --> RT["retreat: back off 18 blocks"]
   R -- no --> DF["defend: fight it"]
-  T(["every 2 s"]) --> LOW{"health ≤ 4, mob close,<br/>food<br/>(disengageToHeal)?"}
+  T(["every 2 s"]) --> LR{"health ≤ retreatBelow,<br/>hostile within 6?"}
+  LR -- yes --> RT
+  LR -- no --> LOW{"health ≤ 4, mob close,<br/>food<br/>(disengageToHeal)?"}
   LOW -- yes --> DF
-  LOW -- no --> G{"better armour,<br/>shield or totem?<br/>(autoArmor)"}
+  LOW -- no --> PRE{"hostile within 4,<br/>or creeper within 7?"}
+  PRE -- yes --> DF
+  PRE -- no --> G{"better armour,<br/>shield or totem?<br/>(autoArmor)"}
   G -- yes --> GU["gear_up<br/>(beside the current action)"]
   G -- no --> E{"food &lt; eatBelow<br/>or hurt and safe?"}
   E -- yes --> EAT["eat best food"]
@@ -442,11 +450,24 @@ flowchart TB
   classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
   classDef r fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
   class H,T a
-  class M,R,E,LOW,G d
+  class M,R,E,LR,LOW,PRE,G d
   class DF,EAT,GU g
   class RT r
   class X a
 ```
+
+Besides this loop the reflexes also:
+
+- start `ranged_defense` when a shooter out of melee reach hurts the bot or aims at it (checked
+  every 500 ms, see [Ranged threats](#ranged-threats));
+- back off from a warden instead of fighting it, and `bunker` from phantoms at night (below);
+- move a totem into the offhand at 8 health or less, and start `water_bucket` during a damaging
+  fall or while burning (`combat.totem`, `combat.waterClutch`);
+- start `defend_player` against a player who hits the bot or its guarded player, only with
+  `combat.pvp defend` (see [PvP](#pvp-defend-only)).
+
+`reflexes.selfDefense` off turns off all the fighting parts, PvP defence included. In creative
+and spectator the mob, hunger and fall reflexes are off.
 
 Tune per variant (`reflexes({ ... })`) or per [profile](/guide/profiles):
 
@@ -457,23 +478,33 @@ reflexes:
   eatBelow: 15          # eat when food drops below this
   retreatBelow: 8       # back off at or below this health; 0 = stand your ground
   waterFightAbove: 14   # don't fight mobs in water below this health; 0 = always fight
-  rangedDefense: true   # shoot back / shield / cover / back off when mobs shoot at it
 ```
+
+`rangedDefense` (default true: shoot back, shield, cover or back off when mobs shoot at it) is a
+variant option only, `reflexes({ rangedDefense: false })`; the profile `reflexes:` block doesn't
+take it.
 
 Pax uses `retreatBelow: 0` and `waterFightAbove: 0`: it always fights back. It still backs off
 briefly to eat at 4 health or less when it has food (`combat.disengageToHeal`), see
 [Fighting](#fighting).
 
+In a profile the `combat` values go under `settings:` (a top-level `combat:` key is ignored).
+Defaults shown; the full list, techniques and PvP included, is on
+[Feature toggles](../guide/live-config):
+
 ```yaml
-combat:                 # all live via !config_set combat.*
-  adaptiveWeapon: true
-  ranged: true
-  shield: true
-  crits: true           # jump-crits, sprint into the first hit
-  strafe: true          # spacing and strafing between swings
-  disengageToHeal: true # back off to eat at <= 4 health when there is food
-  autoArmor: true       # wear the best armour, shield/totem in the offhand
-  maxChase: 16          # give up a chase this far from where the fight started
+settings:
+  combat:                 # all live via !config_set combat.*
+    adaptiveWeapon: true
+    ranged: true
+    shield: true
+    crits: true           # jump-crits, sprint into the first hit
+    strafe: true          # spacing and strafing between swings
+    disengageToHeal: true # back off to eat at <= 4 health when there is food
+    autoArmor: true       # wear the best armour, shield/totem in the offhand
+    maxChase: 16          # give up a chase this far from where the fight started
+    pvp: "off"            # or defend
+    friends: []           # players never fought back
 ```
 
 ## Phantoms: bunker
