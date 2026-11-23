@@ -789,6 +789,76 @@ failed behaviour whose key changes ends its failure back-off early (at least 10 
 failure). `keep_tools_upgraded` uses the usable wood it holds, so it retries as soon as the wood
 is there.
 
+## Respawn point: keep_spawn_bed
+
+`keep_spawn_bed` keeps a bed at home and the respawn point on it, so a death ends at home
+instead of at the world spawn. It runs at the npc level with score 24: below safety, food and
+`keep_tools_upgraded` (28), above idle chores. The steps come from the pure planner
+`nextBedStep` (`src/skills/bedPlan.ts`); the `spawn_bed` skill does the work with three actions:
+`place_bed`, `set_spawn` and `shear`.
+
+The skill tracks where the respawn point is and keeps it in storage (`spawnBed`):
+
+| what the bot sees | respawn point |
+|---|---|
+| "Respawn point set", or lying down in a bed | set, at that bed |
+| a bed click answered with "You can sleep only at night..." or "...monsters nearby" | set (1.21.1 sets the point before it checks the time and monsters) |
+| "...too far away", "This bed is obstructed", "This bed is occupied" | not set (`set_spawn` walks closer once for "too far") |
+| a respawn within 4 blocks of the bed | set, confirmed |
+| a respawn anywhere else, "You have no home bed...", or the server resetting the spawn | lost, with the reason |
+| the bed's block loaded and no longer a bed | lost |
+
+While the point isn't a bed within `homeRange` of home, the behaviour works down this list and
+backs off (60 s, doubling up to 30 min) when a step fails:
+
+1. click its own bed near home (`set_spawn`); after a long trip it walks home first
+2. place a bed from the inventory (`place_bed`), then click it
+3. take a bed out of its own chests near home
+4. craft one: 3 wool of one colour and 3 planks of one kind (planks from a log first); no wood
+   raises the `wood` need for `chop_wood_loop`
+5. take wool from its chests when that makes 3 of one colour
+6. shear sheep (`shear`); with 2 iron ingots and no shears it makes shears first
+7. hunt woolly sheep (`hunt animal=sheep`), sparing `spareSheep` adults
+8. by day, search the `rings` around home for sheep (`find_food` with sheep only); an empty ring
+   is skipped for `ringMemoryMinutes`. With every ring empty it stops with "no sheep found
+   within 250" and tries again when the oldest empty ring is forgotten.
+
+The back-off ends early when the wool, planks, logs, shears, iron or beds it carries change.
+
+`place_bed` picks the spot with `planBedSpot`: both bed cells free (not liquid) with a full
+block under them and room above, nothing in a protected area or danger zone, not in front of a
+door, gate or trapdoor, not on or beside a chest, barrel, furnace, crafting table, ladder or
+another bed, not plugging a one-wide passage, and a free cell next to it to click from. The home
+spot itself stays free; the nearest spot to it wins, same floor first, headboard against a wall
+when there is a choice. Beds it places are remembered as its own (`spawnBed.own`). It never
+breaks a bed, its own or anyone else's, and it never places or clicks one in the Nether or the End.
+
+### At night
+
+By day a click only sets the point. At night the click puts the bot to bed, which sets the
+point too. Then it waits up to `graceSeconds` (12) for the night to skip. While it waits it asks
+the players who are still up to go to bed: once at the start (`askText`), then a reminder every
+`askEverySeconds` (5), at most `maxAsks` (3) messages in all, through the rate-limited chat
+queue. It asks players it can see awake. Players it can't see might be in the Nether or the End,
+where they don't count, so it only asks them when the server's "N/M players sleeping" says more
+sleepers are needed than it can see. Until the server reports a count it assumes
+`sleepingPercentage` (100, the vanilla gamerule). Spectators and names in `ignore` are never
+asked. When the server says "Sleeping through this night", it stays in bed until the morning.
+When the grace runs out, or the server says no amount of rest will pass the night, it gets up
+and carries on. The respawn point counts as set either way.
+
+```yaml
+behaviors:
+  keep_spawn_bed: { homeRange: 6, graceSeconds: 12, ask: true, maxAsks: 3,
+                    askText: "{players}, could you hop into bed so we can skip the night?",
+                    ignore: [Pip] }   # other bots
+```
+
+`!behavior_configure keep_spawn_bed graceSeconds=20 ask=false` changes it live. The
+`set_spawn` action takes the same settings (`grace_seconds`, `ask`, `ask_text`, ...) when an
+LLM or a player uses it directly; `stay=true` keeps the bot in bed until the morning.
+`observe()` shows `respawnPoint` once it is known.
+
 ## Capabilities
 
 A behaviour lists the actions it `requires`; if the bot lacks one it is skipped with a
@@ -957,6 +1027,28 @@ Walks back home when it strays too far by day, and stays close to home at night.
 |---|---|---|---|
 | `maxDistance` | number (4..512) | `32` | head home when farther than this by day |
 | `nightDistance` | number (2..128) | `6` | at night, head home when farther than this |
+
+### `keep_spawn_bed`
+
+*routine · priority npc (20) · needs `place_bed`, `set_spawn`, block placing · uses `go_home`, `withdraw`, `craft`, `shear`, `hunt`, `find_food` when present*
+
+Keeps a bed at home and the respawn point on it, so after a death it comes back at home. Knows whether the point is set (server messages, where it respawns); if not: uses its own bed near home, else places one from the inventory or its chests, else crafts one (3 wool of one colour + 3 planks; wool by shearing, shears from 2 iron, or hunting sheep, searching rings for sheep by day), then right-clicks it. At night that is a short sleep: it waits a few seconds and asks players still up to go to bed. Never breaks a bed; below safety and food, above idle; backs off with a reason ("no sheep found within 250").
+
+| option | type | default | description |
+|---|---|---|---|
+| `homeRange` | number (2..16) | `6` | the bed goes within this many blocks of home |
+| `radius` | number (8..64) | `32` | how far to look for sheep before searching further out |
+| `rings` | list | `[64,128,250]` | search rings for sheep around home, smallest first (by day) |
+| `ringMemoryMinutes` | number (1..240) | `30` | remember an empty ring this long before searching it again |
+| `spareSheep` | integer (0..16) | `2` | adult sheep to leave alive when hunting for wool (shearing spares them all) |
+| `graceSeconds` | number (0..120) | `12` | at night: how long to stay in bed waiting for the others before getting up |
+| `ask` | boolean | `true` | at night: ask the players still up to go to bed |
+| `askText` | string | `"{players}, could you hop into bed so we can skip the night?"` | first ask; {players} is replaced by the names |
+| `remindText` | string | `"Still in bed, {players}: {sleeping}/{needed} asleep."` | reminders; {players}, {sleeping}, {needed} |
+| `askEverySeconds` | number (3..60) | `5` | between asks |
+| `maxAsks` | integer (0..5) | `3` | asks per night, the first one included |
+| `sleepingPercentage` | integer (0..101) | `100` | the server's playersSleepingPercentage, until the server reports a count |
+| `ignore` | list | `[]` | players never asked to sleep (other bots) |
 
 ### `deposit_when_full`
 

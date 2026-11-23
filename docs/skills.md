@@ -14,7 +14,7 @@ Two bundles live in `src/skills/index.ts`:
 - `standardSkills()`: status, config, movement, combat, survival, inventory, gather,
   [journal](/guide/journal), bodyguard.
 - `extendedSkills()`: crafting, containers, farming, food, search, woodcutting, building, construction,
-  roads, blueprint library, materials, progression, pickup, worldedit.
+  roads, blueprint library, materials, progression, pickup, worldedit, spawn bed.
 
 `navigation()`, `modsSkill()` and `config()` are exported on their own (the villager bot uses
 `navigation()`).
@@ -285,6 +285,16 @@ Observe hook: `worldedit` (only when it is available).
 | `upgrade_tools` | Climb the tool tiers as far as it can now: stone tools, a furnace, iron (smelted with coal or charcoal), diamond if it has diamonds; armour optionally. Says what is missing. |
 
 See [Tool progression](./guide/progression.md).
+
+### spawn bed
+| action | |
+|---|---|
+| `place_bed` | Put a bed from the inventory down near home: free spot with floor and headroom, beside the home spot if possible, never in front of a door, on a chest, in a passage or a protected area. Remembers it as its own. |
+| `set_spawn` | Right-click its bed (or the one at x y z) to set the respawn point. At night it lies down, waits a few seconds for the night to skip and asks players still up to go to bed, then gets up. |
+| `shear` | Shear sheep nearby and pick up the wool (not babies, named, leashed or penned sheep). |
+
+Observe hook: `respawnPoint` (once known). The behaviour that uses them is
+[keep_spawn_bed](./guide/behaviors#respawn-point-keep-spawn-bed).
 
 ### mods
 Not in a bundle; add `modsSkill()`.

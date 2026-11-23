@@ -10,7 +10,7 @@ scopeNote: "Generated from the skills: most are Minecraft; the journal and confi
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-25 skills, 108 actions.
+26 skills, 111 actions.
 
 ## blueprint-library
 
@@ -1046,6 +1046,52 @@ Go to where a player (default: whoever asked) died and bring their dropped items
 | `y` | number |  |  |  |
 | `z` | number |  |  |  |
 | `try_anyway` | boolean |  | `false` | go even when the items have probably despawned (they only age while the area is loaded) |
+
+## spawn_bed
+
+A bed at home and the respawn point on it: place_bed, set_spawn (by day a click, at night a short sleep), shear.
+
+### `place_bed`
+
+Put a bed from the inventory down near home (or near the bot without a home): an air spot with a floor and headroom, next to the home spot if possible, never in front of a door, on a chest, in a one-wide passage or in a protected area. With x y z (and facing) it goes exactly there. Remembers the bed as its own.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `item` | string |  |  | which bed; default the first one in the inventory |
+| `x` | integer (-9007199254740991..9007199254740991) |  |  |  |
+| `y` | integer (-9007199254740991..9007199254740991) |  |  |  |
+| `z` | integer (-9007199254740991..9007199254740991) |  |  |  |
+| `facing` | `north` \| `south` \| `east` \| `west` |  |  | which way the head goes from x y z |
+| `range` | number (2..16) |  | `6` | how far from home to look for a spot |
+
+### `set_spawn`
+
+Set the respawn point at a bed: its own bed near home (or the bed at x y z) by right-clicking it. By day that only sets the point; at night it lies down, waits a few seconds for the night to skip and asks players still up to go to bed (a few polite asks at most), then gets up. Never in the Nether or the End (beds explode there).
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `x` | integer (-9007199254740991..9007199254740991) |  |  |  |
+| `y` | integer (-9007199254740991..9007199254740991) |  |  |  |
+| `z` | integer (-9007199254740991..9007199254740991) |  |  |  |
+| `grace_seconds` | number (0..120) |  | `12` | at night: how long to stay in bed waiting for the others |
+| `ask` | boolean |  | `true` | at night: ask players who are still up to go to bed |
+| `ask_text` | string |  | `"{players}, could you hop into bed so we can skip the night?"` | first ask; {players} is replaced by the names |
+| `remind_text` | string |  | `"Still in bed, {players}: {sleeping}/{needed} asleep."` | reminders; {players}, {sleeping}, {needed} |
+| `ask_every_seconds` | number (3..60) |  | `5` | between asks |
+| `max_asks` | integer (0..5) |  | `3` | asks per night, the first one included |
+| `sleeping_percentage` | integer (0..101) |  | `100` | the server's playersSleepingPercentage, until the server reports a count |
+| `ignore` | array |  | `[]` | players never asked (other bots) |
+| `stay` | boolean |  | `false` | stay in bed until morning instead of getting up after the grace |
+
+### `shear`
+
+Shear sheep nearby with shears from the inventory and pick up the wool. Leaves babies, named, leashed and penned sheep alone.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `count` | integer (1..16) |  | `3` | how many sheep to shear |
+| `radius` | number (4..64) |  | `24` | how far to look |
+| `pens` | boolean |  | `false` | also shear sheep inside fences (only your own) |
 
 ## status
 
