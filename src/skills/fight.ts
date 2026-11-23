@@ -8,12 +8,44 @@
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
 import { goals, FLYING, isHostile, sleep, checkAborted } from '../core/index.ts'
-import { equipForTarget, hasRanged, shootAt, readyShield, isRangedMob, DEFAULT_MAX_CHASE, type WeaponFlags } from './weapons.ts'
+import { equipForTarget, hasRanged, shootAt, readyShield, isRangedMob, meleeDamage, DEFAULT_MAX_CHASE, type WeaponFlags } from './weapons.ts'
 import { attackCooldownMs, swingDecision, spacing, chaseRefusal, outnumbered, shouldDisengageToHeal, shouldEatInLull, creeperMove, MELEE_REACH } from './tactics.ts'
+import { hitStyle, sweepWorth, wantKnockback, shieldAgainstMelee, creeperEscape, goldenAppleNow, rangedUseless, SPRINT_LEAD_MS, CREEPER_FUSE_MS, type HitStyle } from './techniques.ts'
 import { bestFood } from './survival.ts'
 
 export type FightEnd = 'killed' | 'escaped' | 'timeout' | 'gave_up' | 'heal' | 'outnumbered' | 'retarget'
-export interface FightResult { end: FightEnd, killed: boolean, reason?: string, hits: number, crits: number }
+export interface FightResult {
+  end: FightEnd, killed: boolean, reason?: string, hits: number, crits: number
+  /** Technique counters: sprint (W-tap) hits, sweep hits, shield raises against melee, golden apples eaten, creeper blasts blocked. */
+  sprints?: number, sweeps?: number, blocks?: number, apples?: number, creeperBlocks?: number
+}
+
+// ---- shield cooldown: an axe hit on a raised shield disables it (set_cooldown for the shield item) ----
+
+const shieldDown = new WeakMap<Bot, number>()
+/** Watches set_cooldown packets for the shield item; returns the remover. */
+export function installShieldWatch (bot: Bot): () => void {
+  const id = (bot.registry as any).itemsByName?.shield?.id
+  const onCooldown = (p: { itemID: number, cooldownTicks: number }) => {
+    if (p.itemID === id) shieldDown.set(bot, Date.now() + p.cooldownTicks * 50)
+  }
+  bot._client.on('set_cooldown', onCooldown as any)
+  return () => { bot._client.removeListener('set_cooldown', onCooldown as any) }
+}
+/** The bot's shield is disabled right now (hit by an axe while blocking). */
+export function shieldDisabled (bot: Bot): boolean {
+  return (shieldDown.get(bot) ?? 0) > Date.now()
+}
+
+/** Ground mobs within r of an entity other than itself (who a sweep would also hit). */
+function bunchedAround (bot: Bot, t: Entity, r = 1.5): number {
+  let n = 0
+  for (const e of Object.values(bot.entities)) {
+    if (e === t || e === bot.entity || !isHostile(e) || FLYING.has(e.name ?? '')) continue
+    if (e.position.distanceTo(t.position) <= r) n++
+  }
+  return n
+}
 
 const EYE = 1.62
 const LIQUID = /^(water|lava|bubble_column)$/
@@ -108,6 +140,22 @@ export function meleeNear (bot: Bot, r = 6): number {
 }
 
 const GOLDEN = /^(enchanted_)?golden_apple$/
+const lastApple = new WeakMap<Bot, number>()
+
+/** Eats a golden apple now, backing away from `from` while it does (combat.goldenApple). */
+async function eatAppleInFight (bot: Bot, from: Entity, signal: AbortSignal): Promise<boolean> {
+  const apple = bot.inventory.items().find(i => i.name === 'enchanted_golden_apple') ?? bot.inventory.items().find(i => GOLDEN.test(i.name))
+  if (!apple) return false
+  lastApple.set(bot, Date.now())
+  checkAborted(signal)
+  try {
+    await bot.equip(apple, 'hand')
+    await bot.lookAt(from.position.offset(0, (from.height ?? 1.8) * 0.8, 0), true).catch(() => {})
+    if (safeStep(bot, 'back')) bot.setControlState('back', true)
+    await bot.consume()
+    return true
+  } catch { return false } finally { bot.setControlState('back', false) }
+}
 
 /** Food for a fight: a golden apple when hurt, otherwise the best normal food (if hungry enough to eat). */
 export function fightFood (bot: Bot): any {
@@ -158,7 +206,10 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
   const archer = isRangedMob(target.name)
   const start = Date.now()
   const origin = bot.entity.position.clone()
-  const res: FightResult = { end: 'timeout', killed: false, hits: 0, crits: 0 }
+  const res: FightResult = { end: 'timeout', killed: false, hits: 0, crits: 0, sprints: 0, sweeps: 0, blocks: 0, apples: 0, creeperBlocks: 0 }
+  const canShoot = flags.ranged && !rangedUseless(target.name)
+  let fuseSince = 0 // when the target creeper's fuse was first seen lit
+  let style: HitStyle = 'crit'
 
   const heldBefore = bot.heldItem?.name ?? null
   let held: string | null = await equipForTarget(bot, target, flags)
@@ -197,9 +248,9 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
     bot.setControlState('sprint', sprint && dir === 'forward')
   }
   const lowerShield = () => { if (shieldUp) { try { bot.deactivateItem() } catch {} shieldUp = false } }
-  const raiseShield = async () => {
-    if (shieldUp || !flags.shield) return shieldUp
-    if (!await readyShield(bot)) return false
+  const raiseShield = async (melee = false) => {
+    if (shieldUp || (melee ? flags.shieldMelee === false : !flags.shield)) return shieldUp
+    if (shieldDisabled(bot) || !await readyShield(bot)) return false
     bot.activateItem(true)
     shieldUp = true
     return true
@@ -226,6 +277,19 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
 
       if (tactical) {
         const apple = bot.inventory.items().some(i => GOLDEN.test(i.name))
+        if (apple && goldenAppleNow({
+          enabled: flags.goldenApple ?? true, health: bot.health, hasGoldenApple: apple, meleeNear: meleeNear(bot, 4),
+          litCreeperNear: !!bot.nearestEntity(e => e.name === 'creeper' && creeperFuseLit(e) && e.position.distanceTo(me) < 5),
+          sinceLastMs: Date.now() - (lastApple.get(bot) ?? 0)
+        })) {
+          lowerShield()
+          if (mode === 'path') { bot.pathfinder.setGoal(null); mode = 'still' }
+          clearMoves(bot)
+          if (await eatAppleInFight(bot, target, signal)) res.apples!++
+          held = await equipForTarget(bot, target, flags)
+          lastSwing = Date.now()
+          continue
+        }
         if (shouldDisengageToHeal({ enabled: flags.disengageToHeal ?? true, health: bot.health, food: bot.food, hasFood: !!bestFood(bot), hasGoldenApple: apple })) {
           return finish('heal', `health ${Math.ceil(bot.health)}`)
         }
@@ -238,7 +302,28 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
       }
 
       // A creeper whose fuse is lit (~1.5 s): get away now, finish it after the fizzle.
-      const creeper = target.name === 'creeper' ? creeperMove({ dist, fuseLit: creeperFuseLit(target), bow: !!(flags.ranged && hasRanged(bot)), holdFire: opts.holdFire?.(target) }) : null
+      const lit = target.name === 'creeper' && creeperFuseLit(target)
+      if (!lit) fuseSince = 0
+      else if (!fuseSince) fuseSince = Date.now()
+      const creeper = target.name === 'creeper' ? creeperMove({ dist, fuseLit: lit, bow: !!(canShoot && hasRanged(bot)), holdFire: opts.holdFire?.(target) }) : null
+      if (creeper === 'back_off' && flags.shieldMelee !== false && !shieldDisabled(bot) &&
+          creeperEscape({ dist, msLeft: CREEPER_FUSE_MS - (Date.now() - fuseSince), shield: bot.inventory.slots[45]?.name === 'shield' || bot.inventory.items().some(i => i.name === 'shield') }) === 'shield') {
+        // too close to outrun the rest of the fuse: face it behind the shield (a blocked blast does no damage)
+        if (mode === 'path') { bot.pathfinder.setGoal(null); mode = 'still' }
+        clearMoves(bot)
+        if (await raiseShield(true)) {
+          res.creeperBlocks!++
+          const until = Date.now() + 1700
+          while (Date.now() < until && (target as any).isValid !== false && creeperFuseLit(target)) {
+            await bot.lookAt(target.position.offset(0, 1, 0), true).catch(() => {})
+            if (safeStep(bot, 'back')) bot.setControlState('back', true)
+            await sleep(50, signal)
+          }
+          bot.setControlState('back', false)
+          lowerShield()
+          continue
+        }
+      }
       if (creeper === 'back_off') {
         lowerShield()
         clearMoves(bot)
@@ -275,7 +360,7 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
         hazardSince = 0
         // Not getting closer (no path up to it, e.g. a skeleton on a ledge): standing still while
         // it shoots us is the worst option. 3 s without 0.5 blocks of progress: stop.
-        if (dist < bestDist - 0.5) { bestDist = dist; bestAt = Date.now() } else if (Date.now() - bestAt > 3000 && !(archer && flags.ranged && hasRanged(bot))) {
+        if (dist < bestDist - 0.5) { bestDist = dist; bestAt = Date.now() } else if (Date.now() - bestAt > 3000 && !(archer && canShoot && hasRanged(bot))) {
           return finish('gave_up', 'no way to get closer')
         }
       } else {
@@ -307,7 +392,7 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
           held = await swapIfNeeded()
           if (Date.now() - lastSwing >= attackCooldownMs(held)) { bot.attack(target); lastSwing = Date.now(); res.hits++ }
           await sleep(50, signal)
-        } else if (flags.ranged && hasRanged(bot) && dist < 32 && Date.now() - lastSwing > 300 && !opts.holdFire?.(target)) {
+        } else if (canShoot && hasRanged(bot) && dist < 32 && Date.now() - lastSwing > 300 && !opts.holdFire?.(target)) {
           await shootAt(bot, target, signal)
           held = await equipForTarget(bot, target, flags)
           lastSwing = Date.now()
@@ -328,7 +413,7 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
           await sleep(100, signal)
           continue
         }
-        if ((creeper === 'shoot' || (archer && flags.ranged && hasRanged(bot) && dist > 6 && dist < 32 && !opts.holdFire?.(target)))) {
+        if ((creeper === 'shoot' || (archer && canShoot && hasRanged(bot) && dist > 6 && dist < 32 && !opts.holdFire?.(target)))) {
           lowerShield()
           if (mode === 'path') { bot.pathfinder.setGoal(null); mode = 'still' }
           clearMoves(bot)
@@ -368,6 +453,18 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
       held = await swapIfNeeded()
       const cdLeft = attackCooldownMs(held) - (Date.now() - lastSwing)
       await bot.lookAt(aimPoint(bot, target), true).catch(() => {})
+      const near = meleeNear(bot, 4)
+      const canCrit = crits && !inLiquid(bot) && headroom(bot) && target.name !== 'creeper'
+      // pick the style while on the ground; keep it through a jump so a crit in the air isn't dropped
+      if (bot.entity.onGround) {
+        style = hitStyle({
+          canCrit,
+          sweep: flags.sweep ?? true,
+          sweepWorth: sweepWorth({ weapon: held, damage: meleeDamage(held), sweepingLevel: sweepingLevel(bot), bunched: bunchedAround(bot, target) }),
+          sprintReset: flags.sprintReset ?? true,
+          wantKnockback: wantKnockback({ target: target.name ?? '', health: bot.health, meleeNear: near })
+        })
+      }
       const decision = swingDecision({
         cooldownLeftMs: cdLeft,
         reach,
@@ -375,20 +472,34 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
         velY: bot.entity.velocity.y,
         inLiquid: inLiquid(bot),
         headroom: headroom(bot),
-        crits,
+        crits: crits && style === 'crit',
         firstHit: firstHit && crits,
         hurry: target.name === 'creeper'
       })
+      // W-tap: sprint goes on again a tick or two before the charge completes, so the hit carries knockback
+      const sprinting = style === 'sprint' && decision !== 'jump' && cdLeft <= SPRINT_LEAD_MS && bot.entity.onGround
+      if (sprinting && !bot.getControlState('sprint')) {
+        lowerShield()
+        bot.setControlState('forward', safeStep(bot, 'forward'))
+        bot.setControlState('sprint', true)
+      }
+      // a sweep needs a slow ground hit: stop moving the tick before
+      if (style === 'sweep' && cdLeft <= 100 && cdLeft > 0) clearMoves(bot)
       if (decision === 'sprint_hit' || decision === 'swing') {
         lowerShield()
-        if (decision === 'swing') bot.setControlState('sprint', false)
+        const sprintHit = decision === 'sprint_hit' || (style === 'sprint' && bot.getControlState('sprint'))
+        if (!sprintHit) bot.setControlState('sprint', false)
         else { bot.setControlState('forward', true); bot.setControlState('sprint', true) }
-        const crit = decision === 'swing' && !bot.entity.onGround && bot.entity.velocity.y < 0
+        if (style === 'sweep' && decision === 'swing') clearMoves(bot)
+        const crit = decision === 'swing' && !sprintHit && !bot.entity.onGround && bot.entity.velocity.y < 0
         bot.attack(target)
         lastSwing = Date.now()
         res.hits++
         if (crit) res.crits++
+        else if (sprintHit) res.sprints!++
+        else if (style === 'sweep' && held?.endsWith('_sword') && bot.entity.onGround) res.sweeps!++
         firstHit = false
+        // let go of sprint right away (the "W" of a W-tap): the server ends the sprint on a knockback hit anyway
         bot.setControlState('sprint', false)
         if (opts.stopAfterHits && res.hits >= opts.stopAfterHits) return finish('retarget', 'tagged')
         if (target.name === 'creeper') {
@@ -404,9 +515,21 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
         setTimeout(() => bot.setControlState('jump', false), 60)
       } else if (archer && flags.shield && cdLeft > 200) {
         await raiseShield() // point-blank skeleton: block between swings
-      }
+      } else if (!sprinting && shieldAgainstMelee({
+        enabled: flags.shieldMelee ?? true,
+        hasShield: true,
+        attacker: target.name ?? '',
+        attackerHeld: (target as any).heldItem?.name ?? null,
+        dist: hd,
+        cooldownLeftMs: cdLeft,
+        disabled: shieldDisabled(bot)
+      })) {
+        if (!shieldUp && await raiseShield(true)) res.blocks!++
+      } else if (shieldUp && !archer && cdLeft <= SHIELD_LOWER_MS) lowerShield()
 
-      if (strafe) {
+      if (sprinting) {
+        // W-tap in progress: keep running into the hit
+      } else if (strafe) {
         if (Date.now() < backUntil) press('back')
         else {
           const s = spacing(hd)
@@ -432,6 +555,15 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
     if ((bot.heldItem?.name ?? null) !== before) lastSwing = Date.now() // switching resets the charge
     return bot.heldItem?.name ?? now
   }
+}
+
+/** Shield goes down this long before the charge completes, so the swing isn't held up by it. */
+const SHIELD_LOWER_MS = 60
+
+/** Sweeping Edge level of the held item (0 without it). */
+function sweepingLevel (bot: Bot): number {
+  const e = ((bot.heldItem as any)?.enchants ?? []) as { name: string, lvl: number }[]
+  return e.find(x => x.name === 'sweeping_edge' || x.name === 'sweeping')?.lvl ?? 0
 }
 
 /** Where to look to hit: the point of its hitbox nearest our eye line, a little inside. */

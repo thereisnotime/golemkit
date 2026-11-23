@@ -13,6 +13,10 @@ import { fillerBlock } from './survival.ts'
 import { getHome } from './navigation.ts'
 import { gearUp, wornArmorPoints } from './gear.ts'
 import { rangedDefense, installRangedWatch } from './ranged.ts'
+import { installShieldWatch } from './fight.ts'
+import { findChokepoint, wantChokepoint } from './techniques.ts'
+import { waterBucket } from './clutch.ts'
+import { defendPlayer, notePlayerHit, installGazeGuard } from './defense.ts'
 const WEAPONS = ['netherite_sword', 'diamond_sword', 'iron_sword', 'stone_sword', 'golden_sword', 'wooden_sword',
   'netherite_axe', 'diamond_axe', 'iron_axe', 'stone_axe']
 
@@ -221,6 +225,53 @@ function touchAnchor (bot: Bot): void {
   if (a) a.until = Date.now() + 20_000
 }
 
+/** Feet, head free and solid floor: a cell the bot can stand in. */
+function standable (bot: Bot, p: any): boolean {
+  const feet = bot.blockAt(p)
+  const head = bot.blockAt(p.offset(0, 1, 0))
+  const floor = bot.blockAt(p.offset(0, -1, 0))
+  if (!feet || !head || !floor) return false
+  if (feet.boundingBox !== 'empty' || head.boundingBox !== 'empty' || /water|lava|fire/.test(feet.name)) return false
+  return floor.boundingBox === 'block'
+}
+
+/**
+ * combat.chokepoints: 3+ melee mobs coming and health to fight with: walk to a 1-wide gap
+ * (techniques.findChokepoint) within 6 blocks and fight from it without strafing, so they reach
+ * the bot one at a time. Null when it doesn't apply or there is no such gap.
+ */
+async function holdChokepoint (ctx: ActionContext, flags: WeaponFlags): Promise<string | null> {
+  const { bot, agent, signal } = ctx
+  const enabled = ((agent.settings.combat ?? {}) as { chokepoints?: boolean }).chokepoints !== false
+  if (!wantChokepoint({ enabled, meleeNear: meleeNear(bot, 8), health: bot.health })) return null
+  const me = bot.entity.position.floored()
+  const mobs = threats(bot, 12).filter(e => !FLYING.has(e.name ?? '') && !isRangedMob(e.name) && e.name !== 'creeper')
+  if (mobs.length < 3) return null
+  const toward = { x: mobs.reduce((a, e) => a + e.position.x, 0) / mobs.length - me.x, z: mobs.reduce((a, e) => a + e.position.z, 0) / mobs.length - me.z }
+  const spot = findChokepoint((dx, dz) => standable(bot, me.offset(dx, 0, dz)), toward, 6)
+  if (!spot) return null
+  if (spot.dx !== 0 || spot.dz !== 0) {
+    try { await gotoTimed(bot, new goals.GoalBlock(me.x + spot.dx, me.y, me.z + spot.dz), signal, 5000) } catch { checkAborted(signal); return null }
+  }
+  const until = Date.now() + 45_000
+  let kills = 0
+  while (Date.now() < until && meleeNear(bot, 8) >= 1 && bot.health > 6) {
+    checkAborted(signal)
+    const near = threats(bot, 5).find(e => eyeReach(bot, e) <= 3)
+    if (near) {
+      const r = await fightTarget(bot, near, signal, { maxMs: 2000, flags: { ...flags, strafe: false, maxChase: 1 } })
+      if (r.killed) kills++
+      if (r.end === 'heal' || r.end === 'outnumbered') break
+    } else {
+      const m = threats(bot, 10)[0]
+      if (!m) break
+      await bot.lookAt(m.position.offset(0, (m.height ?? 1.8) * 0.8, 0), true).catch(() => {})
+      await sleep(150, signal)
+    }
+  }
+  return `held a chokepoint (${kills} killed there)`
+}
+
 const defend = defineAction({
   name: 'defend',
   description: 'Fight back against the hostile mobs around, most dangerous first (used by reflexes).',
@@ -237,16 +288,23 @@ const defend = defineAction({
     let heals = 0
     let hits = 0
     let crits = 0
+    let choked = false
+    const extra = { sprints: 0, sweeps: 0, blocks: 0, apples: 0, creeperBlocks: 0 }
     const until = Date.now() + 60_000
     while (Date.now() < until) {
       checkAborted(signal)
       const mob = threats(bot, 24).find(e => !skip.has(e.id) && e.position.distanceTo(origin) <= maxChase + 12)
       if (!mob) break
+      if (!choked) {
+        const held = await holdChokepoint(ctx, flags)
+        if (held) { choked = true; notes.push(held); continue }
+      }
       const drift = bot.entity.position.distanceTo(origin)
       const long = FLYING.has(mob.name ?? '') || isRangedMob(mob.name)
       const r: FightResult = await fightTarget(bot, mob, signal, { maxMs: long ? 25000 : 12000, flags: { ...flags, maxChase: Math.max(3, maxChase - drift) } })
       hits += r.hits
       crits += r.crits
+      for (const k of Object.keys(extra) as (keyof typeof extra)[]) extra[k] += r[k] ?? 0
       if (bot.health <= 0) return fail(`died fighting ${mob.name}`)
       if (r.killed) { killed.push(mob.name ?? 'mob'); continue }
       if (r.end === 'heal' && heals < 3) {
@@ -281,7 +339,9 @@ const defend = defineAction({
     }
     if (!killed.length && !notes.length) return fail('nothing to fight')
     const k = killed.length ? `killed ${[...new Set(killed)].map(n => `${killed.filter(x => x === n).length} ${n}`).join(', ')}` : 'killed nothing'
-    return ok([k + (hits ? ` (${hits} hits, ${crits} crits)` : ''), ...notes].join('; '))
+    const tech = [extra.sprints && `${extra.sprints} sprint hits`, extra.sweeps && `${extra.sweeps} sweeps`, extra.blocks && `${extra.blocks} shield blocks`,
+      extra.creeperBlocks && `${extra.creeperBlocks} creeper blasts blocked`, extra.apples && `${extra.apples} golden apples`].filter(Boolean)
+    return ok([k + (hits ? ` (${[`${hits} hits`, `${crits} crits`, ...tech].join(', ')})` : ''), ...notes].join('; '))
   }
 })
 
@@ -519,14 +579,22 @@ export const combat = () => defineSkill({
   name: 'combat',
   capabilities: ['move', 'combat'],
   description: 'Fighting hostile mobs, guarding players and hunting animals for food.',
-  actions: [attack, guard, defend, retreat, hunt, gearUp, rangedDefense],
-  setup: (_agent, bot) => {
-    // remember who hit us: neutral mobs are fought only while they attack
-    const onHurt = (e: Entity) => { if (e === bot.entity) noteAttacker(bot) }
-    bot.on('entityHurt', onHurt)
+  actions: [attack, guard, defend, retreat, hunt, gearUp, rangedDefense, waterBucket, defendPlayer],
+  setup: (agent, bot) => {
+    // remember who hit us: neutral mobs are fought only while they attack; players hitting
+    // anyone are logged for combat.pvp defend
+    const onHurt = (e: Entity, source?: Entity) => {
+      if (e === bot.entity) noteAttacker(bot)
+      try { notePlayerHit(bot, e, source) } catch {}
+    }
+    bot.on('entityHurt', onHurt as any)
     // projectiles flying at the bot and hits from range (ranged.ts)
     const unwatch = installRangedWatch(bot)
-    return () => { bot.off('entityHurt', onHurt); unwatch() }
+    // an axe hit on the raised shield disables it for 5 s (fight.ts reads this)
+    const unshield = installShieldWatch(bot)
+    // never look an enderman in the eyes unless it is already fighting us (combat.endermanGaze)
+    const ungaze = installGazeGuard(bot, () => ((agent.settings.combat ?? {}) as { endermanGaze?: boolean }).endermanGaze !== false, id => recentAttacker(bot, id))
+    return () => { bot.off('entityHurt', onHurt as any); unwatch(); unshield(); ungaze() }
   },
   observe: (_agent, bot) => {
     const mob = threats(bot, 16)[0] ?? nearestHostile(bot, bot.entity.position, 16)

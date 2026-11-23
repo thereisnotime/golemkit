@@ -373,7 +373,12 @@
       "description": "Put on the best armour in the inventory and put a totem of undying or a shield in the offhand.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "danger": {
+            "description": "a fall or fire that could kill: the totem goes in the offhand whatever the health",
+            "type": "boolean"
+          }
+        }
       }
     },
     {
@@ -3350,7 +3355,12 @@
       "description": "Put on the best armour in the inventory and put a totem of undying or a shield in the offhand.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "danger": {
+            "description": "a fall or fire that could kill: the totem goes in the offhand whatever the health",
+            "type": "boolean"
+          }
+        }
       }
     },
     {

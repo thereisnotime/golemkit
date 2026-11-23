@@ -15,6 +15,9 @@ import { escorting } from '../../../skills/bodyguard.ts'
 import { rangedSituation, onRangedAlarm, noteUnexplainedHit } from '../../../skills/ranged.ts'
 import { isShooter, rangedResponse } from '../../../skills/ranged-plan.ts'
 import { wornArmorPoints } from '../../../skills/gear.ts'
+import { clutchInputs, extinguishInputs, hasWaterBucket } from '../../../skills/clutch.ts'
+import { totemSwap } from '../../../skills/techniques.ts'
+import { pvpAllowed } from '../../../skills/defense.ts'
 
 export interface ReflexOptions {
   selfDefense?: boolean
@@ -30,7 +33,7 @@ export interface ReflexOptions {
 }
 
 /** Actions the ranged reflex never interrupts. */
-const RANGED_KEEP = new Set(['ranged_defense', 'retreat', 'bunker', 'pillar', 'climb_out', 'eat'])
+const RANGED_KEEP = new Set(['ranged_defense', 'retreat', 'bunker', 'pillar', 'climb_out', 'eat', 'water_bucket', 'defend_player'])
 
 export const reflexes = (defaults: ReflexOptions = {}) => {
   const caller = { kind: 'reflex', name: 'reflexes' } as const
@@ -47,12 +50,69 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       let busy = false
       let bunkerFailedAt = 0
       let gearTriedAt = 0
-      const combatCfg = () => (agent.settings.combat ?? {}) as { autoArmor?: boolean, disengageToHeal?: boolean }
-      const reflex = async (action: string, force = false) => {
+      const combatCfg = () => (agent.settings.combat ?? {}) as { autoArmor?: boolean, disengageToHeal?: boolean, totem?: boolean, waterClutch?: boolean }
+      const reflex = async (action: string, force = false, params: Record<string, unknown> = {}) => {
         if (busy && !force) return
         busy = true
-        try { await agent.act(action, {}, { caller, priority: PRIORITY.reflex }) } finally { busy = false }
+        try { await agent.act(action, params, { caller, priority: PRIORITY.reflex }) } finally { busy = false }
       }
+
+      // ---- totem: into the offhand the moment health gets low (gear_up runs beside the current action) ----
+      let totemTriedAt = 0
+      const totemCheck = (lethalFall = false) => {
+        if (!needsSurvival(bot) || bot.currentWindow || !agent.getAction('gear_up') || Date.now() - totemTriedAt < 1000) return
+        const off = bot.inventory.slots[45]?.name ?? null
+        if (!totemSwap({ enabled: combatCfg().totem !== false, hasTotem: bot.inventory.items().some(i => i.name === 'totem_of_undying'), offhand: off, health: bot.health, lethalFall })) return
+        totemTriedAt = Date.now()
+        void agent.act('gear_up', lethalFall ? { danger: true } : {}, { caller, priority: PRIORITY.reflex })
+      }
+
+      // ---- water bucket: a damaging fall (MLG clutch) or burning ----
+      let fallStartY: number | null = null
+      let waterBusy = false
+      let fireTriedAt = 0
+      const water = (params: Record<string, unknown>) => {
+        if (waterBusy || !agent.getAction('water_bucket')) return
+        waterBusy = true
+        void agent.act('water_bucket', params, { caller, priority: PRIORITY.reflex }).finally(() => { waterBusy = false })
+      }
+      const onTick = () => {
+        try {
+          if (!bot.entity || bot.health <= 0 || !needsSurvival(bot)) { fallStartY = null; return }
+          const e = bot.entity as any
+          const y = bot.entity.position.y
+          if (bot.entity.onGround || e.isInWater || e.isInLava || e.onClimbable) { fallStartY = y; return }
+          if (fallStartY === null || y > fallStartY) fallStartY = y
+          const enabled = combatCfg().waterClutch !== false
+          if (bot.entity.velocity.y < -0.5 && !waterBusy) {
+            const d = clutchInputs(bot, fallStartY, enabled && hasWaterBucket(bot))
+            if (d.act !== 'none') water({ reason: 'fall', fallStartY })
+            // a fall that kills without water: a totem in the offhand at least
+            if (d.damage >= bot.health || (!hasWaterBucket(bot) && clutchInputs(bot, fallStartY, true).damage >= bot.health)) totemCheck(true)
+          }
+          if (enabled && Date.now() - fireTriedAt > 3000 && extinguishInputs(bot, true)) { fireTriedAt = Date.now(); water({ reason: 'fire' }) }
+        } catch {}
+      }
+      bot.on('physicsTick', onTick)
+
+      // ---- PvP (combat.pvp defend): fight back a player who hits the bot or the player it guards ----
+      let pvpBusy = false
+      const onPlayerHit = (entity: any, source: any) => {
+        if (!source || source.type !== 'player' || source === bot.entity || pvpBusy || !cfg().selfDefense) return
+        const who = source.username as string | undefined
+        if (!who) return
+        const guarded = escorting(agent)
+        const victimMe = entity === bot.entity
+        if (!victimMe && !(guarded && entity?.username?.toLowerCase() === guarded.toLowerCase())) return
+        if (pvpAllowed(agent, bot, who)) return
+        if (agent.currentAction?.name === 'defend_player' || !agent.getAction('defend_player')) return
+        pvpBusy = true
+        setImmediate(() => {
+          void agent.act('defend_player', guarded ? { player: who, protect: guarded } : { player: who }, { caller, priority: PRIORITY.reflex })
+            .finally(() => { pvpBusy = false })
+        })
+      }
+      bot.on('entityHurt', onPlayerHit)
 
       const inWater = (e: any) => {
         const b = bot.blockAt(e.position)
@@ -118,7 +178,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           bot.nearestEntity((e: any) => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20)
         if (!mob) return
         const cur = agent.currentAction?.name
-        if (cur === 'bunker') return
+        if (cur === 'bunker' || cur === 'defend_player' || cur === 'water_bucket') return
         // Phantoms at night with no weapon (or hurt): dig in instead of punching the sky.
         const unarmed = !bot.inventory.items().some(i => /_(sword|axe)$/.test(i.name))
         const night = bot.time.timeOfDay >= 12_500 && bot.time.timeOfDay <= 23_500
@@ -155,6 +215,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       let lastHealth = bot.health
       const onHealth = () => {
         const dropped = bot.health < lastHealth && bot.health > 0
+        if (dropped) totemCheck()
         lastHealth = bot.health
         if (!dropped || !cfg().selfDefense || !needsSurvival(bot)) return
         // Starving (food 0) drains health too, so a drop alone isn't a hit then. But a shooter with
@@ -207,6 +268,8 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
 
       return () => {
         bot.off('entityHurt', onHurt)
+        bot.off('entityHurt', onPlayerHit)
+        bot.off('physicsTick', onTick)
         bot.off('health', onHealth)
         bot.off('spawn', onSpawn)
         clearInterval(timer)

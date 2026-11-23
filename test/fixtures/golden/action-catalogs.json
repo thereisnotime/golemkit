@@ -23,6 +23,8 @@
       "hunt",
       "gear_up",
       "ranged_defense (internal)",
+      "water_bucket (internal)",
+      "defend_player (internal)",
       "eat",
       "sleep",
       "wake",
@@ -378,7 +380,12 @@
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "danger": {
+              "description": "a fall or fire that could kill: the totem goes in the offhand whatever the health",
+              "type": "boolean"
+            }
+          }
         },
         "exclusive": false,
         "longRunning": false
@@ -814,6 +821,8 @@
       "hunt",
       "gear_up",
       "ranged_defense (internal)",
+      "water_bucket (internal)",
+      "defend_player (internal)",
       "eat",
       "sleep",
       "wake",
@@ -1095,7 +1104,12 @@
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "danger": {
+              "description": "a fall or fire that could kill: the totem goes in the offhand whatever the health",
+              "type": "boolean"
+            }
+          }
         },
         "exclusive": false,
         "longRunning": false
@@ -1458,6 +1472,8 @@
       "hunt",
       "gear_up",
       "ranged_defense (internal)",
+      "water_bucket (internal)",
+      "defend_player (internal)",
       "eat",
       "sleep",
       "wake",
@@ -1805,7 +1821,12 @@
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "danger": {
+              "description": "a fall or fire that could kill: the totem goes in the offhand whatever the health",
+              "type": "boolean"
+            }
+          }
         },
         "exclusive": false,
         "longRunning": false
@@ -2187,6 +2208,8 @@
       "hunt",
       "gear_up",
       "ranged_defense (internal)",
+      "water_bucket (internal)",
+      "defend_player (internal)",
       "eat",
       "sleep",
       "wake",
@@ -2602,7 +2625,12 @@
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "danger": {
+              "description": "a fall or fire that could kill: the totem goes in the offhand whatever the health",
+              "type": "boolean"
+            }
+          }
         },
         "exclusive": false,
         "longRunning": false
@@ -5481,6 +5509,8 @@
       "hunt",
       "gear_up",
       "ranged_defense (internal)",
+      "water_bucket (internal)",
+      "defend_player (internal)",
       "eat",
       "sleep",
       "wake",
@@ -5819,7 +5849,12 @@
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "danger": {
+              "description": "a fall or fire that could kill: the totem goes in the offhand whatever the health",
+              "type": "boolean"
+            }
+          }
         },
         "exclusive": false,
         "longRunning": false
@@ -8431,6 +8466,8 @@
       "hunt",
       "gear_up",
       "ranged_defense (internal)",
+      "water_bucket (internal)",
+      "defend_player (internal)",
       "eat",
       "sleep",
       "wake",
@@ -8712,7 +8749,12 @@
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "danger": {
+              "description": "a fall or fire that could kill: the totem goes in the offhand whatever the health",
+              "type": "boolean"
+            }
+          }
         },
         "exclusive": false,
         "longRunning": false
@@ -9075,6 +9117,8 @@
       "hunt",
       "gear_up",
       "ranged_defense (internal)",
+      "water_bucket (internal)",
+      "defend_player (internal)",
       "eat",
       "sleep",
       "wake",
@@ -9422,7 +9466,12 @@
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "danger": {
+              "description": "a fall or fire that could kill: the totem goes in the offhand whatever the health",
+              "type": "boolean"
+            }
+          }
         },
         "exclusive": false,
         "longRunning": false
@@ -9804,6 +9853,8 @@
       "hunt",
       "gear_up",
       "ranged_defense (internal)",
+      "water_bucket (internal)",
+      "defend_player (internal)",
       "eat",
       "sleep",
       "wake",
@@ -10219,7 +10270,12 @@
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "danger": {
+              "description": "a fall or fire that could kill: the totem goes in the offhand whatever the health",
+              "type": "boolean"
+            }
+          }
         },
         "exclusive": false,
         "longRunning": false

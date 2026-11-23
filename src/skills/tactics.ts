@@ -232,9 +232,14 @@ export function pickArmor<T extends ArmorItem> (inventory: T[], worn: Partial<Re
   return out
 }
 
-/** Offhand item: a totem when it matters (low health or nothing else), otherwise a shield. */
-export function pickOffhand (s: { hasTotem: boolean, hasShield: boolean, health: number }): 'totem_of_undying' | 'shield' | null {
-  if (s.hasTotem && (!s.hasShield || s.health <= 10)) return 'totem_of_undying'
+/**
+ * Offhand item: a totem when it matters (low health, a lethal fall or burn: `danger`, or nothing
+ * else), otherwise a shield. A totem already in the offhand stays until health is back above 14,
+ * so it doesn't swap back and forth around 10.
+ */
+export function pickOffhand (s: { hasTotem: boolean, hasShield: boolean, health: number, current?: string | null, danger?: boolean }): 'totem_of_undying' | 'shield' | null {
+  if (s.hasTotem && (!s.hasShield || s.health <= 10 || s.danger)) return 'totem_of_undying'
+  if (s.hasTotem && s.current === 'totem_of_undying' && s.health <= 14) return 'totem_of_undying'
   if (s.hasShield) return 'shield'
   return s.hasTotem ? 'totem_of_undying' : null
 }

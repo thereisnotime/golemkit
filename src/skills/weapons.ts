@@ -27,10 +27,18 @@ const MELEE: Record<string, { damage: number, speed: number }> = {
 }
 const FIST = { damage: 1, speed: 4 }
 
+/** Base attack damage of a held item (1 for a fist or anything that isn't a weapon). */
+export function meleeDamage (item: string | null | undefined): number {
+  const n = item ?? ''
+  return MELEE[n]?.damage ?? (/_sword$/.test(n) ? 6 : /_axe$/.test(n) ? 8 : FIST.damage)
+}
+
 const UNDEAD = new Set(['zombie', 'zombie_villager', 'husk', 'drowned', 'skeleton', 'stray', 'wither_skeleton', 'bogged', 'phantom', 'zombified_piglin', 'zoglin', 'wither', 'skeleton_horse', 'zombie_horse'])
 const ARTHROPOD = new Set(['spider', 'cave_spider', 'silverfish', 'endermite', 'bee'])
 const RANGED_MOBS = new Set(['skeleton', 'stray', 'bogged', 'pillager', 'blaze', 'ghast', 'witch'])
-export const SHIELDED = new Set(['piglin_brute', 'vindicator']) // plus players holding shields
+// No mob blocks with a shield (vindicators and piglin brutes carry axes, which disable the bot's
+// shield instead: techniques.SHIELD_BREAKERS). Only players do; equipForTarget checks them.
+export const SHIELDED = new Set<string>()
 
 export interface WeaponFlags {
   adaptive: boolean
@@ -41,12 +49,17 @@ export interface WeaponFlags {
   strafe?: boolean
   disengageToHeal?: boolean
   maxChase?: number
+  /** Skilled-player techniques (techniques.ts); missing = on. */
+  sprintReset?: boolean
+  sweep?: boolean
+  shieldMelee?: boolean
+  goldenApple?: boolean
 }
 
 export const DEFAULT_MAX_CHASE = 16
 
 export function weaponFlags (agent: Agent): WeaponFlags {
-  const c = (agent.settings.combat ?? {}) as Partial<{ adaptiveWeapon: boolean, ranged: boolean, shield: boolean, crits: boolean, strafe: boolean, disengageToHeal: boolean, maxChase: number }>
+  const c = (agent.settings.combat ?? {}) as Partial<{ adaptiveWeapon: boolean, ranged: boolean, shield: boolean, crits: boolean, strafe: boolean, disengageToHeal: boolean, maxChase: number, sprintReset: boolean, sweep: boolean, shieldMelee: boolean, goldenApple: boolean }>
   return {
     adaptive: c.adaptiveWeapon ?? true,
     ranged: c.ranged ?? true,
@@ -54,7 +67,11 @@ export function weaponFlags (agent: Agent): WeaponFlags {
     crits: c.crits ?? true,
     strafe: c.strafe ?? true,
     disengageToHeal: c.disengageToHeal ?? true,
-    maxChase: c.maxChase ?? DEFAULT_MAX_CHASE
+    maxChase: c.maxChase ?? DEFAULT_MAX_CHASE,
+    sprintReset: c.sprintReset ?? true,
+    sweep: c.sweep ?? true,
+    shieldMelee: c.shieldMelee ?? true,
+    goldenApple: c.goldenApple ?? true
   }
 }
 
@@ -188,6 +205,8 @@ export async function shootAt (bot: Bot, target: Entity, signal: AbortSignal): P
 /** Shield in the offhand (equips it from the inventory if needed). */
 export async function readyShield (bot: Bot): Promise<boolean> {
   if (bot.inventory.slots[45]?.name === 'shield') return true
+  // a totem put there for low health stays (combat.totem): it is worth more than blocking now
+  if (bot.inventory.slots[45]?.name === 'totem_of_undying' && bot.health <= 10) return false
   const shield = bot.inventory.items().find(i => i.name === 'shield')
   if (!shield) return false
   await bot.equip(shield, 'off-hand').catch(() => {})
