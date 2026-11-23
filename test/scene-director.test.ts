@@ -85,6 +85,7 @@ test('a request from any bot is cast, directed and run with cue sync', async () 
     const run = s.runs()[0]!
     assert.equal(run.director, 'A')
     assert.equal(s.actors().C!.busyIn, run.runId)
+    assert.equal(s.rts[0]!.actingIn(), run.runId, 'armed behaviours pause on this')
     const summary = await s.rts[1]!.waitForRun(run.runId, 5000)
     assert.equal(summary?.result, 'finished')
 
@@ -98,6 +99,7 @@ test('a request from any bot is cast, directed and run with cue sync', async () 
     assert.ok(cue.t >= 55, 'foreman waited first')
     assert.equal(s.runs().length, 0)
     assert.equal(s.actors().C!.busyIn, undefined)
+    assert.equal(s.rts[0]!.actingIn(), null)
 
     const again = await s.rts[2]!.request('start', 'nope')
     assert.equal(again.ok, false)

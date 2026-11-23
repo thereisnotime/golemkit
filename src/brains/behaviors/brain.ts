@@ -16,6 +16,7 @@ import { BehaviorRuntime } from './runtime.ts'
 import { mergeConfigs, validateBehaviorConfig, type BehaviorConfig } from './config.ts'
 import { attachRuntime, behaviorActions, fmtOptions, runtimeFor } from './actions.ts'
 import { defaultBehaviors } from '../../adapters/minecraft-java/behaviors/index.ts'
+import { runtimeOf as sceneRuntimeOf } from '../scene/runtime.ts'
 
 export interface BehaviorsBrainOptions extends SelectOptions, BlackboardOptions {
   /** Caller name for act() and logs. Default 'behaviors'. */
@@ -129,7 +130,10 @@ export const behaviorsBrain = (opts: BehaviorsBrainOptions = {}) => {
         name,
         autoHome: opts.autoHome ?? false,
         behaviors: () => rt.behaviors(),
-        hooks: () => rt.hooks()
+        hooks: () => rt.hooks(),
+        // a scene holds the body at PRIORITY.scene (25), below armed behaviours (35): without this
+        // keep_fed or bodyguard would walk the actor off mid-scene. Reflexes still cover emergencies.
+        suspended: () => { const run = sceneRuntimeOf(agent)?.actingIn(); return run ? `acting in scene ${run}` : null }
       })
       rt.controller = c
       const tick = () => { c.tick().catch(e => rt.log.warn(`tick: ${(e as Error).message}`)) }

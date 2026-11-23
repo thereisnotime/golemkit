@@ -81,6 +81,12 @@ export class SceneRuntime {
     return this.board.get<Record<string, RunInfo>>(BOARD.runs) ?? {}
   }
 
+  /** The run this bot is cast in right now (null: not acting). Armed behaviours pause while set. */
+  actingIn (): string | null {
+    const id = this.actors()[this.self]?.busyIn
+    return id && this.runs()[id] ? id : null
+  }
+
   private updateActor (name: string, fn: (a: ActorEntry | undefined) => ActorEntry | undefined): void {
     const all = { ...this.actors() }
     const next = fn(all[name])

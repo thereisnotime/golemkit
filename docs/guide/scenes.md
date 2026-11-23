@@ -50,6 +50,13 @@ over the scene, and goes back to its routine once the scene ends. Actors don't n
 brain, but it combines well: villagers living their lives who drop everything when the market
 scene starts.
 
+Armed [behaviours](/guide/behaviors) are the exception: they run at 35, above the scene, so
+`keep_fed`, `bodyguard`, `stay_safe` or `recover_items` would walk an actor off mid-scene. The
+behaviours brain therefore pauses all of them while the bot is cast in a run (the running one is
+stopped, nothing new starts) and picks up again once the cast is released. Emergencies still
+go through: [reflexes](/concepts/world#reflexes) (eating when starving, fighting back,
+retreating) run at 60 and preempt scene beats as above.
+
 ```mermaid
 %%{init: {"sequence": {"width": 100, "actorMargin": 20, "diagramMarginX": 10}}}%%
 sequenceDiagram

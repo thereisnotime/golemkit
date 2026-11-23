@@ -181,5 +181,5 @@ All are exported from `src/brains/npc/index.ts`. `wander`, `goHome`, `sleepAtNig
   `<bot>/npc`, and an early retry when a `retryKey` changed (`retrying early (old -> new)`).
 - When nothing has run for 2 minutes, the controller logs why once every 2 minutes (debug):
   `idle 125s` with who holds the body and at what priority, how long it is paused, the
-  behaviours scoring above 0 and the ones cooling down with the seconds left. A bot that
+  behaviours scoring above 0 on that tick and the ones cooling down with the seconds left. A bot that
   stands around shows there whether a stale holder or failure back-offs keep it idle.

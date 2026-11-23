@@ -282,3 +282,61 @@ test('duplicate behaviour names are rejected', () => {
   const f = fake()
   assert.throws(() => controller(f, [manual('x', { v: 1 }), manual('x', { v: 2 })]), /duplicate/)
 })
+
+test('idle report prints the scores of the tick it reports on', async () => {
+  const f = fake()
+  const lines: Array<{ msg: string, fields?: Record<string, unknown> }> = []
+  const log: any = {
+    name: 'test',
+    trace () {},
+    debug: (msg: string, fields?: Record<string, unknown>) => { lines.push({ msg, fields }) },
+    info () {},
+    warn () {},
+    error () {},
+    enabled: () => true,
+    child: () => log,
+    with: () => log
+  }
+  f.agent.log = log
+  const score = { v: 0 }
+  const c = controller(f, [manual('chores', score)])
+  await c.tick() // idle starts counting
+  f.clock.t += 130_000
+  score.v = 7 // changed since the last tick
+  await c.tick(); await flush()
+  const idle = lines.find(l => l.msg.startsWith('idle '))
+  assert.ok(idle, 'idle report logged')
+  assert.equal(idle.fields?.scores, 'chores=7')
+  c.stop()
+})
+
+test('suspended: no behaviour runs, even above the holder, and the running one stops', async () => {
+  const f = fake()
+  f.hold = true
+  let scene: string | null = null
+  const cancelled: string[] = []
+  f.agent.cancelActions = (match: (i: ActionInfo) => boolean, reason: string) => {
+    const cur = f.agent.currentAction
+    if (cur && match(cur)) { cancelled.push(reason); f.release(fail(reason)) }
+    return cancelled.length
+  }
+  const c = controller(f, [manual('keep_fed', { v: 50 })], { priority: PRIORITY.behavior, suspended: () => scene })
+  await c.tick(); await flush()
+  assert.equal(c.current, 'keep_fed')
+  // cast into a scene: the scene holds the body at 25, below this behaviour's 35
+  scene = 'acting in scene broken_cart#1'
+  f.clock.t += 5000
+  await c.tick(); await flush()
+  assert.equal(c.current, null)
+  assert.deepEqual(cancelled, ['suspended'])
+  assert.equal(c.status().suspended, 'acting in scene broken_cart#1')
+  const calls = f.calls.length
+  f.clock.t += 5000
+  await c.tick(); await flush()
+  assert.equal(f.calls.length, calls, 'nothing started while suspended')
+  scene = null
+  f.clock.t += 5000
+  await c.tick(); await flush()
+  assert.equal(c.current, 'keep_fed')
+  c.stop()
+})

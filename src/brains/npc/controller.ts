@@ -34,6 +34,11 @@ export interface NpcOptions extends SelectOptions, BlackboardOptions {
   now?: () => number
   /** Where repeated failures are escalated (settings.askHelp). Default: the agent's shared desk. */
   help?: HelpDesk
+  /**
+   * Read every tick: while it returns a reason, no behaviour runs (the running one is stopped),
+   * whatever its priority. The behaviours brain uses it to stay out of a scene the bot acts in.
+   */
+  suspended?: () => string | null
 }
 
 const DEFAULT_BACKOFF: Record<Caller['kind'], number> = { player: 20000, brain: 20000, reflex: 3000, system: 10000 }
@@ -306,16 +311,33 @@ export class NpcController {
       const lowest = list.reduce((m, b) => Math.min(m, this.prio(b)), this.priority)
       const highest = list.reduce((m, b) => Math.max(m, this.prio(b)), this.priority)
       const holder = this.foreignHolder(lowest)
-      this.idleReport(now, holder)
+      const isBlocked = (p: number): boolean => this.blocked(p, holder, now)
+      const report = this.idleReportDue(now)
+      const suspended = this.opts.suspended?.() ?? null
+      if (suspended) {
+        if (this.suspendedBy !== suspended) this.log.debug(`suspended: ${suspended}`)
+        this.suspendedBy = suspended
+        if (this.running) {
+          this.abortRunning('suspended', false)
+          this.agent.cancelActions?.(i => i.caller.kind === 'brain' && i.caller.name === this.name, 'suspended')
+        }
+        if (report) this.idleReport(now, holder, [])
+        return
+      }
+      if (this.suspendedBy) { this.log.debug(`resuming after ${this.suspendedBy}`); this.suspendedBy = null }
       if (holder) this.yieldTo(holder.label, now, holder.priority)
-      if (holder && holder.priority >= highest) return
-      if (!holder && now < this.pausedUntil && this.pausedLevel >= highest) return
+      if ((holder && holder.priority >= highest) || (!holder && now < this.pausedUntil && this.pausedLevel >= highest)) {
+        // nothing will be scored this tick; the report still shows this tick's scores
+        if (report) this.idleReport(now, holder, this.scoreAll(ctx, isBlocked))
+        return
+      }
       if (!holder && now >= this.pausedUntil && this.yieldedTo) {
         this.log.debug(`resuming after ${this.yieldedTo}`)
         this.yieldedTo = null
       }
 
-      this.lastScores = this.scoreAll(ctx, p => this.blocked(p, holder, now))
+      this.lastScores = this.scoreAll(ctx, isBlocked)
+      if (report) this.idleReport(now, holder, this.lastScores)
       const running = this.running ? { name: this.running.behavior.name, startedAt: this.running.startedAt } : null
       const d = decide(this.lastScores, running, now, this.opts)
       switch (d.kind) {
@@ -342,19 +364,25 @@ export class NpcController {
 
   private idleSince = 0
   private idleReportedAt = 0
+  private suspendedBy: string | null = null
 
   /**
    * Nothing running for a while: once every IDLE_REPORT_MS, log what holds the body and the
    * scores, so a bot that stands around says why (a stale holder, every behaviour cooling down).
+   * `idleReportDue` decides at the start of a tick; `idleReport` prints with that tick's scores.
    */
-  private idleReport (now: number, holder: { label: string, priority: number } | null): void {
-    if (this.running) { this.idleSince = 0; return }
-    if (!this.idleSince) { this.idleSince = now; return }
-    if (now - this.idleSince < IDLE_REPORT_MS || now - this.idleReportedAt < IDLE_REPORT_MS) return
+  private idleReportDue (now: number): boolean {
+    if (this.running) { this.idleSince = 0; return false }
+    if (!this.idleSince) { this.idleSince = now; return false }
+    if (now - this.idleSince < IDLE_REPORT_MS || now - this.idleReportedAt < IDLE_REPORT_MS) return false
     this.idleReportedAt = now
+    return true
+  }
+
+  private idleReport (now: number, holder: { label: string, priority: number } | null, scores: Scored[]): void {
     const cooling = [...this.stats.entries()].filter(([, st]) => now < st.cooldownUntil)
       .map(([n, st]) => `${n} ${Math.round((st.cooldownUntil - now) / 1000)}s`)
-    const scored = this.lastScores.filter(x => x.score > 0).map(x => `${x.name}=${Math.round(x.score)}`)
+    const scored = scores.filter(x => x.score > 0).map(x => `${x.name}=${Math.round(x.score)}`)
     this.log.debug(`idle ${Math.round((now - this.idleSince) / 1000)}s`, {
       holder: holder ? `${holder.label}@${holder.priority}` : 'none',
       paused: now < this.pausedUntil ? `${Math.round((this.pausedUntil - now) / 1000)}s` : 'no',
@@ -462,6 +490,7 @@ export class NpcController {
       cooldowns: Object.fromEntries([...this.stats].filter(([, s]) => s.cooldownUntil > now)
         .map(([n, s]) => [n, Math.ceil((s.cooldownUntil - now) / 1000)])),
       last: Object.fromEntries([...this.stats].filter(([, s]) => s.last).map(([n, s]) => [n, s.last])),
+      ...(this.suspendedBy ? { suspended: this.suspendedBy } : {}),
       ...(this.help.recent(now).length ? { askedForHelp: this.help.observeView(now) } : {}),
       ...this.bb.toJSON()
     }
