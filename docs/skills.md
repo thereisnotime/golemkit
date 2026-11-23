@@ -11,11 +11,13 @@ each one is for and how it behaves.
 
 Two bundles live in `src/skills/index.ts`:
 
-- `standardSkills()`: status, movement, combat, survival, inventory, gather, [journal](/guide/journal).
+- `standardSkills()`: status, config, movement, combat, survival, inventory, gather,
+  [journal](/guide/journal), bodyguard.
 - `extendedSkills()`: crafting, containers, farming, food, search, woodcutting, building, construction,
-  roads, materials, pickup.
+  roads, blueprint library, materials, progression, pickup, worldedit.
 
-`navigation()` is exported on its own (the villager bot uses it).
+`navigation()`, `modsSkill()` and `config()` are exported on their own (the villager bot uses
+`navigation()`).
 
 ```ts
 import { standardSkills, extendedSkills } from '../src/skills/index.ts'
@@ -47,6 +49,7 @@ Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actio
 | `goto_player` | Walk to where a player is now, once. |
 | `look_at` *ne* | Turn to look at a player. |
 | `jump` *ne* | Jump once. |
+| `look_around` *ne* | Glance at a nearby player now and then, otherwise a random direction (idle fidget, internal). |
 
 ### combat
 
@@ -57,7 +60,27 @@ Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actio
 | `attack` | Fight the nearest hostile mob, or an entity by id. |
 | `guard` | Protect a player from hostile mobs until stopped (long-running). |
 | `defend` | Fight back at the closest hostile (internal, used by reflexes). |
-| `hunt` | Hunt passive animals for food and pick up the drops. Never pets, named, tamed, leashed or baby animals, villagers or players, never in protected areas; fenced animals only with `pens=true`. `keepAtLeast` spares the last N adults of each kind. |
+| `hunt` | Hunt passive animals for food and pick up the drops. Never pets, named, tamed, leashed or baby animals, villagers or players, never in protected areas; fenced animals only with `pens=true`. `keepAtLeast` spares the last N adults of each kind. With `reach` (default on) it bridges, pillars or digs to an animal it can't walk to, never in protected areas or danger zones. |
+| `gear_up` *ne* | Wear the best armour in the inventory and put a totem of undying or a shield in the offhand (the reflexes run it when there is an upgrade, `combat.autoArmor`). |
+| `ranged_defense` | Answer mobs that shoot at the bot: shoot back, shield up and close in, take cover (or build some) and eat there, or back out of range, by health, gear and numbers (internal, used by reflexes and `stay_safe`). |
+| `water_bucket` | Land a long fall in water placed just before the ground, or put out fire, then scoop the water back up (internal, `combat.waterClutch`). |
+| `defend_player` | Fight back against a player who attacked the bot or the player it guards, only with `combat.pvp defend`; never owners or `combat.friends` (internal). |
+
+The fight loop uses skilled-player techniques (crits, W-tap, sweeps, shield timing, totem,
+golden apples, chokepoints, enderman gaze), each behind a `combat.*` toggle you can change live
+with `config_set`; see [Skilled-player techniques](/concepts/world#skilled-player-techniques),
+[PvP: defend only](/concepts/world#pvp-defend-only) and the
+[combat research](/concepts/combat-research) page. The decisions are pure and unit-tested
+(`tactics.ts`, `techniques.ts`, `pvp.ts`, `ranged-plan.ts`); `fight.ts`, `ranged.ts`, `clutch.ts`
+and `defense.ts` apply them.
+
+### bodyguard
+| action | |
+|---|---|
+| `protect` | Stay with a player as a bodyguard until stopped: keep between them and the nearest danger, kill what threatens them, block arrows with a shield, toss them food when they look hurt (long-running). |
+| `feed_player` | Walk up to a player and toss them food, keeping some for itself. |
+
+See [Bodyguard](/guide/behaviors#bodyguard).
 
 ### survival
 | action | |
@@ -65,6 +88,9 @@ Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actio
 | `eat` | Eat the best food in the inventory. |
 | `sleep` | Sleep in a bed within 16 blocks. |
 | `wake` | Get out of bed. |
+| `pillar` | Emergency escape: jump and place blocks underneath, out of reach of mobs. |
+| `climb_out` | Get out of a pit, shaft or cave straight up to open sky; without blocks it carves steps into the wall. |
+| `bunker` *dig* | Hide from phantoms and other mobs: dig down 3 blocks, seal the hole, wait for morning or until no hostiles are near, then climb out. |
 
 ### inventory
 | action | |
@@ -77,6 +103,16 @@ Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actio
 | action | |
 |---|---|
 | `collect` *dig* | Mine N blocks of one type nearby and pick up the drops. Equips the best tool; for stone and ores it crafts a pickaxe of the needed tier first when the inventory allows. Skips blocks it can't reach and protected areas. |
+
+### config
+Feature toggles changed in game without a restart; see [Live config](/guide/live-config).
+
+| action | |
+|---|---|
+| `config_list` *ne* | Settings that can be changed in game, with current values. |
+| `config_get` *ne* | One setting, what it does and whether it was changed in game. |
+| `config_set` *ne* | Change a setting live (owners only), e.g. `config_set combat.pvp defend`. |
+| `config_reset` *ne* | Back to the profile values, one key or all (owners only). |
 
 ### journal
 See [Event journal](./guide/journal.md).
@@ -136,12 +172,18 @@ Harvest and plant don't change terrain, so they work with digging off. Observe h
 Food self-sufficiency, used by [`keep_fed`](/guide/behaviors#keep-fed) and [`farm_setup`](/guide/behaviors#farm-setup).
 What it finds is remembered in `agent.storage` (`foodSpots`, `farms`), as named places
 (`food:animals`, `food:village_farm`, `food:water`, `farm:<n>`) and in the [journal](/guide/journal)
-(`food_spot`, `farm_started`). The planning is pure and unit-tested (`src/skills/foodPlan.ts`).
+(`food_spot`, `farm_started`). The planning is pure and unit-tested: `foodPlan.ts` (scout
+rings, farm sites, plot layout, which food spots are worth a trip), `farmPlan.ts` (what to plant,
+re-till and grow) and `reachPlan.ts` (when `hunt` may bridge, pillar or dig). The order
+`keep_fed` climbs through these is the [food ladder](/guide/behaviors#food-keep-fed-the-food-ladder-and-farm-setup).
 
 | action | |
 |---|---|
-| `find_food` | Scout for animals or a village farm beyond what is in sight: known spots first, then an expanding spiral around home out to `radius` (default 200), by day, skipping water, lava and protected areas, giving up when stuck, at night, at low health or after `maxMinutes`. Remembers what it finds; doesn't hunt. |
+| `find_food` | Scout for animals or a village farm beyond what is in sight: known spots first, then an expanding spiral around home out to `radius` (default 200; `minRadius` skips rings an earlier search covered), by day, skipping water, lava and protected areas, giving up when stuck, at night, at low health or after `maxMinutes` (default 8). Remembers what it finds; doesn't hunt. |
 | `start_farm` *dig* | Start a farm of its own: first a site, shore water near home or a place with at least 8 grass/dirt cells at the water's height (or under a one-block bank it digs off), outside protected areas, the spawn and away from builds or fields (or water poured from a bucket); then seeds from breaking grass (or carrots, potatoes, beetroot seeds), a hoe (crafted, chopping logs first if needed), a plot of up to 9x9 tilled and planted around the water, a fence and torches if it has the materials. Saved as `farm:<n>`. |
+| `tend_farm` | Look after its own farm: put the water back, plant bare farmland, till trampled dirt again, and grow the plot a ring at a time towards `size` (up to 9x9) with the seeds beyond `seedReserve`. Tilling needs digging. |
+| `gather_seeds` *dig* | Break grass and ferns patch by patch out to `radius` until it has `count` seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. |
+| `forage` | Stopgap food: ripe sweet berries, kelp at the shore, and with `apples=true` oak leaves for apples. Never on protected land. |
 | `breed` | Feed two adults of a kind (cows/sheep: wheat, pigs: carrots/potatoes/beetroot, chickens: seeds, rabbits: carrots), leading them to its farm first. Same animal filter as `hunt`; keeps seeds for replanting and stops at `maxHerd`. |
 
 Never taken from other players: crops count only on the bot's own farm or a village farm
@@ -201,6 +243,20 @@ recorded (`build.placements`) so roads can find their doors.
 
 See [Roads and stairs](./guide/roads.md).
 
+### blueprint library
+| action | |
+|---|---|
+| `blueprint_list` *ne* | The blueprints in the shipped, user and learned libraries, with size, tags and materials. |
+| `blueprint_search` *ne* | Search by text, tags, material and size, best match first. |
+| `blueprint_show` *ne* | One blueprint: library info, a text drawing and its materials vs the inventory. |
+| `blueprint_pick` *ne* | Pick a blueprint for a request, following the `building` policy (library, creative or ask). |
+| `blueprint_import` *ne* | Import a schematic (.schem, .schematic, .litematic, .nbt, .bp) into the learned library (owners only). |
+| `blueprint_capture` *ne* | Save a build in the world as a learned blueprint (owners only). |
+| `blueprint_design` *ne* | Validate and save a blueprint written as YAML or JSON. |
+| `blueprint_delete`, `blueprint_rename` *ne* | Manage learned blueprints (owners only). |
+
+See [Blueprints](./guide/blueprints.md).
+
 ### materials
 | action | |
 |---|---|
@@ -222,6 +278,22 @@ For servers that run [WorldEdit](/guide/worldedit) (mod, plugin or FAWE) and let
 | `we_build` | A library blueprint through WorldEdit when the server has a schematic of that name, else the normal `build`. |
 
 Observe hook: `worldedit` (only when it is available).
+
+### progression
+| action | |
+|---|---|
+| `upgrade_tools` | Climb the tool tiers as far as it can now: stone tools, a furnace, iron (smelted with coal or charcoal), diamond if it has diamonds; armour optionally. Says what is missing. |
+
+See [Tool progression](./guide/progression.md).
+
+### mods
+Not in a bundle; add `modsSkill()`.
+
+| action | |
+|---|---|
+| `mods` *ne* | The mods on this server and how many items, blocks and mobs each adds. |
+| `mod_items` *ne* | Exact names a mod adds, optionally filtered by a word. |
+| `creative_get` | Creative mode only: put any item (vanilla or modded) into the inventory. |
 
 ### pickup
 | action | |
