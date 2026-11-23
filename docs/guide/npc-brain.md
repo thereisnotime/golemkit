@@ -10,7 +10,7 @@ night, sleep, eat, deal with mobs, notice players, do chores when it has the ski
 utility-AI loop you configure with behaviours. For behaviours that owners and LLMs switch on and tune at runtime, see [Behaviours](behaviors.md), which runs on the same controller. `variants/villager.ts` is the worked example. For brains in general see [Writing brains](writing-brains.md).
 
 ```ts
-import { npcBrain, wander, goHome, sleepAtNight, fleeOrFight, actionBehavior } from '../src/brains/npc/index.ts'
+import { npcBrain, wander, goHome, sleepAtNight, fleeOrFight, greetPlayers, actionBehavior } from '../src/brains/npc/index.ts'
 
 brains: [
   commandBrain(),          // players can still command it (player priority beats npc)
@@ -29,7 +29,7 @@ Add `navigation()` to the skills: most built-in behaviours use its actions (`wan
 
 Every `tickMs` (1.5 s) the brain:
 
-1. refreshes the **[blackboard](/concepts/architecture#fleets-and-multiple-servers)** from the bot (needs and facts, below)
+1. refreshes the **[blackboard](#blackboard)** from the bot (needs and facts, below)
 2. runs the **hooks** (cheap per-tick functions that don't need the body)
 3. checks `agent.currentAction`: if a player, LLM, reflex or system caller holds the body at
    npc priority or above, it aborts its own behaviour and **backs off** (player/brain 20 s,
@@ -138,6 +138,11 @@ actionBehavior('deposit', { chest: 'home' }, ({ bb }) => bb.needs.inventoryFull 
 It requires the action, so listing chores whose skills the bot doesn't have is harmless.
 
 ## Built-in behaviours
+
+All are exported from `src/brains/npc/index.ts`. `wander`, `goHome`, `sleepAtNight` and
+`actionBehavior` live in `src/brains/npc/behaviors/`; the ones that read Minecraft state
+(`fleeOrFight`, `eatWhenHungry`, `followNearbyPlayer`, `greetPlayers`) live in
+`src/adapters/minecraft-java/npc/`.
 
 | factory | score | needs actions |
 |---|---|---|

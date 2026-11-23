@@ -11,7 +11,7 @@ It can run on a subscription you already pay for (Claude Pro/Max through Claude 
 through Codex) or on an API key.
 
 ```ts
-// variants/companion.ts (shipped)
+// variants/companion.ts (shipped; trimmed, it also has hooks, behaviours and intents brains)
 brains: [
   commandBrain({ verbose: false, whisperNeedsPrefix: true }), // !stop always works
   reflexes(),
@@ -354,7 +354,8 @@ one fleet collides; leave it at 0 (random) there.
 ## Teaching mods
 
 The `mods` skill tells a bot exactly what this server runs, from the NeoForge [registry sync](/concepts/neoforge#_4-modded-item-and-entity-names) and
-the learned channel list:
+the learned channel list. It needs the `mods` capability, which only the NeoForge platform adds
+(`MC_PLATFORM`, default `neoforge`); with `vanilla` or `paper` the bot doesn't offer these actions.
 
 - `mods`: installed mods with versions and item/block/mob counts (on mc02: create 6.0.8,
   ars_nouveau, createdeco, create_sa, ars_additions, createdieselgenerators, createaddition, ...)

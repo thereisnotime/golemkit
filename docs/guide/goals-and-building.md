@@ -124,7 +124,7 @@ that waited for a fully idle body would never get a turn. The rule:
 |---|---|---|
 | `maxTurns` | 40 | goal turns allowed without hearing from the owner |
 | `timeoutMin` | 45 | minutes on its own without hearing from the owner |
-| `maxSameFailures` | 3 | the same failure (action + message, numbers blanked) this often stops the loop |
+| `maxSameFailures` | 3 | the same failure (action + message, numbers blanked) this often puts that action on hold for 10 min |
 | `budgetReserve` | 0.15 | share of the hourly turn/token budget kept for chat |
 | `continueDelayMs` | 1500 | gap before the next turn after progress |
 | `idleBaseMs` / `idleMaxMs` | 20000 / 300000 | idle backoff |
@@ -159,7 +159,7 @@ still apply: "started" isn't "done".
 ## Building
 
 ```
-build({ template, x?, y?, z?, facing?, material?, theme?, gather?, path? })
+build({ template, x?, y?, z?, facing?, material?, theme?, gather?, path?, method?, replace? })
 build_plan({ template?, material?, theme?, x?, y?, z?, facing?, preview? })
 ```
 
@@ -179,7 +179,9 @@ build_plan({ template?, material?, theme?, x?, y?, z?, facing?, preview? })
    blocks...), it refuses and names the block and position. Blocks that already fit their cell
    count as placed, whatever the material (oak planks from an earlier run in a wall now built
    from spruce), and blocks the bot placed itself (remembered by position in `build.own`) are
-   never taken for someone else's: a misplaced one of its own is dug out.
+   never taken for someone else's: a misplaced one of its own is dug out. With `replace=true` (owners
+   only, for fixing or upgrading something already there) it digs up and replaces player-made
+   blocks in the footprint instead of refusing.
 4. **Materials.** It counts what's still to place against the inventory. With `gather=true`
    it runs `gather_materials` for the missing part first and walks back.
 5. **Site preparation.** Dips under the floor are filled with dirt or cobblestone the bot

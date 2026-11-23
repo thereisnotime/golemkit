@@ -361,7 +361,8 @@ scene it can cast, if a player is within 48 blocks of an actor. Tune or disable 
 | `scene_walk`, `scene_look`, `scene_gesture` | internal stage directions used by goto/look/gesture beats |
 | `scene_hold` | internal: keeps the body between beats |
 
-They come with `sceneSkill()` (and `sceneBrain()` registers them if the skill is missing).
+They come with `sceneSkill()` (`src/adapters/minecraft-java/skills/scene.ts`, re-exported from
+`src/brains/index.ts`), and `sceneBrain()` registers them if the skill is missing.
 When several actors hear the same public `!scene_start`, the first one handles it and the
 others stay quiet. Who may run them is the command brain's owner check, plus
 `sceneBrain({ allow: (player, op, scene) => ... })` if you want finer control.

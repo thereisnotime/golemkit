@@ -62,9 +62,9 @@ the bot never turns chat or model output into code:
   players, LLM brains and [reflexes](/concepts/world#reflexes) always outrank it and it backs off while they hold the body.
 - **A deny list on top.** By default programs can't call `attack`, `guard`, `defend`,
   `chop_tree`, `till`, `place_block`, `drop`, `stop`, `say`, `craft`, `smelt`, `deposit`,
-  `withdraw`, `hunt`, `pillar`, internal actions, any `program_*` action, or any long-running action (they never
+  `withdraw`, `hunt`, `pillar`, `llm_usage`, `npc_status`, internal actions, any `program_*` action, or any long-running action (they never
   end, so a routine would hang). Configure with `actions: { allow, deny }`.
-- **Reading is limited too.** Conditions read a fixed list of facts (observation, [blackboard](/concepts/architecture#fleets-and-multiple-servers)
+- **Reading is limited too.** Conditions read a fixed list of facts (observation, [blackboard](/guide/npc-brain#blackboard)
   needs, inventory counts, distances to remembered places, program variables and timers).
 - **Hard caps.** Loops are bounded (`repeat.times` <= 20, `while` needs `max` <= 100), waits
   <= 60 s, no recursion, size limits on every list, and each routine run is cut off after
