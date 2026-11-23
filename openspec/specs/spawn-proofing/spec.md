@@ -12,6 +12,17 @@ light_up SHALL look at every standable cell within `radius` (flat) and `y_range`
 - **WHEN** the client has no light data and a lantern hangs 3 blocks from a grass cell
 - **THEN** that cell's light is 12 and it needs no torch for a target of 8
 
+### Requirement: Ground around a farm
+Around one of the bot's own farms (the area light_home makes for it, `place` naming the farm, or `surface` true) light_up SHALL count and plan only the cells of the ground sheet: cells within a block of the centre's level, every cell joined to those by steps of at most 2 blocks up or down to a neighbouring column, and cells with sky light above 0. The centre of a farm area SHALL be one above the farm's water level.
+
+#### Scenario: Cave under the farm
+- **WHEN** a dark cave lies 6 blocks under the ground south of a 9x9 wheat farm
+- **THEN** its cells are not counted as spawnable spots of farm:1 and no torch is planned in it
+
+#### Scenario: Hill next to the farm
+- **WHEN** the ground rises one block per column east of the farm up to 6 blocks
+- **THEN** the slope's cells are counted and lit
+
 ### Requirement: Torch plan
 light_up SHALL choose torch spots greedily: each pick is the allowed spot that brings the most cells below `target` up to it (a torch gives 14 at its cell, one less per block of Manhattan distance), floor torches before wall torches on a tie, then by position so the plan does not depend on input order. It SHALL stop when no cell is below target, at `max_torches`, or when no allowed spot reaches the remaining cells, and report how many cells were dark and how many are left.
 
@@ -24,11 +35,19 @@ light_up SHALL choose torch spots greedily: each pick is the allowed spot that b
 - **THEN** it plans 3 torches and reports the cells still dark
 
 ### Requirement: Allowed torch spots
-A torch SHALL only go into a cell holding air or cave air (never replacing grass, crops or anything else), against a block that is already there: on the floor when the floor is a full block that does not open a GUI and is not leaves, else on a full wall block beside the cell. It SHALL never go on farmland or a path, within a block of a door, fence gate or trapdoor, in water or a waterlogged cell, in a protected area, within `spawn_clearance` of the world spawn, where the server refused a placement before, or where one of its own torches was taken away. The bot SHALL never break or replace a block while spawn-proofing.
+A torch SHALL only go into a cell holding air or cave air (never replacing grass, crops or anything else), against a block that is already there: on the floor when the floor is a full block that does not open a GUI and is not leaves, else on a full wall block beside the cell. It SHALL never go on farmland or a path, within a block of a door, fence gate or trapdoor, in water or a waterlogged cell, within `spawn_clearance` of the world spawn, where the server refused a placement before, inside a learned protected zone where the server refused two torches before, or where one of its own torches was taken away. A learned protected zone (from refused breaks) SHALL NOT by itself stop torches. The bot SHALL never break or replace a block while spawn-proofing, and while walking to a torch spot it SHALL not step on farmland.
 
 #### Scenario: Farm and door
 - **WHEN** the area holds a wheat field on farmland, a dirt path and a door
 - **THEN** no planned torch stands on the farmland, on the path or within a block of the door
+
+#### Scenario: A break zone over the bot's own farm
+- **WHEN** a protected zone learned from a refused break while harvesting covers farm:1 and its ring
+- **THEN** light_up still plans and places torches on the ring, and only after the server refuses two torches inside that zone does it leave the zone alone
+
+#### Scenario: No spot reaches the dark cells
+- **WHEN** no allowed torch spot reaches any dark cell
+- **THEN** light_up places nothing and its report gives the commonest reasons the spots were rejected
 
 ### Requirement: Torches from coal or charcoal
 With fewer torches than planned and `craft` on, light_up SHALL craft torches from coal or charcoal and sticks (4 per coal), sticks from planks and planks from logs. With no coal or charcoal it SHALL smelt charcoal from logs, burning planks of the same wood (never the logs being smelted), in a furnace within 32 blocks, one it carries, or one crafted from 8 cobblestone. With some torches and no way to make more it SHALL place those. With no torches, no coal or charcoal and no logs (or no furnace and fewer than 8 cobblestone) it SHALL fail with the reason.
@@ -49,7 +68,7 @@ Every torch light_up places SHALL be remembered with its position and dimension 
 - **THEN** the bot leaves 570 68 -40 alone from then on
 
 ### Requirement: When light_home runs
-light_home SHALL cover home (radius), each own farm (farmRadius, at least half the farm plus 4) and the listed places. It SHALL score 18 at the npc level only by day, in survival, with block placing allowed, when an area within `maxTrip` of the bot is due: never checked, checked more than `everyMinutes` ago, or a hostile was seen inside it since the last check (each mob once). It SHALL walk to the area when farther than 24 blocks, run light_up, and mark the area checked when nothing is left dark or the run placed nothing. A failure SHALL back off 2 minutes, doubling up to an hour, and the back-off SHALL end early when the torches, coal, charcoal, logs, planks, sticks, cobblestone or furnaces it carries change.
+light_home SHALL cover home (radius), each own farm (farmRadius, at least half the farm plus 4) and the listed places. It SHALL score 18 at the npc level only by day, in survival, with block placing allowed, when an area within `maxTrip` of the bot is due: never checked, checked more than `everyMinutes` ago, or a hostile was seen inside it since the last check (each mob once). It SHALL walk to the area when farther than 24 blocks (to a farm: the middle of its ring side facing the bot, not the water), run light_up, and mark the area checked when nothing is left dark or the run placed nothing. A failure SHALL back off 2 minutes, doubling up to an hour, and the back-off SHALL end early when the torches, coal, charcoal, logs, planks, sticks, cobblestone or furnaces it carries change.
 
 #### Scenario: Creeper by the farm at night
 - **WHEN** a creeper shows up inside farm:1's area at night after the farm was checked that afternoon

@@ -28,7 +28,12 @@ export class ProtectedAreas {
   }
 
   isProtected (p: { x: number, y: number, z: number }, radius = ZONE_RADIUS): boolean {
-    return this.zones.some(z => Math.abs(z.x - p.x) <= radius && Math.abs(z.z - p.z) <= radius && Math.abs(z.y - p.y) <= radius * 2)
+    return !!this.zoneAt(p, radius)
+  }
+
+  /** The zone covering `p`, if any. */
+  zoneAt (p: { x: number, y: number, z: number }, radius = ZONE_RADIUS): Zone | undefined {
+    return this.zones.find(z => Math.abs(z.x - p.x) <= radius && Math.abs(z.z - p.z) <= radius && Math.abs(z.y - p.y) <= radius * 2)
   }
 
   /**

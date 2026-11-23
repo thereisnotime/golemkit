@@ -695,7 +695,7 @@ Spawn-proofing with torches.
 
 ### `light_up`
 
-Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates, or here) where hostile mobs could spawn (block light below `target`; 1.21.1 monsters need light 0), works out the fewest torches that light them all, crafts torches from coal or charcoal (smelts charcoal from logs when out of coal) and places them: floor torches, wall torches where there is no floor; never on farmland, paths, in front of doors, in water or protected areas, and never breaking anything. Remembers its own torches. dry_run only reports.
+Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates, or here) where hostile mobs could spawn (block light below `target`; 1.21.1 monsters need light 0), works out the fewest torches that light them all, crafts torches from coal or charcoal (smelts charcoal from logs when out of coal) and places them: floor torches, wall torches where there is no floor; never on farmland, crops, paths, in front of doors, in water, near the world spawn or where the server refused a torch, and never breaking anything. Around its own farms it stays off the field and counts only the ground the field is on. Remembers its own torches. dry_run only reports.
 
 | param | type | required | default | description |
 |---|---|---|---|---|
@@ -709,6 +709,7 @@ Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates,
 | `max_torches` | integer (1..64) |  | `16` | torches to place at most this time |
 | `craft` | boolean |  | `true` | craft torches (and smelt charcoal) when it has too few |
 | `spawn_clearance` | number (0..256) |  | `24` | never place within this distance of the world spawn |
+| `surface` | boolean |  |  | only the ground connected to the centre's level, no caves under it; default on around its own farms |
 | `dry_run` | boolean |  | `false` | only report the dark spots and the planned torches |
 
 ## materials

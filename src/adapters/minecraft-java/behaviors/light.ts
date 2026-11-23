@@ -18,7 +18,26 @@ const placeOpt = z.union([
   z.object({ name: z.string().optional(), x: z.number(), y: z.number(), z: z.number(), radius: z.number().int().min(2).max(48).optional() })
 ])
 
-interface Area extends Point { key: string, label: string, radius: number }
+interface Area extends Point {
+  key: string
+  label: string
+  radius: number
+  /** Side of the field when the area is one of its own farms. */
+  farmSize?: number
+}
+
+/**
+ * Where to walk to before lighting an area: the centre, or for a farm (whose centre is the
+ * water) the middle of the ring side nearest the bot, so the walk ends off the field.
+ */
+export function approachPoint (a: Area, from: { x: number, z: number }): Point {
+  if (!a.farmSize) return { x: a.x, y: a.y, z: a.z }
+  const off = Math.ceil(a.farmSize / 2) + 1
+  const dx = from.x - a.x, dz = from.z - a.z
+  return Math.abs(dx) >= Math.abs(dz)
+    ? { x: a.x + Math.sign(dx || 1) * off, y: a.y, z: a.z }
+    : { x: a.x, y: a.y, z: a.z + Math.sign(dz) * off }
+}
 
 /** Home, own farms and the listed places in the bot's dimension. */
 function areas (agent: Agent, bot: Bot, o: { home: boolean, farms: boolean, radius: number, farmRadius: number, places: z.infer<typeof placeOpt>[] }): Area[] {
@@ -29,7 +48,7 @@ function areas (agent: Agent, bot: Bot, o: { home: boolean, farms: boolean, radi
     const dim = bot.game?.dimension
     for (const f of getFarms(agent)) {
       if (f.dim && dim && f.dim !== dim) continue
-      out.push({ key: f.name, label: f.name, x: f.x, y: f.y + 1, z: f.z, radius: Math.max(o.farmRadius, Math.ceil(f.size / 2) + 4) })
+      out.push({ key: f.name, label: f.name, x: f.x, y: f.y + 1, z: f.z, radius: Math.max(o.farmRadius, Math.ceil(f.size / 2) + 4), farmSize: f.size })
     }
   }
   const places = getPlaces(agent)
@@ -53,7 +72,8 @@ export const lightHome = defineBehavior({
   category: 'work',
   description: 'Spawn-proofs home, its own farms and listed places: by day, every so often (sooner after a hostile was seen there) it walks over, ' +
     'finds the spots where mobs could spawn and puts torches down so every one has light (light_up: floor torches, walls where there is no floor, ' +
-    'never on farmland, paths, in front of doors, in water or protected areas, never breaking anything). Crafts torches from coal or charcoal ' +
+    'never on farmland, crops, paths, in front of doors, in water, near spawn or where a torch was refused, never breaking anything; around a farm ' +
+    'it stays off the field and counts only the ground the field is on). Crafts torches from coal or charcoal ' +
     '(smelts charcoal from logs); backs off with a reason when out of both. Low priority: after food, safety and tools.',
   options: z.object({
     radius: z.number().int().min(4).max(48).default(24).describe('flat radius around home (and listed places) to light'),
@@ -119,7 +139,7 @@ export const lightHome = defineBehavior({
         if (flatDist(area, bot.entity.position) > 24) {
           const r = area.key === 'home' && agent.getAction('go_home')
             ? await ctx.act('go_home', { range: 4 })
-            : await ctx.act('goto', { x: area.x, y: area.y, z: area.z })
+            : await ctx.act('goto', { ...approachPoint(area, bot.entity.position) })
           if (!r.ok) return { ok: false, message: `light_home: could not get to ${area.label}: ${r.message}` }
         }
         const r = await ctx.act('light_up', {

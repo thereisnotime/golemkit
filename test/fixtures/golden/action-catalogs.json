@@ -5705,7 +5705,7 @@
       },
       {
         "name": "light_up",
-        "description": "Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates, or here) where hostile mobs could spawn (block light below `target`; 1.21.1 monsters need light 0), works out the fewest torches that light them all, crafts torches from coal or charcoal (smelts charcoal from logs when out of coal) and places them: floor torches, wall torches where there is no floor; never on farmland, paths, in front of doors, in water or protected areas, and never breaking anything. Remembers its own torches. dry_run only reports.",
+        "description": "Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates, or here) where hostile mobs could spawn (block light below `target`; 1.21.1 monsters need light 0), works out the fewest torches that light them all, crafts torches from coal or charcoal (smelts charcoal from logs when out of coal) and places them: floor torches, wall torches where there is no floor; never on farmland, crops, paths, in front of doors, in water, near the world spawn or where the server refused a torch, and never breaking anything. Around its own farms it stays off the field and counts only the ground the field is on. Remembers its own torches. dry_run only reports.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -5762,6 +5762,10 @@
               "type": "number",
               "minimum": 0,
               "maximum": 256
+            },
+            "surface": {
+              "description": "only the ground connected to the centre's level, no caves under it; default on around its own farms",
+              "type": "boolean"
             },
             "dry_run": {
               "default": false,
@@ -9084,7 +9088,7 @@
       },
       {
         "name": "light_up",
-        "description": "Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates, or here) where hostile mobs could spawn (block light below `target`; 1.21.1 monsters need light 0), works out the fewest torches that light them all, crafts torches from coal or charcoal (smelts charcoal from logs when out of coal) and places them: floor torches, wall torches where there is no floor; never on farmland, paths, in front of doors, in water or protected areas, and never breaking anything. Remembers its own torches. dry_run only reports.",
+        "description": "Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates, or here) where hostile mobs could spawn (block light below `target`; 1.21.1 monsters need light 0), works out the fewest torches that light them all, crafts torches from coal or charcoal (smelts charcoal from logs when out of coal) and places them: floor torches, wall torches where there is no floor; never on farmland, crops, paths, in front of doors, in water, near the world spawn or where the server refused a torch, and never breaking anything. Around its own farms it stays off the field and counts only the ground the field is on. Remembers its own torches. dry_run only reports.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -9141,6 +9145,10 @@
               "type": "number",
               "minimum": 0,
               "maximum": 256
+            },
+            "surface": {
+              "description": "only the ground connected to the centre's level, no caves under it; default on around its own farms",
+              "type": "boolean"
             },
             "dry_run": {
               "default": false,
@@ -14096,7 +14104,7 @@
       },
       {
         "name": "light_up",
-        "description": "Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates, or here) where hostile mobs could spawn (block light below `target`; 1.21.1 monsters need light 0), works out the fewest torches that light them all, crafts torches from coal or charcoal (smelts charcoal from logs when out of coal) and places them: floor torches, wall torches where there is no floor; never on farmland, paths, in front of doors, in water or protected areas, and never breaking anything. Remembers its own torches. dry_run only reports.",
+        "description": "Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates, or here) where hostile mobs could spawn (block light below `target`; 1.21.1 monsters need light 0), works out the fewest torches that light them all, crafts torches from coal or charcoal (smelts charcoal from logs when out of coal) and places them: floor torches, wall torches where there is no floor; never on farmland, crops, paths, in front of doors, in water, near the world spawn or where the server refused a torch, and never breaking anything. Around its own farms it stays off the field and counts only the ground the field is on. Remembers its own torches. dry_run only reports.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -14153,6 +14161,10 @@
               "type": "number",
               "minimum": 0,
               "maximum": 256
+            },
+            "surface": {
+              "description": "only the ground connected to the centre's level, no caves under it; default on around its own farms",
+              "type": "boolean"
             },
             "dry_run": {
               "default": false,

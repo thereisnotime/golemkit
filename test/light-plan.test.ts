@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   planTorches, torchSpotProblem, torchFor, estimateLight, torchSupplyStep, plankFor, lightCheckDue, placingOrder, manhattan,
+  surfaceCells, spotProblems,
   type LightCell, type LightSource
 } from '../src/skills/lightPlan.ts'
 
@@ -141,6 +142,81 @@ test('planTorches: light spreads in 3D, a torch on another floor counts by Manha
   assert.equal(plan.dark, 0)
 })
 
+/**
+ * Pax's farm:1 as the survey sees it: a 9x9 wheat field on y 63 with the water in the middle
+ * (no cell there), a grass ring, two trees (trunk where a cell would be, leaves on top), a
+ * hill rising east from x 8, and a dark cave 6 below the south side. Cells are at y 64 (the
+ * centre's level); the cave is sealed, so no sky light there.
+ */
+function farmSurvey (): LightCell[] {
+  const cells: LightCell[] = []
+  const R = 14
+  const trees = new Set(['-7,-7', '6,-9'])
+  for (let x = -R; x <= R; x++) {
+    for (let z = -R; z <= R; z++) {
+      if (Math.hypot(x, z) > R) continue
+      if (x === 0 && z === 0) continue // the water
+      if (Math.abs(x) <= 4 && Math.abs(z) <= 4) {
+        cells.push(cell(x, z, { spawnable: false, floor: 'farmland', block: x % 2 ? 'wheat' : 'air', floorTorch: false, sky: 15 }))
+        continue
+      }
+      if (trees.has(`${x},${z}`)) {
+        cells.push(cell(x, z, { spawnable: false, floor: 'oak_leaves', floorTorch: false, sky: 15 }, 70))
+        continue
+      }
+      const y = x >= 8 ? 64 + Math.min(6, x - 7) : 64 // the hill: one block up per column
+      cells.push(cell(x, z, { sky: 15, ...(x === -6 && z % 3 === 0 ? { block: 'short_grass' } : {}) }, y))
+      if (z >= 6 && z <= 10 && x >= -10 && x <= 10) cells.push(cell(x, z, { sky: 0 }, 58)) // the cave
+    }
+  }
+  return cells
+}
+
+test('surfaceCells: the ground around a farm, not the cave under it', () => {
+  const cells = farmSurvey()
+  const surface = surfaceCells(cells, { x: 0, y: 64, z: 0 })
+  assert.ok(surface.every(c => c.y !== 58), 'cave cells dropped')
+  assert.ok(surface.some(c => c.y === 70 && c.floor === 'grass_block'), 'the hill slope stays')
+  assert.equal(surface.length, cells.filter(c => c.y !== 58).length)
+  // without sky data the hill is still reached by its slope, the cave still not; only the tree
+  // tops (on leaves, no spawns) drop out
+  const noSky = surfaceCells(cells.map(c => ({ ...c, sky: null })), { x: 0, y: 64, z: 0 })
+  assert.equal(noSky.length, surface.length - 2)
+  assert.equal(noSky.filter(c => c.spawnable).length, surface.filter(c => c.spawnable).length)
+})
+
+test('planTorches: a 9x9 farm gets torches on the ring, none on the field, the water or in the cave', () => {
+  const cells = surfaceCells(farmSurvey(), { x: 0, y: 64, z: 0 })
+  const plan = planTorches(cells, [], { target: 8, maxTorches: 64 })
+  assert.ok(plan.torches.length > 0)
+  assert.equal(plan.left, 0, 'every surface spot lit')
+  for (const t of plan.torches) {
+    const c = cells.find(q => q.x === t.x && q.y === t.y && q.z === t.z)!
+    assert.equal(torchSpotProblem(c), null)
+    assert.ok(Math.abs(t.x) > 4 || Math.abs(t.z) > 4, `torch at ${t.x} ${t.z} is on the field`)
+    assert.notEqual(c.floor, 'farmland')
+    assert.notEqual(t.y, 58)
+  }
+  assert.ok(after(cells, [], plan.torches).every(l => l >= 8))
+})
+
+test('planTorches: too few torches for the farm places the most useful ones and says how many stay dark', () => {
+  const cells = surfaceCells(farmSurvey(), { x: 0, y: 64, z: 0 })
+  const plan = planTorches(cells, [], { target: 8, maxTorches: 3 })
+  assert.equal(plan.torches.length, 3)
+  assert.ok(plan.left > 0 && plan.left < plan.dark)
+})
+
+test('planTorches: the live bug, every spot off limits leaves nothing to place; spotProblems says why', () => {
+  // a learned protected zone (from a refused break while harvesting) covered the whole farm
+  const cells = surfaceCells(farmSurvey(), { x: 0, y: 64, z: 0 }).map(c => ({ ...c, offLimits: true }))
+  const plan = planTorches(cells, [], { target: 8 })
+  assert.equal(plan.torches.length, 0)
+  assert.equal(plan.left, plan.dark)
+  assert.match(spotProblems(cells), /^\d+ off limits$/)
+  assert.equal(spotProblems(farmSurvey().filter(c => c.floor === 'farmland')).split(', ').length, 2)
+})
+
 test('placingOrder: nearest first, then nearest to the last', () => {
   const spots = [{ x: 20, y: 64, z: 0 }, { x: 2, y: 64, z: 0 }, { x: 10, y: 64, z: 0 }]
   assert.deepEqual(placingOrder(spots, { x: 0, y: 64, z: 0 }).map(s => s.x), [2, 10, 20])
@@ -196,4 +272,27 @@ test('lightCheckDue: first time, after the interval, after a mob was seen', () =
   assert.equal(lightCheckDue(now - 90_000, now, 60_000), true)
   assert.equal(lightCheckDue(now - 30_000, now, 60_000, now - 10_000), true)
   assert.equal(lightCheckDue(now - 30_000, now, 60_000, now - 40_000), false)
+})
+
+test('torchOffLimits: a learned break zone stops torches only once two torches were refused in it; spawn always', async () => {
+  const { torchOffLimits, zonesRefusingTorches } = await import('../src/skills/lighting.ts')
+  const { ProtectedAreas } = await import('../src/core/protection.ts')
+  const areas = new ProtectedAreas('/nonexistent/protected.json')
+  areas.zones = [{ x: 565, y: 63, z: -18, at: '' }] // the zone harvesting put over Pax's farm
+  const agent = { protectedAreas: areas }
+  const bot: any = { spawnPoint: { x: 545, y: 70, z: 45 } }
+  const ring = { x: 556, y: 63, z: -20 }
+  assert.equal(torchOffLimits(agent as any, bot, ring, 24, new Set()), false)
+  assert.equal(torchOffLimits(agent as any, bot, ring, 24, new Set(['565,63,-18'])), true)
+  assert.deepEqual(zonesRefusingTorches(agent as any, [{ x: 556, y: 64, z: -15 }]), new Set(), 'one refusal can be lag')
+  assert.deepEqual(zonesRefusingTorches(agent as any, [{ x: 556, y: 64, z: -15 }, { x: 570, y: 64, z: -25 }, { x: 0, y: 64, z: 0 }]), new Set(['565,63,-18']))
+  assert.equal(torchOffLimits(agent as any, bot, { x: 550, y: 70, z: 40 }, 24, new Set()), true, 'near spawn')
+})
+
+test('approachPoint: a farm is approached on the ring side facing the bot, not at the water', async () => {
+  const { approachPoint } = await import('../src/adapters/minecraft-java/behaviors/light.ts')
+  const farm = { key: 'farm:1', label: 'farm:1', x: 561, y: 63, z: -20, radius: 14, farmSize: 9 }
+  assert.deepEqual(approachPoint(farm, { x: 560, z: -46 }), { x: 561, y: 63, z: -26 })
+  assert.deepEqual(approachPoint(farm, { x: 600, z: -18 }), { x: 567, y: 63, z: -20 })
+  assert.deepEqual(approachPoint({ ...farm, farmSize: undefined }, { x: 0, z: 0 }), { x: 561, y: 63, z: -20 })
 })

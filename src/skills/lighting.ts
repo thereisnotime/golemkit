@@ -3,17 +3,24 @@
 // torches from coal or charcoal and puts them down. Torches it places are remembered as its own
 // (`lighting.torches`), so it can tell them from the owner's; a remembered torch that is gone
 // was taken away by someone, and the spot is left alone after that. It only places torches into
-// air, on blocks that are already there: it never breaks or replaces anything.
+// air, on blocks that are already there: it never breaks or replaces anything. Around its own
+// farms it keeps off the farmland (no trampling) and only counts the ground the field is on.
+//
+// Protected areas: the zones the bot learns (src/core/protection.ts) come from refused *breaks*,
+// a 41-block box around one refusal, and a lag rollback while harvesting can put one over the
+// bot's own farm. Placing is a different permission, so a learned zone doesn't stop torches by
+// itself; once the server has refused two torches inside one (one can be lag), that zone is off
+// limits for torches, as is every refused spot. The world spawn is always kept clear.
 import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
 import { defineSkill, defineAction, z, ok, fail, fmtPos, goals, checkAborted, sleep, type Agent, type ActionResult } from '../core/index.ts'
 import { vec, findItem, within, gotoWithin, isPlaceFace, REACH } from './world.ts'
 import { craftItem, smeltItem } from './crafting.ts'
 import { inventoryCounts } from './toolkit.ts'
-import { offLimits } from './food.ts'
+import { spawnOf, getFarms, type Farm } from './food.ts'
 import { getHome, getPlaces, sameDimension } from './navigation.ts'
 import {
-  planTorches, placingOrder, torchSupplyStep, LIGHT_LEVELS, LIT_STATE,
+  planTorches, placingOrder, torchSupplyStep, surfaceCells, spotProblems, LIGHT_LEVELS, LIT_STATE,
   type LightCell, type LightSource, type Pos, type TorchSpot, type TorchPlan
 } from './lightPlan.ts'
 
@@ -63,6 +70,44 @@ function wet (b: Block | null): boolean {
   return FLUID.test(b.name) || (b.getProperties?.() as Record<string, unknown> | undefined)?.waterlogged === true
 }
 
+const zoneKey = (z: Pos) => `${z.x},${z.y},${z.z}`
+
+/** Learned protected zones (by key) holding at least two spots where the server refused a torch. */
+export function zonesRefusingTorches (agent: Pick<Agent, 'protectedAreas'>, refused: readonly Pos[]): Set<string> {
+  const n = new Map<string, number>()
+  for (const r of refused) {
+    const z = agent.protectedAreas?.zoneAt?.(r)
+    if (z) n.set(zoneKey(z), (n.get(zoneKey(z)) ?? 0) + 1)
+  }
+  return new Set([...n].filter(([, c]) => c >= 2).map(([key]) => key))
+}
+
+/**
+ * Whether a torch may not go at `p`: near the world spawn, or inside a learned protected zone
+ * where the server already refused a torch.
+ */
+export function torchOffLimits (agent: Pick<Agent, 'protectedAreas'>, bot: Bot, p: Pos, spawnClearance: number, refusedZones: Set<string>): boolean {
+  const spawn = spawnOf(bot)
+  if (spawn && spawnClearance > 0 && Math.hypot(p.x - spawn.x, p.z - spawn.z) < spawnClearance) return true
+  const zone = agent.protectedAreas?.zoneAt?.(p)
+  return !!zone && refusedZones.has(zoneKey(zone))
+}
+
+/**
+ * Keeps the pathfinder off farmland (and the crops on it) until the returned function is
+ * called: walking there tramples nothing, but jumps and drops do, and paths across a field
+ * jump. Torches around a farm are reached from the ring.
+ */
+function keepOffFarmland (bot: Bot): () => void {
+  const m = (bot as any).pathfinder?.movements
+  if (!m?.exclusionAreasStep) return () => {}
+  const farmland = bot.registry.blocksByName.farmland?.id
+  const noStep = (b: { position: { x: number, y: number, z: number } }) =>
+    bot.blockAt(vec(bot, b.position.x, b.position.y - 1, b.position.z))?.type === farmland ? Infinity : 0
+  m.exclusionAreasStep.push(noStep)
+  return () => { m.exclusionAreasStep = m.exclusionAreasStep.filter((f: unknown) => f !== noStep) }
+}
+
 export interface Survey {
   cells: LightCell[]
   sources: LightSource[]
@@ -83,6 +128,7 @@ export function surveyLight (bot: Bot, agent: Agent, centre: Pos, radius: number
   const own = ownTorches(agent).filter(t => !t.dim || !dim || t.dim === dim)
   const removed = new Set(agent.storage.get<Pos[]>(REMOVED_KEY, []).map(k))
   const refused = new Set(agent.storage.get<Pos[]>(REFUSED_KEY, []).map(k))
+  const refusedZones = zonesRefusingTorches(agent, agent.storage.get<Pos[]>(REFUSED_KEY, []))
   const gone: Pos[] = []
   for (const t of own) {
     if (Math.hypot(t.x - centre.x, t.z - centre.z) > radius + 16) continue
@@ -111,7 +157,8 @@ export function surveyLight (bot: Bot, agent: Agent, centre: Pos, radius: number
         const below = at(x, y - 1, z)
         if (here && above && below && passable(here) && passable(above) && below.boundingBox === 'block' && !wet(below)) {
           const light = typeof (here as any).light === 'number' ? (here as any).light as number : null
-          if (((here as any).skyLight ?? 0) > 0 || (light ?? 0) > 0) lightSeen = true
+          const sky = typeof (here as any).skyLight === 'number' ? (here as any).skyLight as number : null
+          if ((sky ?? 0) > 0 || (light ?? 0) > 0) lightSeen = true
           const floorFull = fullCube(below)
           let wall: Pos | null = null
           for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
@@ -128,6 +175,7 @@ export function surveyLight (bot: Bot, agent: Agent, centre: Pos, radius: number
           cells.push({
             ...p,
             light,
+            sky,
             spawnable: floorFull && !(below as any).transparent && !NO_SPAWN_FLOOR.test(below.name),
             block: here.name,
             floor: below.name,
@@ -135,7 +183,7 @@ export function surveyLight (bot: Bot, agent: Agent, centre: Pos, radius: number
             wall,
             water: wet(here),
             nearDoor,
-            offLimits: refused.has(k(p)) || offLimits(agent, bot, p, spawnClearance),
+            offLimits: refused.has(k(p)) || torchOffLimits(agent, bot, p, spawnClearance, refusedZones),
             removed: removed.has(k(p))
           })
         }
@@ -145,7 +193,7 @@ export function surveyLight (bot: Bot, agent: Agent, centre: Pos, radius: number
       }
     }
   }
-  if (!lightSeen) for (const c of cells) c.light = null
+  if (!lightSeen) for (const c of cells) { c.light = null; c.sky = null }
 
   const sources: LightSource[] = []
   const ids = Object.keys(LIGHT_LEVELS).map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
@@ -172,11 +220,14 @@ async function placeTorch (bot: Bot, spot: TorchSpot, signal: AbortSignal): Prom
   const ref = bot.blockAt(vec(bot, spot.against.x, spot.against.y, spot.against.z))
   if (!isPlaceFace(ref)) return 'the block to put it on is gone'
   if (!within(bot, pos, REACH - 0.3)) {
+    const restore = keepOffFarmland(bot)
     try {
       await gotoWithin(bot, new goals.GoalNear(pos.x, pos.y, pos.z, 2), signal, 25_000)
     } catch (e) {
       checkAborted(signal)
       return `could not get there (${(e as Error).message})`
+    } finally {
+      restore()
     }
   }
   if (!within(bot, pos)) return 'could not get close enough'
@@ -221,11 +272,21 @@ async function supplyTorches (bot: Bot, signal: AbortSignal, log: { debug: (m: s
   return inventoryCounts(bot).torch ?? 0
 }
 
+/** The bot's own farm centred on `c` (light_home passes the farm's x/z), or named `place`. */
+function farmAt (agent: Agent, c: Pos, place?: string): Farm | undefined {
+  return getFarms(agent).find(f => place ? f.name === place.toLowerCase() : f.x === c.x && f.z === c.z)
+}
+
 /** Centre from a place name ("home", "farm:1"), coordinates, or where the bot stands. */
 function centreFor (agent: Agent, bot: Bot, p: { place?: string, x?: number, y?: number, z?: number }): Pos | string {
   if (p.place) {
     const name = p.place.toLowerCase()
     const place = name === 'home' ? getHome(agent) : getPlaces(agent)[name]
+    const farm = place ? undefined : getFarms(agent).find(f => f.name === name)
+    if (farm) {
+      if (farm.dim && bot.game?.dimension && farm.dim !== bot.game.dimension) return `${p.place} is in ${farm.dim}`
+      return { x: Math.floor(farm.x), y: Math.floor(farm.y) + 1, z: Math.floor(farm.z) }
+    }
     if (!place) return `I don't know a place called ${p.place}`
     if (!sameDimension(bot, place)) return `${p.place} is in ${place.dimension}`
     return { x: Math.floor(place.x), y: Math.floor(place.y), z: Math.floor(place.z) }
@@ -240,7 +301,8 @@ const lightUp = defineAction({
   description: 'Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates, or here) where hostile mobs could spawn ' +
     '(block light below `target`; 1.21.1 monsters need light 0), works out the fewest torches that light them all, crafts torches from coal ' +
     'or charcoal (smelts charcoal from logs when out of coal) and places them: floor torches, wall torches where there is no floor; never on ' +
-    'farmland, paths, in front of doors, in water or protected areas, and never breaking anything. Remembers its own torches. dry_run only reports.',
+    'farmland, crops, paths, in front of doors, in water, near the world spawn or where the server refused a torch, and never breaking anything. ' +
+    'Around its own farms it stays off the field and counts only the ground the field is on. Remembers its own torches. dry_run only reports.',
   params: z.object({
     place: z.string().optional().describe('remembered place to light up, e.g. home or farm:1; default x/y/z or where it stands'),
     x: z.number().optional(),
@@ -252,30 +314,43 @@ const lightUp = defineAction({
     max_torches: z.number().int().min(1).max(64).default(16).describe('torches to place at most this time'),
     craft: z.boolean().default(true).describe('craft torches (and smelt charcoal) when it has too few'),
     spawn_clearance: z.number().min(0).max(256).default(24).describe('never place within this distance of the world spawn'),
+    surface: z.boolean().optional().describe('only the ground connected to the centre\'s level, no caves under it; default on around its own farms'),
     dry_run: z.boolean().default(false).describe('only report the dark spots and the planned torches')
   }),
   async run ({ bot, agent, signal, log }, p) {
     const centre = centreFor(agent, bot, p)
     if (typeof centre === 'string') return fail(centre)
+    // around its own farm: the centre is the water, so stop on the ring, keep off the field and
+    // look at the ground the field is on (not caves under it)
+    const farm = farmAt(agent, centre, p.place)
+    if (farm) centre.y = Math.max(centre.y, farm.y + 1)
+    const surface = p.surface ?? !!farm
     if (Math.hypot(bot.entity.position.x - centre.x, bot.entity.position.z - centre.z) > 32) {
+      const restore = farm ? keepOffFarmland(bot) : () => {}
       try {
-        await gotoWithin(bot, new goals.GoalNear(centre.x, centre.y, centre.z, 3), signal, 90_000)
+        await gotoWithin(bot, new goals.GoalNear(centre.x, centre.y, centre.z, farm ? Math.ceil(farm.size / 2) + 1 : 3), signal, 90_000)
       } catch (e) {
         checkAborted(signal)
         return fail(`could not get to ${fmtPos(centre)} (${(e as Error).message})`)
+      } finally {
+        restore()
       }
     }
     const survey = surveyLight(bot, agent, centre, p.radius, p.y_range, p.spawn_clearance)
-    const plan: TorchPlan = planTorches(survey.cells, survey.sources, { target: p.target, maxTorches: p.max_torches })
+    const cells = surface ? surfaceCells(survey.cells, centre) : survey.cells
+    const plan: TorchPlan = planTorches(cells, survey.sources, { target: p.target, maxTorches: p.max_torches })
     const where = p.place ?? fmtPos(centre)
     const summary = `${plan.spawnable} spawnable spots within ${p.radius} of ${where}, ${plan.dark} below light ${p.target}`
     const info = {
-      centre, dark: plan.dark, left: plan.left, spawnable: plan.spawnable, unloaded: survey.unloaded, realLight: survey.realLight,
+      centre, surface, dark: plan.dark, left: plan.left, spawnable: plan.spawnable, unloaded: survey.unloaded, realLight: survey.realLight,
       gone: survey.gone.length, torches: plan.torches.map(t => ({ x: t.x, y: t.y, z: t.z, kind: t.kind }))
     }
     if (survey.gone.length) log.info(`light_up: ${survey.gone.length} of its torches were taken away; leaving those spots alone`)
     if (!plan.dark) return ok(`${summary}: nothing to light`, { ...info, placed: [] })
-    if (!plan.torches.length) return ok(`${summary}, and no spot for a torch reaches them`, { ...info, placed: [] })
+    if (!plan.torches.length) {
+      const why = spotProblems(cells)
+      return ok(`${summary}, and no spot for a torch reaches them${why ? ` (${why})` : ''}`, { ...info, placed: [] })
+    }
     if (p.dry_run) return ok(`${summary}; ${plan.torches.length} torches would fix ${plan.dark - plan.left}: ${plan.torches.map(t => `${t.x} ${t.y} ${t.z}${t.kind === 'wall' ? ' (wall)' : ''}`).join(', ')}`, { ...info, placed: [] })
 
     let have = inventoryCounts(bot).torch ?? 0

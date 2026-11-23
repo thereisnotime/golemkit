@@ -1125,30 +1125,43 @@ hostile shows up inside an area (each mob counts once), it walks over and runs `
    from the chunk's light data (Mineflayer keeps it per block in loaded chunks, `Block.light`),
    raised by what the light sources it can see would give (torches, lanterns, glowstone, sea
    lanterns, lit campfires and furnaces, lava ...). When the chunks carry no light data at all
-   it uses the sources alone.
+   it uses the sources alone. Around its own farms it counts only the ground the field is on
+   (`surfaceCells`): cells at the farm's level, everything joined to them by steps of up to 2
+   blocks to the next column, and cells open to the sky. A cave under the field or a pocket in
+   a hill is left out (a torch there would be wasted and is usually out of reach), slopes and
+   the ring around the field stay.
 2. **Plan.** Greedy cover (`planTorches` in `src/skills/lightPlan.ts`): it keeps picking the
    torch spot that brings the most cells below `target` up to it, floor torches before wall
    torches, until none are dark, `maxTorches` (16) is reached or no allowed spot reaches the
    rest. A torch only goes into air (never replacing grass, crops or anything else) on a
    block that is already there: on the floor when it takes one, on a wall next to the cell
    when it doesn't. Never on farmland or crops, on a path, within a block of a door, gate or
-   trapdoor, in water, in a protected area, within `spawnClearance` (24) of the world spawn,
-   or where the server refused one before.
+   trapdoor, in water, within `spawnClearance` (24) of the world spawn, or where the server
+   refused one before. The protected zones the bot learns come from refused *breaks* (41
+   blocks across around one refusal, and a lag rollback while harvesting can put one over its
+   own farm), so they don't stop torches on their own; once the server has refused two torches
+   inside one (one can be lag), the whole zone is off limits for torches. Around a farm the
+   torches end up on the ring of grass and on whatever isn't farmland, never on the field or
+   the water. When no spot reaches the dark ones, the report says why ("472 spawnable spots
+   ... and no spot for a torch reaches them (400 off limits, 60 farmland)").
 3. **Torches.** With too few torches it crafts them from coal or charcoal and sticks (sticks
    from planks, planks from logs). With no coal it smelts charcoal from logs, planks as fuel,
    in a furnace within 32 blocks or one it carries or makes from 8 cobblestone. With neither
    coal nor logs it fails with the reason ("out of coal and charcoal, and no logs to make
    charcoal") and backs off (2 minutes, doubling up to an hour); the back-off ends when the
    torches, coal, charcoal, logs, planks, sticks or cobblestone it carries change.
-4. **Place.** Nearest first. Each torch it puts down is remembered as its own
+4. **Place.** Nearest first. While walking to a torch spot the pathfinder keeps off farmland
+   (jumps and drops trample it), and a farm is approached on the ring side facing the bot,
+   not at the water in the middle. Each torch it puts down is remembered as its own
    (`lighting.torches` in storage), so it can tell its torches from the owner's. When one of
    its torches is gone on a later check, someone took it away: it forgets it and never puts
    one in that spot again (`lighting.removed`).
 
 An area counts as checked when nothing is left dark, or when a run placed nothing (no spot
-reaches the rest); with more dark spots than `maxTorches` it carries on with the next run. It
-scores 18 at the npc level, below food, safety, `keep_tools_upgraded` (28) and
-`follow_owner` (26), so with the owner in sight it follows them and lights up later. Only
+reaches the rest); with more dark spots than `maxTorches` it carries on with the next run.
+When the plan needs more torches than it can make, it places the ones that light the most and
+reports the spots still dark. It scores 18 at the npc level, below food, safety,
+`keep_tools_upgraded` (28) and `follow_owner` (26), so with the owner in sight it follows them and lights up later. Only
 areas within `maxTrip` (96) of the bot count, so a long food trip doesn't turn into a walk
 home for torches.
 
@@ -1592,7 +1605,7 @@ Places torches on dark ground around home (or a remembered place) so mobs do not
 
 *work · priority npc (20) · needs `light_up`, block placing · uses `go_home`, `goto`, `craft`, `smelt` when present*
 
-Spawn-proofs home, its own farms and listed places: by day, every so often (sooner after a hostile was seen there) it walks over, finds the spots where mobs could spawn and puts torches down so every one has light (light_up: floor torches, walls where there is no floor, never on farmland, paths, in front of doors, in water or protected areas, never breaking anything). Crafts torches from coal or charcoal (smelts charcoal from logs); backs off with a reason when out of both. Low priority: after food, safety and tools.
+Spawn-proofs home, its own farms and listed places: by day, every so often (sooner after a hostile was seen there) it walks over, finds the spots where mobs could spawn and puts torches down so every one has light (light_up: floor torches, walls where there is no floor, never on farmland, crops, paths, in front of doors, in water, near spawn or where a torch was refused, never breaking anything; around a farm it stays off the field and counts only the ground the field is on). Crafts torches from coal or charcoal (smelts charcoal from logs); backs off with a reason when out of both. Low priority: after food, safety and tools.
 
 | option | type | default | description |
 |---|---|---|---|

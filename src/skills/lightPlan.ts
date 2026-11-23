@@ -32,6 +32,8 @@ export interface LightSource extends Pos { level: number }
 export interface LightCell extends Pos {
   /** Real block light at the cell from the chunk's light data; null when unknown. */
   light: number | null
+  /** Sky light at the cell (above 0: open to the sky or next to an opening); null or missing when unknown. */
+  sky?: number | null
   /** A monster could spawn here (full, opaque floor; free cell and head room). Only these need light. */
   spawnable: boolean
   /** Block in the cell (air, short_grass, wheat...). */
@@ -81,6 +83,56 @@ export function torchFor (c: LightCell): TorchSpot | null {
   if (torchSpotProblem(c)) return null
   if (c.floorTorch && !NO_TORCH_FLOOR.test(c.floor)) return { x: c.x, y: c.y, z: c.z, kind: 'floor', against: { x: c.x, y: c.y - 1, z: c.z } }
   return c.wall ? { x: c.x, y: c.y, z: c.z, kind: 'wall', against: c.wall } : null
+}
+
+/** How many surveyed cells can't take a torch, by reason, most common first: "40 off limits, 12 farmland". */
+export function spotProblems (cells: readonly LightCell[], top = 3): string {
+  const n = new Map<string, number>()
+  for (const c of cells) {
+    const why = torchSpotProblem(c)
+    if (why) n.set(why, (n.get(why) ?? 0) + 1)
+  }
+  return [...n].sort((a, b) => b[1] - a[1]).slice(0, top).map(([why, c]) => `${c} ${why}`).join(', ')
+}
+
+/**
+ * The cells on the ground sheet around `centre`: the ones at the centre's level (within
+ * `seedDy`) and every cell connected to them by steps of at most `step` blocks up or down to a
+ * neighbouring column, plus cells open to the sky (light data). Caves under the area (sealed by
+ * a roof of 1+ blocks, so 3+ below the surface next to them) and pockets inside hills drop out;
+ * slopes, the ring around a farm and buildings at the centre's level stay. Used for farms, where
+ * only the surface around the field matters and torches in a cave below are wasted (and out of
+ * reach).
+ */
+export function surfaceCells<T extends LightCell> (cells: readonly T[], centre: Pos, o: { seedDy?: number, step?: number } = {}): T[] {
+  const seedDy = o.seedDy ?? 1
+  const step = o.step ?? 2
+  const col = (x: number, z: number) => `${x},${z}`
+  const byColumn = new Map<string, number[]>()
+  cells.forEach((c, i) => {
+    const k = col(c.x, c.z)
+    const list = byColumn.get(k)
+    if (list) list.push(i)
+    else byColumn.set(k, [i])
+  })
+  const reached = new Array<boolean>(cells.length).fill(false)
+  const queue: number[] = []
+  cells.forEach((c, i) => {
+    if (Math.abs(c.y - centre.y) <= seedDy) { reached[i] = true; queue.push(i) }
+  })
+  while (queue.length) {
+    const c = cells[queue.pop()!]!
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      for (const j of byColumn.get(col(c.x + dx, c.z + dz)) ?? []) {
+        if (reached[j] || Math.abs(cells[j]!.y - c.y) > step) continue
+        reached[j] = true
+        queue.push(j)
+      }
+    }
+  }
+  // open to the sky but not connected (a ledge, a walkway): still the surface; it doesn't spread
+  // further, so a cave mouth doesn't pull in the cave behind it
+  return cells.filter((c, i) => reached[i] || (c.sky ?? 0) > 0)
 }
 
 export const manhattan = (a: Pos, b: Pos) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) + Math.abs(a.z - b.z)
