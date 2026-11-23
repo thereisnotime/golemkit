@@ -1,7 +1,7 @@
 # combat-techniques Specification
 
 ## Purpose
-How the fight loop, `defend` and the reflexes use skilled-player techniques from the 1.9+ combat system (hit styles, shield timing, totem, golden apples, water bucket, enderman gaze, chokepoints), and the opt-in PvP defence. Each technique has a `combat.*` live toggle.
+How the fight loop, `defend` and the reflexes use skilled-player techniques from the 1.9+ combat system (hit styles, shield timing, totem, golden apples, water bucket, enderman gaze, chokepoints), and the opt-in PvP (modes and PvP tactics are in the pvp spec). Each technique has a `combat.*` live toggle.
 
 ## Requirements
 
@@ -109,8 +109,8 @@ With `combat.chokepoints` on, when three or more melee mobs come at the bot and 
 - **WHEN** there is no such gap within 6 blocks
 - **THEN** it fights as before
 
-### Requirement: PvP is opt-in and defensive only
-Bots SHALL never start a fight with a player. With `combat.pvp` set to `defend`, the bot SHALL fight back against a player who hits it, or who hits the player it is guarding, and SHALL stop when that player has not hit for 5 s or is more than 10 blocks away. It SHALL never fight an owner, a player in `combat.friends`, or a player in creative or spectator. The default is `off`.
+### Requirement: PvP is opt-in
+Bots SHALL never fight a player while `combat.pvp` is `off` (the default). With `defend` or any mode above it (see the [pvp spec](../pvp/spec.md)), the bot SHALL fight back against a player who hits it, or who hits the player it is guarding, and SHALL stop defending when that player has not hit for 5 s or is more than 10 blocks away. It SHALL never fight an owner, a player in `combat.friends`, or a player in creative or spectator.
 
 #### Scenario: Default
 - **WHEN** a player hits the bot and `combat.pvp` is not set
@@ -118,7 +118,7 @@ Bots SHALL never start a fight with a player. With `combat.pvp` set to `defend`,
 
 #### Scenario: Defend
 - **WHEN** `combat.pvp` is `defend` and a player hits the bot
-- **THEN** the bot fights that player with its normal fight loop, without a bow
+- **THEN** the bot fights that player with the PvP fight loop (`combat.pvpTactics`, else the mob loop)
 
 #### Scenario: Attacker stops
 - **WHEN** the attacker stops hitting for 5 s or runs 10 blocks off

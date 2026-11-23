@@ -64,15 +64,21 @@ Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actio
 | `gear_up` *ne* | Wear the best armour in the inventory and put a totem of undying or a shield in the offhand (the reflexes run it when there is an upgrade, `combat.autoArmor`). |
 | `ranged_defense` | Answer mobs that shoot at the bot: shoot back, shield up and close in, take cover (or build some) and eat there, or back out of range, by health, gear and numbers (internal, used by reflexes and `stay_safe`). |
 | `water_bucket` | Land a long fall in water placed just before the ground, or put out fire, then scoop the water back up (internal, `combat.waterClutch`). |
-| `defend_player` | Fight back against a player who attacked the bot or the player it guards, only with `combat.pvp defend`; never owners or `combat.friends` (internal). |
+| `defend_player` | Fight back against a player who attacked the bot or the player it guards, with `combat.pvp` anything but `off`; never owners or `combat.friends` (internal). |
+| `pvp` *ne* | PvP mode (owners only): `off` (also the kill switch: ends every fight and hunt), `defend`, `revenge`, `targets`, `all`; no mode shows the status. |
+| `attack_player` *ne* | Put a player on the target list (owners only); switches to `targets` mode if needed. Never owners or friends. |
+| `spare_player` *ne* | Take a player off the target list, forgive their grudge, end a fight or hunt with them. |
+| `hunt_player` | Go where a player was last seen and fight them (owners only); gives up after `combat.huntMinutes`. |
+| `pvp_list` *ne* | Mode, targets, grudges (who, why, minutes left) and hunts (alias `grudges`). |
+| `pvp_engage` | Attack a player the mode allows (internal, started by the reflexes). |
 
 The fight loop uses skilled-player techniques (crits, W-tap, sweeps, shield timing, totem,
 golden apples, chokepoints, enderman gaze), each behind a `combat.*` toggle you can change live
 with `config_set`; see [Skilled-player techniques](/concepts/world#skilled-player-techniques),
-[PvP: defend only](/concepts/world#pvp-defend-only) and the
+[PvP](/concepts/world#pvp) and the
 [combat research](/concepts/combat-research) page. The decisions are pure and unit-tested
-(`tactics.ts`, `techniques.ts`, `pvp.ts`, `ranged-plan.ts`); `fight.ts`, `ranged.ts`, `clutch.ts`
-and `defense.ts` apply them.
+(`tactics.ts`, `techniques.ts`, `pvp.ts`, `pvp-tactics.ts`, `ranged-plan.ts`); `fight.ts`, `pvp-fight.ts`,
+`ranged.ts`, `clutch.ts`, `defense.ts` and `pvp-actions.ts` apply them.
 
 ### bodyguard
 | action | |

@@ -209,7 +209,7 @@ function watched (signal: AbortSignal, check: () => string | null): { signal: Ab
   return { signal: ctl.signal, stop: () => { clearInterval(timer); signal.removeEventListener('abort', onAbort) }, why: () => why }
 }
 
-export interface EngageResult { killed: boolean, hits: number, crits: number, why: string }
+export interface EngageResult { killed: boolean, hits: number, crits: number, why: string, extra?: Record<string, number> }
 
 /**
  * Fights `player` while the policy allows it (`allowed` re-checked every 200 ms): the PvP loop
@@ -243,6 +243,11 @@ export async function engagePlayer (ctx: ActionContext, player: string, allowed:
     if (!r) break
     out.hits += r.hits
     out.crits += r.crits
+    const ex = out.extra ??= {}
+    for (const k of ['sprints', 'blocks', 'apples', 'shieldBreaks', 'shots', 'totems'] as const) {
+      const v = (r as unknown as Record<string, number | undefined>)[k]
+      if (v) ex[k] = (ex[k] ?? 0) + v
+    }
     if (b.health <= 0) { out.why = 'died'; break }
     if (r.end === 'killed') { out.killed = true; out.why = 'killed'; break }
     if (r.end === 'heal') {
@@ -268,7 +273,7 @@ export async function engagePlayer (ctx: ActionContext, player: string, allowed:
   return out
 }
 
-const fmtEngage = (player: string, r: EngageResult) => `${r.killed ? `killed ${player}` : `stopped fighting ${player}: ${r.why || 'time up'}`}${r.hits ? ` (${r.hits} hits, ${r.crits} crits)` : ''}`
+const fmtEngage = (player: string, r: EngageResult) => `${r.killed ? `killed ${player}` : `stopped fighting ${player}: ${r.why || 'time up'}`}${r.hits ? ` (${r.hits} hits, ${r.crits} crits${Object.entries(r.extra ?? {}).map(([k, v]) => `, ${v} ${k}`).join('')})` : ''}`
 
 const realName = (bot: Bot, name: string) => Object.keys(bot.players ?? {}).find(n => n.toLowerCase() === name.toLowerCase()) ?? name
 

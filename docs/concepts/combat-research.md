@@ -651,17 +651,19 @@ ignore players on land.
 
 ## PvP etiquette and server rules
 
-golemkit bots don't attack players by default ([world.md](./world.md)) and should stay that way.
+golemkit bots don't attack players by default ([world.md](./world.md#pvp)): `combat.pvp` is `off`
+unless the owner turns it on, and the attacking modes are the owner's call on their own server.
 Server rules vary, but these patterns are common
 ([HostHavoc on server rules](https://hosthavoc.com/en-GB/blog/importance-of-minecraft-server-rules),
 [BadWolfMC rules](https://www.badwolfmc.com/server-rules)):
 
-- **Consent:** many servers require both players to agree to a fight outside PvP zones. A bot never
-  starts a fight with a player.
+- **Consent:** many servers require both players to agree to a fight outside PvP zones. A bot
+  only starts fights in the attacking modes (`revenge`, `targets`, `all`) an owner chose.
 - **Defend-only stance:** if PvP is ever enabled for a bot, it only fights back against a player
   who hurt it or its owner, stops when the attacker leaves, and doesn't chase.
 - **No spawn killing:** protected spawn areas are near universal, and attacking or luring players
-  at their edge counts as spawn killing.
+  at their edge counts as spawn killing. `combat.spareProtected` (default on) leaves players in
+  protected areas alone.
 - **No combat logging:** logging out within a short window after PvP damage is the most commonly
   banned behaviour. A bot that disconnects mid-fight (crash, reconnect logic) can trigger it; delay
   voluntary disconnects until out of combat.
@@ -705,7 +707,7 @@ Server rules vary, but these patterns are common
 | Raid mobs | vindicator disables shield; fangs ignore armour and shields | partial | low |
 | Warden | boom ignores armour/shield; sneak avoids vibrations | yes (avoid only) | medium (avoidance) |
 | Blaze / drowned | 5 s volley gap; trident 8 HP to 20 blocks | yes | low |
-| PvP etiquette | consent, no spawn kill, no combat log | n/a | high (policy) |
+| PvP etiquette | consent, no spawn kill, no combat log | n/a | high (policy, done: owner-only modes, `spareProtected`) |
 
 ## What golemkit does with it
 
@@ -729,7 +731,25 @@ under [Skilled-player techniques](./world.md#skilled-player-techniques), toggles
 | Bow lead with arrow physics, shield against archers | fight loop | `combat.ranged`, `combat.shield` |
 | Cover, cover walls, backing off and danger zones against shooters | reflexes, `ranged_defense`, `stay_safe` | `reflexes.rangedDefense` (profile, variant or `!config_set`), `stay_safe` option `ranged` |
 | Pillaring when outnumbered, bunker against phantoms | `defend`, reflexes | none |
-| Defend-only PvP, never owners or friends | reflexes, `defend_player` | `combat.pvp`, `combat.friends` |
+| PvP modes (off, defend, revenge, targets, all), grudges, target list, hunts, kill switch; never owners, friends, creative players or protected areas | reflexes, `defend_player`, `pvp_engage`, `hunt_player`, `pvp`, `attack_player`, `spare_player` (`pvp.ts`, `pvp-actions.ts`) | `combat.pvp`, `combat.friends`, `combat.targets`, `combat.revengeMinutes`, `combat.revengeKills`, `combat.spareProtected`, `combat.taunts` |
+| Gear check before a fight: duel odds from health, armour formula, weapon, shield, totem, golden apples | reflexes (`pvp.ts` `duelOdds`) | `combat.pvpMinOdds`, `combat.revengeIgnoresOdds` |
+
+PvP tactics (`pvp-tactics.ts`, pure; `pvp-fight.ts` applies them; toggle `combat.pvpTactics`), mapped
+to the sections above:
+
+| Section | PvP use |
+|---|---|
+| Attack cooldown | the enemy's charge from their last swing (`entitySwingArm`) and held item: shield up when it's ready, step out of reach while ours charges |
+| Critical hits | jump crits on full charge, as against mobs |
+| Sprint hits, W-tap | sprint into reach only as the hit charges; sprint (knockback) hits when the enemy has a drop or lava behind them or the bot is losing |
+| Spacing and reach, strafing | about 3 blocks while charging, circle at that range, back off inside 2.4; zig-zag approach against a drawn bow |
+| Axe vs sword | axe swap and immediate hit on a raised shield facing the bot (disabled 5 s), then the sword again |
+| Shield | up for arrows on course, a drawn bow, or their charged swing in reach; down to hit; never against an axe at close range |
+| Totem of Undying, golden apples | totem into the offhand and an apple at 10 health (PvP bursts are bigger than mob hits) |
+| Healing behind cover | retreat to heal when low with nothing to heal and losing, back at 14 or 4 more than them |
+| Bow | 12 to 40 blocks with velocity lead (`aimArrow`), not into a raised shield or at someone closing faster than a draw |
+| Ender pearls | the enemy's pearl or teleport (8+ blocks in a sample) ends the chase when it lands past half the chase limit |
+| Terrain | sidestep when a drop or lava is behind the bot; knock the enemy towards one |
 
 Not implemented: ender pearls, building walls mid-fight against melee crowds, cobwebs, potions,
 Blast Protection choices (armour is scored by total protection), sleeping to reset phantoms

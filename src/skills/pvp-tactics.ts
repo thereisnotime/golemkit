@@ -150,13 +150,13 @@ export const STRAFE_FLIP_MS = 600
 // ---- ranged ----
 
 /**
- * Bow or melee: the bow at 9 to 40 blocks with arrows, while the enemy isn't blocking (a raised
+ * Bow or melee: the bow at 12 to 40 blocks with arrows, while the enemy isn't blocking (a raised
  * shield stops arrows) and isn't closing in fast; melee otherwise. Closing speed is blocks per
  * second towards us.
  */
 export function pvpRange (s: { dist: number, bow: boolean, arrows: number, enemyBlocking: boolean, closing: number }): 'bow' | 'melee' {
   if (!s.bow || s.arrows <= 0 || s.enemyBlocking) return 'melee'
-  if (s.dist < 9 || s.dist > 40) return 'melee'
+  if (s.dist < 12 || s.dist > 40) return 'melee'
   // a full draw takes 1.1 s: don't start one they'll walk through
   if (s.dist - s.closing * 1.3 < 5) return 'melee'
   return 'bow'

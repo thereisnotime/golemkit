@@ -129,6 +129,9 @@ patterns first is the predictable choice.
 
 ### What the loose layers may and may not do
 
+- **Never PvP.** The PvP intents (pvp mode, attack, hunt, spare) come from the anchored patterns
+  only: they are not in the label set the embeddings and the local LLM choose from, so a loose
+  guess can't start a fight.
 - **They only pick the intent.** Counts, items, places, players and templates come from the line
   through the parser's own helpers (`slots.ts`): "dig up twenty sand" is collect, sand, 20 because
   "twenty" and "sand" are in the line. A guess whose required slot is missing (bring without an
@@ -328,6 +331,10 @@ the LLM in `first` mode.
 | set home | set home, set home here, this is your home | `set_home` (bot's or speaker's position) |
 | remember | remember this place as the mine, save this spot as wheat field | `remember_place` at the speaker's position |
 | build | build a house (here), build me a log cabin, put up a shelter | `build` with the [blueprint](/guide/goals-and-building#blueprint-format) (house = small_house, big house = cottage, log cabin = cabin); "here" = the speaker's position |
+| PvP mode | pvp off, pvp defend, set pvp to revenge, pvp targets, pvp all; stop attacking, stop pvp, ceasefire (= off) | `pvp {mode}`; off is the kill switch (ends every fight and hunt). Owners only, see [PvP](/concepts/world#pvp) |
+| attack a player | attack bob, fight bob, go after bob, kill bob on sight | `attack_player {player}`: only a player online by that name (never "attack zombies", "kill everything", "attack me") |
+| hunt a player | hunt bob, hunt bob down, track down bob, find and kill bob | `hunt_player {player}`: goes where they were last seen and fights them |
+| spare a player | stop attacking bob, leave bob alone, don't attack bob, forgive bob | `spare_player {player}`: off the list, grudge forgiven, fight ended |
 | behaviours | start farming, keep chopping, go exploring, stop chopping, turn on keep_fed, disarm farm_loop | `behavior_arm` / `behavior_disarm` (farming = farm_loop, chopping = chop_wood_loop, following = follow_owner, exploring = wander, ...) |
 | help | help, what can you do? | lists the phrases |
 

@@ -27,7 +27,7 @@ can't change their own.
 | `canDig` | on/off | may break blocks and tunnel while pathing |
 | `selfAware` | on/off | show the bot its own [variant](/concepts/variants-profiles), profile, model, brains and settings every turn (default on) |
 | `respectBuilds` | on/off | leave blocks that look player-made alone when building (default off: the bot may dig and use anything it needs) |
-| `reflexes.selfDefense` | on/off | fight back when hit (default on; also gates `combat.pvp defend`) |
+| `reflexes.selfDefense` | on/off | fight back when hit (default on; also gates PvP `defend`) |
 | `reflexes.autoEat` | on/off | eat when hungry (default on) |
 | `reflexes.eatBelow` | 0–20 | eat when food drops below this (default 15) |
 | `reflexes.retreatBelow` | 0–20 | back off at or below this health (0 = stand ground; default 8) |
@@ -50,8 +50,20 @@ can't change their own.
 | `combat.endermanGaze` | on/off | never look an enderman in the eyes unless fighting it (default on) |
 | `combat.fightFastMobs` | on/off | at low health keep fighting mobs faster than the bot (vindicators, ravagers, spiders, wolves, piglin brutes, hoglins) instead of backing off at `retreatBelow`; the water back-off (`waterFightAbove`) still applies (default on) |
 | `combat.chokepoints` | on/off | against 3+ melee mobs with half health or more, fight from a 1-wide gap nearby (default on) |
-| `combat.pvp` | off / defend | `defend`: fight back a player who attacks the bot or the player it guards, stop when they stop or run; never owners or friends (default off) |
-| `combat.friends` | names | players never fought back, even with `combat.pvp defend` (comma separated) |
+| `combat.pvp` | off / defend / revenge / targets / all | [PvP mode](../concepts/world#pvp): `defend` fights back; `revenge` also goes after whoever killed or attacked the bot, an owner or the guarded player; `targets` attacks the target list; `all` every player in range. Never owners, friends or creative players; changes are whispered to the owners (default off) |
+| `combat.friends` | names | players never fought in any PvP mode (comma separated; owners are always spared) |
+| `combat.targets` | names | players attacked on sight in `targets` and `all` (`!attack_player`, `!spare_player` edit it) |
+| `combat.revengeMinutes` | 0–1440 | how long a grudge lasts (default 30; 0 = no grudges) |
+| `combat.revengeKills` | 1–100 | a grudge is forgiven after this many kills (default 1) |
+| `combat.revengeIgnoresOdds` | on/off | revenge fights start even when the gear check says it would lose (default off) |
+| `combat.spareProtected` | on/off | leave players in protected areas alone in the attacking modes (default on) |
+| `combat.taunts` | on/off | a short public line after winning a PvP fight (default off) |
+| `combat.pvpEngage` | 2–64 | start PvP fights with players within this many blocks (default 16) |
+| `combat.pvpChase` | 4–256 | give up a PvP chase this far from where the fight started (default 48) |
+| `combat.pvpLostSec` | 1–600 | give up after this many seconds without seeing the player (default 30) |
+| `combat.pvpMinOdds` | 0–10 | gear check: odds needed to start a `targets`/`all` fight (default 0.7; 1 = even) |
+| `combat.pvpTactics` | on/off | the PvP fight loop (axe vs shields, shield timing, spacing, bow, totem and apples, ledges); off = the mob loop (default on) |
+| `combat.huntMinutes` | 1–120 | `hunt_player` gives up after this many minutes (default 10) |
 | `mining.safe` | on/off | [safe mining](./progression#safe-mining): readiness before going deeper than `mining.safeDepth`, no caves, torches, climb out when losing underground (default on) |
 | `mining.safeDepth` | 0–64 | blocks below the surface it may dig or go for ore without being ready (default 8) |
 | `mining.needWeapon` | on/off | a sword or axe is part of being ready (default on) |

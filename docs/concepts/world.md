@@ -280,26 +280,92 @@ Not done, and why: ender pearls (aiming a pearl to a safe spot needs landing pre
 costs 5 HP; little use against mobs), building cover walls mid-fight against crowds (the
 `ranged_defense` reflex already builds cover against archers), cobwebs against spiders, potions.
 
-### PvP: defend only
+### PvP
 
-Bots never start fights with players. `combat.pvp` (default `off`) can be set to `defend`:
+Bots don't fight players unless the owner says so. `combat.pvp` picks how far it goes (default
+`off` for the framework; Pax's profile doesn't change it):
 
-- the bot fights back a player who hits it, or who hits the player it guards while the bodyguard
-  is armed, with the same fight loop and techniques (no bow: a player out of reach has backed off);
-- it stops as soon as that player hasn't hit for 5 s, or is more than 10 blocks away;
-- it never fights an owner, a name in `combat.friends`, or a player in creative or spectator,
-  and does nothing with `reflexes.selfDefense` off.
-  With no owners configured, nobody counts as an owner here, so set `combat.friends` for the
-  people it should always spare.
+| Mode | What the bot does |
+|---|---|
+| `off` | never fights a player |
+| `defend` | fights back a player who hits it, or who hits the player it guards while the bodyguard is armed; stops when they haven't hit for 5 s or are more than 10 blocks away |
+| `revenge` | `defend`, and remembers players who killed or attacked the bot, an owner or the guarded player (a grudge), and attacks them on sight for `combat.revengeMinutes` (30) or until it killed them `combat.revengeKills` times (1), then forgives them |
+| `targets` | attacks the players on `combat.targets`, plus grudges |
+| `all` | attacks every player within range, plus everything above |
+
+Safety rails, in every mode:
+
+- owners and `combat.friends` are never fought, and never get a grudge or a place on the target
+  list; neither are players in creative or spectator, or the bot itself;
+- in the attacking modes (`revenge`, `targets`, `all`) players inside a protected area (learned
+  spawn protection or claims, or `world.spawnProtection` around the world spawn) are left alone
+  while `combat.spareProtected` is on (default);
+- only owners change the mode or the lists (`!pvp`, `!attack_player`, `!hunt_player`,
+  `!config_set`); an LLM or NPC brain can't start PvP. Anyone may make it more peaceful
+  (`!pvp off`, `!spare_player`);
+- the kill switch: `!pvp off`, or "pax stop" / `!stop` from an owner, ends every fight with a
+  player and every hunt at once; `stop` also drops an attacking mode to `off` (`defend` stays,
+  it only answers attacks);
+- mode changes are whispered to the owners online; nothing is said in public unless
+  `combat.taunts` is on (a short line after a win);
+- `reflexes.selfDefense` off turns off `defend`; the attacking modes have their own switch (the mode).
 
 ```sh
-!config_set combat.pvp defend
-!config_set combat.friends Alice,Bob
-!config_reset combat.pvp
+!pvp                    # mode, targets, grudges and hunts (also !pvp_list, !grudges)
+!pvp revenge
+!attack_player Bob      # on the target list; switches off/defend/revenge to targets
+!hunt_player Bob        # ...and go find them (where they were last seen) and fight them
+!spare_player Bob       # off the list, grudge forgiven, fight or hunt ended
+!pvp off                # kill switch
+!config_set combat.friends Alice,Carol
 ```
 
+In plain words (intents, owners only): "pax pvp all", "pax attack Bob", "pax hunt Bob",
+"pax stop attacking Bob", "pax leave Bob alone", "pax stop attacking" (= PvP off), "pax stop".
+"attack" and "hunt" only take the name of a player who is online, so "attack the zombie" or a
+typo never adds a target; `!attack_player` adds an offline name.
+
+**Starting a fight.** Every 500 ms the reflexes look for an allowed player within
+`combat.pvpEngage` blocks (16) and in sight (or within 4): grudges first, then targets, then
+anyone (mode `all`), nearest first. A gear check runs before it starts: the duel odds are the
+time the player needs to kill the bot over the time the bot needs to kill them, from health,
+armour (the vanilla formula), the best weapon (theirs is what they hold, at least a stone
+sword), a shield, a totem and golden apples. Below `combat.pvpMinOdds` (0.7) it doesn't start the
+fight; a grudge does with `combat.revengeIgnoresOdds`. A player it gave up on waits a minute.
+
+**Giving up.** Past `combat.pvpChase` blocks (48) from where the fight started, after
+`combat.pvpLostSec` seconds (30) without seeing them, or when they pearl or teleport away past
+half the chase limit. A hunt (`hunt_player`) walks to where the player was last seen (this
+session) and gives up after `combat.huntMinutes` (10).
+
+**Fighting a player** (`combat.pvpTactics`, default on; off = the mob fight loop). Players strafe,
+block, crit, shoot, pearl and heal, so the PvP loop (`pvp-fight.ts`, decisions in
+`pvp-tactics.ts`) reads the enemy every tick: what they hold, a raised shield (living-entity
+flags), a drawn bow, their last swing (so it knows when their hit is charged), velocity from
+position samples, their health:
+
+- weapon: the sword, swapped for the axe when they raise a shield that faces the bot (any axe hit
+  on it turns it off for 5 s), hit at once, then back to the sword; swaps happen on the way in;
+- hits on full charge, jump crits, a sprinted first hit, W-tap sprint hits when the enemy has a
+  drop or lava behind them (knock them off) or the bot is losing; aim 2 ticks ahead of their
+  movement;
+- footwork: sprint in strafing (a faster zig-zag against a drawn bow), step into reach only when
+  the hit is (almost) charged, circle at about 3 blocks while it charges, step back inside 2.4 or
+  when their swing is ready and ours isn't; without an axe against a raised shield it works
+  round to the side;
+- shield: up when an arrow is on course or a bow is drawn at it, and in reach when their swing is
+  charged and ours has more than 5 ticks to go; down to hit, and never against an axe at close
+  range (it would be disabled for 5 s);
+- bow at 12 to 40 blocks with arrows, with lead from arrow physics, unless they block or close in
+  faster than a draw takes; melee once close;
+- sustain: a totem into the offhand at 10 health, a golden apple at 10 (when they're not on it)
+  or at 6, back off to heal when low with nothing to heal with and losing, then come back at 14
+  health or 4 more than theirs; normal food when they're 10+ blocks away;
+- terrain: never stands with a drop or lava behind (sidesteps to the safe side, or presses
+  forward when boxed in), doesn't follow into liquid and stops at the chase limit.
+
 Server rules come first: plenty of servers ban bots or PvP outside arenas. Leave it `off` unless
-the server allows it.
+the server allows it. The bot-vs-bot benchmark is on [Behaviours](../guide/behaviors#pvp-benchmark-just-pvp-bench).
 
 Two live benchmarks: `scripts/fight-test.ts` stands the bot outside for a night and counts kills,
 deaths and damage taken; `scripts/arena-test.ts` uses an op account to hand out the same gear
@@ -464,8 +530,9 @@ Besides this loop the reflexes also:
 - back off from a warden instead of fighting it, and `bunker` from phantoms at night (below);
 - move a totem into the offhand at 8 health or less, and start `water_bucket` during a damaging
   fall or while burning (`combat.totem`, `combat.waterClutch`);
-- start `defend_player` against a player who hits the bot or its guarded player, only with
-  `combat.pvp defend` (see [PvP](#pvp-defend-only)).
+- start `defend_player` against a player who hits the bot or its guarded player, with
+  `combat.pvp` anything but `off`, and `pvp_engage` against an allowed player in range in the
+  attacking modes (see [PvP](#pvp)).
 
 `reflexes.selfDefense` off turns off all the fighting parts, PvP defence included. In creative
 and spectator the mob, hunger and fall reflexes are off.
@@ -505,8 +572,12 @@ settings:
     disengageToHeal: true # back off to eat at <= 4 health when there is food
     autoArmor: true       # wear the best armour, shield/totem in the offhand
     maxChase: 16          # give up a chase this far from where the fight started
-    pvp: "off"            # or defend
-    friends: []           # players never fought back
+    pvp: "off"            # defend | revenge | targets | all (see PvP)
+    friends: []           # players never fought, in any mode
+    targets: []           # attacked on sight with pvp targets/all
+    revengeMinutes: 30    # how long a grudge lasts
+    spareProtected: true  # leave players in protected areas alone
+    taunts: false
 ```
 
 ## Phantoms: bunker

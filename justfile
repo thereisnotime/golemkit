@@ -59,6 +59,12 @@ guard-bench *args:
     @echo "{{BOLD}}{{BLUE}}==> guard benchmark {{args}}{{NORMAL}}"
     node --env-file-if-exists=.env scripts/guard-bench.ts {{args}}
 
+# Bot-vs-bot PvP benchmark (PvpA vs PvpB, ClaudeTest directs): new tactics vs the old loop, or a mirror match
+[group('debug')]
+pvp-bench *args:
+    @echo "{{BOLD}}{{BLUE}}==> pvp benchmark {{args}}{{NORMAL}}"
+    node --env-file-if-exists=.env scripts/pvp-bench.ts {{args}}
+
 # Survival benchmark: a test bot with a profile's behaviours alone for N in-game days (--compare a b)
 [group('debug')]
 survival-bench *args:
