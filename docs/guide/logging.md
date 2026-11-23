@@ -38,7 +38,7 @@ Loggers are hierarchical, `<username>/<component>/...`:
 | `McBuddy/action/<name>` | logs written by an action itself (`ctx.log`) |
 | `McBuddy/chat` | chat in (`<Steve> hi`), whispers, and what the bot says (`> hello`) |
 | `McBuddy/server` | system messages: joins, deaths, advancements (debug) |
-| `McBuddy/neoforge` | server platform: handshake, channel learning (debug), skipped packets (trace); the name stays `neoforge` with `MC_PLATFORM=vanilla` or `paper` |
+| `McBuddy/neoforge` | server platform: handshake, channel learning (debug), skipped packets (trace); named after the platform, so `McBuddy/vanilla` or `McBuddy/paper` with `MC_PLATFORM=vanilla` or `paper` |
 | `McBuddy/journal` | the [event journal](./journal): write and rollup failures, retention, summaries |
 | `McBuddy/<brain>` | brains log under their own name (e.g. `McBuddy/npc`) |
 | `fleet` | fleet messages between bots (debug) |

@@ -46,7 +46,7 @@ export class MinecraftJavaAdapter implements GameAdapter {
     this.agent = agent
     this.platform = platformFor(agent.server)
     for (const c of this.platform.capabilities) this.capabilities.add(c)
-    this.platformLog = agent.log.child('neoforge')
+    this.platformLog = agent.log.child(this.platform.name)
     this.capture = new JournalCapture(agent, agent.journal)
   }
 
