@@ -32,8 +32,10 @@
 
 Bots are real protocol clients, not headless Minecraft, so they start in a second and use about
 100 MB each. golemkit is built and tested on a NeoForge 1.21.1 modpack (Create, Ars Nouveau,
-Curios, ...); the NeoForge layer learns any server's mod channels on its own and stays idle on
-vanilla and Paper servers. See the [support status](#support-status) for what has been tested.
+Curios, ...); the NeoForge platform learns any server's mod channels on its own and stays idle on
+vanilla and Paper servers (`MC_PLATFORM=vanilla` or `paper` skips it). The game itself sits
+behind an adapter interface, so the core, brains and intents don't depend on Minecraft. See the
+[support status](#support-status) for what has been tested.
 
 ## What the bots can do
 
@@ -45,8 +47,11 @@ vanilla and Paper servers. See the [support status](#support-status) for what ha
   they work through on their own, budgets, quota pauses, and an NPC fallback mode when the
   quota runs out.
 - **Look after themselves and you.** Reflexes (fight back, eat, escape), adaptive weapons,
-  shields, crits, a bodyguard behaviour that protects its owner, tool upgrades, food scouting,
-  farming, climbing out of caves, swimming up when low on air.
+  shields, crits and skilled-player techniques (W-tap, sweeps, shield timing, totems, golden
+  apples, water bucket clutch), cover and return fire against archers, remembered danger zones,
+  a bodyguard behaviour that protects its owner, tool upgrades, a food ladder that searches
+  wider, travels to known farms and grows its own, climbing out of caves, swimming up when low
+  on air.
 - **Find and fetch.** Search for ores, mobs, water, villages or biomes, then bring items from
   their own chests, crafting, smelting or gathering, and recover an owner's drops after a death.
 - **Build.** YAML blueprints, imports from `.schem`/`.litematic`/`.nbt`, a blueprint library,
@@ -66,7 +71,7 @@ vanilla and Paper servers. See the [support status](#support-status) for what ha
 |---|---|---|
 | NeoForge 1.21.1 | ✅ | tested daily on mc02; mod channels, registry sync and config tasks handled |
 | Other NeoForge versions | 🧪 | set `MC_VERSION`; the handshake follows the 1.21.1 wire formats |
-| Vanilla, Paper, Spigot | 🧪 | the NeoForge layer stays idle; not part of regular testing |
+| Vanilla, Paper, Spigot | 🧪 | the NeoForge layer stays idle, or `MC_PLATFORM=vanilla` / `paper` skips it; not part of regular testing |
 | Fabric / Quilt | 🧪 | fine when no mod needs a client side; not tested |
 | Legacy Forge (FML 1.12 to 1.20.1) | ❌ | different handshake, not implemented |
 | Offline auth | ✅ | what mc02 uses |
@@ -74,7 +79,7 @@ vanilla and Paper servers. See the [support status](#support-status) for what ha
 | Modded items and mobs | ✅ | real names from NeoForge's registry sync |
 | Modded blocks | 🧪 | treated as full cubes, since their states aren't synced |
 | Mod GUIs, Create contraptions, Ars spells, Curios slots | ❌ | |
-| Games other than Minecraft Java | 🚧 | the LLM brain, intents, behaviours and context packs are game-agnostic; a game-adapter split is proposed in [game-adapters](openspec/changes/game-adapters/proposal.md) |
+| Games other than Minecraft Java | 🚧 | Minecraft Java runs behind the [GameAdapter interface](docs/concepts/adapters.md) with capability gating ([game-adapters](openspec/changes/game-adapters/proposal.md) phases 0 to 3); a second game is phase 4 |
 
 ### Bot features
 
@@ -87,8 +92,12 @@ vanilla and Paper servers. See the [support status](#support-status) for what ha
 | LLM brain (Claude / Codex subscription or API) | ✅ | goals, budgets, quota pause, token usage in the journal |
 | NPC mode when the LLM quota runs out | ✅ | default routine: 🚧 [daily-routine](openspec/changes/daily-routine/proposal.md) |
 | Reflexes and combat (weapons, shields, crits, creepers) | ✅ | |
-| Bodyguard | ✅ | a third fewer hits in the [mob-wave benchmark](docs/guide/behaviors.md); 🚧 [guard-intercept](openspec/changes/guard-intercept/proposal.md), [bodyguard-coexistence](openspec/changes/bodyguard-coexistence/proposal.md), [guard-bench-modes](openspec/changes/guard-bench-modes/proposal.md) |
-| Food, farming, woodcutting, mining, tool upgrades | ✅ | |
+| Combat techniques (W-tap, sweeps, shield timing, totem, golden apples, water bucket, enderman gaze, chokepoints) | ✅ | `combat.*` toggles, benchmarked in [behaviours](docs/guide/behaviors.md); notes in [combat research](docs/concepts/combat-research.md) |
+| Fighting back against players (`combat.pvp defend`) | 🧪 | off by default; never owners or `combat.friends` |
+| Ranged defence (cover, shooting back) and danger zones | ✅ | `ranged_defense` reflex and stay_safe; spots where archers or a patrol were seen are avoided for a few minutes |
+| Bodyguard | ✅ | intercepts mobs and pulls aggro off its player; a third fewer hits in the [mob-wave benchmark](docs/guide/behaviors.md); 🚧 [bodyguard-coexistence](openspec/changes/bodyguard-coexistence/proposal.md), [guard-bench-modes](openspec/changes/guard-bench-modes/proposal.md) |
+| Food ladder (search rings, trips to known food places, seeds, a farm that grows to 9x9) | ✅ | `keep_fed` in [behaviours](docs/guide/behaviors.md) |
+| Farming, woodcutting, mining, tool upgrades | ✅ | |
 | Search and fetch (`find_target`, `bring_item`, `fetch_drops`) | 🧪 | ores and water found live; hunting, shearing and re-runs: 🚧 [search-gaps](openspec/changes/search-gaps/proposal.md) |
 | Building from blueprints, imports (.schem, .litematic, .nbt) | ✅ | |
 | Roads and stairs between buildings | ✅ | stair tower as an action: 🚧 [stair-tower-action](openspec/changes/stair-tower-action/proposal.md) |
@@ -172,8 +181,8 @@ Guides worth starting with:
 - [Live config](docs/guide/live-config.md) and [profiles](docs/guide/profiles.md)
 - [NPC brain](docs/guide/npc-brain.md), [self-improving NPCs](docs/guide/self-improver.md), [scenes](docs/guide/scenes.md)
 - [Context packs](docs/guide/context-pack.md) and the [journal](docs/guide/journal.md)
-- Concepts: [architecture](docs/concepts/architecture.md), [world, movement and combat](docs/concepts/world.md)
-- [What is game-specific](docs/concepts/scope.md): which code is game-agnostic, Minecraft-specific or NeoForge-specific, ahead of the [game-adapter split](openspec/changes/game-adapters/proposal.md)
+- Concepts: [architecture](docs/concepts/architecture.md), [world, movement and combat](docs/concepts/world.md), [combat research](docs/concepts/combat-research.md)
+- [What is game-specific](docs/concepts/scope.md): which code is game-agnostic, Minecraft-specific or NeoForge-specific, and the [game adapters](docs/concepts/adapters.md) that keep them apart
 - Reference: [skills](docs/skills.md) and the generated [action reference](docs/reference/actions.md)
 
 ## buddy's commands
@@ -182,8 +191,10 @@ Say them in chat with `!`, or whisper without it. `!help <command>` explains one
 Positional args follow the parameter order, `key=value` works too (`!follow distance=4`).
 
 `!come` `!follow [player] [distance]` `!goto <x> [y] <z>` `!goto_player <player>` `!stop`
-`!guard [player]` `!attack` `!eat` `!sleep` `!wake` `!inventory` `!drop [item|all] [count]`
-`!equip <item>` `!collect <block> [count]` `!pos` `!hp` `!say <text>` `!look_at` `!jump`
+`!guard [player]` `!protect [player]` `!attack` `!hunt [animal] [count]` `!gear_up` `!eat`
+`!sleep` `!wake` `!pillar` `!climb_out` `!bunker` `!inventory` `!drop [item|all] [count]`
+`!equip <item>` `!collect <block> [count]` `!feed_player [player]` `!last_death` `!goto_death`
+`!pos` `!hp` `!say <text>` `!look_at [player]` `!jump` `!config_set <key> <value>`
 
 It also fights back when hit, eats when hungry, respawns and reconnects. Bots with the
 intents brain understand the same requests in plain chat ("follow me", "come here"); say
@@ -191,9 +202,10 @@ intents brain understand the same requests in plain chat ("follow me", "come her
 
 ## Config
 
-Env vars, see [.env.example](.env.example): server (`MC_HOST`, `MC_PORT`, `MC_AUTH`),
-`MC_OWNERS` (who may command bots), `MC_CAN_DIG`, `MC_LOG_LEVEL`. Per-bot values in the bot
-definition or the fleet file override them.
+Env vars, see [.env.example](.env.example): server (`MC_HOST`, `MC_PORT`, `MC_AUTH`,
+`MC_PLATFORM`), `MC_OWNERS` (who may command bots), `MC_CAN_DIG`, `MC_LOG_LEVEL`. Per-bot values
+in the bot definition, profile or fleet file override them; profiles can use `${VAR:-default}`
+to read env vars. Full list in the [configuration reference](docs/reference/config.md).
 
 ## How it gets into a NeoForge server
 
@@ -217,7 +229,8 @@ Mineflayer only speaks vanilla. `src/adapters/minecraft-java/platforms/neoforge/
 
 ```bash
 just            # list recipes
-just check      # typecheck + unit tests
+just check      # typecheck + unit tests + adapter lint
+just parity     # offline parity: tests, golden snapshots, packet replay, intents bench
 just probe      # connect once, dump the world snapshot
 just chat-test  # join as a second player and send commands to a running bot
 ```
@@ -227,7 +240,7 @@ Specs live in `openspec/`.
 
 ## Contributing
 
-Issues and pull requests are welcome. Run `just check` (typecheck and unit tests) before sending
+Issues and pull requests are welcome. Run `just check` (typecheck, unit tests, adapter lint) before sending
 a change, and describe behaviour changes in [`openspec/`](openspec/): planned work lives in
 [`openspec/changes/`](openspec/changes/) and on the [roadmap](https://thereisnotime.github.io/golemkit/roadmap).
 Agent and coding conventions are in [AGENTS.md](AGENTS.md).

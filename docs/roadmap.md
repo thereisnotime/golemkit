@@ -47,7 +47,12 @@ Games with anti-cheat and no bot API are out of scope.
 
 | feature | status | proposal |
 |---|---|---|
-| Bodyguard that intercepts mobs, pulls them away and handles creepers safely | <span class="rm soon">next</span> | [guard-intercept](https://github.com/thereisnotime/golemkit/blob/main/openspec/changes/guard-intercept/proposal.md) |
+| Bodyguard that intercepts mobs, pulls them away and handles creepers safely | <span class="rm now">works today</span> | [guard-intercept](https://github.com/thereisnotime/golemkit/blob/main/openspec/changes/archive/2026-11-23-guard-intercept/proposal.md) (done) |
+| Combat techniques: W-tap, sweeps, shield timing, totem, golden apples, water bucket, enderman gaze, chokepoints | <span class="rm now">works today</span> | [combat-techniques spec](https://github.com/thereisnotime/golemkit/blob/main/openspec/specs/combat-techniques/spec.md), [research notes](/concepts/combat-research) |
+| Fighting back against players (`combat.pvp defend`, off by default) | <span class="rm try">untested</span> | [combat-techniques spec](https://github.com/thereisnotime/golemkit/blob/main/openspec/specs/combat-techniques/spec.md) |
+| Ranged defence (cover, shooting back, backing out of range) and danger zones | <span class="rm now">works today</span> | [stay-safe spec](https://github.com/thereisnotime/golemkit/blob/main/openspec/specs/stay-safe/spec.md) |
+| Food ladder: search rings, trips to known food places, seed gathering, a farm that grows to 9x9 | <span class="rm now">works today</span> | [food spec](https://github.com/thereisnotime/golemkit/blob/main/openspec/specs/food/spec.md) |
+| Game adapter interface, capability gating, adapter lint (game-adapters phases 0 to 3) | <span class="rm now">works today</span> | [game-adapters](https://github.com/thereisnotime/golemkit/blob/main/openspec/changes/game-adapters/proposal.md) |
 | Bodyguard that lets LLM goals use the body between threats | <span class="rm soon">next</span> | [bodyguard-coexistence](https://github.com/thereisnotime/golemkit/blob/main/openspec/changes/bodyguard-coexistence/proposal.md) |
 | Lighter, more realistic guard benchmark | <span class="rm soon">next</span> | [guard-bench-modes](https://github.com/thereisnotime/golemkit/blob/main/openspec/changes/guard-bench-modes/proposal.md) |
 | Job queue ("farm, then wood, then home") | <span class="rm soon">next</span> | [job-queue](https://github.com/thereisnotime/golemkit/blob/main/openspec/changes/job-queue/proposal.md) |
@@ -58,5 +63,5 @@ Games with anti-cheat and no bot API are out of scope.
 | Known plain-language misses | <span class="rm soon">next</span> | [intent-parser-gaps](https://github.com/thereisnotime/golemkit/blob/main/openspec/changes/intent-parser-gaps/proposal.md) |
 | Staircase towers as an action | <span class="rm soon">next</span> | [stair-tower-action](https://github.com/thereisnotime/golemkit/blob/main/openspec/changes/stair-tower-action/proposal.md) |
 | Restart a stopped agent | <span class="rm soon">next</span> | [core-restart-fixes](https://github.com/thereisnotime/golemkit/blob/main/openspec/changes/core-restart-fixes/proposal.md) |
-| Other games (phases 0-3 done: adapter interface, capabilities; phase 4: a second game) | <span class="rm soon">next</span> | [game-adapters](https://github.com/thereisnotime/golemkit/blob/main/openspec/changes/game-adapters/proposal.md) |
+| A second game (game-adapters phase 4) | <span class="rm soon">next</span> | [game-adapters](https://github.com/thereisnotime/golemkit/blob/main/openspec/changes/game-adapters/proposal.md) |
 | Mod GUIs, Create contraptions, Ars spells, Curios slots | <span class="rm idea">idea</span> | |

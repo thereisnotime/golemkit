@@ -1,12 +1,12 @@
 # golemkit
 
-Framework for Minecraft bots on NeoForge servers, built on Mineflayer. TypeScript run directly by Node (see `.tool-versions`), no build step. Read `docs/concepts/architecture.md` before changing core, skills or brains.
+Framework for Minecraft bots built on Mineflayer, tested on NeoForge (vanilla and Paper work too, picked with `MC_PLATFORM`). The game sits behind an adapter interface, so the core is game-agnostic. TypeScript run directly by Node (see `.tool-versions`), no build step. Read `docs/concepts/architecture.md` before changing core, skills or brains.
 
 ## Layout
 
 - `src/core/` agent lifecycle, action lock and priorities, chat queue, storage, CLI helpers, and `adapter.ts` (the GameAdapter interface and capabilities). `src/core/index.ts` is the public API; skills, brains and bots import from there (it also re-exports the Minecraft helpers).
 - `src/adapters/minecraft-java/` the Minecraft Java adapter: Mineflayer, pathfinder and session events (`adapter.ts`), helpers, journal capture, reflexes, the behaviour library, stock NPC behaviours, scene actions, and the server platforms in `platforms/` (`neoforge/` with wire formats from neoforged/NeoForge branch `1.21.1`, `network/payload/`; `vanilla`, `paper`).
-- `src/skills/` Minecraft actions grouped by topic. `src/brains/` decision loops. `variants/` bot definitions. `scripts/` live-server tools.
+- `src/skills/` Minecraft actions grouped by topic, with the pure planners next to them (`foodPlan`, `farmPlan`, `searchPlan`, `reachPlan`, `ranged-plan`, `techniques`, `pvp`, ...). `src/brains/` decision loops. `variants/` bot definitions. `scripts/` live-server tools.
 
 ## Scope: game-agnostic vs game-specific
 

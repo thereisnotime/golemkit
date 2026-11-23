@@ -4,7 +4,7 @@ import { withMermaid } from 'vitepress-plugin-mermaid'
 // Local docs site: `just docs` (dev server) or `just docs-build` (static HTML in docs/.vitepress/dist).
 export default withMermaid(defineConfig({
   title: 'golemkit',
-  description: 'Minecraft bot framework for NeoForge servers',
+  description: 'Minecraft bot framework on Mineflayer, for NeoForge, Paper and vanilla servers',
   cleanUrls: true,
   // '/' locally; the GitHub Pages workflow sets DOCS_BASE=/golemkit/ (the site lives under the repo name)
   base: process.env.DOCS_BASE || '/',
