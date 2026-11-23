@@ -819,8 +819,9 @@ backs off (60 s, doubling up to 30 min) when a step fails:
 5. take wool from its chests when that makes 3 of one colour
 6. shear sheep (`shear`); with 2 iron ingots and no shears it makes shears first
 7. hunt woolly sheep (`hunt animal=sheep`), sparing `spareSheep` adults
-8. by day, search the `rings` around home for sheep (`find_food` with sheep only); an empty ring
-   is skipped for `ringMemoryMinutes`. With every ring empty it stops with "no sheep found
+8. by day, search the `rings` around home for sheep (`find_food` with sheep only); a ring searched
+   all the way round without sheep is skipped for `ringMemoryMinutes` (one cut short by nightfall
+   is searched again). With every ring empty it stops with "no sheep found
    within 250" and tries again when the oldest empty ring is forgotten.
 
 The back-off ends early when the wool, planks, logs, shears, iron or beds it carries change.

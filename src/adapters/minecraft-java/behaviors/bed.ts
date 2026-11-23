@@ -160,8 +160,12 @@ export const keepSpawnBed = defineBehavior({
             return ctx.act('hunt', { animal: 'sheep', count: step.count, radius: o.radius, keepAtLeast: o.spareSheep })
           case 'search': {
             const r = await ctx.act('find_food', { animals: ['sheep'], radius: step.radius, minRadius: step.covered, keepAtLeast: o.spareSheep, from: 'home', maxMinutes: 8 })
-            const searches = agent.storage.get<SearchRecord[]>(SEARCHES_KEY, [])
-            agent.storage.set(SEARCHES_KEY, recordSheepSearch(searches, step.radius, r.ok, Date.now()))
+            // only a ring searched all the way round counts as empty; one cut short (night, time, a cave) is tried again
+            const why = (r.data as { reason?: string } | undefined)?.reason ?? ''
+            if (r.ok || /^covered every direction/.test(why)) {
+              const searches = agent.storage.get<SearchRecord[]>(SEARCHES_KEY, [])
+              agent.storage.set(SEARCHES_KEY, recordSheepSearch(searches, step.radius, r.ok, Date.now()))
+            }
             return r.ok ? r : { ok: false, message: `no sheep within ${step.radius}: ${r.message}` }
           }
         }

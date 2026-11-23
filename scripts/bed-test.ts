@@ -1,7 +1,7 @@
 // Live test of keep_spawn_bed on a real server.
 //   node scripts/bed-test.ts run 950 -300 [minutes]   walk to x/z (300+ blocks from spawn, the fortress and the village),
-//                                                     set home there, arm keep_spawn_bed (asking off) with chop_wood_loop,
-//                                                     keep_fed and stay_safe, and watch until the respawn point is set at home
+//                                                     set home there, arm keep_fed until fed, then keep_spawn_bed (asking off)
+//                                                     with chop_wood_loop, and watch until the respawn point is set at home
 //   node scripts/bed-test.ts remove                   break the beds, crafting tables and furnaces the last run put down
 //   node scripts/bed-test.ts report                   the respawn record and the blocks the last run put down
 // The bot is BED_BOT (default BedTest); data lives in data/bed-test. It never runs gamerule or op commands.
@@ -86,8 +86,10 @@ async function run (): Promise<void> {
   if (!getHome(a) || Math.hypot(getHome(a)!.x - X, getHome(a)!.z - Z) > 24) await step(a, 'set_home')
   watchPlaced(a)
   log(`start: ${state(a)}; spawn record ${JSON.stringify(getSpawn(a))}`)
-  await step(a, 'behavior_arm', { name: 'stay_safe', options: { retreatBelow: 6 } })
+  // fed first (the walk out costs food), then the bed; stay_safe stays off (its night walks home fight chop_wood_loop)
   await step(a, 'behavior_arm', { name: 'keep_fed', options: {} })
+  const fedBy = Date.now() + 10 * 60_000
+  while (a.bot.food < 14 && Date.now() < fedBy) { await pause(15_000); log(state(a)) }
   await step(a, 'behavior_arm', { name: 'chop_wood_loop', options: { keep: 2 } })
   await step(a, 'behavior_arm', { name: 'keep_spawn_bed', options: { ask: false, graceSeconds: 8 } })
   const until = Date.now() + Number(mins) * 60_000
