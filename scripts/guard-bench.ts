@@ -5,6 +5,7 @@
 //        [--time day|night] [--phantoms] [--waves mixed|ranged] [--bow] [--blocks 0] [--no-intercept] [--no-pull] [--variants a,b]
 //        [--tag run] [--scout] [--cleanup] [--force]
 //        [--duel zombie,skeleton,creeper,vindicator] [--duel-count 2] [--clutch 5] [--clutch-height 22]
+//        [--no-shield] [--bread 16]
 // DIRECTOR (default ClaudeTest, an op) runs everything with commands: before every phase it sets
 // the time, kills leftover tagged mobs, fills explosion holes in the arena floor, resets both
 // players to full health and hunger, gives the same gear (GUARD_BOT: a sword, a shield, 16 bread,
@@ -14,7 +15,10 @@
 // phantom every third with --phantoms), one every --interval seconds while fewer than --cap mobs
 // are alive. --waves ranged summons archers only: 2 skeletons and 2 pillagers (crossbows), 3
 // pillagers on every other wave, to see how the bot keeps itself alive under fire. --bow also gives
-// the bot a bow and 32 arrows; --blocks N gives it N cobblestone (to build cover against archers).
+// the bot a bow and 32 arrows; --blocks N gives it N cobblestone (to build cover against archers);
+// --no-shield leaves the shield out and --bread N changes the bread (a poorly geared bot, like one
+// out scouting with stone tools). Cobblestone and dirt the bot places anywhere (cover walls, pillars
+// while backing off) are noted and removed at the end.
 // --no-intercept and --no-pull arm the bodyguard with intercept or pulling aggro off, so each can be
 // measured on its own (the results carry `variant`); --variants all,no-intercept,no-pull runs a guard
 // phase for each in one session. The tester stands still (no self-defence, eats). Phases: guard (bodyguard armed for
@@ -44,7 +48,7 @@ const AVOID = process.env.MC_OWNER || 'Robin'
 const argv = process.argv.slice(2)
 const flag = (name: string) => argv.includes(`--${name}`)
 const opt = (name: string, def: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : def }
-const BOOL_FLAGS = ['--armour', '--phantoms', '--scout', '--force', '--cleanup', '--bow', '--no-intercept', '--no-pull']
+const BOOL_FLAGS = ['--armour', '--phantoms', '--scout', '--force', '--cleanup', '--bow', '--no-intercept', '--no-pull', '--no-shield']
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i > 0 && argv[i - 1].startsWith('--') && !BOOL_FLAGS.includes(argv[i - 1])))
 const X = Number(positional[0] ?? 1250)
 const Z = Number(positional[1] ?? 445)
@@ -62,6 +66,8 @@ const PHANTOMS = flag('phantoms')
 const WAVES = opt('waves', 'mixed') as 'mixed' | 'ranged'
 const BOW = flag('bow')
 const BLOCKS = Number(opt('blocks', '0'))
+const SHIELD = !flag('no-shield')
+const BREAD = Number(opt('bread', '16'))
 type Variant = 'all' | 'no-intercept' | 'no-pull' | 'neither'
 /** Which bodyguard tactics are on: all, no-intercept, no-pull, neither. --variants runs several guard phases, one per variant. */
 const VARIANTS: Variant[] = opt('variants', '') ? opt('variants', '').split(',') as Variant[]
@@ -284,6 +290,8 @@ async function main (): Promise<void> {
   let measuring = false
   let testerDied = false
   let botDied = false
+  /** Blocks the bot placed: "x y z" -> block name. */
+  const placedBlocks = new Map<string, string>()
   const spot = { x: X + 0.5, y: G + 1, z: Z + 0.5 }
   const toSpot = (p: { x: number, y: number, z: number }) => Math.hypot(p.x - spot.x, p.z - spot.z)
   let spotV: any = null // the spot as a Vec3, once the tester is in
@@ -342,6 +350,11 @@ async function main (): Promise<void> {
         st.explosions++
         if (Math.hypot(p.x - b.entity.position.x, p.y - b.entity.position.y, p.z - b.entity.position.z) <= 6) st.explosionsNear++
       })
+      // blocks it puts down (cover walls, pillars), wherever it ran to: removed at the end
+      b.on('blockUpdate', (old: any, now: any) => {
+        if (!now || !/^(cobblestone|dirt)$/.test(now.name) || (old && old.boundingBox === 'block') || !b.entity) return
+        if (now.position.distanceTo(b.entity.position) <= 6) placedBlocks.set(`${now.position.x} ${now.position.y} ${now.position.z}`, now.name)
+      })
       // the bot's own hits taken (any drop in health while measuring; hunger can't hurt it, it carries bread)
       let lastHp = b.health
       b.on('health', () => {
@@ -366,8 +379,8 @@ async function main (): Promise<void> {
   const gearBot = async () => {
     await cmd(`/clear ${BOT}`)
     await cmd(`/give ${BOT} minecraft:${SWORD}_sword 1`)
-    await cmd(`/give ${BOT} minecraft:shield 1`)
-    await cmd(`/give ${BOT} minecraft:bread 16`)
+    if (SHIELD) await cmd(`/give ${BOT} minecraft:shield 1`)
+    if (BREAD > 0) await cmd(`/give ${BOT} minecraft:bread ${BREAD}`)
     if (BOW) { await cmd(`/give ${BOT} minecraft:bow 1`); await cmd(`/give ${BOT} minecraft:arrow 32`) }
     if (BLOCKS > 0) await cmd(`/give ${BOT} minecraft:cobblestone ${BLOCKS}`)
     if (ARMOUR) for (const p of ['helmet', 'chestplate', 'leggings', 'boots']) await cmd(`/give ${BOT} minecraft:iron_${p} 1`)
@@ -423,6 +436,8 @@ async function main (): Promise<void> {
     await parkPlayers()
     await pause(1000)
     await repairFloor()
+    for (const [at, name] of placedBlocks) await cmd(`/execute if block ${at} minecraft:${name} run setblock ${at} minecraft:air`)
+    if (placedBlocks.size) log(`removed up to ${placedBlocks.size} blocks the bot placed`)
     if (live(bot)) await disarmAll()
     await cmd(`/clear ${BOT}`)
     await cmd(`/clear ${TESTER}`)
@@ -517,7 +532,7 @@ async function main (): Promise<void> {
         const kills = st.kills[mob] ?? 0
         const result = {
           tag: RUN_TAG, mode: 'duel', mob, count: DUEL_COUNT, repeat: rep + 1, at: new Date().toISOString(), spot: [X, G + 1, Z],
-          minutes: MINUTES, seed: SEED, sword: SWORD, armour: ARMOUR, bow: BOW, summoned: st.summoned,
+          minutes: MINUTES, seed: SEED, sword: SWORD, armour: ARMOUR, bow: BOW, shield: SHIELD, blocks: BLOCKS, summoned: st.summoned,
           kills, killsPerMin: Math.round(kills / MINUTES * 10) / 10, botDeaths: st.botDeaths, botHits: st.botHits,
           botDamage: Math.round(st.botDamage), damagePerKill: kills ? Math.round(st.botDamage / kills * 10) / 10 : null,
           explosions: st.explosions, explosionsNearBot: st.explosionsNear
