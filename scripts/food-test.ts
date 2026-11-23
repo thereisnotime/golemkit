@@ -2,6 +2,7 @@
 //   node scripts/food-test.ts run 760 45 [minutes]   walk to x/z, empty the inventory, set home, arm keep_fed + farm_setup, watch
 //   node scripts/food-test.ts farm 800 -40           walk to x/z and run start_farm there directly (no behaviours)
 //   node scripts/food-test.ts tend [seeds]           go to the farm the last run made, gather seeds, run tend_farm and show the plot
+//   node scripts/food-test.ts seeds 900 300 [count]   walk to x/z and run gather_seeds there (a grassy spot away from bases)
 //   node scripts/food-test.ts report                  farms and food spots the last run remembered
 //   node scripts/food-test.ts remove                  break the crops, fences and torches of the farms the last run made
 // The bot is FOOD_BOT (default FoodTest), owned by FOOD_TESTER (default FoodTester), who joins
@@ -169,6 +170,34 @@ async function tend (): Promise<void> {
   await bot.stop()
 }
 
+/** Places the seeds test must stay 300+ blocks away from: spawn, the fortress, the village (and the owner, checked live). */
+const KEEP_AWAY = [{ name: 'spawn', x: 545, z: 45 }, { name: 'fortress', x: 560, z: -43 }, { name: 'village', x: -2770, z: 1090 }]
+
+async function seeds (): Promise<void> {
+  const near = KEEP_AWAY.find(p => Math.hypot(p.x - X, p.z - Z) < 300)
+  if (near) { log(`${X} ${Z} is within 300 blocks of the ${near.name}; pick another spot`); return }
+  const bot = new Agent(variant, server, { username: BOT, dataDir: DATA, canDig: true, owners: [TESTER] })
+  bot.on('actionEnd', (info: any, r: ActionResult) => { if (info.caller?.name !== 'food-test') log(`${r.ok ? 'done' : 'FAIL'} ${info.name} (${info.caller.kind}:${info.caller.name}): ${r.message}`) })
+  await connect(bot)
+  for (const name of ['keep_fed', 'farm_setup', 'stay_safe']) await step(bot, 'behavior_disarm', { name }).catch(() => null)
+  const owner = process.env.MC_OWNER ? bot.bot.players[process.env.MC_OWNER]?.entity : undefined
+  if (owner && Math.hypot(owner.position.x - X, owner.position.z - Z) < 300) { log('the owner is within 300 blocks of that spot; stopping'); await bot.stop(); return }
+  log(`spawned: ${state(bot)}`)
+  await waitForDay(bot)
+  const far = () => Math.hypot(bot.bot.entity.position.x - X, bot.bot.entity.position.z - Z)
+  for (let i = 0; i < 8 && far() > 12; i++) {
+    while (bot.currentAction) await pause(2000)
+    if (!(await step(bot, 'goto', { x: X, z: Z })).ok) await pause(3000)
+  }
+  if (far() > 24) { log(`never got to ${X} ${Z}`); await bot.stop(); return }
+  const before = state(bot)
+  log(`at the spot: ${before}`)
+  await step(bot, 'gather_seeds', { count: Number(mins === '30' ? 10 : mins), radius: 64, maxMinutes: 4 })
+  log(state(bot))
+  bot.storage.flush()
+  await bot.stop()
+}
+
 async function report (): Promise<void> {
   const bot = new Agent(variant, server, { username: BOT, dataDir: DATA, canDig: true })
   // read storage without connecting
@@ -197,5 +226,5 @@ async function remove (): Promise<void> {
   await bot.stop()
 }
 
-const main = mode === 'report' ? report : mode === 'tend' ? tend : mode === 'remove' ? remove : mode === 'farm' ? farm : run
+const main = mode === 'seeds' ? seeds : mode === 'report' ? report : mode === 'tend' ? tend : mode === 'remove' ? remove : mode === 'farm' ? farm : run
 main().then(() => process.exit(0), e => { console.error(e); process.exit(1) })
