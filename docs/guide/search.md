@@ -20,6 +20,7 @@ died". The `search` skill (in the extended skills) answers these without the LLM
 | `find_target` | `target` (a word), `radius` (160), `max_minutes` (8), `bring` + `count` (also fetch some), `go` (walk there and stay instead of coming back), `prospect` (strip mine for ores), `at_night`. |
 | `bring_item` | `item`, `count` (1), `player` (default the asker), `max_minutes` (10, for a search). |
 | `fetch_drops` | `player` (default the asker), `x y z` when the bot didn't see the death, `try_anyway`. |
+| `where_stored` | `item` (a name or a word of it): where it remembers seeing it in a chest, with the position and how long ago ([container memory](#container-memory)). Quick, not long-running. |
 
 ```
 !find_target iron
@@ -28,6 +29,7 @@ died". The `search` skill (in the extended skills) answers these without the LLM
 !bring_item oak_planks 16
 !bring_item bread 2
 !fetch_drops
+!where_stored iron
 ```
 
 All three are long-running: they honour the stop signal, whisper milestones to whoever asked
@@ -146,7 +148,10 @@ flowchart TD
       chests: ["120 64 -30", [130, 64, -30]]
   ```
 
-  Nobody else's chest is opened for taking, whatever `respectBuilds` says.
+  Nobody else's chest is opened for taking, whatever `respectBuilds` says. Which chest it tries
+  first comes from what it remembers seeing inside them; with [container memory](#container-memory)
+  on that survives a restart, and an old sighting still sends it to the chest but is checked on
+  the spot.
 - **Crafting** uses the existing `craftItem`; bread, sticks, torches and hay blocks fetch one level
   of ingredients first. Wood products (planks, sticks, tables, chests) go through
   `gather_materials`, which chops and crafts in one go.
@@ -159,6 +164,77 @@ flowchart TD
 - **Delivery** watches the player's `playerCollect` events for 4 s after the toss, so "gave" means
   the player picked it up. Items that weren't picked up, or fewer than asked, make the result a
   failure that says so.
+
+## Container memory
+
+Every time the bot opens a chest, barrel or shulker box (`deposit`, `withdraw`, `list_container`,
+the pantry top-up before a trip, keep_fed's food chests, `check_chests`) it notes what is inside.
+By default that note lives in memory only and is gone after a restart. With
+`settings.inventoryMemory` on it is kept in the bot's storage (`data/bots/<name>/store.json`, key
+`containers.memory`), per server and dimension, as position -> block, contents, when it looked
+inside (`at`) and when it last saw the block in place (`verifiedAt`). A double chest is one entry,
+found by either half.
+
+```yaml
+settings:
+  inventoryMemory:
+    enabled: true        # default false: in memory only, as before
+    maxAgeHours: 24      # older sightings are hints, not facts
+    indexOwn: true       # check_storage looks into its own and configured chests by day
+    refreshMinutes: 60   # ...ones not seen inside for this long
+    radius: 48           # ...within this many blocks of home
+    lowFood: 8           # tell the owners when the pantry holds fewer food items (0 = never)
+    grumble: true        # grumble once when its chest is raided, moved or broken (default false)
+    grumbleTo: owners    # owners (whisper the owners online) | say (public chat)
+    grumbleHours: 3      # at most once per chest this often
+```
+
+`true` alone turns it on with the defaults. Every key is also a [live toggle](/guide/live-config)
+(`!config_set inventoryMemory.grumble false`), and a key the bot doesn't know is warned about
+when the profile loads.
+
+**Facts and hints.** A sighting younger than `maxAgeHours` is a fact. An older one, or one in
+doubt (half of the double chest broken, a second half added), is a hint: callers still use it to
+pick which chest to try first, but the bot opens the chest and goes by what is really there.
+`knownContainers()` reports `ageMs` and `freshness` (`fresh`, `hint`, `unknown`) for each entry;
+the pre-trip pantry count only counts fresh entries as food in hand.
+
+**Staying right in a shared world.** Players take things, move chests and break them:
+
+- Whenever the bot opens a container it overwrites the entry with what is really there. If that
+  differs from what it remembered (someone else was in there), it records a `container_changed`
+  [journal](/guide/journal) event, e.g. "pantry at 559 69 -47: 12 bread gone since 2 h ago".
+- When it gets to a remembered container and finds another block or nothing, or sees the block
+  change while the chunk is loaded (a block update, or a chunk coming into view), it drops the
+  entry without walking there and records `container_gone` with what it last held.
+- A container it has never opened, placed in view or standing within 6 blocks of where its chest
+  was (moved?), is remembered without contents. It is only opened when it is its own or a
+  configured chest; other people's chests are never opened.
+- Its own chest that is gone is no longer its own (`search.ownChests`).
+
+**Grumbling.** When its own or a configured chest is emptied, raided, moved or broken it says
+so once, mildly and in character: "who took my bread?!", "my chest is gone... rude", "who moved
+my chest?". At most once per chest every `grumbleHours`, at most once every 10 minutes overall,
+by whisper to the owners online (nobody online: nothing) or in public chat with `grumbleTo: say`;
+it goes through `agent.whisper`/`say`, so the chat rate limits apply.
+
+**Where is X.** "pax, where's my iron?" (the plain-language commands route "where is my X" here)
+or `!where_stored iron` answers from memory: "12 iron_ingot in the chest at 559 69 -47, seen
+2 h ago", older sightings marked "(may have changed)". When the chest is its own, it adds that
+"bring me iron" fetches it; [bring_item](#bring-item) takes from its own and configured chests,
+the ones known to hold the item first.
+
+**Keeping it current.** The [check_storage](/guide/behaviors#container-memory-check-storage)
+behaviour (with `indexOwn`) looks into its own and configured chests near home by day and tells
+the owners when the pantry runs low. `!check_chests` does one round on demand.
+
+Live run (`node scripts/chest-memory-test.ts 1100 400`, test bot `ChestTest` with `ClaudeTest`
+as the op director, 2026-11-23): a chest with 18 bread was looked into, the bot restarted and
+still knew it ("18 bread in the chest at 1101 83 400"); after `/data modify` took 12 the next look
+journalled "12 bread gone" and whispered "hey, someone took my bread" to the owner; the chest set
+to air in view gave `container_gone` and "my chest is gone... rude" without the bot moving; a
+chest moved two blocks gave `container_gone` with `movedTo` and "who moved my chest?"; and
+check_storage, armed by day, found 5 bread and whispered "pantry low: 5 bread left".
 
 ## fetch_drops
 

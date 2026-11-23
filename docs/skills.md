@@ -153,7 +153,9 @@ ingredients; `gather_materials` does the whole chain for wooden things.
 |---|---|
 | `deposit` | Store an item, or `all`, in the nearest chest/barrel/shulker box or the one at x y z. `all` keeps tools, armour, food and anything in `keep`. Reports partial deposits when the container fills up. |
 | `withdraw` | Take N of an item (or `all`) out of a container. Stops when the inventory is full. |
-| `list_container` *ne* | What's inside. Opens it only when it is within reach and the bot is idle; otherwise answers from what the bot saw last time it opened it (in memory). |
+| `list_container` *ne* | What's inside. Opens it only when it is within reach and the bot is idle; otherwise answers from what the bot saw last time it opened it, with how long ago ([container memory](/guide/search#container-memory)). |
+| `check_chests` | Look inside its own and configured chests near home that it has not seen inside lately: notes items taken or added, chests moved or broken, and says when the pantry runs low. Never opens anyone else's chest. |
+| `where_stored` *ne* | Where an item is stored, from container memory: position and how long ago it looked. |
 
 Observe hook: `containersNearby` (within 16 blocks).
 

@@ -70,6 +70,8 @@ coordinates).
 | `food_spot` | `find_food` / `keep_fed` saw huntable animals, a village farm or water to farm by (also kept as places `food:animals`, `food:village_farm`, `food:water`) | `kind`, `count`, `animals` |
 | `farm_started` | `start_farm` planted a new farm (also a place `farm:<n>`) | `name`, `size`, `crop`, `tilled`, `planted` |
 | `found` | a [search](/guide/search) (`find_target`, `search`) found what it was looking for (also a place `found:<target>`) | `target`, `what`, `count`, `how`, `note` |
+| `container_changed` | [container memory](/guide/search#container-memory) on: a container it opened holds something else than it remembered (someone took or added things), or half of a double chest was broken | `block`, `label`, `gone`, `added`, `since`, `own`, `note`, `text` |
+| `container_gone` | container memory on: a remembered container is gone or another block (found on arrival or seen in view) | `block`, `label`, `found`, `how` (`arrived`/`in view`), `held`, `since`, `own`, `movedTo`, `text` |
 | `connect` / `disconnect` | each session | `server`, `gameMode` / `reason` (kick text when kicked) |
 | `llm_turn` | after every LLM turn | `provider`, `model`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `toolCalls`, `ms`, `ok`, `trigger` if the brain reports one |
 | `help` | a behaviour kept failing and asked the owners for help, or works again after asking ([asking for help](/guide/behaviors#asking-for-help)) | `status` (`asked`/`sorted`), `behavior`, `reason`, `goal`, `help`, `failures`, `tried`, `to`, `message` / `minutes` |
@@ -167,7 +169,7 @@ The journal skill's actions are chat commands and LLM tools like every other act
 
 | action | |
 |---|---|
-| `recall_events` (`!events`) | recent events, filtered: `type` (`death`, `chat`, `items`, `blocks`, `players`, `actions`, `places`, `combat`, `connections`, `food`, `finds` (search finds), `help` / `stuck` (help requests), `llm` or any type), `since` (`30m`, `1h`, `today`, `yesterday`, `2026-11-20`; default 24 h), `player`, `near` (`"x y z"` or `"x z"`, optional radius), `text`, `limit`, `fleet` |
+| `recall_events` (`!events`) | recent events, filtered: `type` (`death`, `chat`, `items`, `blocks`, `players`, `actions`, `places`, `combat`, `connections`, `food`, `finds` (search finds), `help` / `stuck` (help requests), `chests` / `containers` / `storage` (container changes), `llm` or any type), `since` (`30m`, `1h`, `today`, `yesterday`, `2026-11-20`; default 24 h), `player`, `near` (`"x y z"` or `"x z"`, optional radius), `text`, `limit`, `fleet` |
 | `last_death` (`!death`) | where, when, what killed it, what it was doing, what it lost and whether the drops may still be there (items despawn 5 minutes after death) |
 | `history` (`!summary`) | a summary of `today`, `yesterday`, a date, `3h`, or hours today like `10-12` |
 | `goto_death` | walk back to the last death position and pick up the drops (exclusive, long-running) |

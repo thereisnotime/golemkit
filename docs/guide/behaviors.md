@@ -1175,6 +1175,41 @@ The `light_up` action does one area on demand ("light up around farm:1"): `place
 torches would go. `light_area` is the older, simpler behaviour: a torch next to the bot
 when it stands somewhere dark.
 
+## Container memory: check_storage
+
+With [container memory](/guide/search#container-memory) on (`settings.inventoryMemory.enabled`),
+what the bot saw in chests survives a restart, and it notices when players change things: items
+taken or added (`container_changed`), chests moved or broken (`container_gone`), noted in the
+[journal](/guide/journal). `check_storage` keeps that memory current:
+
+```yaml
+settings:
+  storage: { chests: [[559, 69, -47]] }     # the pantry
+  inventoryMemory: { enabled: true, indexOwn: true, refreshMinutes: 60, radius: 48, lowFood: 8, grumble: true, grumbleTo: owners }
+behaviors:
+  check_storage: { max: 3 }
+```
+
+By day, when `indexOwn` is on and the bot is within `maxTrip` (96) of home, it scores 14
+(below food, safety, tools, beds and light_home's 18) as long as one of its own chests (placed
+by it) or configured chests (`settings.storage.chests`) within `radius` of home has not been
+looked into for `refreshMinutes`. It then runs `check_chests`: walks over, opens up to `max` of
+them, and updates the memory. A chest it tried is left alone for `refreshMinutes` whatever
+happened, so an unreachable one doesn't loop. It never opens anyone else's chest.
+
+**Pantry low.** After a round it adds up the food in the configured chests (its own ones when
+none is configured) from fresh memory. Below `lowFood` items it tells the owners through the
+[help desk](#asking-for-help): "pantry low: 6 bread left", by whisper to the owners online, at
+most every 6 hours (sooner only when the pantry ran out), within the help desk's hourly cap; it is
+journalled as a `help` event.
+
+**Grumbling.** When its own or a configured chest turns out emptied, raided, moved or broken by
+someone else, it grumbles once, short and mild: "who took my bread?!", "someone cleaned out my
+chest... rude", "my chest is gone... rude", "who moved my chest?". `grumble` is off by default
+(Pax has it on); `grumbleTo: owners` whispers the owners online and stays quiet when none is,
+`say` uses public chat. Once per chest every `grumbleHours` (3) and once every 10 minutes
+overall, through `agent.whisper`/`say` and their rate limits.
+
 ## Survival benchmark: `just survival-bench`
 
 `scripts/survival-bench.ts` measures how well a bot gets by on its own. A fresh test bot
@@ -1679,6 +1714,17 @@ Keeps tools usable and moving up the tiers when the bot is idle: re-crafts a wor
 | `armour` | boolean | `false` | also make iron armour once iron tools are done |
 | `senseSeconds` | number (5..600) | `30` | how often to look around for stone and ore (the scan costs CPU) |
 | `safeMining` | boolean | `true` | safe mining (settings.mining): ore deeper than mining.safeDepth only with a weapon, food and the gear mining.gear asks for; no caves, torches, climb out when losing underground |
+
+### `check_storage`
+
+*work · priority npc (20) · needs `check_chests`*
+
+Keeps container memory right: by day, when settings.inventoryMemory has enabled and indexOwn on, every refreshMinutes it walks to its own and configured chests near home that it has not looked into lately and looks inside (check_chests), noting items taken or added and chests moved or broken; tells the owners when the pantry runs low ("pantry low: 6 bread left"), at most every 6 hours. Never opens anyone else's chest. Low priority: after food, safety, tools and lighting.
+
+| option | type | default | description |
+|---|---|---|---|
+| `max` | integer (1..8) | `3` | chests to look into per run |
+| `maxTrip` | integer (16..512) | `96` | only when the bot is within this distance of home |
 
 ### `greet_players`
 

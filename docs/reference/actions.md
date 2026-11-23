@@ -10,7 +10,7 @@ scopeNote: "Generated from the skills: most are Minecraft; the journal and confi
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-28 skills, 114 actions.
+28 skills, 116 actions.
 
 ## blueprint-library
 
@@ -441,6 +441,26 @@ Say what is inside the nearest chest/barrel (or the one at x y z). Looks inside 
 | `y` | number |  |  |  |
 | `z` | number |  |  |  |
 
+### `check_chests`
+
+Look inside its own chests (ones it placed) and the configured ones (settings.storage.chests) near home that it has not looked into lately, so what it remembers is right again: notes items taken or added, chests moved or broken, and says when the pantry runs low. Never opens anyone else's chest.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `radius` | integer (4..256) |  | `48` | chests within this many blocks of home |
+| `max` | integer (1..8) |  | `3` | chests to look into this time |
+| `all` | boolean |  | `false` | also chests it looked into lately |
+
+### `where_stored`
+
+Say where an item is stored, from what the bot remembers seeing in chests and barrels: position and how long ago it looked ("12 iron_ingot in the chest at 559 69 -47, seen 2 h ago"). Older sightings are marked as maybe changed. bring_item fetches it from its own chests.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `item` | string | yes |  | item name or a word of it, e.g. iron, bread, oak_log |
+
 ## crafting
 
 Crafting and smelting.
@@ -653,7 +673,7 @@ What happened: recent journal events (deaths, damage, kills, items, chat, action
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck |
+| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck |
 | `since` | string |  |  | how far back: 30m, 1h, 2d, today, yesterday, a date (YYYY-MM-DD); default 24h |
 | `player` | string |  |  | only events involving this player |
 | `near` | string |  |  | only events near "x y z" or "x z", optionally with a radius as 4th number (default 32) |

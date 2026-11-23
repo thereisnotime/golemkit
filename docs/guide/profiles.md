@@ -105,7 +105,8 @@ journal:                      # optional, event journal settings (on by default)
 A key the profile format doesn't know (a typo such as `retreatBelo`, or `combat:` at the top
 level instead of under `settings:`) is ignored with a warning naming the file and the key, e.g.
 `profiles/pax.yaml: unknown key combat (ignored); combat toggles go under settings: combat:`.
-The same goes for unknown keys under `settings: combat:`. Free-form maps (`settings`,
+The same goes for unknown keys under `settings: combat:`, `settings: mining:`, `settings: trips:`
+and `settings: inventoryMemory:` ([container memory](./search#container-memory)). Free-form maps (`settings`,
 `behaviors`, `llm.budget`) and extra `llm` keys are not checked; `intents`, `journal` and
 `context` reject unknown keys with an error.
 

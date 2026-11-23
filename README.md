@@ -54,6 +54,7 @@ behind an adapter interface, so the core, brains and intents don't depend on Min
   on air.
 - **Find and fetch.** Search for ores, mobs, water, villages or biomes, then bring items from
   their own chests, crafting, smelting or gathering, and recover an owner's drops after a death.
+  Optionally remember what is in their chests across restarts and notice when someone raids them.
 - **Build.** YAML blueprints, imports from `.schem`/`.litematic`/`.nbt`, a blueprint library,
   creative builds by hand or by command, road and stair planning, optional WorldEdit.
 - **Stay configurable.** Variants, saved profiles, armable behaviours, live toggles

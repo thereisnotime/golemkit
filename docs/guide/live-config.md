@@ -80,6 +80,15 @@ can't change their own.
 | `trips.speed` | 0.5–10 | walking speed used for the way home, blocks per second (default 3) |
 | `trips.minDistance` | 0–1024 | walks shorter than this many blocks are not trips (default 64) |
 | `trips.ownerOrders` | on/off | also prepare and budget actions an owner ordered (default off) |
+| `inventoryMemory.enabled` | on/off | [container memory](./search#container-memory): keep what it saw in chests across restarts and keep it right (journal changes, notice chests moved or broken); off = in memory only (default off) |
+| `inventoryMemory.maxAgeHours` | 0.1–720 | sightings older than this are hints, re-checked before relying on them (default 24) |
+| `inventoryMemory.indexOwn` | on/off | by day, look into its own and configured chests near home now and then ([check_storage](./behaviors#container-memory-check-storage)) and say when the pantry runs low (default off) |
+| `inventoryMemory.refreshMinutes` | 1–1440 | check_storage looks into a chest not seen inside for this long (default 60) |
+| `inventoryMemory.radius` | 4–256 | check_storage: chests within this many blocks of home (default 48) |
+| `inventoryMemory.lowFood` | 0–1000 | tell the owners when the pantry holds fewer food items than this (default 8, 0 = never) |
+| `inventoryMemory.grumble` | on/off | grumble once in chat when its own chest is raided, moved or broken (default off) |
+| `inventoryMemory.grumbleTo` | owners / say | whisper the owners online, or public chat |
+| `inventoryMemory.grumbleHours` | 0–168 | at most one grumble per chest this often (default 3) |
 | `humanize.enabled` | on/off | player-like reaction and typing delays |
 | `humanize.typoRate` | 0–1 | chance of a typo per message |
 | `humanize.lowercase` | on/off | write chat in lower case |

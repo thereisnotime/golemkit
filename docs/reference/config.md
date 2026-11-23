@@ -81,7 +81,7 @@ All optional except `variant`; see [Profiles](../guide/profiles).
 | `reflexes` | `selfDefense`, `autoEat`, `eatBelow`, `retreatBelow`, `waterFightAbove`, `rangedDefense` | [Movement, protection, combat](../concepts/world#reflexes) |
 | `retry` | action, LLM and reconnect retries | [Profiles](../guide/profiles#retries) |
 | `journal` | journal on/off, types, retention, summaries | [Journal](../guide/journal) |
-| `settings` | free-form values for skills and brains, e.g. `settings.combat` for the `combat.*` toggles, `settings.road`, `settings.pathfinder` | [Writing a variant](../guide/writing-a-bot) |
+| `settings` | free-form values for skills and brains, e.g. `settings.combat` for the `combat.*` toggles, `settings.road`, `settings.pathfinder`, `settings.storage.chests` (configured chests), `settings.inventoryMemory` (container memory: `enabled`, `maxAgeHours`, `refreshMinutes`, `indexOwn`, `radius`, `lowFood`, `grumble`, `grumbleTo`, `grumbleHours`) | [Writing a variant](../guide/writing-a-bot), [Container memory](../guide/search#container-memory) |
 | `logging` | level spec, format, files | [Logging](../guide/logging) |
 
 ## Files and directories
@@ -94,7 +94,7 @@ All optional except `variant`; see [Profiles](../guide/profiles).
 | `data/channels-<host>-<port>.json` | learned NeoForge channels per server (NeoForge platform) |
 | `data/protected-<host>-<port>.json` | learned [protected areas](/concepts/world#protected-areas) (spawn, claims) per server |
 | `data/registries-<host>-<port>.json` | the server's item / entity / block registries (from the NeoForge registry sync) |
-| `data/bots/<username>/store.json` | per-bot storage (`agent.storage`) |
+| `data/bots/<username>/store.json` | per-bot storage (`agent.storage`; container memory under `containers.memory`) |
 | `data/bots/<username>/journal/` | journal: daily JSONL files and `rollups/` |
 | `data/models/` | cached model for the [intents embeddings layer](../guide/intents) |
 | `profiles/<name>/` | context pack (AGENTS.md, USER.md, MEMORY.md, skills/, hooks.yaml) |
