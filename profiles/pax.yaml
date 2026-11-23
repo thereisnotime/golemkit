@@ -94,6 +94,11 @@ behaviors:
   keep_spawn_bed: { homeRange: 6, graceSeconds: 12, ask: true }   # a bed by home (fortress, approved by ${MC_OWNER:-Robin}) as respawn point:
                               # own bed, else one from its chests, else crafted (shears or sheep); at night a short sleep,
                               # asking players still up to go to bed; redone when it respawns away from home
+  # Spawn-proofing (owner's OK on 2026-11-23 for torches around home and farm:1 in the fortress):
+  # Pax got into creeper/skeleton/zombie fights by home. By day, once a Minecraft day per area or
+  # after a hostile shows up there, torches so every spot a mob could spawn on has light 8+;
+  # coal, else charcoal from logs; only places, never breaks anything; remembers its own torches.
+  light_home: { radius: 24, farmRadius: 14, target: 8, maxTorches: 12 }
   anti_afk: { afterSeconds: 45 }   # small look/swing/hop so idle-kick servers don't drop it
 # Plain-language commands without the LLM (docs/guide/intents.md): "pax follow me", "pax chop some
 # wood". first = simple requests are handled directly (no tokens), everything else goes to the LLM.

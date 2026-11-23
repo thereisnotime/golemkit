@@ -123,7 +123,9 @@ Behaviours have their own live commands: `!behavior_arm`, `!behavior_configure`,
 `!behavior_disarm` (see [Behaviours](./behaviors)), e.g. `!behavior_configure chop_wood_loop`
 with `rings` to change how far it looks for trees, or `!behavior_configure keep_spawn_bed graceSeconds=20 ask=false` to
 change how long it lies in bed at night and whether it asks the others to sleep
-([respawn point](./behaviors#respawn-point-keep-spawn-bed)).
+([respawn point](./behaviors#respawn-point-keep-spawn-bed)), or `!behavior_configure light_home target=4 maxTorches=24`
+to change how bright it keeps home and its farms and how many torches it puts down a run
+([spawn-proofing](./behaviors#spawn-proofing-light-home)).
 
 ## How it works
 

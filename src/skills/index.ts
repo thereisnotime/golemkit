@@ -40,6 +40,7 @@ export { worldedit } from './worldedit.ts'
 export { roads, buildRoad, scanTerrain, getRoads } from './roads.ts'
 export { search, lookFor, ownChests, recentDeaths } from './search.ts'
 export { spawnBed, getSpawn, ownBeds } from './bed.ts'
+export { lighting, ownTorches } from './lighting.ts'
 
 import { crafting } from './crafting.ts'
 import { containers } from './containers.ts'
@@ -56,8 +57,9 @@ import { worldedit } from './worldedit.ts'
 import { roads } from './roads.ts'
 import { search } from './search.ts'
 import { spawnBed } from './bed.ts'
+import { lighting } from './lighting.ts'
 
-/** Extra skills on top of standardSkills(): crafting, containers, farming, food, search, woodcutting, building, construction, roads, blueprint library, materials, progression, pickup, WorldEdit, spawn bed. */
-export const extendedSkills = () => [crafting(), containers(), farming(), food(), search(), woodcutting(), building(), construction(), roads(), blueprintLibrary(), materialsSkill(), progressionSkill(), pickup(), worldedit(), spawnBed()]
+/** Extra skills on top of standardSkills(): crafting, containers, farming, food, search, woodcutting, building, construction, roads, blueprint library, materials, progression, pickup, WorldEdit, spawn bed, lighting. */
+export const extendedSkills = () => [crafting(), containers(), farming(), food(), search(), woodcutting(), building(), construction(), roads(), blueprintLibrary(), materialsSkill(), progressionSkill(), pickup(), worldedit(), spawnBed(), lighting()]
 export { modsSkill, installedMods } from './mods.ts'
 export { config } from './config.ts'

@@ -10,7 +10,7 @@ scopeNote: "Generated from the skills: most are Minecraft; the journal and confi
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-26 skills, 111 actions.
+27 skills, 113 actions.
 
 ## blueprint-library
 
@@ -653,7 +653,7 @@ What happened: recent journal events (deaths, damage, kills, items, chat, action
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn; or deaths, chat, items, blocks, players, combat, connections, food, finds |
+| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, help; or deaths, chat, items, blocks, players, combat, connections, food, finds, stuck |
 | `since` | string |  |  | how far back: 30m, 1h, 2d, today, yesterday, a date (YYYY-MM-DD); default 24h |
 | `player` | string |  |  | only events involving this player |
 | `near` | string |  |  | only events near "x y z" or "x z", optionally with a radius as 4th number (default 32) |
@@ -688,6 +688,28 @@ Walk back to where the bot last died to pick up its dropped items (they despawn 
 | param | type | required | default | description |
 |---|---|---|---|---|
 | `pickup` | boolean |  | `true` | pick up dropped items there |
+
+## lighting
+
+Spawn-proofing with torches.
+
+### `light_up`
+
+Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates, or here) where hostile mobs could spawn (block light below `target`; 1.21.1 monsters need light 0), works out the fewest torches that light them all, crafts torches from coal or charcoal (smelts charcoal from logs when out of coal) and places them: floor torches, wall torches where there is no floor; never on farmland, paths, in front of doors, in water or protected areas, and never breaking anything. Remembers its own torches. dry_run only reports.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `place` | string |  |  | remembered place to light up, e.g. home or farm:1; default x/y/z or where it stands |
+| `x` | number |  |  |  |
+| `y` | number |  |  |  |
+| `z` | number |  |  |  |
+| `radius` | integer (2..48) |  | `16` | flat radius around the centre |
+| `y_range` | integer (1..16) |  | `6` | blocks above and below the centre to look at |
+| `target` | integer (1..15) |  | `8` | light every spawnable spot to at least this (1 stops spawns; higher leaves a margin) |
+| `max_torches` | integer (1..64) |  | `16` | torches to place at most this time |
+| `craft` | boolean |  | `true` | craft torches (and smelt charcoal) when it has too few |
+| `spawn_clearance` | number (0..256) |  | `24` | never place within this distance of the world spawn |
+| `dry_run` | boolean |  | `false` | only report the dark spots and the planned torches |
 
 ## materials
 
@@ -894,6 +916,17 @@ Run away from the nearest hostile mob until it is a safe distance away.
 |---|---|---|---|---|
 | `distance` | number (4..32) |  | `16` | how far to get from the mob |
 | `entityId` | integer (-9007199254740991..9007199254740991) |  |  | run from this mob instead of the nearest hostile one |
+
+### `prepare_trip`
+
+Get ready to leave home: take food from my pantry and own chests up to trips.food items, hold my best weapon, and check health. Fails with what is missing (no weapon, too little food, low health) when I should not go; a food trip while starving goes anyway.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `purpose` | string |  | `"a trip"` | what the trip is for, for the report |
+| `kind` | `food` \| `wood` \| `wool` \| `ore` \| `travel` |  | `"travel"` | food trips may go while starving; the others need the kit |
+| `distance` | number (0..100000) |  |  | planned distance from home, in blocks |
+| `waive` | array |  | `[]` | checks to skip for this trip |
 
 ## pickup
 

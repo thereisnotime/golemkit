@@ -1042,6 +1042,61 @@ through the same desk: shared limits and journal, so the owner never gets both, 
 works with `askHelp` off (then it is limited to once an hour, falling back to public chat when no
 owner is online).
 
+## Spawn-proofing: light_home
+
+`light_home` keeps mobs from spawning around home, the bot's own farms (`farm:1`, ...) and any
+places you list. In 1.21.1 overworld monsters spawn only at block light 0. A torch gives 14 at
+its block and one less per block of distance (Manhattan, through air), so on flat ground a
+torch about every 12 blocks is enough for light 1. The default `target` is 8: the estimate
+ignores walls, and the margin covers corners it gets wrong.
+
+By day, once per `everyMinutes` (20, one Minecraft day) for each area, and sooner when a
+hostile shows up inside an area (each mob counts once), it walks over and runs `light_up`:
+
+1. **Survey.** Every standable cell within `radius` (24 around home and places, `farmRadius`
+   12 around a farm) and `yRange` (6) up and down: a free cell with head room and a block
+   under it. A cell needs light when a monster could spawn there: a full, opaque floor (not
+   glass, leaves, slabs, ice, farmland or paths). The light at a cell is the real block light
+   from the chunk's light data (Mineflayer keeps it per block in loaded chunks, `Block.light`),
+   raised by what the light sources it can see would give (torches, lanterns, glowstone, sea
+   lanterns, lit campfires and furnaces, lava ...). When the chunks carry no light data at all
+   it uses the sources alone.
+2. **Plan.** Greedy cover (`planTorches` in `src/skills/lightPlan.ts`): it keeps picking the
+   torch spot that brings the most cells below `target` up to it, floor torches before wall
+   torches, until none are dark, `maxTorches` (16) is reached or no allowed spot reaches the
+   rest. A torch only goes into air (never replacing grass, crops or anything else) on a
+   block that is already there: on the floor when it takes one, on a wall next to the cell
+   when it doesn't. Never on farmland or crops, on a path, within a block of a door, gate or
+   trapdoor, in water, in a protected area, within `spawnClearance` (24) of the world spawn,
+   or where the server refused one before.
+3. **Torches.** With too few torches it crafts them from coal or charcoal and sticks (sticks
+   from planks, planks from logs). With no coal it smelts charcoal from logs, planks as fuel,
+   in a furnace within 32 blocks or one it carries or makes from 8 cobblestone. With neither
+   coal nor logs it fails with the reason ("out of coal and charcoal, and no logs to make
+   charcoal") and backs off (2 minutes, doubling up to an hour); the back-off ends when the
+   torches, coal, charcoal, logs, planks, sticks or cobblestone it carries change.
+4. **Place.** Nearest first. Each torch it puts down is remembered as its own
+   (`lighting.torches` in storage), so it can tell its torches from the owner's. When one of
+   its torches is gone on a later check, someone took it away: it forgets it and never puts
+   one in that spot again (`lighting.removed`).
+
+An area counts as checked when nothing is left dark, or when a run placed nothing (no spot
+reaches the rest); with more dark spots than `maxTorches` it carries on with the next run. It
+scores 18 at the npc level, below food, safety, `keep_tools_upgraded` (28) and
+`follow_owner` (26), so with the owner in sight it follows them and lights up later. Only
+areas within `maxTrip` (96) of the bot count, so a long food trip doesn't turn into a walk
+home for torches.
+
+```yaml
+behaviors:
+  light_home: { radius: 24, target: 8, maxTorches: 12, places: [storage, { name: gate, x: 540, y: 66, z: -60, radius: 10 }] }
+```
+
+The `light_up` action does one area on demand ("light up around farm:1"): `place`, or `x y z`,
+`radius`, `target`, `max_torches`; `dry_run=true` only reports the dark spots and where the
+torches would go. `light_area` is the older, simpler behaviour: a torch next to the bot
+when it stands somewhere dark.
+
 ## Capabilities
 
 A behaviour lists the actions it `requires`; if the bot lacks one it is skipped with a
@@ -1329,6 +1384,27 @@ Places torches on dark ground around home (or a remembered place) so mobs do not
 | `darkBelow` | integer (1..15) | `8` | place a torch where block light is below this |
 | `spacing` | integer (3..16) | `7` | no torch closer than this to another light |
 | `craft` | boolean | `true` | craft torches from coal/charcoal and sticks when out |
+
+### `light_home`
+
+*work · priority npc (20) · needs `light_up`, block placing · uses `go_home`, `goto`, `craft`, `smelt` when present*
+
+Spawn-proofs home, its own farms and listed places: by day, every so often (sooner after a hostile was seen there) it walks over, finds the spots where mobs could spawn and puts torches down so every one has light (light_up: floor torches, walls where there is no floor, never on farmland, paths, in front of doors, in water or protected areas, never breaking anything). Crafts torches from coal or charcoal (smelts charcoal from logs); backs off with a reason when out of both. Low priority: after food, safety and tools.
+
+| option | type | default | description |
+|---|---|---|---|
+| `radius` | integer (4..48) | `24` | flat radius around home (and listed places) to light |
+| `farmRadius` | integer (4..48) | `12` | radius around each of its own farms |
+| `home` | boolean | `true` | light around home |
+| `farms` | boolean | `true` | light around its own farms (farm:1, ...) |
+| `places` | list | `[]` | more areas: remembered place names, or {name, x, y, z, radius} |
+| `target` | integer (1..15) | `8` | light every spawnable spot to at least this (1 stops 1.21.1 spawns; 8 leaves a margin) |
+| `maxTorches` | integer (1..64) | `16` | torches per run |
+| `yRange` | integer (1..16) | `6` | blocks above and below the centre to look at |
+| `everyMinutes` | number (5..1440) | `20` | check each area this often (20 = one Minecraft day) |
+| `onMobs` | boolean | `true` | re-check an area sooner when a hostile shows up in it |
+| `maxTrip` | integer (16..512) | `96` | only areas within this distance of the bot |
+| `spawnClearance` | number (0..256) | `24` | never place within this distance of the world spawn |
 
 ### `keep_tools_upgraded`
 

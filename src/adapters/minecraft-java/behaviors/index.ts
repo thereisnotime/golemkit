@@ -11,6 +11,7 @@ import { farmSetup } from './farm.ts'
 import { keepToolsUpgraded } from './tools.ts'
 import { keepSpawnBed } from './bed.ts'
 import { withStockHelp } from './help.ts'
+import { lightHome } from './light.ts'
 
 export { keepFed, nextFoodStep, isHungry, senseFood, COOKED, type FoodStep, type FoodWorld, type FoodStepOptions } from './keepFed.ts'
 export { staySafe, avoidMobs, assessDanger } from './safety.ts'
@@ -23,13 +24,14 @@ export { farmSetup, nextFarmTask, senseFarm, type FarmTask, type FarmState, type
 export { keepToolsUpgraded, wornTools } from './tools.ts'
 export { keepSpawnBed } from './bed.ts'
 export { stockHelp, stockGoal, withStockHelp } from './help.ts'
+export { lightHome } from './light.ts'
 
 export function defaultBehaviors (): BehaviorDefinition<any>[] {
   return withStockHelp([
     staySafe, avoidMobs, keepFed,
     bodyguard, guardOwner, guardArea, followOwner,
     sleepAtNightBehavior, returnHome, keepSpawnBed, depositWhenFull,
-    farmSetup, farmLoop, chopWoodLoop, collectDrops, lightArea, keepToolsUpgraded,
+    farmSetup, farmLoop, chopWoodLoop, collectDrops, lightArea, lightHome, keepToolsUpgraded,
     greetPlayersBehavior, wanderBehavior, idleLook, idleAntics, antiAfk
   ])
 }

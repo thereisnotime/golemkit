@@ -3139,6 +3139,73 @@
       }
     },
     {
+      "name": "light_up",
+      "description": "Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates, or here) where hostile mobs could spawn (block light below `target`; 1.21.1 monsters need light 0), works out the fewest torches that light them all, crafts torches from coal or charcoal (smelts charcoal from logs when out of coal) and places them: floor torches, wall torches where there is no floor; never on farmland, paths, in front of doors, in water or protected areas, and never breaking anything. Remembers its own torches. dry_run only reports.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "place": {
+            "description": "remembered place to light up, e.g. home or farm:1; default x/y/z or where it stands",
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "z": {
+            "type": "number"
+          },
+          "radius": {
+            "default": 16,
+            "description": "flat radius around the centre",
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 48
+          },
+          "y_range": {
+            "default": 6,
+            "description": "blocks above and below the centre to look at",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16
+          },
+          "target": {
+            "default": 8,
+            "description": "light every spawnable spot to at least this (1 stops spawns; higher leaves a margin)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 15
+          },
+          "max_torches": {
+            "default": 16,
+            "description": "torches to place at most this time",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          },
+          "craft": {
+            "default": true,
+            "description": "craft torches (and smelt charcoal) when it has too few",
+            "type": "boolean"
+          },
+          "spawn_clearance": {
+            "default": 24,
+            "description": "never place within this distance of the world spawn",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 256
+          },
+          "dry_run": {
+            "default": false,
+            "description": "only report the dark spots and the planned torches",
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
       "name": "mods",
       "description": "List the mods this server runs (with versions when known) and how many items/blocks/mobs each adds. Use it before explaining or teaching a mod, so you talk about what is actually installed.",
       "inputSchema": {
@@ -6338,6 +6405,73 @@
           "pens": {
             "default": false,
             "description": "also shear sheep inside fences (only your own)",
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "name": "light_up",
+      "description": "Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates, or here) where hostile mobs could spawn (block light below `target`; 1.21.1 monsters need light 0), works out the fewest torches that light them all, crafts torches from coal or charcoal (smelts charcoal from logs when out of coal) and places them: floor torches, wall torches where there is no floor; never on farmland, paths, in front of doors, in water or protected areas, and never breaking anything. Remembers its own torches. dry_run only reports.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "place": {
+            "description": "remembered place to light up, e.g. home or farm:1; default x/y/z or where it stands",
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "z": {
+            "type": "number"
+          },
+          "radius": {
+            "default": 16,
+            "description": "flat radius around the centre",
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 48
+          },
+          "y_range": {
+            "default": 6,
+            "description": "blocks above and below the centre to look at",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16
+          },
+          "target": {
+            "default": 8,
+            "description": "light every spawnable spot to at least this (1 stops spawns; higher leaves a margin)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 15
+          },
+          "max_torches": {
+            "default": 16,
+            "description": "torches to place at most this time",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          },
+          "craft": {
+            "default": true,
+            "description": "craft torches (and smelt charcoal) when it has too few",
+            "type": "boolean"
+          },
+          "spawn_clearance": {
+            "default": 24,
+            "description": "never place within this distance of the world spawn",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 256
+          },
+          "dry_run": {
+            "default": false,
+            "description": "only report the dark spots and the planned torches",
             "type": "boolean"
           }
         }
