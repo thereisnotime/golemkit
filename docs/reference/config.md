@@ -8,7 +8,8 @@ scopeNote: "LLM, logging and storage settings are game-agnostic; MC_* connection
 Precedence, lowest to highest: environment (`.env`) → variant (bot definition) → profile →
 [fleet](/concepts/architecture#fleets-and-multiple-servers) `defaults` → fleet bot entry → CLI flags
 (see [Precedence](/concepts/variants-profiles#precedence)). In-game changes to
-[feature toggles](../guide/live-config) win over all of these until reset.
+[feature toggles](../guide/live-config) win over all of these until reset. In a fleet, the
+server entry's keys win over a profile's `server:` block, which only fills the gaps.
 
 `.env` in the working directory is loaded on start when it exists (no `--env-file` needed);
 copy it from `.env.example`. Profiles, context packs, fleet and scene files expand `${NAME}` and
@@ -66,7 +67,7 @@ All optional except `variant`; see [Profiles](../guide/profiles).
 | key | what | guide |
 |---|---|---|
 | `variant` | which variant to run | [Variants, profiles, fleets](../concepts/variants-profiles) |
-| `username`, `description`, `persona`, `owners`, `canDig`, `server` | identity, permissions, server override (`host`, `port`, `auth`, `version`, `platform`) | [Profiles](../guide/profiles) |
+| `username`, `description`, `persona`, `owners`, `canDig`, `server` | identity, permissions, server override (`host`, `port`, `auth`, `version`, `platform`; in a fleet only for keys the fleet's server leaves out) | [Profiles](../guide/profiles) |
 | `respectBuilds`, `selfAware` | leave player-made blocks alone (default off); show the bot its own setup each turn (default on) | [Feature toggles](../guide/live-config) |
 | `npcMode` | behaviours to arm while the LLM is paused, or `false` | [NPC mode](../guide/behaviors#npc-mode-when-the-llm-can-t-think) |
 | `behaviors` | armed behaviours and their options | [Behaviours](../guide/behaviors) |

@@ -113,8 +113,9 @@ flowchart TD
 and keep the variant's other LLM options.
 
 Two exceptions: CLI flags (`--username`, `--owners`, `--dig`) only exist for `run`, so in a
-fleet the entry is the top layer; and for the server, a profile's `server:` block wins over the
-fleet's `servers:` entry, which in turn fills its gaps from the environment.
+fleet the entry is the top layer; and for the server, the fleet's `servers:` entry wins over a
+profile's `server:` block, which only fills the keys the fleet leaves out (`platform`,
+`version`, ...); anything neither sets comes from the environment.
 
 ## When to make what
 

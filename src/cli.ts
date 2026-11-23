@@ -8,7 +8,7 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { Agent, Fleet, serverFromEnv, createLogger, configureLogging, installCrashHandlers, type BotDefinition, type InstanceOptions, type ServerConfig } from './core/index.ts'
-import { parseFleetFile, resolveUsername } from './core/fleetFile.ts'
+import { parseFleetFile, resolveUsername, fleetServerConfig } from './core/fleetFile.ts'
 import { loadProfile, mergeOptions, PROFILES_DIR, type LoadedProfile } from './core/profile.ts'
 import { validateBehaviorConfig, defaultBehaviorRegistry } from './brains/behaviors/index.ts'
 
@@ -133,7 +133,7 @@ async function main (): Promise<void> {
         const { def, profile } = p.profile ? await resolveTarget(p.profile) : { def: await loadVariant(p.variant!), profile: null }
         const merged = mergeOptions(profile?.options, p.options)
         const opts = resolveUsername(p, merged.username ?? def.username ?? def.name, plan.multiServer, merged)
-        fleet.add(new Agent(def, { ...p.serverConfig, ...profile?.server }, opts), p.server)
+        fleet.add(new Agent(def, fleetServerConfig(p, profile?.server), opts), p.server)
       }
       for (const name of fleet.servers) {
         const s = plan.servers[name]!

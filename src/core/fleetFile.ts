@@ -73,6 +73,8 @@ export interface PlannedAgent {
   profile?: string
   server: string
   serverConfig: ServerConfig
+  /** What the fleet file itself sets for that server (no environment fallbacks). */
+  serverFields: Partial<ServerConfig>
   options: InstanceOptions
   /** Copy number when count > 1 (used to suffix the definition's default username). */
   index?: number
@@ -84,6 +86,16 @@ export interface FleetPlan {
   staggerMs: number
   multiServer: boolean
   logging?: z.infer<typeof LoggingSchema>
+}
+
+/**
+ * Connection settings for one fleet bot: environment (and --host/--port) < the profile's
+ * `server:` < what the fleet's server entry sets. The fleet decides where its bots connect; a
+ * profile only fills what the fleet leaves out (e.g. `platform` or `version`).
+ */
+export function fleetServerConfig (p: PlannedAgent, profileServer: Partial<ServerConfig> = {}): ServerConfig {
+  const { staggerMs: _s, ...base } = p.serverConfig as ServerConfig & { staggerMs?: number }
+  return { ...base, ...profileServer, ...p.serverFields }
 }
 
 /** Final username and data dir once the default username (profile or variant) is known. */
@@ -100,9 +112,11 @@ export function resolveUsername (p: PlannedAgent, defUsername: string, multiServ
 export function parseFleetFile (text: string, base: ServerConfig = serverFromEnv()): FleetPlan {
   const file = FleetFileSchema.parse(YAML.parse(expandEnv(text)))
   const servers: FleetPlan['servers'] = {}
+  const declared: Record<string, Partial<ServerConfig>> = {}
   const rawServers = file.servers ?? { default: file.server ?? {} }
   for (const [name, s] of Object.entries(rawServers)) {
     const { staggerMs, ...conn } = s
+    declared[name] = Object.fromEntries(Object.entries(conn).filter(([, v]) => v !== undefined))
     servers[name] = { ...base, ...conn, staggerMs: staggerMs ?? file.staggerMs }
   }
   const names = Object.keys(servers)
@@ -122,6 +136,7 @@ export function parseFleetFile (text: string, base: ServerConfig = serverFromEnv
         profile: entry.profile,
         server,
         serverConfig,
+        serverFields: declared[server]!,
         ...(entry.count > 1 ? { index: i } : {}),
         options: {
           username,

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseFleetFile, resolveUsername } from '../src/core/fleetFile.ts'
+import { parseFleetFile, resolveUsername, fleetServerConfig } from '../src/core/fleetFile.ts'
 import { Agent, Fleet, defineVariant } from '../src/core/index.ts'
 
 const base = { host: 'base.example', port: 25565, auth: 'offline' as const, version: '1.21.1' }
@@ -65,4 +65,13 @@ test('fleet messages stay on their server and respect recipients', () => {
   fleet.board('s1').set('scene', 'act1')
   assert.equal(fleet.board('s1').get('scene'), 'act1')
   assert.equal(fleet.board('s2').get('scene'), undefined)
+})
+
+test("fleet server wins over a profile's server:, the profile fills the gaps", () => {
+  const plan = parseFleetFile('servers:\n  mc: { host: fleet.example, port: 25570 }\nbots:\n  - profile: p\n', base)
+  const p = plan.agents[0]!
+  assert.deepEqual(p.serverFields, { host: 'fleet.example', port: 25570 })
+  const s = fleetServerConfig(p, { host: 'profile.example', port: 1, platform: 'paper', version: '1.21.4' })
+  assert.deepEqual(s, { host: 'fleet.example', port: 25570, auth: 'offline', version: '1.21.4', platform: 'paper' })
+  assert.deepEqual(fleetServerConfig(p), { host: 'fleet.example', port: 25570, auth: 'offline', version: '1.21.1' }, 'no profile: fleet over environment, no staggerMs')
 })

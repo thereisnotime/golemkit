@@ -70,8 +70,9 @@ leaves out comes from the environment (and `--host`/`--port`). The top-level `st
 `${VAR:-default}` like [profiles](./profiles#personal-values-from-the-environment).
 
 For a `profile:` entry, the fleet's `owners`, `canDig`, `username` and `settings` override the
-profile, while the profile's own `server:` block, if it has one, overrides the fleet's server
-for that bot. `--username`, `--owners` and `--dig` only apply to `run`, not to fleets.
+profile. The fleet also decides the server: what its `servers:` entry sets wins over the
+profile's `server:` block, which only fills the keys the fleet leaves out (say `platform` or
+`version`), and the environment fills the rest. `--username`, `--owners` and `--dig` only apply to `run`, not to fleets.
 
 ## Several servers
 
