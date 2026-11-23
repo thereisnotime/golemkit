@@ -123,3 +123,10 @@ Bots SHALL never start a fight with a player. With `combat.pvp` set to `defend`,
 #### Scenario: Guarded player attacked
 - **WHEN** the bodyguard is armed for Alice and a player hits Alice, with `combat.pvp` `defend`
 - **THEN** the bot fights that player until they stop or run
+
+### Requirement: Never fight the warden
+The bot SHALL NOT attack a warden, and SHALL back off when one hurts it.
+
+#### Scenario: Warden in a deep dark cave
+- **WHEN** a warden hits the bot
+- **THEN** the bot retreats instead of fighting it
