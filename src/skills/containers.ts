@@ -107,7 +107,7 @@ export function ownChests (agent: Agent): Pos[] {
 
 /** Chests listed in the profile (storage.chests). */
 export function configuredChests (agent: Agent): Pos[] {
-  const s = (agent.settings as { storage?: { chests?: unknown } }).storage
+  const s = (agent.settings as { storage?: { chests?: unknown } } | undefined)?.storage
   return parseChestList(s?.chests)
 }
 
