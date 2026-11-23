@@ -77,7 +77,7 @@ All optional except `variant`; see [Profiles](../guide/profiles).
 | `llm` | provider, model, effort, login, token source, proxy, listen, immersive, aliases, budget | [LLM brain](../guide/llm-brain) |
 | `context` | [context pack](/guide/context-pack) directory (default `profiles/<name>/`) | [Context pack](../guide/context-pack) |
 | `humanize` | reaction/typing delays, stand still while typing, typos, fidgeting | [Profiles](../guide/profiles#humanize-player-like-timing) |
-| `reflexes` | `selfDefense`, `autoEat`, `eatBelow`, `retreatBelow`, `waterFightAbove` | [Movement, protection, combat](../concepts/world#reflexes) |
+| `reflexes` | `selfDefense`, `autoEat`, `eatBelow`, `retreatBelow`, `waterFightAbove`, `rangedDefense` | [Movement, protection, combat](../concepts/world#reflexes) |
 | `retry` | action, LLM and reconnect retries | [Profiles](../guide/profiles#retries) |
 | `journal` | journal on/off, types, retention, summaries | [Journal](../guide/journal) |
 | `settings` | free-form values for skills and brains, e.g. `settings.combat` for the `combat.*` toggles, `settings.road`, `settings.pathfinder` | [Writing a variant](../guide/writing-a-bot) |

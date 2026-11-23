@@ -90,7 +90,7 @@ journal:                      # optional, event journal settings (on by default)
 | `server` | per-bot server override: `host`, `port`, `auth`, `version`, `platform` (`neoforge`, `vanilla`, `paper`; same as `MC_PLATFORM`) |
 | `intents` | [plain-language commands](/guide/intents) without the LLM: `mode`, `threshold`, `layers`, ... Lands in `settings.intents` |
 | `llm` | [LLM brain](/guide/llm-brain) settings: provider, model, effort, login, token source, `listen`, `immersive`, aliases, budget, [goals](/guide/goals-and-building) |
-| `reflexes` | eat/retreat thresholds, e.g. `retreatBelow: 0` to stand its ground ([details](../concepts/world#reflexes)) |
+| `reflexes` | eat/retreat thresholds and `rangedDefense`, e.g. `retreatBelow: 0` to stand its ground ([details](../concepts/world#reflexes)) |
 | `retry`, `humanize`, `journal`, `context` | see the sections below and the linked guides |
 | `settings` | anything the variant's skills/brains read |
 | `logging` | applied when the profile is run on its own |
@@ -100,6 +100,13 @@ journal:                      # optional, event journal settings (on by default)
 | `worldedit` | `true`/`false` forces [WorldEdit](/guide/worldedit) on or off; or `{ enabled, maxBlocks, ownersOnly, replyMs }`. Lands in `settings.worldedit` |
 | `blueprints` | extra blueprint folders (relative to the profile), added to `settings.build.blueprintDirs` |
 | `behaviors` | armed behaviours for the [behaviours brain](/guide/behaviors): `{ name: true \| false \| { enabled?, ...options } }`, checked against the registry when the profile is run, see [Behaviours](./behaviors) |
+
+A key the profile format doesn't know (a typo such as `retreatBelo`, or `combat:` at the top
+level instead of under `settings:`) is ignored with a warning naming the file and the key, e.g.
+`profiles/pax.yaml: unknown key combat (ignored); combat toggles go under settings: combat:`.
+The same goes for unknown keys under `settings: combat:`. Free-form maps (`settings`,
+`behaviors`, `llm.budget`) and extra `llm` keys are not checked; `intents`, `journal` and
+`context` reject unknown keys with an error.
 
 ## LLM listening modes
 

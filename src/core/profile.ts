@@ -16,6 +16,8 @@ import { z } from 'zod'
 import type { InstanceOptions, ServerConfig } from './definition.ts'
 import { expandEnv } from './definition.ts'
 import { LoggingSchema } from './fleetFile.ts'
+import { createLogger } from './log.ts'
+import { TOGGLES } from './toggles.ts'
 
 export const LlmProfileSchema = z.object({
   provider: z.string().optional().describe('claude-subscription | codex | anthropic | opencode | openai'),
@@ -104,13 +106,14 @@ export const ProfileSchema = z.object({
   /** Extra blueprint folders (relative to the profile), added to settings.build.blueprintDirs. */
   blueprints: z.union([z.string(), z.array(z.string())]).optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
-  /** Reflex tuning: { selfDefense, autoEat, eatBelow, retreatBelow (0 = never retreat), waterFightAbove }. */
+  /** Reflex tuning: { selfDefense, autoEat, eatBelow, retreatBelow (0 = never retreat), waterFightAbove, rangedDefense }. */
   reflexes: z.object({
     selfDefense: z.boolean().optional(),
     autoEat: z.boolean().optional(),
     eatBelow: z.number().optional(),
     retreatBelow: z.number().optional(),
-    waterFightAbove: z.number().optional()
+    waterFightAbove: z.number().optional(),
+    rangedDefense: z.boolean().optional()
   }).optional(),
   /** Retry policies (actions, llm, reconnect); see core/retry.ts. */
   retry: z.object({
@@ -190,8 +193,60 @@ export function profilePath (name: string, dir = PROFILES_DIR): string | null {
   return null
 }
 
+/** Keys zod would drop silently, with a hint for the usual mistakes. */
+const HINTS: Record<string, string> = {
+  combat: 'combat toggles go under settings: combat:',
+  bot: 'the key is variant:'
+}
+
+/** settings.combat keys the code reads (the combat.* feature toggles). */
+const COMBAT_KEYS = new Set(TOGGLES.filter(t => t.key.startsWith('combat.')).map(t => t.key.slice('combat.'.length)))
+
+/**
+ * Keys in `raw` that `schema` doesn't declare (zod strips them without a word), as dotted paths.
+ * Records are not looked into, passthrough objects only for their declared keys, strict objects
+ * not at all (zod fails on those); settings.combat is checked against the combat toggles.
+ */
+export function unknownProfileKeys (raw: unknown, schema: z.ZodType = ProfileSchema, path = ''): string[] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
+  const def = (schema as any)._zod.def
+  switch (def.type) {
+    case 'optional': case 'nullable': case 'default': case 'readonly':
+      return unknownProfileKeys(raw, def.innerType, path)
+    case 'union': {
+      const objs = (def.options as z.ZodType[]).filter(o => ['object', 'optional', 'nullable'].includes((o as any)._zod.def.type))
+      return objs.length === 1 ? unknownProfileKeys(raw, objs[0]!, path) : []
+    }
+    case 'object': {
+      const catchall = def.catchall?._zod.def.type
+      if (catchall === 'never') return []   // strict: zod reports unknown keys itself
+      const out: string[] = []
+      for (const [k, v] of Object.entries(raw)) {
+        const key = path ? `${path}.${k}` : k
+        if (!(k in def.shape)) { if (!catchall) out.push(key) }   // passthrough objects take any key
+        else out.push(...unknownProfileKeys(v, def.shape[k], key))
+      }
+      if (path === '') {
+        const combat = (raw as { settings?: { combat?: unknown } }).settings?.combat
+        if (combat && typeof combat === 'object' && !Array.isArray(combat)) {
+          out.push(...Object.keys(combat).filter(k => !COMBAT_KEYS.has(k)).map(k => `settings.combat.${k}`))
+        }
+      }
+      return out
+    }
+    default:
+      return []
+  }
+}
+
 export function parseProfile (text: string, name = 'profile', file = '(inline)'): LoadedProfile {
-  const profile = ProfileSchema.parse(YAML.parse(expandEnv(text)))
+  const raw = YAML.parse(expandEnv(text))
+  const profile = ProfileSchema.parse(raw)
+  const unknown = unknownProfileKeys(raw)
+  if (unknown.length) {
+    const log = createLogger('golemkit/profile')
+    for (const k of unknown) log.warn(`${file === '(inline)' ? name : file}: unknown key ${k} (ignored)${HINTS[k] ? `; ${HINTS[k]}` : ''}`)
+  }
   const settings: Record<string, unknown> = { ...profile.settings }
   if (profile.respectBuilds !== undefined) settings.respectBuilds = profile.respectBuilds
   if (profile.selfAware !== undefined) settings.selfAware = profile.selfAware

@@ -25,6 +25,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'reflexes.eatBelow', description: 'eat when food drops below this', schema: health },
   { key: 'reflexes.retreatBelow', description: 'back off at or below this health (0 = stand ground)', schema: health },
   { key: 'reflexes.waterFightAbove', description: "don't fight mobs in water below this health (0 = always fight)", schema: health },
+  { key: 'reflexes.rangedDefense', description: 'react to mobs shooting at it: shoot back, shield, cover or back off', schema: bool },
   { key: 'combat.adaptiveWeapon', description: 'pick the best weapon per target (damage, enchantments, finishers, axes vs shields)', schema: bool },
   { key: 'combat.ranged', description: 'use bow/crossbow for flyers and out-of-reach targets when it has arrows', schema: bool },
   { key: 'combat.shield', description: 'raise a shield against ranged mobs between swings', schema: bool },

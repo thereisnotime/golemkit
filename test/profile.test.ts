@@ -1,6 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseProfile, mergeOptions, loadProfile } from '../src/core/profile.ts'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import YAML from 'yaml'
+import { parseProfile, mergeOptions, loadProfile, unknownProfileKeys } from '../src/core/profile.ts'
+import { subscribeLogs } from '../src/core/log.ts'
 import { parseFleetFile } from '../src/core/fleetFile.ts'
 
 test('profile maps to instance options; llm goes to settings.llm', () => {
@@ -50,4 +54,36 @@ test('fleet entries can reference profiles', () => {
   assert.equal(plan.agents[0]!.profile, 'pax')
   assert.equal(plan.agents[1]!.variant, 'buddy')
   assert.throws(() => parseFleetFile('bots:\n  - username: nobody\n'), /profile or a variant/)
+})
+
+test('reflexes.rangedDefense reaches settings.reflexes', () => {
+  const p = parseProfile('variant: x\nreflexes: { rangedDefense: false, retreatBelow: 0 }\n')
+  assert.deepEqual((p.options.settings as any).reflexes, { rangedDefense: false, retreatBelow: 0 })
+})
+
+test('unknown profile keys are reported, not fatal', () => {
+  const raw = YAML.parse(`
+variant: x
+combat: { pvp: defend }
+reflexes: { retreatBelo: 3 }
+server: { hots: a }
+llm: { anyExtra: 1, goals: { maxTurn: 3 } }
+settings: { combat: { pvp: defend, crit: true }, free: 1 }
+behaviors: { keep_fed: { x: 1 } }
+`)
+  assert.deepEqual(unknownProfileKeys(raw), ['combat', 'reflexes.retreatBelo', 'server.hots', 'llm.goals.maxTurn', 'settings.combat.crit'])
+  const seen: string[] = []
+  const off = subscribeLogs(e => { if (e.level === 'warn') seen.push(e.msg) })
+  try {
+    const p = parseProfile('variant: x\ncombat: { pvp: defend }\n', 'typo')
+    assert.equal(p.profile.variant, 'x')
+  } finally { off() }
+  assert.equal(seen.length, 1)
+  assert.match(seen[0]!, /unknown key combat .*settings: combat:/)
+})
+
+test('stock profiles load without unknown keys', () => {
+  for (const f of readdirSync('profiles').filter(f => /\.ya?ml$/.test(f))) {
+    assert.deepEqual(unknownProfileKeys(YAML.parse(readFileSync(join('profiles', f), 'utf8'))), [], f)
+  }
 })

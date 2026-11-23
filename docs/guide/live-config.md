@@ -32,6 +32,7 @@ can't change their own.
 | `reflexes.eatBelow` | 0–20 | eat when food drops below this (default 15) |
 | `reflexes.retreatBelow` | 0–20 | back off at or below this health (0 = stand ground; default 8) |
 | `reflexes.waterFightAbove` | 0–20 | don't fight mobs in water below this health (0 = always fight; default 14) |
+| `reflexes.rangedDefense` | on/off | react to mobs shooting at it: shoot back, shield, cover or back off (default on) |
 | `combat.adaptiveWeapon` | on/off | best weapon per target (damage × speed, enchantments, one-hit finishers, axe vs shields; default on) |
 | `combat.ranged` | on/off | bow/crossbow for flyers and targets out of reach, if it has arrows (default on) |
 | `combat.shield` | on/off | raise a shield against ranged mobs between swings (default on) |
@@ -84,7 +85,7 @@ can't change their own.
 | `retry.actions.<action>` | 0–10 | extra attempts after a failed action |
 
 In a profile, the `reflexes.*` values go under `reflexes:` and the `combat.*` values under
-`settings: combat:` (a top-level `combat:` key is ignored); see
+`settings: combat:` (a top-level `combat:` key is ignored with a warning); see
 [Reflexes](/concepts/world#reflexes). The techniques behind the `combat.*` toggles are described
 in [Movement, protection and combat](/concepts/world#skilled-player-techniques).
 

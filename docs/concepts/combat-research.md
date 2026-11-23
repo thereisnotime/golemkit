@@ -727,7 +727,7 @@ under [Skilled-player techniques](./world.md#skilled-player-techniques), toggles
 | Fight from a 1-wide corridor against 3+ melee mobs | `defend` | `combat.chokepoints` |
 | No low-health back-off from mobs that outrun the bot | reflexes | `combat.fightFastMobs` |
 | Bow lead with arrow physics, shield against archers | fight loop | `combat.ranged`, `combat.shield` |
-| Cover, cover walls, backing off and danger zones against shooters | reflexes, `ranged_defense`, `stay_safe` | `reflexes({ rangedDefense })` (variant option), `stay_safe` option `ranged` |
+| Cover, cover walls, backing off and danger zones against shooters | reflexes, `ranged_defense`, `stay_safe` | `reflexes.rangedDefense` (profile, variant or `!config_set`), `stay_safe` option `ranged` |
 | Pillaring when outnumbered, bunker against phantoms | `defend`, reflexes | none |
 | Defend-only PvP, never owners or friends | reflexes, `defend_player` | `combat.pvp`, `combat.friends` |
 

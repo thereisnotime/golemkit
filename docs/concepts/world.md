@@ -479,17 +479,18 @@ reflexes:
   eatBelow: 15          # eat when food drops below this
   retreatBelow: 8       # back off at or below this health; 0 = stand your ground
   waterFightAbove: 14   # don't fight mobs in water below this health; 0 = always fight
+  rangedDefense: true   # shoot back, shield, cover or back off when mobs shoot at it
 ```
 
-`rangedDefense` (default true: shoot back, shield, cover or back off when mobs shoot at it) is a
-variant option only, `reflexes({ rangedDefense: false })`; the profile `reflexes:` block doesn't
-take it.
+`rangedDefense` can also be set in the variant, `reflexes({ rangedDefense: false })`; the profile
+and `!config_set reflexes.rangedDefense` override it.
 
 Pax uses `retreatBelow: 0` and `waterFightAbove: 0`: it always fights back. It still backs off
 briefly to eat at 4 health or less when it has food (`combat.disengageToHeal`), see
 [Fighting](#fighting).
 
-In a profile the `combat` values go under `settings:` (a top-level `combat:` key is ignored).
+In a profile the `combat` values go under `settings:` (a top-level `combat:` key is ignored with a
+warning).
 Defaults shown; the full list, techniques and PvP included, is on
 [Feature toggles](../guide/live-config):
 
