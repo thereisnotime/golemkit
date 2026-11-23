@@ -53,13 +53,13 @@ takes the tools with `creative_get` and never gathers.
 |---|---|---|
 | `upgrade_tools` action | asked for (`!upgrade_tools up_to=iron`, or the LLM) | everything it can do now, up to `up_to` |
 | automatic cheap upgrades | before `gather_materials`, `collect` of stone and every `chop_tree` | stone tools (3 cobblestone + 2 sticks each) once a pickaxe exists; iron only when the iron is already in hand |
-| `keep_tools_upgraded` behaviour | idle, armed in the [profile](/guide/profiles) | re-crafts a worn tool (`minDurability`), then upgrades up to `upTo` |
+| `keep_tools_upgraded` behaviour | idle, armed in the [profile](/guide/profiles) | re-crafts a worn tool (`minDurability`), then upgrades up to `upTo`, and makes iron armour after the iron tools with `armour: true` |
 
 Pax arms it in `profiles/pax.yaml`:
 
 ```yaml
 behaviors:
-  keep_tools_upgraded: { upTo: iron }
+  keep_tools_upgraded: { upTo: iron, armour: true }
 ```
 
 ## Gathering
@@ -105,8 +105,9 @@ junk cleaner keeps 16 wheat seeds and 8 beetroot seeds, so seeds picked up while
 searches for food survive until the bot starts a farm. `gather_seeds` breaks grass on purpose,
 `forage` picks sweet berries, cuts kelp (smelted into dried kelp) and, when desperate, breaks
 leaves for apples, `tend_farm` keeps a farm planted and grows it towards 9x9 with seeds beyond a
-small reserve, and the whole food ladder (search 48, 120, 250 blocks, then a farm near home,
-with farm work between meals) is in [behaviours](/guide/behaviors#food-keep-fed-the-food-ladder-and-farm-setup).
+small reserve, and the whole food ladder (search rings of 48, 120 and 250 blocks, a trip to a
+known farm or village, the far rings by day, then a farm near home, with farm work between
+meals) is in [behaviours](/guide/behaviors#food-keep-fed-the-food-ladder-and-farm-setup).
 
 ## Speed
 

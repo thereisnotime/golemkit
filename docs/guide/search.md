@@ -90,8 +90,10 @@ flowchart TD
   server sends, biomes sampled every 16 blocks at the surface.
 - **The scout** is [find_food](/guide/behaviors)'s spiral with the target's look: day only by
   default, it stops at low health with mobs near or 3+ mobs around, skips waypoints on water,
-  lava and in [protected areas](/concepts/world#protected-areas), gives up on a direction where a leg got stuck, and climbs out
-  when a leg drops underground under a roof.
+  lava, in [protected areas](/concepts/world#protected-areas) and in or past remembered
+  [danger zones](/guide/behaviors#ranged-safety) (a skeleton or pillager patrol it fought
+  recently), gives up on a direction where a leg got stuck, and climbs out when a leg drops
+  underground under a roof.
 - **Prospecting** only runs for ores whose height band the strip mine reaches from where the bot
   stands (coal, iron and copper from the surface; diamonds only from y ≈ 30 down).
 - **The report** is relative to the owner when the bot can see them (or saw them in the last 15
@@ -117,9 +119,10 @@ flowchart TD
   K -- no --> GA{"gather nearby?<br/>collect / chop<br/>/ harvest"}
   K -- yes --> KR["craft (ingredients:<br/>obtain wheat, planks,<br/>coal the same way)"] --> D
   K -- "wood product" --> GM["gather_materials<br/>chop + craft"] --> D
+  K -- "smelted item" --> SM["smelt (raw iron, sand,<br/>raw meat... obtained<br/>the same way)"] --> D
   GA -- got it --> D
   GA -- "none close" --> FT["find_target<br/>its source,<br/>walk there,<br/>gather"] --> D
-  W ~~~ KR ~~~ GM ~~~ FT
+  W ~~~ KR ~~~ GM ~~~ SM ~~~ FT
   I -- enough --> D
   D["deliver: walk to the player,<br/>follow if they move,<br/>look at them, toss"] --> A{"picked up?"}
   A -- all --> OK(["ok: gave Steve 2 bread"])
@@ -128,7 +131,7 @@ flowchart TD
   classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
   classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
   classDef r fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-  class W,KR,GM,FT,D a
+  class W,KR,GM,SM,FT,D a
   class I,C,K,GA,A d
   class OK g
   class PART r
@@ -147,6 +150,9 @@ flowchart TD
 - **Crafting** uses the existing `craftItem`; bread, sticks, torches and hay blocks fetch one level
   of ingredients first. Wood products (planks, sticks, tables, chests) go through
   `gather_materials`, which chops and crafts in one go.
+- **Smelting**: ingots, glass, stone, smooth stone, charcoal, bricks, baked potatoes and cooked
+  meat come out of a furnace; the input (raw iron, sand, cobblestone, logs, raw beef...) is
+  obtained the same way first, one level deep.
 - **Crops** come only from the bot's own farms or village farms, and each harvested crop is
   replanted when the bot has the seed.
 - **Tidy**: crafting tables and furnaces it puts down while crafting are dug up again and picked up.
