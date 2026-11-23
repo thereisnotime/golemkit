@@ -1,7 +1,10 @@
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
 import type { ActionContext } from '../core/index.ts'
-import { defineSkill, defineAction, z, noParams, ok, fail, goals, fmtPos, gotoTimed, playerEntity, nearestHostile, isHostile, FLYING, sleep, checkAborted } from '../core/index.ts'
+import { defineSkill, defineAction, z, noParams, ok, fail, goals, fmtPos, gotoTimed, playerEntity, nearestHostile, isHostile, FLYING, sleep, checkAborted, dangerMemory, reachMovements } from '../core/index.ts'
+import { vec } from './world.ts'
+import { inDangerZone } from './food-danger.ts'
+import { reachEffort, digIntoLiquid, SCAFFOLD_BLOCKS } from './reachPlan.ts'
 import { pickupNearby } from './pickup.ts'
 import { isRangedMob, weaponFlags, type WeaponFlags } from './weapons.ts'
 import { fightTarget, eyeReach, lineOfSight, creeperFuseLit, eatNow, fightFood, meleeNear, type FightResult } from './fight.ts'
@@ -372,6 +375,67 @@ export function inPen (bot: Bot, e: Entity, r = 3): boolean {
   return false
 }
 
+const SCAFFOLD = new Set<string>(SCAFFOLD_BLOCKS)
+const scaffoldCount = (bot: Bot) => bot.inventory.items().filter(i => SCAFFOLD.has(i.name)).reduce((n, i) => n + i.count, 0)
+
+/**
+ * One more go at an animal the pathfinder couldn't get to on foot: bridge and pillar with blocks
+ * from the inventory and dig through or down, within reachEffort's budget (16 blocks, 45 s),
+ * never in protected areas or danger zones and never digging into water or lava. Says what it did.
+ */
+async function reachAnimal (ctx: ActionContext, target: Entity): Promise<{ killed: boolean, note: string }> {
+  const { bot, agent, signal, log } = ctx
+  const name = target.name ?? 'animal'
+  const p = target.position
+  const me = bot.entity.position
+  const danger = dangerMemory(agent)
+  const inDanger = (q: { x: number, y?: number, z: number }) => !!danger.isInDanger(q) || inDangerZone(agent, q)
+  const at = (x: number, y: number, z: number) => bot.blockAt(vec(bot, Math.floor(x), Math.floor(y), Math.floor(z)))?.name
+  const feet = [at(p.x, p.y, p.z), at(p.x, p.y - 1, p.z)]
+  const liquidAt = feet.includes('lava') ? 'lava' as const : feet.includes('water') ? 'water' as const : null
+  const decision = reachEffort({
+    canDig: agent.canDig,
+    canPlace: (agent.settings as { canPlace?: boolean } | undefined)?.canPlace !== false,
+    scaffold: scaffoldCount(bot),
+    distance: p.distanceTo(me),
+    dy: p.y - me.y,
+    protectedTarget: !!agent.protectedAreas?.isProtected(p),
+    dangerTarget: inDanger(p) || !!danger.crosses(me, p),
+    liquidAt
+  })
+  if (!decision.ok) return { killed: false, note: `the ${name} at ${fmtPos(p)}: ${decision.reason}` }
+  log.debug('hunt: out of reach on foot, trying harder', { animal: name, at: fmtPos(p), how: decision.how })
+  const before = scaffoldCount(bot)
+  let dug = 0
+  const onDig = () => { dug++ }
+  bot.on('diggingCompleted', onDig)
+  const restore = reachMovements(bot, {
+    ...decision.budget,
+    scaffold: SCAFFOLD_BLOCKS,
+    forbidden: q => !!agent.protectedAreas?.isProtected(q) || inDanger(q),
+    avoidStep: q => inDanger(q),
+    unsafeBreak: q => digIntoLiquid([at(q.x, q.y - 1, q.z), at(q.x, q.y - 2, q.z)])
+  })
+  let why = ''
+  let killed = false
+  try {
+    const until = Date.now() + decision.budget.ms
+    const t = target.position
+    try { await gotoTimed(bot, new goals.GoalNear(t.x, t.y, t.z, 2), signal, decision.budget.ms) } catch (e) { checkAborted(signal); why = (e as Error).message }
+    if ((target as any).isValid !== false && bot.entities[target.id]) killed = await fight(bot, target, signal, Math.max(8000, until - Date.now()))
+    else if (!why) why = 'it was gone'
+    if (!killed && !why) why = 'still out of reach'
+  } finally {
+    restore()
+    bot.off('diggingCompleted', onDig)
+  }
+  const placed = Math.max(0, before - scaffoldCount(bot))
+  const did = [placed ? `placed ${placed} block${placed === 1 ? '' : 's'}` : '', dug ? `dug ${dug}` : ''].filter(Boolean).join(', ') || 'nothing placed or dug'
+  return killed
+    ? { killed, note: `reached the ${name} at ${fmtPos(p)} (${did})` }
+    : { killed, note: `the ${name} at ${fmtPos(p)}: out of reach even with ${decision.how} (${did}; ${why})` }
+}
+
 const hunt = defineAction({
   name: 'hunt',
   description: 'Hunt passive animals (cow, pig, sheep, chicken, rabbit, mooshroom) for food and pick up the drops. ' +
@@ -381,9 +445,11 @@ const hunt = defineAction({
     count: z.number().int().min(1).max(8).default(1).describe('how many to kill'),
     radius: z.number().min(4).max(64).default(24).describe('how far to look, in blocks'),
     pens: z.boolean().default(false).describe('also hunt animals inside fences (only your own farm)'),
-    keepAtLeast: z.number().int().min(0).max(32).default(0).describe('leave at least this many adults of each kind alive (sustainable herd)')
+    keepAtLeast: z.number().int().min(0).max(32).default(0).describe('leave at least this many adults of each kind alive (sustainable herd)'),
+    reach: z.boolean().default(true).describe('when an animal is out of reach on foot, bridge, pillar (up to 16 blocks of dirt, cobblestone or planks) or dig to it, never in protected areas or danger zones')
   }),
-  async run ({ bot, agent, signal, log }, { animal, count, radius, pens, keepAtLeast }) {
+  async run (ctx, { animal, count, radius, pens, keepAtLeast, reach }) {
+    const { bot, agent, signal, log } = ctx
     const animals = animal ? [animal] : HUNTABLE
     const skipped = unreachableAnimals(bot) // shared across hunt runs: keep_fed re-runs hunt every few seconds
     const allowed = (e: any) => {
@@ -406,6 +472,7 @@ const hunt = defineAction({
     let killed = 0
     const names: string[] = []
     let spared = false
+    const notes: string[] = []
     while (killed < count) {
       checkAborted(signal)
       const left = surplus()
@@ -422,18 +489,29 @@ const hunt = defineAction({
         const p = target.position
         try { await gotoTimed(bot, new goals.GoalNear(p.x, p.y, p.z, 4), signal, 30_000) } catch { checkAborted(signal) }
       }
-      const dead = await fight(bot, target, signal, 25_000)
+      let dead = await fight(bot, target, signal, 25_000)
+      if (!dead && reach && (target as any).isValid !== false && bot.entities[target.id]) {
+        const r = await reachAnimal(ctx, target)
+        dead = r.killed
+        notes.push(r.note)
+      }
       if (!dead) { skipped.add(target.id); log.debug('hunt: giving up on this one for 5 min', { animal: target.name, at: fmtPos(target.position) }); continue }
       killed++
       names.push(target.name ?? 'animal')
       await sleep(400, signal)
       await pickupNearby(bot, signal, { radius: 6, maxMs: 8000 })
     }
-    if (!killed) return fail(`no animal I may hunt within ${radius} blocks${animal ? ` (${animal})` : ''}${spared ? `, sparing the last ${keepAtLeast} of each kind` : ''}`)
+    const why = notes.length ? `; ${notes.join('; ')}` : ''
+    if (!killed) {
+      if (notes.length) return fail(`couldn't get to the animals within ${radius} blocks (left alone for 5 min)${why}`)
+      const left = Object.values(bot.entities).filter(e => e.position && skipped.has(e.id) && e.position.distanceTo(bot.entity.position) <= radius && allowed(e))
+      if (left.length) return fail(`no animal I can get to within ${radius} blocks: ${left.length} ${left.length === 1 ? left[0]!.name : 'animals'} I couldn't reach a few minutes ago (trying again later)`)
+      return fail(`no animal I may hunt within ${radius} blocks${animal ? ` (${animal})` : ''}${spared ? `, sparing the last ${keepAtLeast} of each kind` : ''}`)
+    }
     await sleep(500, signal) // drops can arrive a moment after the last pickup walk
     const picked = Math.max(0, total() - before)
     const tally = [...new Set(names)].map(n => `${names.filter(x => x === n).length} ${n}`).join(', ')
-    return ok(`hunted ${tally}, picked up ${picked} item${picked === 1 ? '' : 's'}`)
+    return ok(`hunted ${tally}, picked up ${picked} item${picked === 1 ? '' : 's'}${why}`)
   }
 })
 

@@ -211,6 +211,60 @@ async function travelLegs (bot: Bot, target: { x: number, y?: number, z: number 
   }
 }
 
+export interface ReachMoves {
+  /** Blocks the pathfinder may place in total (bridges, pillars); 0 = none. */
+  blocks: number
+  dig: boolean
+  /** Pillar straight up (1x1 towers). */
+  tower: boolean
+  /** Item names it may place, in order of preference. */
+  scaffold: readonly string[]
+  /** Positions it must not break or place at (protected areas, danger zones). */
+  forbidden? (p: { x: number, y: number, z: number }): boolean
+  /** Positions it must not step on (danger zones; walking through a protected area is fine). */
+  avoidStep? (p: { x: number, y: number, z: number }): boolean
+  /** Positions it must not break: digging there would open onto water or lava. */
+  unsafeBreak? (p: { x: number, y: number, z: number }): boolean
+}
+
+/**
+ * Lets the pathfinder bridge, pillar and dig a little more than usual, until the returned
+ * function is called: scaffolding from `scaffold` (counted against `blocks`, never more than
+ * carried), 1x1 towers when `tower`, digging when `dig`, with `forbidden` kept out of breaking
+ * and placing and `avoidStep` out of the path. Everything it changes is put back by the restore function.
+ */
+export function reachMovements (bot: Bot, o: ReachMoves): () => void {
+  const m = bot.pathfinder?.movements as any
+  if (!m) return () => {}
+  const saved = { scafoldingBlocks: m.scafoldingBlocks, allow1by1towers: m.allow1by1towers, canDig: m.canDig, placeCost: m.placeCost, count: m.countScaffoldingItems }
+  const ids = o.scaffold.map(n => bot.registry.itemsByName[n]?.id).filter((x): x is number => x !== undefined)
+  m.scafoldingBlocks = o.blocks > 0 ? ids : []
+  m.allow1by1towers = o.tower && o.blocks > 0
+  m.canDig = o.dig
+  m.placeCost = 2
+  const budget = o.blocks
+  const carried = saved.count.bind(m)
+  // the pathfinder plans with "remaining blocks" from this count: cap it at the budget
+  m.countScaffoldingItems = () => Math.min(budget, carried())
+  const no = (b: { position: { x: number, y: number, z: number } }) => (o.forbidden?.(b.position) ? Infinity : 0)
+  const noStep = (b: { position: { x: number, y: number, z: number } }) => (o.avoidStep?.(b.position) ? Infinity : 0)
+  const noBreak = (b: { position: { x: number, y: number, z: number } }) => (o.forbidden?.(b.position) || o.unsafeBreak?.(b.position) ? Infinity : 0)
+  m.exclusionAreasBreak.push(noBreak)
+  m.exclusionAreasPlace.push(no)
+  m.exclusionAreasStep.push(noStep)
+  return () => {
+    m.scafoldingBlocks = saved.scafoldingBlocks
+    m.allow1by1towers = saved.allow1by1towers
+    m.canDig = saved.canDig
+    m.placeCost = saved.placeCost
+    if (saved.count === Object.getPrototypeOf(m).countScaffoldingItems) delete m.countScaffoldingItems
+    else m.countScaffoldingItems = saved.count
+    m.exclusionAreasBreak = m.exclusionAreasBreak.filter((f: unknown) => f !== noBreak)
+    m.exclusionAreasPlace = m.exclusionAreasPlace.filter((f: unknown) => f !== no)
+    m.exclusionAreasStep = m.exclusionAreasStep.filter((f: unknown) => f !== noStep)
+  }
+}
+
 /** Sets a dynamic goal until the signal aborts (follow-style). Resolves on abort. */
 export function holdGoal (bot: Bot, goal: Goal, signal: AbortSignal): Promise<void> {
   bot.pathfinder.setGoal(goal, true)
