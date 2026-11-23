@@ -114,6 +114,9 @@ export async function fightPlayer (bot: Bot, target: Entity, signal: AbortSignal
   let enemySwing = 0
   let enemyShieldDownUntil = 0
   let lastEat = 0
+  let bestDist = Infinity
+  let bestAt = Date.now()
+  let pathUntil = 0
   let died = false
   const arrows = new Map<number, { x: number, y: number, z: number, at: number }>()
   const onDead = (e: Entity) => { if (e.id === target.id) died = true }
@@ -263,7 +266,20 @@ export async function fightPlayer (bot: Bot, target: Entity, signal: AbortSignal
 
       // ---------- out of reach: approach ----------
       if (reach > MELEE_REACH) {
-        const direct = hd <= 12 && Math.abs(tp.y - me.y) < 1.5 && los
+        // no progress (water or a block between us, a ledge): the pathfinder for a while, then a
+        // shot if it can, then give up
+        if (dist < bestDist - 0.5) { bestDist = dist; bestAt = now } else if (now - bestAt > 2500 && pathUntil < now) pathUntil = now + 3000
+        if (now - bestAt > 10_000) {
+          if (los && r && arrowsLeft > 0 && !enemyBlocking) {
+            lowerShield(); stopPath(); clearMoves(bot)
+            if (await shootAt(bot, target, signal)) res.shots++
+            lastSwing = Date.now()
+            bestAt = Date.now() - 7000
+            continue
+          }
+          return finish('gave_up', 'no way to get closer')
+        }
+        const direct = pathUntil < now && hd <= 12 && Math.abs(tp.y - me.y) < 1.5 && los
         if (!direct) {
           lowerShield()
           if (mode !== 'path') {
@@ -294,6 +310,9 @@ export async function fightPlayer (bot: Bot, target: Entity, signal: AbortSignal
       }
 
       // ---------- in reach ----------
+      bestDist = dist
+      bestAt = now
+      pathUntil = 0
       stopPath()
       mode = 'manual'
       await bot.lookAt(aimPoint(bot, target), true).catch(() => {})
