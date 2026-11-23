@@ -188,3 +188,10 @@ test('go_home fails when the walk settles without getting home', async () => {
   assert.match(r.message, /ended short of home/)
   assert.equal(gotos.length, 1)
 })
+
+test('go_home: stopping right at the edge of the range counts as home', async () => {
+  const pos = { x: 570, y: 68, z: -30 }
+  const { bot, agent } = homeBot(pos, () => { Object.assign(pos, { x: 564.8, z: -45.5 }); return Promise.resolve() })
+  const r = await goHomeAction().run({ agent, bot, signal: new AbortController().signal } as any, { range: 4 }) as ActionResult
+  assert.equal(r.ok, true, r.message)
+})

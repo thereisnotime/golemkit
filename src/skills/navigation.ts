@@ -213,7 +213,9 @@ const goHome = defineAction({
       if (atHome(bot.entity.position, home, range)) return ok(`home at ${fmtPos(home)}`)
       return fail(`couldn't get home (${(e as Error).message}), at ${fmtPos(bot.entity.position)}`)
     }
-    if (atHome(bot.entity.position, home, range)) return ok(`home at ${fmtPos(home)}`)
+    // GoalNear measures to the block corner in 3D, atHome to the block's middle: allow the half
+    // block (and a little) between them so stopping right at the edge counts
+    if (atHome(bot.entity.position, home, range + 1)) return ok(`home at ${fmtPos(home)}`)
     // the pathfinder can settle without getting there (seen live: done in 5 ms, 80 blocks out);
     // only being there counts, so stay_safe backs off instead of calling this every second
     return fail(arrived
