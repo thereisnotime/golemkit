@@ -9,6 +9,11 @@
 //   3. with 12 oak logs and 8 cobblestone (no coal): charcoal path, places up to 6 torches, then the rest
 //   5. one of its torches broken (by the test bot itself): the next dry run leaves that spot alone
 //   6. light_home armed (home here, by day only): runs on its own and checks the area
+// FARM=1 instead builds a 9x9 wheat farm on the dry patch (/fill: water in the middle, farmland,
+// ripe wheat), saves it as the test bot's farm:1, puts a learned protected zone over it in
+// memory (what blocked Pax's farm), and from 12 blocks out runs light_up place=farm:1: a dry
+// run, then with 16 torches. It checks no torch is on the field and no farmland was trampled,
+// then puts every block of the farm back as it was.
 // Every block that appears near the spot while it runs (torches, crafting table, furnace) is
 // removed at the end with /setblock air; inventories are cleared and drops killed.
 import { rmSync } from 'node:fs'
@@ -16,6 +21,7 @@ import { Agent, defineVariant, serverFromEnv, PRIORITY, fmtPos, type ActionResul
 import { standardSkills, extendedSkills, navigation } from '../src/skills/index.ts'
 import { behaviorsBrain } from '../src/brains/index.ts'
 import { ownTorches } from '../src/skills/lighting.ts'
+import { saveFarm } from '../src/skills/food.ts'
 
 const argv = process.argv.slice(2)
 const X = Number(argv[0] ?? 1600)
@@ -85,12 +91,14 @@ async function main (): Promise<void> {
       if (d !== null && d < 300) throw new Error(`${p} is ${Math.round(d)} blocks from the spot`)
     }
     await cmd(`/clear ${BOT}`)
-    // tp high up first so the chunk loads, then down to the surface before it lands (a teleport resets the fall)
-    await cmd(`/tp ${BOT} ${X + 0.5} 200 ${Z + 0.5}`)
-    await pause(600)
+    // the director (spectator or creative, no fall damage) goes first so the chunks load, then the
+    // bot straight onto the surface; teleporting the bot to y 200 and down again killed it by fall
+    // damage (the second teleport doesn't reset the fall on this server)
+    await cmd(`/tp ${DIRECTOR} ${X + 0.5} 150 ${Z + 0.5}`)
+    await pause(4000)
     replies.length = 0
     await cmd(`/execute positioned ${X} 0 ${Z} positioned over motion_blocking_no_leaves run tp ${BOT} ~0.5 ~ ~0.5`)
-    await pause(1000)
+    await pause(2000)
     log(`server: ${replies.join(' | ')}`)
   })
   await pause(6000)
@@ -121,8 +129,16 @@ async function main (): Promise<void> {
     }
     return null
   }
+  const here = a.bot.entity.position
+  if (Math.hypot(here.x - X, here.z - Z) > 32) { await a.stop(); throw new Error(`not at the spot (at ${fmtPos(here)}; died on the teleport?)`) }
   const dryAt = land()
-  if (!dryAt) { await a.stop(); throw new Error('no dry land within 80 blocks') }
+  if (!dryAt) {
+    const me = a.bot.entity.position.floored()
+    const tops: string[] = []
+    for (let i = -8; i <= 8; i += 8) for (let j = -8; j <= 8; j += 8) for (let y = 120; y > 40; y--) { const b = a.bot.blockAt(me.offset(i, y - me.y, j)); if (!b) { tops.push('unloaded'); break } if (!/^(air|cave_air|short_grass)$/.test(b.name)) { tops.push(`${b.name}@${y}`); break } }
+    log(`tops around ${fmtPos(me)}: ${tops.join(', ')}`)
+    await a.stop(); throw new Error('no dry land within 80 blocks')
+  }
   // everything that appears near the spot, for cleanup
   const placed = new Map<string, { x: number, y: number, z: number, name: string }>()
   a.bot.on('blockUpdate', (old: any, now: any) => {
@@ -130,6 +146,7 @@ async function main (): Promise<void> {
     if (Math.hypot(now.position.x - dryAt.x, now.position.z - dryAt.z) > 40) return
     placed.set(`${now.position.x},${now.position.y},${now.position.z}`, { x: now.position.x, y: now.position.y, z: now.position.z, name: now.name })
   })
+  if (process.env.FARM === '1') return farmTest(a, dryAt, step, withDirector, placed)
   // one short director session: onto the dry patch, the checks that need an empty inventory, then the wood
   let spot = a.bot.entity.position.floored()
   let base = { x: spot.x, y: spot.y, z: spot.z, radius: 10, y_range: 4, target: 8 }
@@ -191,6 +208,79 @@ async function main (): Promise<void> {
       if (b && b.name !== 'air') { left++; log(`still there: ${b.name} at ${p.x} ${p.y} ${p.z}`) }
     }
     log(`cleanup: ${placed.size - left} removed, ${left} left`)
+    a.storage.flush()
+    await a.stop()
+  }
+}
+
+type Director = (fn: (cmd: (c: string) => Promise<void>, replies: string[]) => Promise<void>) => Promise<void>
+
+async function farmTest (a: Agent, dryAt: { x: number, z: number }, step: (n: string, p?: Record<string, unknown>) => Promise<ActionResult>,
+  withDirector: Director, placed: Map<string, { x: number, y: number, z: number, name: string }>): Promise<void> {
+  const blockAt = (x: number, y: number, z: number) => a.bot.blockAt(a.bot.entity.position.clone().set(x, y, z))
+  // the bot may have died on the way (and respawned at the world spawn): check where the farm goes
+  for (const [name, x, z] of KEEP_AWAY) if (Math.hypot(dryAt.x - x, dryAt.z - z) < 300) throw new Error(`the farm would be within 300 of the ${name} (${dryAt.x} ${dryAt.z})`)
+  // the farm's ground level: the top solid block at the middle
+  let g = 0
+  for (let y = 120; y > 40; y--) { const b = blockAt(dryAt.x, y, dryAt.z); if (b && b.boundingBox === 'block') { g = y; break } }
+  const X = dryAt.x, Z = dryAt.z
+  // everything the farm overwrites (ground level to 3 above, 9x9), to put back afterwards
+  const saved: { x: number, y: number, z: number, state: string }[] = []
+  for (let x = X - 4; x <= X + 4; x++) {
+    for (let z = Z - 4; z <= Z + 4; z++) {
+      for (let y = g; y <= g + 3; y++) {
+        const b = blockAt(x, y, z)
+        if (!b) throw new Error(`not loaded at ${x} ${y} ${z}`)
+        const props = Object.entries(b.getProperties() as Record<string, unknown>).map(([k, v]) => `${k}=${v}`).join(',')
+        saved.push({ x, y, z, state: `minecraft:${b.name}${props ? `[${props}]` : ''}` })
+      }
+    }
+  }
+  const zone = { x: X + 4, y: g + 1, z: Z + 2, at: new Date().toISOString() }
+  try {
+    await withDirector(async cmd => {
+      await cmd(`/execute positioned ${X + 12} 0 ${Z} positioned over motion_blocking_no_leaves run tp ${a.username} ~0.5 ~ ~0.5`)
+      await pause(1500)
+      await cmd(`/fill ${X - 4} ${g + 1} ${Z - 4} ${X + 4} ${g + 3} ${Z + 4} minecraft:air`)
+      await cmd(`/fill ${X - 4} ${g} ${Z - 4} ${X + 4} ${g} ${Z + 4} minecraft:farmland[moisture=7]`)
+      await cmd(`/fill ${X - 4} ${g + 1} ${Z - 4} ${X + 4} ${g + 1} ${Z + 4} minecraft:wheat[age=7]`)
+      await cmd(`/setblock ${X} ${g + 1} ${Z} minecraft:air`)
+      await cmd(`/setblock ${X} ${g} ${Z} minecraft:water`)
+      await cmd(`/give ${a.username} minecraft:torch 16`)
+    })
+    await pause(3000)
+    saveFarm(a, { name: 'farm:1', x: X, y: g, z: Z, size: 9, crop: 'wheat', created: Date.now(), dim: a.bot.game.dimension })
+    // the false zone: in memory only, never written to the shared protected-areas file
+    a.protectedAreas.zones.push(zone)
+    const count = (name: string) => { let n = 0; for (let x = X - 4; x <= X + 4; x++) for (let z = Z - 4; z <= Z + 4; z++) if (blockAt(x, name === 'wheat' ? g + 1 : g, z)?.name === name) n++; return n }
+    log(`farm at ${X} ${g} ${Z}: ${count('farmland')} farmland, ${count('wheat')} wheat; bot at ${fmtPos(a.bot.entity.position)}`)
+    const dry = await step('light_up', { place: 'farm:1', radius: 12, target: 8, dry_run: true })
+    log(`dry run data: ${JSON.stringify({ ...(dry.data as object), torches: undefined })}`)
+    const r = await step('light_up', { place: 'farm:1', radius: 12, target: 8, max_torches: 16, craft: false })
+    const torches = ((r.data as any)?.placed ?? []) as { x: number, y: number, z: number }[]
+    const onField = torches.filter(t => Math.abs(t.x - X) <= 4 && Math.abs(t.z - Z) <= 4)
+    log(`placed ${torches.length}: ${torches.map(t => fmtPos(t)).join(', ')}; on the field: ${onField.length}`)
+    log(`after: ${count('farmland')} farmland, ${count('wheat')} wheat (80 of each before)`)
+    const again = await step('light_up', { place: 'farm:1', radius: 12, target: 8, dry_run: true })
+    log(`after, dry run: ${JSON.stringify({ ...(again.data as object), torches: undefined })}`)
+  } finally {
+    a.protectedAreas.zones = a.protectedAreas.zones.filter(z => z !== zone)
+    for (const p of ownTorches(a)) placed.set(`${p.x},${p.y},${p.z}`, { ...p, name: 'torch' })
+    log(`removing ${placed.size} torches, putting back ${saved.length} farm blocks`)
+    await withDirector(async cmd => {
+      for (const p of placed.values()) await cmd(`/setblock ${p.x} ${p.y} ${p.z} minecraft:air`)
+      // clear above the ground, then the saved blocks bottom up, so plants go back onto their ground
+      // (air above the ground is already back; at ground level it may have been a dip)
+      await cmd(`/fill ${X - 4} ${g + 1} ${Z - 4} ${X + 4} ${g + 3} ${Z + 4} minecraft:air`)
+      for (const b of [...saved].sort((p, q) => p.y - q.y)) if (b.y === g || !/^minecraft:(air|cave_air)$/.test(b.state)) await cmd(`/setblock ${b.x} ${b.y} ${b.z} ${b.state}`)
+      await cmd(`/kill @e[type=minecraft:item,x=${X},y=${g},z=${Z},distance=..32]`)
+      await cmd(`/clear ${a.username}`)
+    })
+    await pause(1500)
+    let off = 0
+    for (const b of saved) { const now = blockAt(b.x, b.y, b.z); if (now && !b.state.startsWith(`minecraft:${now.name}`)) { off++; if (off <= 5) log(`differs: ${b.x} ${b.y} ${b.z} ${now.name}, was ${b.state}`) } }
+    for (const p of placed.values()) { const now = blockAt(p.x, p.y, p.z); if (now && now.name !== 'air') { off++; log(`still there: ${now.name} at ${p.x} ${p.y} ${p.z}`) } }
+    log(`cleanup: ${off} blocks differ`)
     a.storage.flush()
     await a.stop()
   }
