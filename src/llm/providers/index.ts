@@ -1,5 +1,6 @@
 // Provider registry: build a provider by name, with settings from options or env.
 import type { LlmProvider } from '../types.ts'
+import { envValue } from '../../core/env.ts'
 import { AnthropicProvider, type AnthropicProviderOptions } from './anthropic.ts'
 import { ClaudeSubscriptionProvider, type ClaudeSubscriptionOptions } from './claude.ts'
 import { CodexProvider, type CodexProviderOptions } from './codex.ts'
@@ -30,7 +31,9 @@ const list = (v: string | undefined) => (v ?? '').split(/\s+/).filter(Boolean)
  *   ANTHROPIC_API_KEY                   anthropic
  *   MC_CLAUDE_MODE=sdk|cli, MC_CLAUDE_TRANSPORT=sdk|http, MC_CLAUDE_ALLOW_API_KEY, MC_CLAUDE_BIN
  *   MC_CLAUDE_OAUTH_TOKEN_VAR (+ MC_CLAUDE_OAUTH_TOKEN_FILE): take the subscription token from that variable (in that dotenv file)
- *   MC_CLAUDE_LOGIN, MC_CODEX_LOGIN, MC_OPENCODE_LOGIN: login dir (default .auth/<provider>) or "user" (old names: MC_*_PROFILE)
+ *     (old names MC_OAUTH_TOKEN_VAR / MC_OAUTH_TOKEN_FILE still work, with a deprecation warning)
+ *   MC_CLAUDE_LOGIN, MC_CODEX_LOGIN, MC_OPENCODE_LOGIN: login dir (default .auth/<provider>) or "user"
+ *     (old names MC_*_PROFILE still work, with a deprecation warning)
  *   MC_CODEX_BIN, MC_CODEX_USE_USER_CONFIG, MC_CODEX_CONFIG (space-separated key=value overrides)
  *   MC_OPENCODE_BIN, MC_OPENCODE_CONFIG_VERSION=v2|v1
  *   MC_OPENAI_BASE_URL, MC_OPENAI_API_KEY (or OPENAI_API_KEY)
@@ -51,9 +54,9 @@ export function createProvider (name: string, opts: Record<string, unknown> = {}
         transport: (env.MC_CLAUDE_TRANSPORT as 'sdk' | 'http' | undefined) ?? 'sdk',
         allowApiKey: bool(env.MC_CLAUDE_ALLOW_API_KEY),
         bin: env.MC_CLAUDE_BIN,
-        login: env.MC_CLAUDE_LOGIN || env.MC_CLAUDE_PROFILE || undefined,
-        oauthTokenVar: env.MC_CLAUDE_OAUTH_TOKEN_VAR || undefined,
-        oauthTokenFile: env.MC_CLAUDE_OAUTH_TOKEN_FILE || undefined,
+        login: envValue('MC_CLAUDE_LOGIN', env),
+        oauthTokenVar: envValue('MC_CLAUDE_OAUTH_TOKEN_VAR', env),
+        oauthTokenFile: envValue('MC_CLAUDE_OAUTH_TOKEN_FILE', env),
         ...opts
       })
     case 'codex':
@@ -61,7 +64,7 @@ export function createProvider (name: string, opts: Record<string, unknown> = {}
         model,
         reasoningEffort: effort,
         bin: env.MC_CODEX_BIN,
-        login: env.MC_CODEX_LOGIN || env.MC_CODEX_PROFILE || undefined,
+        login: envValue('MC_CODEX_LOGIN', env),
         useUserConfig: bool(env.MC_CODEX_USE_USER_CONFIG),
         config: list(env.MC_CODEX_CONFIG),
         ...opts
@@ -70,7 +73,7 @@ export function createProvider (name: string, opts: Record<string, unknown> = {}
       return new OpenCodeProvider({ ...(proxy ? { proxy } : {}),
         model,
         bin: env.MC_OPENCODE_BIN,
-        login: env.MC_OPENCODE_LOGIN || env.MC_OPENCODE_PROFILE || undefined,
+        login: envValue('MC_OPENCODE_LOGIN', env),
         configVersion: (env.MC_OPENCODE_CONFIG_VERSION as 'v1' | 'v2' | undefined) ?? 'v2',
         ...opts
       })

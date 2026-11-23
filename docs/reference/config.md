@@ -11,9 +11,10 @@ Precedence, lowest to highest: environment (`.env`) → [variant](/concepts/vari
 [feature toggles](../guide/live-config) win over all of these until reset.
 
 Connection settings (`host`, `port`, `auth`, `version`, `platform`) layer differently. With
-`run`: environment < the profile's `server:` < `--host`/`--port`. In a fleet: environment (with
-`--host`/`--port` on top of it) < the profile's `server:` < the fleet's `servers:` entry, so the
-fleet decides where its bots connect and a profile only fills the keys the fleet leaves out.
+`run`: environment < the profile's `server:` < `--host`/`--port`. In a fleet: environment < the
+profile's `server:` < the fleet's `servers:` entry < `--host`/`--port`, so the fleet decides where
+its bots connect, a profile only fills the keys the fleet leaves out, and the command-line flags
+win in both.
 
 `.env` in the working directory is loaded on start when it exists (no `--env-file` needed);
 copy it from `.env.example`. Profiles, context packs, fleet and [scene](/guide/scenes) files expand `${NAME}` and
@@ -30,8 +31,8 @@ copy it from `.env.example`. Profiles, context packs, fleet and [scene](/guide/s
 | `MC_PLATFORM` | `neoforge` | server platform: `neoforge`, `vanilla` or `paper` (also `server.platform` in a profile); NeoForge also works on vanilla servers |
 | `MC_OWNERS` | (everyone) | comma-separated players allowed to command bots |
 | `MC_OWNER` | | your Minecraft name, used by the stock profiles as `${MC_OWNER:-Robin}` and by the live test scripts as the player to keep away from |
-| `MC_OAUTH_TOKEN_VAR` | `CLAUDE_CODE_OAUTH_TOKEN` | variable holding the Claude subscription token (pax and [apprentice](/guide/self-improver) profiles) |
-| `MC_OAUTH_TOKEN_FILE` | `~/.config/golemkit/secrets.env` | dotenv file to read only that variable from |
+| `MC_CLAUDE_OAUTH_TOKEN_VAR` | `CLAUDE_CODE_OAUTH_TOKEN` | variable holding the Claude subscription token (every `claude-subscription` bot; the pax and [apprentice](/guide/self-improver) profiles default to it) |
+| `MC_CLAUDE_OAUTH_TOKEN_FILE` | `~/.config/golemkit/secrets.env` in pax and apprentice | dotenv file to read only that variable from |
 | `MC_PREFIX` | `!` | chat command prefix |
 | `MC_CAN_DIG` | `false` | let bots break blocks |
 | `MC_RECONNECT_DELAY_MS` | `10000` | wait before reconnecting |
@@ -61,10 +62,20 @@ bots take their name from the profile, `--username` or the variant. The LLM vari
 (`MC_LLM_*`, `MC_CLAUDE_*`, `MC_CODEX_*`, `MC_OPENCODE_*`, `MC_OPENAI_*`, `ANTHROPIC_API_KEY`,
 `CLAUDE_CODE_OAUTH_TOKEN`) are listed in `.env.example` and described in the
 [LLM brain](../guide/llm-brain) guide. The login directory variables are `MC_CLAUDE_LOGIN`,
-`MC_CODEX_LOGIN` and `MC_OPENCODE_LOGIN`; the `MC_*_PROFILE` names in `.env.example` are the
-older spelling and still work. `MC_CLAUDE_OAUTH_TOKEN_VAR` and `MC_CLAUDE_OAUTH_TOKEN_FILE` set
-the subscription token source for every bot that runs `claude-subscription` (a profile's
-`llm.oauthTokenVar` / `llm.oauthTokenFile` win over them).
+`MC_CODEX_LOGIN` and `MC_OPENCODE_LOGIN`. `MC_CLAUDE_OAUTH_TOKEN_VAR` and
+`MC_CLAUDE_OAUTH_TOKEN_FILE` set the subscription token source for every bot that runs
+`claude-subscription` (a profile's `llm.oauthTokenVar` / `llm.oauthTokenFile` win over them).
+
+Renamed variables still work under their old names, with a warning once per process (the
+warning names the variable, never its value):
+
+| current | old name |
+|---|---|
+| `MC_CLAUDE_OAUTH_TOKEN_VAR` | `MC_OAUTH_TOKEN_VAR` |
+| `MC_CLAUDE_OAUTH_TOKEN_FILE` | `MC_OAUTH_TOKEN_FILE` |
+| `MC_CLAUDE_LOGIN` | `MC_CLAUDE_PROFILE` |
+| `MC_CODEX_LOGIN` | `MC_CODEX_PROFILE` |
+| `MC_OPENCODE_LOGIN` | `MC_OPENCODE_PROFILE` |
 
 ## Profile keys
 
@@ -75,7 +86,7 @@ All optional except `variant`; see [Profiles](../guide/profiles).
 | key | what | guide |
 |---|---|---|
 | `variant` | which variant to run | [Variants, profiles, fleets](../concepts/variants-profiles) |
-| `username`, `description`, `persona`, `owners`, `canDig`, `server` | identity, permissions, server override (`host`, `port`, `auth`, `version`, `platform`; in a fleet only for keys the fleet's server leaves out) | [Profiles](../guide/profiles) |
+| `username`, `description`, `persona`, `owners`, `canDig`, `server` | identity, permissions, server override (`host`, `port`, `auth`, `version`, `platform`; in a fleet only for keys the fleet's server leaves out; `--host`/`--port` beat it) | [Profiles](../guide/profiles) |
 | `respectBuilds`, `selfAware` | leave player-made blocks alone (default off); show the bot its own setup each turn (default on) | [Feature toggles](../guide/live-config) |
 | `npcMode` | behaviours to arm while the LLM is paused, or `false` | [NPC mode](../guide/behaviors#npc-mode-when-the-llm-can-t-think) |
 | `askHelp` | `true`/`false` or `{ enabled, failures, minutes, forgetMinutes, perReasonMinutes, maxPerHour, tell, llm, thanks, quietHours, observeMinutes }`; lands in `settings.askHelp`. Default off; an options map turns it on unless it says `enabled: false` | [Asking for help](../guide/behaviors#asking-for-help) |
@@ -103,7 +114,7 @@ table; the same keys work in the profile under `settings:` and live with `!confi
 | `settings.combat` | the `combat.*` toggles: mob fight techniques (all on, `maxChase` 16) and [PvP](../concepts/world#pvp) (`pvp: off`, `friends`, `targets`, `revengeMinutes`, `pvpEngage`, ...) | PvP `off` |
 | `settings.mining` | the `mining.*` toggles: [safe mining](../guide/progression#safe-mining) readiness depth, weapon, food, gear, climb-out thresholds, torches | `safe: true`, `safeDepth: 8`, `minFood: 3`, `gear: none`, `retreatBelow: 10`, `retreatHostiles: 2` |
 | `settings.trips` | the `trips.*` toggles: [trips](../guide/behaviors#trips) top-up and turn-back rules | `enabled: true`, `food: 8`, `minFood: 4`, `minHealth: 12`, `turnBackAt: 0.5` |
-| `settings.storage.chests` | the pantry: chests the bot may take from as its own, as `[x, y, z]`, `{ x, y, z }` or `"x y z"` | none |
+| `settings.storage.chests` | chests the bot may take from as its own, as `[x, y, z]`, `{ x, y, z }` or `"x y z"`; with the chests it placed, the ones near home are the pantry | none |
 | `settings.inventoryMemory` | [container memory](../guide/search#container-memory): `true`/`false` or `{ enabled, maxAgeHours, refreshMinutes, indexOwn, radius, lowFood, grumble, grumbleTo, grumbleHours }` | `enabled: false`, `maxAgeHours: 24`, `indexOwn: false` |
 | `settings.pathfinder.thinkTimeoutMs` | planning time per path (ms) | 10000 |
 | `settings.road`, `settings.build`, `settings.world.spawnProtection` | [roads](../guide/roads), creative builds, spawn-protection radius | see the toggles |

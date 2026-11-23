@@ -4,6 +4,7 @@ import type { AdapterFactory, GameClient } from './adapter.ts'
 import type { SkillDef } from './skill.ts'
 import type { BrainDef } from './brain.ts'
 import type { Agent } from './agent.ts'
+import { envValue } from './env.ts'
 
 export interface BotDefinition {
   /** Id of the bot type; also the default data directory name. */
@@ -55,7 +56,7 @@ export interface ServerConfig {
  */
 export function expandEnv (text: string, env: NodeJS.ProcessEnv = process.env): string {
   if (env === process.env) loadDotEnvOnce()
-  return text.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}/g, (_m, name: string, def?: string) => env[name] || def || '')
+  return text.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}/g, (_m, name: string, def?: string) => envValue(name, env) || def || '')
 }
 
 /** An environment variable (after loading `.env`), or the default: for variants and scripts. */

@@ -11,8 +11,8 @@ llm:
   model: claude-sonnet-5-5
   effort: low
   login: .auth/apprentice
-  oauthTokenVar: ${MC_OAUTH_TOKEN_VAR:-CLAUDE_CODE_OAUTH_TOKEN}
-  oauthTokenFile: ${MC_OAUTH_TOKEN_FILE:-~/.config/golemkit/secrets.env}
+  oauthTokenVar: ${MC_CLAUDE_OAUTH_TOKEN_VAR:-CLAUDE_CODE_OAUTH_TOKEN}
+  oauthTokenFile: ${MC_CLAUDE_OAUTH_TOKEN_FILE:-~/.config/golemkit/secrets.env}
   budget:
     turnsPerHour: 10
     tokensPerHour: 300000

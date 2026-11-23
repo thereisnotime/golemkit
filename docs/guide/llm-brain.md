@@ -133,20 +133,25 @@ just llm-login codex           # ChatGPT sign-in into .auth/codex (codex device:
 just llm-status                # which providers are logged in, and where
 ```
 
-Other profile locations, e.g. a second account for a second bot:
+Other login directories, e.g. a second account for a second bot:
 
 ```bash
-just llm-login claude --profile ~/mc-profiles/alt
-MC_CLAUDE_PROFILE=~/mc-profiles/alt just run companion
+just llm-login claude --login ~/mc-logins/alt
+MC_CLAUDE_LOGIN=~/mc-logins/alt just run companion
 ```
 
-| setting | env | per bot (`llm: { providerOptions: { profile } }` or provider options) |
+| setting | env | per bot (profile `llm.login`, or the provider option `login`) |
 |---|---|---|
-| Claude profile | `MC_CLAUDE_PROFILE` | `profile: '/path'` |
-| Codex profile | `MC_CODEX_PROFILE` | `profile: '/path'` |
-| OpenCode profile | `MC_OPENCODE_PROFILE` | `profile: '/path'` |
+| Claude login | `MC_CLAUDE_LOGIN` | `login: '/path'` |
+| Codex login | `MC_CODEX_LOGIN` | `login: '/path'` |
+| OpenCode login | `MC_OPENCODE_LOGIN` | `login: '/path'` |
 
-`profile: user` (or `MC_*_PROFILE=user`) opts back into your normal login in your real home.
+Without `--login`, `just llm-login` uses the provider's `MC_*_LOGIN` (else `.auth/<provider>`),
+the same directory the bots use. The old names still work: `--profile` for `--login`, the
+provider option `profile`, and `MC_CLAUDE_PROFILE` / `MC_CODEX_PROFILE` / `MC_OPENCODE_PROFILE`
+(these log a deprecation warning once, see [configuration](/reference/config)).
+
+`login: user` (or `MC_*_LOGIN=user`) opts back into your normal login in your real home.
 Settings, hooks, plugins and your MCP servers are still ignored by the provider flags, but the
 login (and for Codex, `CODEX_HOME`) is your own.
 

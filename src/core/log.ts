@@ -14,6 +14,7 @@
 import { openSync, writeSync, closeSync, renameSync, statSync, mkdirSync, existsSync, unlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { loadDotEnvOnce } from './definition.ts'
+import { setEnvWarner } from './env.ts'
 
 export const LEVELS = { trace: 5, debug: 10, info: 20, warn: 30, error: 40, silent: 100 } as const
 export type Level = keyof typeof LEVELS
@@ -393,3 +394,6 @@ export function installCrashHandlers (log: Logger = createLogger('golemkit')): v
   })
   process.on('exit', closeFiles)
 }
+
+// deprecated env names (core/env.ts) warn through the logger
+setEnvWarner(m => createLogger('golemkit/env').warn(m))

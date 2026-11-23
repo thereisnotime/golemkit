@@ -79,3 +79,26 @@ test('proxy: caveman maps to the local layer; codex gets a per-run provider over
   assert.match(joined, /model_provider="mcbproxy"/)
   assert.match(joined, /base_url = "https:\/\/gw.example\/v1"/)
 })
+
+test('renamed env variables: current names win, old ones still work with one warning that names no value', async () => {
+  const { envValue, resetEnvWarnings } = await import('../src/core/env.ts')
+  const { expandEnv } = await import('../src/core/definition.ts')
+  resetEnvWarnings()
+  const warnings: string[] = []
+  const warn = (m: string) => { warnings.push(m) }
+  const secretish = '/very/secret/path.env'
+  const env = { MC_OAUTH_TOKEN_FILE: secretish, MC_CLAUDE_OAUTH_TOKEN_VAR: 'NEW_VAR', MC_OAUTH_TOKEN_VAR: 'OLD_VAR' }
+  assert.equal(envValue('MC_CLAUDE_OAUTH_TOKEN_VAR', env, warn), 'NEW_VAR')
+  assert.equal(envValue('MC_CLAUDE_OAUTH_TOKEN_FILE', env, warn), secretish)
+  assert.equal(envValue('MC_CLAUDE_OAUTH_TOKEN_FILE', env, warn), secretish)
+  assert.equal(warnings.length, 1, 'once per old name')
+  assert.match(warnings[0]!, /MC_OAUTH_TOKEN_FILE is deprecated, use MC_CLAUDE_OAUTH_TOKEN_FILE/)
+  assert.ok(!warnings[0]!.includes(secretish), 'never the value')
+  assert.equal(envValue('MC_CLAUDE_LOGIN', {}, warn), undefined)
+  // profiles: ${MC_CLAUDE_OAUTH_TOKEN_FILE:-default} picks up the old name too
+  assert.equal(expandEnv('f: ${MC_CLAUDE_OAUTH_TOKEN_FILE:-~/x.env}', env), `f: ${secretish}`)
+  assert.equal(expandEnv('f: ${MC_CLAUDE_OAUTH_TOKEN_FILE:-~/x.env}', {}), 'f: ~/x.env')
+  resetEnvWarnings()
+  const p = createProvider('codex', {}, { MC_CODEX_LOGIN: '/new/codex' }) as any
+  assert.equal(p.profile.home, '/new/codex')
+})

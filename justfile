@@ -111,12 +111,12 @@ docs-build: docs-gen
     npx vitepress build docs
     @echo "{{GREEN}}✔ open docs/.vitepress/dist/index.html (or: npx vitepress preview docs){{NORMAL}}"
 
-# Log a subscription CLI into its isolated golemkit profile (claude [token] | codex [device] | opencode)
+# Log a subscription CLI into its isolated login dir (claude [token] | codex [device] | opencode) [--login DIR]
 [group('llm')]
 llm-login provider mode="" *args:
     @node scripts/llm-login.ts {{provider}} {{mode}} {{args}}
 
-# Show which LLM providers are logged in (isolated profiles in .auth/)
+# Show which LLM providers are logged in (isolated logins in .auth/, or --login DIR)
 [group('llm')]
 llm-status *args:
     @node scripts/llm-login.ts status {{args}}
