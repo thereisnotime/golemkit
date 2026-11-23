@@ -184,3 +184,9 @@ test('no mob counts as shielded; weapon damage lookup', () => {
   assert.equal(meleeDamage('iron_sword'), 6)
   assert.equal(meleeDamage(null), 1)
 })
+
+test('the warden is never fought', async () => {
+  const { attackRefusal } = await import('../src/skills/tactics.ts')
+  const r = attackRefusal({ name: 'warden', player: false, named: false, owned: false, hostile: true, attacking: true })
+  assert.match(r ?? '', /too strong/)
+})

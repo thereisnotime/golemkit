@@ -706,3 +706,28 @@ Server rules vary, but these patterns are common
 | Warden | boom ignores armour/shield; sneak avoids vibrations | yes (avoid only) | medium (avoidance) |
 | Blaze / drowned | 5 s volley gap; trident 8 HP to 20 blocks | yes | low |
 | PvP etiquette | consent, no spawn kill, no combat log | n/a | high (policy) |
+
+## What golemkit does with it
+
+Implemented (pure decisions in `src/skills/tactics.ts` and `src/skills/techniques.ts`, described
+under [Skilled-player techniques](./world.md#skilled-player-techniques), toggles on
+[Live config](../guide/live-config.md)):
+
+| Technique | Where | Toggle |
+|---|---|---|
+| Cooldown timing, crit jumps, sprinted first hit, spacing, strafing | fight loop | `combat.crits`, `combat.strafe` |
+| W-tap sprint hits when knockback is worth more or no crit is possible | fight loop | `combat.sprintReset` |
+| Sweep hits when mobs bunch around the target | fight loop | `combat.sweep` |
+| Shield between slow swings against melee, never against axes; disabled-shield tracking | fight loop | `combat.shieldMelee` |
+| Shield against a creeper blast that can't be outrun | fight loop | `combat.shieldMelee` |
+| Totem into the offhand at 8 health or in a lethal fall | reflexes | `combat.totem` |
+| Golden apple mid-fight at 8 health (12 when surrounded) | fight loop | `combat.goldenApple` |
+| Water bucket clutch, water against fire | reflexes, `water_bucket` | `combat.waterClutch` |
+| Enderman gaze guard on every look; no arrows at endermen or breezes | combat skill | `combat.endermanGaze` |
+| Fight from a 1-wide corridor against 3+ melee mobs | `defend` | `combat.chokepoints` |
+| Bow lead with arrow physics, shield against archers, cover, pillaring, bunker | existing | `combat.ranged`, `combat.shield` |
+| Defend-only PvP, never owners or friends | reflexes, `defend_player` | `combat.pvp`, `combat.friends` |
+
+Not implemented: ender pearls, building walls mid-fight against melee crowds, cobwebs, potions,
+Blast Protection choices (armour is scored by total protection), sleeping to reset phantoms
+(the bed is the owner's business), warden avoidance beyond never attacking it.

@@ -118,6 +118,9 @@ export const NEUTRAL_FIGHTABLE = new Set(['enderman', 'piglin', 'zombified_pigli
 /** Never attacked, whatever they do. */
 export const NEVER_ATTACK = new Set(['villager', 'wandering_trader', 'iron_golem', 'snow_golem', 'allay', 'cat', 'parrot', 'horse', 'donkey', 'mule', 'axolotl'])
 
+/** Never fought, only avoided: the warden (500 health, hits through shields). */
+export const AVOID = new Set(['warden'])
+
 /** What the attack rule looks at; combatRefusal() reads these off a mineflayer entity. */
 export interface AttackCandidate {
   name: string
@@ -139,6 +142,7 @@ export interface AttackCandidate {
  */
 export function attackRefusal (c: AttackCandidate): string | null {
   if (c.player) return 'a player'
+  if (AVOID.has(c.name)) return `a ${c.name} (too strong: get away from it)`
   if (NEVER_ATTACK.has(c.name) || /golem$/.test(c.name)) return `a ${c.name}`
   if (c.named) return 'named'
   if (c.owned) return 'someone\'s pet'

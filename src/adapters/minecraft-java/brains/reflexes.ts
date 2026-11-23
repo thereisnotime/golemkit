@@ -195,6 +195,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           }
           return
         }
+        if (mob.name === 'warden') { if (cur !== 'retreat' && agent.getAction('retreat')) void reflex('retreat', true); return }
         if (climbingAway(mob)) return
         // a shooter out of reach: the ranged reflex picks shoot back / shield / cover / back off by health and gear
         if (cfg().rangedDefense && isShooter(mob.name, mob.heldItem?.name) && mob.position.distanceTo(bot.entity.position) > 4 && agent.getAction('ranged_defense')) {

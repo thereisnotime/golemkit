@@ -263,6 +263,7 @@ loop, `defend` and the reflexes. Each one has a live toggle, on by default excep
   the mobs is walled on both sides too (a 1-wide corridor or doorway), walks there and fights
   without strafing, so the mobs reach it one at a time. Under half health the outnumbered rules
   (pillar, home, back off) apply as before.
+- **Warden**: never fought (500 health, its hits go through shields); hit by one, the bot backs off.
 - Kept from before: weapon-cooldown timing, crit jumps, the sprinted first hit, spacing and
   strafing, hit-and-step-back, bow lead with arrow physics, shield against archers, pillaring
   when outnumbered, bunkering from phantoms, healing breaks.
