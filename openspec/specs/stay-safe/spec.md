@@ -42,7 +42,7 @@ A path stopped within the first 1.5 s SHALL be started once more; a second stop 
 - **THEN** go_home succeeds
 
 ### Requirement: Flip back-off
-A behaviour whose run drops out ("no longer applies") within 10 s of starting SHALL, from the second such flip in a row, only start again with an urgent score (80+) for 5 s, doubling per flip up to 60 s; a run that finishes by itself SHALL reset the count.
+A behaviour whose run drops out ("no longer applies") within 10 s of starting SHALL, from the second such flip in a row, only start again with a score of at least `flipBypassScore` (default 75) for 5 s, doubling per flip up to 60 s; a run that finishes by itself SHALL reset the count.
 
 #### Scenario: Flickering condition
 - **WHEN** stay_safe started and dropped out twice within a few seconds each
