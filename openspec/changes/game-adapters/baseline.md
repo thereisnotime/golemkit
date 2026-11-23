@@ -58,13 +58,113 @@ Scope-check counts at the baseline (import / bot use / either of files):
 | scripts/ | 25 | 0 | 13 | 13 |
 | variants/ | 5 | 0 | 0 | 0 |
 
-### Live smoke test (phase 0)
+### Guard bench (phase 0)
 
-| step | result | note |
+`--phases guard --repeats 3 --minutes 3 --waves mixed`, seed 1, day, iron sword, no armour. Raw
+results: [bench/guard-phase0.jsonl](bench/guard-phase0.jsonl).
+
+| run | summoned | tester hits | damage | tester deaths | bot deaths | bot hits | kills |
+|---|---|---|---|---|---|---|---|
+| 1 | 27 | 35 | 114 | 3 | 3 | 40 | 18 |
+| 2 | 27 | 35 | 112 | 3 | 3 | 21 | 12 |
+| 3 | 27 | 27 | 78 | 2 | 1 | 13 | 17 |
+| mean | 27 | 32.3 ± 4.6 | 101 ± 20 | 2.7 | 2.3 | 24.7 | 15.7 |
+
+Arena clean-up before the runs (`guard-bench.ts --cleanup`): killed 4 leftover tagged mobs and
+15 dropped items, filled 39 blocks of creeper holes, cleared both inventories and effects.
+GuardTester died to something in the arena during the clean-up, before the kill command landed.
+
+## Live smoke test, every phase
+
+The script changed twice during phase 0 (the bot had no reflexes in a dark forest and died; then
+the tester never picked the planks up). The final script gives both players Resistance, removes
+natural hostiles around the spot and has the tester pick up drops, and counts bring_planks as ok
+when the tester ends up with the planks. All runs below use the final script, from snapshots of
+the code at each phase.
+
+| step | phase 0 | phase 1 | phase 2 | phase 3 |
+|---|---|---|---|---|
+| connect | ok | ok | ok | ok |
+| follow | ok (1.4) | ok (1.7) | ok (1.8) | ok (1.8) |
+| chop | ok (6 logs) | FAIL (tree at 1258 97 -290 out of reach) | ok (30 logs, climbed 24) | ok (8 logs) |
+| find_iron | ok | ok | ok | ok |
+| bring_planks | ok | ok | ok | ok |
+| go_home | ok | ok | ok | ok |
+
+Phase 1 added only interfaces and a lint script (no code path changed), so its chop failure is
+the world: earlier runs had cleared the nearest trees and the next one stood on a slope it
+couldn't path to; the following runs went to other trees. Earlier phase 2 run with the previous
+script: all ok as well.
+
+## Phase 1: interfaces and lint (warning)
+
+| check | before | after |
 |---|---|---|
-| connect | ok | |
-| follow | ok | 2.5 blocks from the tester after it walked 10 blocks |
-| chop | ok | 8 spruce logs |
-| find_iron | ok | iron ore in sight |
-| bring_planks | FAIL | crafted 4 planks and tossed them, but the tester (no brain) never picked them up; the script now has the tester run pickup_items while the bot brings, see the rerun below |
-| go_home | ok | |
+| tsc | clean | clean |
+| unit tests | 680 / 679 pass | 680 / 679 pass |
+| golden snapshots | | identical |
+| packet replay | | identical |
+| intents bench | | identical |
+| smoke test | | see the table above |
+| adapter-lint (warning) | | 407 violations in 40 files: the phase 2 work list |
+
+## Phase 2: Minecraft Java behind the interface
+
+| check | before | after |
+|---|---|---|
+| tsc | clean | clean |
+| unit tests | 680 / 679 pass | 685 / 684 pass (5 new adapter tests) |
+| golden snapshots | | identical |
+| packet replay | | identical (handshake bytes and events) |
+| intents bench | | identical |
+| smoke test | | same results (all ok) |
+| adapter-lint (warning) | 407 | 0 |
+| scope-check: Minecraft imports outside the expected places | 23 | 0 |
+
+Test plumbing that changed (not the goldens): `test/fake-attach.ts` puts the fake bot behind the
+adapter instead of `agent._bot`; fake agents in the npc, behaviours, self and go-home tests get
+`adapter: minecraftView(bot)` (the real adapter over their fake bot), the intents-brain fake
+agent an equivalent view, and `dig-refusal` imports `watchRefusedDigs` from its new place.
+
+## Phase 3: capabilities and lint as an error
+
+| check | before | after |
+|---|---|---|
+| tsc | clean | clean |
+| unit tests | 685 / 684 pass | 689 / 688 pass (4 new capability tests) |
+| golden snapshots | | identical (the Minecraft adapter supports every capability) |
+| packet replay | | identical |
+| intents bench | | identical |
+| smoke test | | same results (all ok) |
+| adapter-lint | | error in `just check`, 0 violations |
+
+After rebasing onto main (1ea3b1e, 0aab79f): 690 tests, all pass. The action-catalog and
+LLM-tool goldens were rewritten once for an intended change from main, not from this work:
+1ea3b1e raised gather_seeds' `radius` maximum from 64 to 128 (5 lines, nothing else).
+
+### Guard bench after phase 3
+
+Same settings and arena as phase 0, run from a snapshot of the phase 3 code (before the rebase
+onto main, whose change only touches keep_fed seed gathering, not armed in the bench). Raw
+results: [bench/guard-phase3.jsonl](bench/guard-phase3.jsonl).
+
+| run | summoned | tester hits | damage | tester deaths | bot deaths | bot hits | kills |
+|---|---|---|---|---|---|---|---|
+| 1 | 27 | 14 | 78 | 2 | 2 | 20 | 17 |
+| 2 | 27 | 27 | 96 | 2 | 2 | 29 | 17 |
+| 3 | 27 | 27 | 90 | 2 | 3 | 24 | 13 |
+| mean | 27 | 22.7 ± 7.5 | 88 ± 9 | 2.0 | 2.3 | 24.3 | 15.7 |
+
+| metric | phase 0 | phase 3 |
+|---|---|---|
+| tester hits | 32.3 ± 4.6 | 22.7 ± 7.5 |
+| tester damage | 101 ± 20 | 88 ± 9 |
+| tester deaths | 2.7 | 2.0 |
+| bot deaths | 2.3 | 2.3 |
+| bot hits taken | 24.7 | 24.3 |
+| kills | 15.7 | 15.7 |
+
+Within run-to-run variance: the ranges overlap (phase 0 hits 27-35, phase 3 14-27, with two
+runs of each at 27), the difference in mean hits is under two pooled standard deviations with
+three runs a side (Welch t about 1.9, not significant), and bot deaths, bot hits and kills are
+the same. No sign of a regression.
