@@ -594,6 +594,21 @@ export function siteAt (agent: Agent, bot: Bot, water: Vec3, size: number, from:
 const GRASS = ['short_grass', 'grass', 'tall_grass', 'fern', 'large_fern']
 const grassIds = (bot: Bot) => GRASS.map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
 
+/** Seed grass more than this far above or below the bot is left alone (caves, cliffs). */
+export const GRASS_Y_BAND = 12
+
+/** Nothing solid above the grass for 24 blocks (leaves and the like let light through): it's at the surface. */
+function openAbove (bot: Bot, p: { x: number, y: number, z: number }): boolean {
+  const base = bot.blockAt(p as any)
+  if (!base) return false
+  for (let dy = 1; dy <= 24; dy++) {
+    const b = bot.blockAt((base.position as any).offset(0, dy, 0))
+    if (!b) return true // above the loaded world: open
+    if (b.boundingBox === 'block' && !/leaves|glass|ice/.test(b.name)) return false
+  }
+  return true
+}
+
 /**
  * Grass it may break for seeds within `radius` of `center` (default: the bot), nearest first:
  * not protected, not near the world spawn, not in `skip`. Looks at many candidates, since the
@@ -604,9 +619,13 @@ export function breakableGrass (agent: Agent, bot: Bot, radius: number, o: { cle
   if (!ids.length) return []
   const center = o.center
   const out: Block[] = []
+  const y0 = bot.entity.position.y
   for (const p of bot.findBlocks({ matching: ids, maxDistance: radius, count: 1024 })) {
     if (o.skip?.has(p.toString())) continue
     if (center && Math.hypot(p.x - center.x, p.z - center.z) > radius) continue
+    // surface grass only: lush caves have grass too, and a seed run walked Pax 75 blocks down
+    // into one (shot by skeletons at y -11)
+    if (Math.abs(p.y - y0) > GRASS_Y_BAND || !openAbove(bot, p)) continue
     if (offLimits(agent, bot, p, o.clearance ?? 48)) continue
     const b = bot.blockAt(p)
     if (b) out.push(b)
