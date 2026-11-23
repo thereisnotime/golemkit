@@ -1,8 +1,10 @@
 import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
 import type { Item } from 'prismarine-item'
-import { defineSkill, defineAction, z, ok, fail, goals, fmtPos, itemName, checkAborted, sleep, type Agent, type ActionResult } from '../core/index.ts'
+import { defineSkill, defineAction, z, ok, fail, goals, fmtPos, itemName, checkAborted, sleep, travel, type Agent, type ActionResult } from '../core/index.ts'
 import { vec, reachBlock, within, gotoWithin } from './world.ts'
+import { parseChestList } from './searchPlan.ts'
+import { woodToTake, woodValue } from './treePlan.ts'
 
 const SEARCH = 32
 const SETTLE_MS = 150
@@ -91,6 +93,80 @@ async function openAt (bot: Bot, block: Block, signal: AbortSignal) {
       throw new Error(`couldn't open the ${block.name} at ${fmtPos(block.position)}`)
     }
   }
+}
+
+// ------------------------------------------------------------------ own chests
+
+export const OWN_CHESTS_KEY = 'search.ownChests'
+interface Pos { x: number, y: number, z: number }
+
+/** Chests and barrels this bot put down (remembered in storage). */
+export function ownChests (agent: Agent): Pos[] {
+  return (agent as { storage?: Agent['storage'] }).storage?.get<Pos[]>(OWN_CHESTS_KEY, []) ?? []
+}
+
+/** Chests listed in the profile (storage.chests). */
+export function configuredChests (agent: Agent): Pos[] {
+  const s = (agent.settings as { storage?: { chests?: unknown } }).storage
+  return parseChestList(s?.chests)
+}
+
+/**
+ * Takes wood (logs first, then planks of one kind) out of the bot's own chests within `range`
+ * until it holds `want` more plank units: own and configured chests, those known to hold wood
+ * first, skipping ones it saw empty of wood and ones in protected areas. Returns what it took.
+ */
+export async function takeWoodFromOwnChests (ctx: { bot: Bot, agent: Agent, signal: AbortSignal }, want: number, range = 48): Promise<{ took: Record<string, number>, units: number, notes: string[] }> {
+  const { bot, agent, signal } = ctx
+  const here = bot.entity.position
+  const seenList = knownContainers(agent)
+  const own = [...ownChests(agent), ...configuredChests(agent)]
+    .filter((p, i, a) => a.findIndex(q => q.x === p.x && q.y === p.y && q.z === p.z) === i)
+    .filter(p => Math.hypot(p.x - here.x, p.y - here.y, p.z - here.z) <= range && !agent.protectedAreas?.isProtected?.(p as any))
+    .map(p => {
+      const s = seenList.find(c => c.x === p.x && c.y === p.y && c.z === p.z)
+      const wood = s ? Object.entries(s.contents).reduce((n, [k, v]) => n + woodValue(k) * v, 0) : null
+      return { p, wood }
+    })
+    .filter(c => c.wood === null || c.wood > 0)
+    .sort((a, b) => (b.wood ?? 0.5) - (a.wood ?? 0.5))
+  const took: Record<string, number> = {}
+  const notes: string[] = []
+  let units = 0
+  for (const c of own.slice(0, 4)) {
+    if (units >= want) break
+    checkAborted(signal)
+    const block = bot.blockAt(vec(bot, c.p.x, c.p.y, c.p.z))
+    if (!block || !CONTAINER_RE.test(block.name)) {
+      if (Math.hypot(c.p.x - here.x, c.p.z - here.z) > 32) {
+        try { await travel(bot, c.p, signal, { range: 3 }) } catch (e) { checkAborted(signal); notes.push(`chest ${fmtPos(c.p)}: ${(e as Error).message}`); continue }
+      }
+      const again = bot.blockAt(vec(bot, c.p.x, c.p.y, c.p.z))
+      if (!again || !CONTAINER_RE.test(again.name)) { notes.push(`no chest at ${fmtPos(c.p)} any more`); continue }
+    }
+    const b = bot.blockAt(vec(bot, c.p.x, c.p.y, c.p.z))!
+    let win
+    try { win = await openAt(bot, b, signal) } catch (e) { checkAborted(signal); notes.push((e as Error).message); continue }
+    try {
+      const contents = tally(win.containerItems().map(i => ({ name: itemName(i), count: i.count })))
+      const plan = woodToTake(contents, want - units)
+      for (const [name, n] of Object.entries(plan)) {
+        checkAborted(signal)
+        const item = win.containerItems().find(i => itemName(i) === name)
+        if (!item) continue
+        const before = win.containerCount(item.type, null)
+        try { await win.withdraw(item.type, null, n) } catch {}
+        await sleep(SETTLE_MS, signal)
+        const moved = before - win.containerCount(item.type, null)
+        if (moved > 0) { took[name] = (took[name] ?? 0) + moved; units += moved * woodValue(name) }
+        if (moved < n) break
+      }
+      remember(agent, b, win.containerItems())
+    } finally {
+      win.close()
+    }
+  }
+  return { took, units, notes }
 }
 
 const coords = {

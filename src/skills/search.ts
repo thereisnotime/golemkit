@@ -22,7 +22,7 @@ import { mineStone } from './mining.ts'
 import { upgradeTools } from './progression.ts'
 import { toolTier, bestToolIn } from './toolkit.ts'
 import { CROPS, isMature, plantOn } from './farming.ts'
-import { withdraw as withdrawAction, knownContainers, CONTAINER_RE } from './containers.ts'
+import { withdraw as withdrawAction, knownContainers, CONTAINER_RE, ownChests, configuredChests, OWN_CHESTS_KEY } from './containers.ts'
 import { moddedNames } from './mods.ts'
 import { offLimits, spawnOf, surfaceAt, topY, isNight, inOwnFarm, getFoodSpots } from './food.ts'
 import {
@@ -39,7 +39,6 @@ type Ctx = Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'> & Partial<Pic
 
 // ------------------------------------------------------------------ memory: own chests, deaths, last seen
 
-const OWN_CHESTS_KEY = 'search.ownChests'
 const DEATHS_KEY = 'search.deaths'
 
 export interface DeathRecord { player: string, at: number, pos?: Pos, dim?: string, message?: string, posFrom?: 'entity' | 'last_seen' }
@@ -50,14 +49,7 @@ function store (agent: Agent): Agent['storage'] | null {
   return (agent as { storage?: Agent['storage'] }).storage ?? null
 }
 
-export function ownChests (agent: Agent): Pos[] {
-  return store(agent)?.get<Pos[]>(OWN_CHESTS_KEY, []) ?? []
-}
-
-function configuredChests (agent: Agent): Pos[] {
-  const s = (agent.settings as { storage?: { chests?: unknown } }).storage
-  return parseChestList(s?.chests)
-}
+export { ownChests }
 
 export function recentDeaths (agent: Agent): DeathRecord[] {
   return store(agent)?.get<DeathRecord[]>(DEATHS_KEY, []) ?? []

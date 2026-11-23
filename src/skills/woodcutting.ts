@@ -1,12 +1,17 @@
 import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
 import type { Vec3 } from 'vec3'
-import { defineSkill, defineAction, z, ok, fail, checkAborted, fmtPos, goals, sleep, dangerMemory, type ActionResult, type ActionContext } from '../core/index.ts'
+import { defineSkill, defineAction, z, ok, fail, checkAborted, fmtPos, goals, sleep, travel, dangerMemory, type Agent, type ActionResult, type ActionContext } from '../core/index.ts'
 import { reachBlock, within, placeAt, findItem, isReplaceable, digBlock, DigRefusedError, gotoWithin } from './world.ts'
 import { pickupNearby } from './pickup.ts'
 import { ensureTool, inventoryCounts, planksFor } from './toolkit.ts'
 import { fillerBlock } from './survival.ts'
 import { autoUpgrade } from './progression.ts'
+import { scoutWaypoints, compass, type XZ } from './foodPlan.ts'
+import {
+  nextTreeStep, mergeTreeSpot, markTreeSpotEmpty, recordTreeSearch, treeRetryInMs, spotKey, DEFAULT_TREE_RINGS,
+  type TreeSpot, type SearchRecord
+} from './treePlan.ts'
 
 /** Wood type of a natural log ("oak" for oak_log), or null for anything else (stripped logs included). */
 export function woodType (name: string): string | null {
@@ -67,13 +72,18 @@ function scanTree (bot: Bot, start: Block): Tree | null {
   return { wood, base, logs }
 }
 
-function findTree (bot: Bot, radius: number, skip: (p: Vec3) => boolean = () => false): Tree | null {
+/** Up to `max` distinct natural trees within `radius`, nearest first. */
+function scanTrees (bot: Bot, radius: number, skip: (p: Vec3) => boolean = () => false, max = 1): Tree[] {
   const ids = Object.values(bot.registry.blocksByName).filter(b => woodType(b.name)).map(b => b.id)
   // Plenty of candidates: the nearest logs are often one tree, a wooden house or a protected spot.
   const candidates = bot.findBlocks({ matching: ids, maxDistance: radius, count: 256 })
   const tried = new Set<string>()
+  const out: Tree[] = []
   for (const p of candidates) {
+    if (out.length >= max) break
     if (skip(p)) continue
+    // logs of a tree already found are skipped without a scan
+    if (out.some(t => t.logs.some(l => l.x === p.x && l.y === p.y && l.z === p.z))) continue
     const b = bot.blockAt(p)
     if (!b) continue
     const tree = scanTree(bot, b)
@@ -81,9 +91,13 @@ function findTree (bot: Bot, radius: number, skip: (p: Vec3) => boolean = () => 
     const key = `${tree.base.x},${tree.base.y},${tree.base.z}`
     if (tried.has(key)) continue
     tried.add(key)
-    return tree
+    out.push(tree)
   }
-  return null
+  return out
+}
+
+function findTree (bot: Bot, radius: number, skip: (p: Vec3) => boolean = () => false): Tree | null {
+  return scanTrees(bot, radius, skip, 1)[0] ?? null
 }
 
 async function equipAxe (bot: Bot, block: Block): Promise<void> {
@@ -151,6 +165,7 @@ export async function fellTree ({ bot, agent, signal, log }: Pick<ActionContext,
       : `no natural tree within ${radius} blocks`)
   }
   log.debug('felling tree', { wood: tree.wood, at: fmtPos(tree.base), logs: tree.logs.length })
+  rememberTreesNear(bot, agent, skip)
   const soil = bot.blockAt(tree.base.offset(0, -1, 0))?.name ?? ''
   if (!logName) logName = `${tree.wood}_log`
   let cut = firstCut
@@ -320,18 +335,193 @@ async function collectTreeDrops (bot: Bot, signal: AbortSignal): Promise<number>
   return picked
 }
 
+// ------------------------------------------------------------------ remembered trees and the wood ladder
+
+const SPOTS_KEY = 'woodcutting.treeSpots'
+const SEARCHES_KEY = 'woodcutting.searches'
+
+function store (agent: Agent): Agent['storage'] | null {
+  return (agent as { storage?: Agent['storage'] }).storage ?? null
+}
+
+/** Places with trees this bot has seen (newest first). */
+export function getTreeSpots (agent: Agent): TreeSpot[] {
+  return store(agent)?.get<TreeSpot[]>(SPOTS_KEY, []) ?? []
+}
+
+function setTreeSpots (agent: Agent, spots: TreeSpot[]): void {
+  store(agent)?.set(SPOTS_KEY, spots)
+}
+
+function treeSearches (agent: Agent): SearchRecord[] {
+  return store(agent)?.get<SearchRecord[]>(SEARCHES_KEY, []) ?? []
+}
+
+/** Remembers the natural trees loaded around the bot (a few, clustered into one spot each). */
+function rememberTreesNear (bot: Bot, agent: Agent, skip: (p: Vec3) => boolean, radius = 48): number {
+  try {
+    const trees = scanTrees(bot, radius, skip, 8)
+    if (!trees.length) return 0
+    const dim = bot.game?.dimension
+    let spots = getTreeSpots(agent)
+    const now = Date.now()
+    for (const t of trees) {
+      const near = trees.filter(o => Math.hypot(o.base.x - t.base.x, o.base.z - t.base.z) <= 24).length
+      spots = mergeTreeSpot(spots, { x: t.base.x, y: t.base.y, z: t.base.z, ...(dim ? { dim } : {}), wood: t.wood, count: near, seen: now })
+    }
+    setTreeSpots(agent, spots)
+    return trees.length
+  } catch { return 0 }
+}
+
+const isNightTime = (bot: Bot) => { const t = bot.time?.timeOfDay ?? 6000; return t >= 13_000 && t < 23_000 }
+const NO_TREE = /no (natural )?tree|no tree I'm allowed/
+
+export interface WideFellOptions {
+  /** Search rings, smallest first. Default 32, 64, 128, 250. */
+  rings?: readonly number[]
+  replant: boolean
+  makeAxe?: boolean
+  /** Walk back to where it started after felling a tree far away. Default true. */
+  returnBack?: boolean
+  /** Give up the search after this long (felling included). Default 10 minutes. */
+  maxMinutes?: number
+  /** Scout at night too. Default false. */
+  atNight?: boolean
+}
+
+/**
+ * The wood ladder: fells one tree, looking further out when there is none close. Remembered
+ * tree spots first (nearest), then rings: a scan of what is loaded for the inner ones, a scouting
+ * spiral out to the ring for the outer ones, skipping danger zones and protected areas. Empty
+ * rings are remembered (TREE_RING_MEMORY_MS) so the next run starts further out; trees seen on
+ * the way are remembered as spots to come back to. Walks back after a far tree.
+ */
+export async function fellTreeWide (ctx: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>, o: WideFellOptions): Promise<ActionResult> {
+  const { bot, agent, signal, log } = ctx
+  if (!agent.canDig) return fail('digging is disabled for this bot')
+  const rings = o.rings?.length ? [...o.rings].sort((a, b) => a - b) : [...DEFAULT_TREE_RINGS]
+  const t0 = Date.now()
+  const maxMs = (o.maxMinutes ?? 10) * 60_000
+  const origin = bot.entity.position.floored()
+  const dim = bot.game?.dimension
+  const danger = dangerMemory(agent)
+  const blocked = (p: XZ & { y?: number }) => {
+    const v = { x: p.x, y: p.y ?? origin.y, z: p.z }
+    return agent.protectedAreas.isProtected(v as any) || !!danger.isInDanger(v) || !!danger.crosses(origin, v)
+  }
+  const tried = new Set<string>()
+  const notes: string[] = []
+  const fell = (radius: number) => fellTree(ctx, { radius, replant: o.replant, makeAxe: o.makeAxe })
+  const back = async (r: ActionResult, how: string): Promise<ActionResult> => {
+    const far = Math.round(Math.hypot(bot.entity.position.x - origin.x, bot.entity.position.z - origin.z))
+    let tail = ''
+    if (far > 48 && o.returnBack !== false) {
+      try { await travel(bot, origin, signal, { range: 4, stepTimeoutMs: 45_000 }); tail = ', walked back' } catch (e) { checkAborted(signal); tail = `, couldn't walk back (${(e as Error).message})` }
+    }
+    return ok(`${r.message} (${how}${tail})`, r.data)
+  }
+  for (let round = 0; round < rings.length + 6; round++) {
+    checkAborted(signal)
+    if (Date.now() - t0 > maxMs) { notes.push(`gave up after ${Math.round(maxMs / 60_000)} minutes`); break }
+    const step = nextTreeStep({ from: origin, dim, now: Date.now(), spots: getTreeSpots(agent), searches: treeSearches(agent) }, { rings, skip: blocked, tried })
+    if (!step) break
+    log.debug('tree search step', { step: step.step, reason: step.reason })
+    if (step.step === 'spot') {
+      tried.add(spotKey(step.spot))
+      const at = step.spot
+      try {
+        if (Math.hypot(at.x - bot.entity.position.x, at.z - bot.entity.position.z) > 16) await travel(bot, { x: at.x, z: at.z }, signal, { range: 8, stepTimeoutMs: 45_000 })
+      } catch (e) {
+        checkAborted(signal)
+        notes.push(`couldn't get to the trees at ${at.x} ${at.z} (${(e as Error).message})`)
+        setTreeSpots(agent, markTreeSpotEmpty(getTreeSpots(agent), at, Date.now(), 24, dim))
+        continue
+      }
+      const r = await fell(32)
+      if (r.ok) return back(r, `at trees I remembered, ${Math.round(Math.hypot(at.x - origin.x, at.z - origin.z))} blocks ${compass(origin, at)}`)
+      setTreeSpots(agent, markTreeSpotEmpty(getTreeSpots(agent), at, Date.now(), 24, dim))
+      notes.push(`no tree left at ${at.x} ${at.z}`)
+      continue
+    }
+    tried.add(`ring:${step.radius}`)
+    if (step.step === 'scan') {
+      const r = await fell(step.radius)
+      if (r.ok) {
+        store(agent)?.set(SEARCHES_KEY, recordTreeSearch(treeSearches(agent), step.radius, true, Date.now()))
+        return back(r, `within ${step.radius} blocks`)
+      }
+      if (NO_TREE.test(r.message)) store(agent)?.set(SEARCHES_KEY, recordTreeSearch(treeSearches(agent), step.radius, false, Date.now()))
+      else notes.push(r.message)
+      continue
+    }
+    // scout: a spiral of waypoints out to the ring, looking around at every one
+    if (isNightTime(bot) && !o.atNight) { notes.push(`it is night, so I did not scout ${step.radius} blocks out`); break }
+    const wps = scoutWaypoints(origin, step.radius, { step: 64, minRadius: step.covered, skip: blocked, startAngle: Math.random() * Math.PI * 2 })
+    let found = false
+    let failures = 0
+    let legs = 0
+    for (const w of wps) {
+      checkAborted(signal)
+      if (Date.now() - t0 > maxMs || failures >= 3 || (isNightTime(bot) && !o.atNight) || (bot.health ?? 20) <= 6) break
+      if (danger.crosses(bot.entity.position, { x: w.x, y: origin.y, z: w.z })) continue
+      const ctl = new AbortController()
+      try {
+        await travel(bot, { x: w.x, z: w.z }, AbortSignal.any([signal, ctl.signal]), {
+          range: 8,
+          stepTimeoutMs: 45_000,
+          onProgress: () => { if (findTree(bot, 32, p => blocked(p))) ctl.abort() }
+        })
+        failures = 0
+      } catch (e) {
+        checkAborted(signal)
+        if (!ctl.signal.aborted) { failures++; log.debug('tree scout: leg failed', { to: `${w.x} ${w.z}`, error: (e as Error).message }) }
+      }
+      legs++
+      if (rememberTreesNear(bot, agent, p => blocked(p))) {
+        const here = bot.entity.position
+        try { agent.journal?.record('found', { target: 'tree', what: 'trees', count: 1, how: `scouted ${step.radius} blocks` }, { pos: { x: Math.floor(here.x), y: Math.floor(here.y), z: Math.floor(here.z) }, ...(dim ? { dim } : {}) }) } catch {}
+        const r = await fell(48)
+        if (r.ok) {
+          found = true
+          store(agent)?.set(SEARCHES_KEY, recordTreeSearch(treeSearches(agent), step.radius, true, Date.now()))
+          const d = Math.round(Math.hypot(here.x - origin.x, here.z - origin.z))
+          return back(r, `scouted ${d} blocks ${compass(origin, here)}, remembered the spot`)
+        }
+        notes.push(r.message)
+      }
+    }
+    if (!found) {
+      // only a ring walked all the way round counts as empty
+      if (legs >= wps.length && failures < 3) store(agent)?.set(SEARCHES_KEY, recordTreeSearch(treeSearches(agent), step.radius, false, Date.now()))
+      else { notes.push(`scouting ${step.radius} blocks out stopped after ${legs} of ${wps.length} legs`); break }
+    }
+  }
+  if (Math.hypot(bot.entity.position.x - origin.x, bot.entity.position.z - origin.z) > 48 && o.returnBack !== false) {
+    try { await travel(bot, origin, signal, { range: 4, stepTimeoutMs: 45_000 }) } catch (e) { checkAborted(signal) }
+  }
+  const retry = treeRetryInMs(treeSearches(agent), Date.now())
+  const widest = rings[rings.length - 1]!
+  return fail(`no natural tree I may cut within ${widest} blocks${notes.length ? ` (${notes.join('; ')})` : ''}${retry ? `; looking again in ${Math.ceil(retry / 60_000)} min` : ''}`, { need: 'trees', retryInMs: retry })
+}
+
 const chopTree = defineAction({
   name: 'chop_tree',
   description: 'Fell the nearest natural tree (any wood type): cut the logs it can reach, pick up the drops and plant a sapling. ' +
+    'With rings it widens the search (remembered tree spots, then ring by ring, with a trip out and back) instead of giving up. ' +
     'Crafts a wooden axe first if there is none and the inventory has the wood. Needs digging enabled. ' +
     'For "get N planks/logs" or materials for a build, prefer gather_materials, which chops as many trees as needed.',
   params: z.object({
     radius: z.number().min(4).max(64).default(32).describe('how far to look for a tree, in blocks'),
     replant: z.boolean().default(true).describe('plant a sapling of the same kind afterwards if the bot has one'),
-    make_axe: z.boolean().default(true).describe('craft a wooden axe first when there is none and there is wood for it')
+    make_axe: z.boolean().default(true).describe('craft a wooden axe first when there is none and there is wood for it'),
+    rings: z.array(z.number().int().min(8).max(512)).max(8).optional()
+      .describe('look further out when there is no tree close: remembered tree spots first, then these rings (e.g. [32, 64, 128, 250]); rings past 64 are a scouting trip out and back, by day')
   }),
   aliases: ['chop'],
-  run: (ctx, { radius, replant, make_axe }) => fellTree(ctx, { radius, replant, makeAxe: make_axe })
+  run: (ctx, { radius, replant, make_axe, rings }) => rings?.length
+    ? fellTreeWide(ctx, { rings, replant, makeAxe: make_axe })
+    : fellTree(ctx, { radius, replant, makeAxe: make_axe })
 })
 
 export const woodcutting = () => defineSkill({
