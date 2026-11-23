@@ -51,7 +51,7 @@ are done: the Minecraft side moved into `src/adapters/minecraft-java` (see
 | `src/brains/behaviors/` | 8 | 0 | 0 | core | Arming, registry (with capability gating), runtime, config and the behaviour actions. |
 | `src/brains/scene/` | 9 | 0 | 0 | core | Casting, beats, lines, the director protocol and scheduling; positions and hits through the adapter. |
 | `src/brains/self/` | 9 | 0 | 0 | core | Program format, gate, interpreter, learner and store; conditions read the adapter's world view. |
-| `src/skills/` | 49 | 27 | 34 | minecraft | Actions for movement, combat, food, mining, crafting, building, roads, WorldEdit, each with the capabilities it needs. `config` is game-agnostic and `journal` nearly so. |
+| `src/skills/` | 54 | 29 | 36 | minecraft | Actions for movement, combat, food, mining, crafting, building, roads, WorldEdit, each with the capabilities it needs, plus pure planners (`foodPlan`, `farmPlan`, `searchPlan`, `reachPlan`, `ranged-plan`, `techniques`, `pvp`, ...) that touch no bot. `config` is game-agnostic and `journal` nearly so. |
 | `src/cli.ts` | 1 | 0 | 0 | core | Argument parsing, run, fleet, list. |
 | `variants/` | 5 | 0 | 0 | minecraft | No direct imports, but every variant picks Minecraft skills, reflexes and settings. |
 | `profiles/` | YAML | | | mixed | The keys are generic (brains, LLM, listen modes); values name Minecraft items, blocks and behaviours. |
