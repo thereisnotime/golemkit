@@ -310,6 +310,12 @@ async function main (): Promise<void> {
       try {
         await checkPlayersFar()
         for (const ag of [dir, a, b]) { if (!live(ag)) await waitLive(ag, 120_000) }
+        // hostile mobs spawn at night and a creeper blew holes in the arena in testing: duel by day only
+        // (the time is never changed, the director just waits)
+        while (live(dir) && (dir.bot.time.timeOfDay >= 12_500 && dir.bot.time.timeOfDay <= 23_400)) {
+          log(`night (time ${dir.bot.time.timeOfDay}): waiting for the day`)
+          await pause(30_000)
+        }
         const sessions = drops
         if (![dir, a, b].every(live)) throw new Error('a test account is offline')
         await clearMobs()
