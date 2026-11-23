@@ -118,8 +118,13 @@ export interface RangedState {
   patrol: number
   /** A spot behind a block was found nearby. */
   coverNear: boolean
+  /** How far that spot is (blocks). Unknown counts as right here. */
+  coverDist?: number
   /** No cover, but it can build some here (blocks in the inventory, placing allowed, a wall plan fits). */
   canBuild?: boolean
+  /** The wall plan's size: blocks to place and how many of them are a pillar under the bot. Unknown counts as one block. */
+  wallBlocks?: number
+  wallPillar?: number
   /** Backing off would still gain distance without passing the retreat cap. Default true. */
   canRetreat?: boolean
   /** Combat flags: combat.ranged and combat.shield (default on). */
@@ -201,6 +206,56 @@ export function activeShooters<T extends ShooterView> (list: readonly T[], range
   return list.filter(s => (s.los && s.dist <= range) || s.hurtMe).sort((a, b) => a.dist - b.dist)
 }
 
+// ---- heavy fire: how long each way of hiding leaves the bot in the open ----
+
+/** Hits per second one shooter with a line lands on a bot in the open (a skeleton draws about every 1.5 s and misses some). */
+export const HITS_PER_SHOOTER_S = 0.3
+/** Blocks a second walking (sprinting is faster, but the path bends and starts slowly). */
+export const COVER_WALK_BPS = 5
+/** Seconds to place one cover block (equip, look, click, the server's answer), and one pillar block (jump and place). */
+export const WALL_BLOCK_S = 0.45
+export const PILLAR_BLOCK_S = 0.6
+/** Expected hits under which a way of hiding counts as quick enough under heavy fire. */
+export const QUICK_HITS = 1
+
+/** Hits it expects to take while `seconds` in the open with `shooters` shooting at it. */
+export function exposureHits (seconds: number, shooters: number): number {
+  return Math.max(0, seconds) * Math.max(0, shooters) * HITS_PER_SHOOTER_S
+}
+
+/**
+ * Heavy fire: outnumbered (RANGED_OUTNUMBERED+ shooters or patrol mobs) with a gear score under
+ * what that many need, or health at RANGED_LOW_HEALTH or less. Building cover in the open or
+ * walking far to a spot loses then: each second in sight is hits from every shooter.
+ */
+export function heavyFire (s: Pick<RangedState, 'health' | 'shooters' | 'patrol' | 'armor' | 'shield' | 'bow' | 'melee' | 'weaponDamage' | 'arrows' | 'useBow' | 'useShield'>): boolean {
+  if (s.health <= RANGED_LOW_HEALTH) return true
+  const many = Math.max(activeShooters(s.shooters).length, s.patrol)
+  const need = gearNeeded(many)
+  return need > 0 && gearScore(gearOf(s)) < need
+}
+
+/** Cover that far can be reached before taking a hit, more or less (under heavy fire). */
+export function quickCover (dist: number, shooters: number): boolean {
+  return exposureHits(dist / COVER_WALK_BPS, shooters) < QUICK_HITS
+}
+
+/** A wall of `blocks` (`pillar` of them under the bot) can be finished before taking a hit, more or less. */
+export function quickWall (blocks: number, pillar: number, shooters: number): boolean {
+  const s = Math.max(0, blocks - pillar) * WALL_BLOCK_S + Math.max(0, pillar) * PILLAR_BLOCK_S
+  return exposureHits(s, shooters) < QUICK_HITS
+}
+
+/**
+ * Whether to raise a shield for a moment while getting away: an arrow on its way, not more often
+ * than every 1.5 s (each block stops the bot), and only when that is worth the time lost: hurt
+ * (12 or less) or at most 2 shooters (a raised shield faces one way only).
+ */
+export function shieldWhileFleeing (s: { shield: boolean, incoming: boolean, sinceBlockMs: number, health: number, shooters: number }): boolean {
+  if (!s.shield || !s.incoming || s.sinceBlockMs < 1500) return false
+  return s.health <= 12 || s.shooters <= 2
+}
+
 /**
  * What to do about mobs shooting at the bot, or null when none has a line to it. In order:
  *  - at RANGED_LOW_HEALTH or less: hide (below);
@@ -213,6 +268,9 @@ export function activeShooters<T extends ShooterView> (list: readonly T[], range
  * Hiding means cover when there is some nearby, else building cover when it can, else backing
  * off; when backing off would pass the retreat cap (canRetreat false) it stands its ground with
  * the bow, shield or weapon it has, except at RANGED_LOW_HEALTH or less, where it backs off anyway.
+ * Under heavy fire (heavyFire) cover counts only when it is quick to reach (quickCover) and a wall
+ * only when it is quick to finish (quickWall); otherwise it gets out of sight by backing off, and
+ * a slow cover or wall is the fallback only when it can't back off any further.
  */
 export function rangedResponse (s: RangedState): RangedDecision | null {
   const active = activeShooters(s.shooters)
@@ -220,7 +278,17 @@ export function rangedResponse (s: RangedState): RangedDecision | null {
   const nearest = active[0]!
   const bow = s.bow && s.useBow !== false
   const shield = s.shield && s.useShield !== false
+  const heavy = heavyFire(s)
+  const n = Math.max(active.length, s.patrol)
+  const coverQuick = s.coverNear && (!heavy || quickCover(s.coverDist ?? 0, n))
+  const wallQuick = !!s.canBuild && (!heavy || quickWall(s.wallBlocks ?? 1, s.wallPillar ?? 0, n))
   const hide = (why: string): RangedDecision => {
+    if (coverQuick) return { act: 'cover', target: nearest.id, why }
+    if (wallQuick) return { act: 'build', target: nearest.id, why }
+    if (heavy && s.canRetreat !== false) {
+      const slow = s.coverNear ? `cover ${Math.round(s.coverDist ?? 0)} blocks off` : s.canBuild ? `a ${s.wallBlocks ?? 1}-block wall` : ''
+      return { act: 'retreat', target: nearest.id, why: `${why}; heavy fire, getting out of sight${slow ? ` (${slow} is too slow)` : ''}` }
+    }
     if (s.coverNear) return { act: 'cover', target: nearest.id, why }
     if (s.canBuild) return { act: 'build', target: nearest.id, why }
     // at the cap it stands its ground, unless it is about to die: then it keeps running (the caller allows a little more)
@@ -404,16 +472,40 @@ export function retreatPoint (bot: V3, shooters: readonly V3[], dist = 20): V3 {
 
 /** How far from where the trouble started the bot backs off at most (blocks). */
 export const RETREAT_CAP = 24
+/** The same under heavy fire: getting out of sight matters more than staying near the job. */
+export const FLEE_CAP = 48
+
+/**
+ * Where to get away to under heavy fire: towards home (or another safe spot) when that lies
+ * roughly away from the shooters (within 100 degrees of straight away) and isn't right here, else
+ * straight away (retreatPoint). `dist` blocks at most.
+ */
+export function fleePoint (bot: V3, shooters: readonly V3[], dist = 24, safe?: V3 | null): V3 {
+  const away = retreatPoint(bot, shooters, dist)
+  if (!safe || !shooters.length) return away
+  const sx = safe.x - bot.x
+  const sz = safe.z - bot.z
+  const sl = Math.hypot(sx, sz)
+  if (sl < 6) return away
+  const ax = away.x - bot.x
+  const az = away.z - bot.z
+  const al = Math.hypot(ax, az) || 1
+  const cos = (sx * ax + sz * az) / (sl * al)
+  if (cos < Math.cos(100 * Math.PI / 180)) return away
+  const k = Math.min(dist, sl) / sl
+  return { x: bot.x + sx * k, y: sl <= dist ? safe.y : bot.y, z: bot.z + sz * k }
+}
 
 /**
  * Where to back off to, capped: retreatPoint, pulled in so it stays within `cap` blocks
  * (horizontally) of `origin`, where the bot was when the shooting started. Null when that gains
  * less than 2 blocks or doesn't get further from the shooters: the bot is at the cap, and should
- * hide, build cover or stand its ground instead of running on.
+ * hide, build cover or stand its ground instead of running on. With `safe` (home) the way
+ * goes there when that is roughly away from the shooters (fleePoint).
  */
-export function cappedRetreat (origin: V3, bot: V3, shooters: readonly V3[], dist = 20, cap = RETREAT_CAP): V3 | null {
+export function cappedRetreat (origin: V3, bot: V3, shooters: readonly V3[], dist = 20, cap = RETREAT_CAP, safe?: V3 | null): V3 | null {
   if (!shooters.length) return null
-  let p = retreatPoint(bot, shooters, dist)
+  let p = safe ? fleePoint(bot, shooters, dist, safe) : retreatPoint(bot, shooters, dist)
   const vx = p.x - origin.x
   const vz = p.z - origin.z
   const l = Math.hypot(vx, vz)

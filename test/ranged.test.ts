@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   isShooter, incoming, patrolCount, rangedResponse, activeShooters, canEatUnderFire, lineBlocked, findCover, retreatPoint,
   gearScore, gearNeeded, hideMs, stillHiding, leaveCover, coverHoldMs, cappedRetreat, planWall,
+  heavyFire, quickCover, quickWall, exposureHits, shieldWhileFleeing, fleePoint, FLEE_CAP,
   type RangedState, type ShooterView
 } from '../src/skills/ranged-plan.ts'
 import { rangedDanger } from '../src/adapters/minecraft-java/behaviors/safety.ts'
@@ -327,4 +328,75 @@ test('stay_safe ranged danger: graded by gear and health', () => {
   assert.ok(rangedDanger({ ...base, active: 5 }), 'but not 5')
   assert.ok(!rangedDanger({ ...base, active: 5, bow: true, arrows: 32 }), 'unless it has a bow')
   assert.ok(rangedDanger({ ...base, weaponDamage: 1 }), 'no weapon')
+})
+
+// Pax, 23 Nov 2026: food 12, stone sword, no armour or shield, 3 skeletons at 665 61 -91. It walked to
+// cover 8+ blocks off, held it while being hit, and died in 12 s.
+const paxGear = { armor: 0, shield: false, melee: true, weaponDamage: 5 }
+const three = () => [sh({ name: 'skeleton', id: 1, dist: 10 }), sh({ name: 'skeleton', id: 2, dist: 12 }), sh({ name: 'skeleton', id: 3, dist: 14 })]
+
+test('heavy fire: outnumbered with poor gear, or low health', () => {
+  assert.ok(heavyFire(st({ ...paxGear, shooters: three() })), 'stone sword against 3')
+  assert.ok(!heavyFire(st({ ...paxGear, shooters: three().slice(0, 2) })), 'two shooters is not heavy at full health')
+  assert.ok(heavyFire(st({ ...paxGear, health: 8, shooters: three().slice(0, 1) })), 'low health')
+  assert.ok(!heavyFire(st({ armor: 15, shield: true, melee: true, weaponDamage: 6, shooters: three() })), 'iron, shield and sword take on 3')
+})
+
+test('heavy fire: exposure from the time in the open', () => {
+  assert.equal(exposureHits(2, 3), 2 * 3 * 0.3)
+  assert.equal(exposureHits(-1, 3), 0)
+  assert.ok(quickCover(4, 3), '4 blocks with 3 shooting: under a second')
+  assert.ok(!quickCover(8, 3), '8 blocks with 3 shooting: too long in the open')
+  assert.ok(quickCover(8, 1), '8 blocks with 1 shooting is fine')
+  assert.ok(quickWall(2, 0, 3), 'two blocks')
+  assert.ok(!quickWall(5, 0, 3), 'five blocks against three')
+  assert.ok(!quickWall(3, 2, 3), 'a pillar is slower')
+  assert.ok(quickWall(5, 0, 1), 'five blocks against one shooter')
+})
+
+test('response under heavy fire: quick cover, else a quick wall, else get out of sight', () => {
+  const s = (o: Partial<RangedState>) => rangedResponse(st({ ...paxGear, shooters: three(), ...o }))!
+  assert.equal(s({ coverNear: true, coverDist: 3 }).act, 'cover', 'cover 3 blocks away')
+  const far = s({ coverNear: true, coverDist: 9 })
+  assert.equal(far.act, 'retreat', 'cover 9 blocks away is too slow with 3 shooting')
+  assert.match(far.why, /heavy fire/)
+  assert.match(far.why, /cover 9 blocks off is too slow/)
+  assert.equal(s({ coverNear: false, canBuild: true, wallBlocks: 2 }).act, 'build', 'a 2-block wall is quick')
+  assert.equal(s({ coverNear: false, canBuild: true, wallBlocks: 5 }).act, 'retreat', 'a 5-block wall in the open is not')
+  assert.equal(s({ coverNear: true, coverDist: 9, canBuild: true, wallBlocks: 2 }).act, 'build', 'a quick wall beats a far spot')
+  // nowhere to back off to: the slow cover or wall is still better than the open
+  assert.equal(s({ coverNear: true, coverDist: 9, canRetreat: false }).act, 'cover')
+  assert.equal(s({ coverNear: false, canBuild: true, wallBlocks: 5, canRetreat: false }).act, 'build')
+  // not heavy (good gear): the old order, any cover first
+  assert.equal(rangedResponse(st({ armor: 15, health: 12, shooters: three().slice(0, 1), coverNear: true, coverDist: 12 }))!.act, 'cover')
+  // the low-health hide is heavy too
+  assert.equal(rangedResponse(st({ health: 6, shooters: three(), coverNear: true, coverDist: 10 }))!.act, 'retreat')
+})
+
+test('flee point: towards home when it lies away from the shooters, else straight away', () => {
+  const bot = { x: 0, y: 64, z: 0 }
+  const shooters = [{ x: 10, y: 64, z: 0 }]
+  const straight = fleePoint(bot, shooters, 20)
+  assert.ok(straight.x < -19 && Math.abs(straight.z) < 0.01)
+  const home = fleePoint(bot, shooters, 20, { x: -30, y: 70, z: 30 })
+  assert.ok(home.x < 0 && home.z > 0, `towards home (north-west of away), got ${home.x} ${home.z}`)
+  assert.ok(Math.abs(Math.hypot(home.x, home.z) - 20) < 0.01, 'still 20 blocks')
+  const near = fleePoint(bot, shooters, 20, { x: -8, y: 66, z: 4 })
+  assert.equal(near.x, -8); assert.equal(near.y, 66)
+  assert.deepEqual(fleePoint(bot, shooters, 20, { x: 30, y: 64, z: 0 }), straight, 'home behind the shooters: not that way')
+  assert.deepEqual(fleePoint(bot, shooters, 20, { x: 2, y: 64, z: 1 }), straight, 'home right here')
+  // the heavy-fire cap lets it run further than the usual one
+  const origin = { x: 0, y: 64, z: 0 }
+  assert.equal(cappedRetreat(origin, { x: -24, y: 64, z: 0 }, [{ x: -5, y: 64, z: 0 }], 20), null)
+  assert.ok(cappedRetreat(origin, { x: -24, y: 64, z: 0 }, [{ x: -5, y: 64, z: 0 }], 20, FLEE_CAP))
+})
+
+test('shield while getting away: an arrow on its way, hurt or few shooting, not too often', () => {
+  const b = { shield: true, incoming: true, sinceBlockMs: 5000, health: 10, shooters: 3 }
+  assert.ok(shieldWhileFleeing(b))
+  assert.ok(!shieldWhileFleeing({ ...b, shield: false }))
+  assert.ok(!shieldWhileFleeing({ ...b, incoming: false }))
+  assert.ok(!shieldWhileFleeing({ ...b, sinceBlockMs: 800 }))
+  assert.ok(!shieldWhileFleeing({ ...b, health: 18 }), 'healthy with 3 shooting: keep running')
+  assert.ok(shieldWhileFleeing({ ...b, health: 18, shooters: 2 }))
 })
