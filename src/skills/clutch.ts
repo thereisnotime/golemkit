@@ -69,21 +69,25 @@ export function extinguishInputs (bot: Bot, enabled: boolean): boolean {
   })
 }
 
-async function scoop (bot: Bot): Promise<boolean> {
-  const bucket = bot.inventory.items().find(i => i.name === 'bucket')
-  if (!bucket) return false
+/** Picks the water back up (feet block or the one below). Returns null on success, else why not. */
+async function scoop (bot: Bot): Promise<string | null> {
+  let why = 'no empty bucket'
   for (let i = 0; i < 4; i++) {
+    const bucket = bot.inventory.items().find(x => x.name === 'bucket')
+    if (!bucket) { await sleep(100); continue }
     const p = bot.entity.position.floored()
-    const src = [p, p.offset(0, -1, 0)].map(q => bot.blockAt(q)).find(b => b?.name === 'water' && (b.metadata === 0 || (b as any).getProperties?.().level === 0))
-    if (!src) return false
+    const blocks = [p, p.offset(0, -1, 0), p.offset(0, 1, 0)].map(q => bot.blockAt(q))
+    const src = blocks.find(b => b?.name === 'water' && (b as any).getProperties?.().level === 0) ?? blocks.find(b => b?.name === 'water')
+    if (!src) { why = `no water by the feet (${blocks.map(b => b?.name ?? '?').join(', ')})`; await sleep(100); continue }
     await bot.equip(bucket, 'hand').catch(() => {})
-    await bot.look(bot.entity.yaw, -Math.PI / 2, true)
+    await bot.lookAt(src.position.offset(0.5, 0.5, 0.5), true)
     await sleep(60)
     bot.activateItem()
-    await sleep(150)
-    if (bot.inventory.items().some(x => x.name === 'water_bucket')) return true
+    await sleep(200)
+    if (bot.inventory.items().some(x => x.name === 'water_bucket')) return null
+    why = 'the bucket stayed empty'
   }
-  return false
+  return why
 }
 
 export const waterBucket = defineAction({
@@ -105,9 +109,9 @@ export const waterBucket = defineAction({
         await bot.look(bot.entity.yaw, -Math.PI / 2, true)
         await sleep(60, signal)
         bot.activateItem()
-        await sleep(300, signal)
-        const wet = await scoop(bot)
-        return burning(bot) ? fail('still burning') : ok(`put the fire out${wet ? '' : ' (left the water)'}`)
+        await sleep(400, signal)
+        const left = await scoop(bot)
+        return burning(bot) ? fail('still burning') : ok(`put the fire out${left ? ` (left the water: ${left})` : ''}`)
       }
       const start = fallStartY ?? bot.entity.position.y
       let placed = false
@@ -136,9 +140,9 @@ export const waterBucket = defineAction({
       const land = Date.now() + 2500
       while (Date.now() < land && !bot.entity.onGround && !(feetBlock(bot)?.name === 'water')) await sleep(50, signal)
       await sleep(250, signal)
-      const wet = await scoop(bot)
+      const left = await scoop(bot)
       const dmg = fallDamage(start - bot.entity.position.y)
-      return ok(`water bucket clutch from ${Math.round(start - bot.entity.position.y)} blocks (would have taken ${dmg})${wet ? '' : ', water left behind'}`)
+      return ok(`water bucket clutch from ${Math.round(start - bot.entity.position.y)} blocks (would have taken ${dmg})${left ? `, water left behind: ${left}` : ''}`)
     } finally {
       if (before && bot.heldItem?.name !== before.name) {
         const it = bot.inventory.items().find(i => i.name === before.name)
