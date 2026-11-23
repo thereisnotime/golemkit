@@ -9,10 +9,11 @@ scopeNote: "The action lock, brains, chat queue and fleets are game-agnostic; th
 variants/<name>.ts      what kind of bot: skills + brains + default persona/settings
 profiles/<name>.yaml    a saved instance: variant + username, owners, server, LLM, settings
 fleets/<name>.yaml      profiles/variants run together, possibly on several servers
-src/brains/             who decides: command (chat), reflexes, npc, llm, ...
+src/brains/             who decides: command (chat), npc, llm, intents, behaviours, scenes, ...
 src/skills/             what it can do: actions grouped by topic (Minecraft)
 src/core/               agent lifecycle, action lock, chat, storage, the GameAdapter interface
-src/adapters/           games: minecraft-java (Mineflayer, NeoForge/vanilla/Paper platforms)
+src/adapters/           games: minecraft-java (Mineflayer, reflexes, behaviour library,
+                        server platforms in platforms/: neoforge, vanilla, paper)
 ```
 
 ## The big picture
@@ -27,8 +28,8 @@ flowchart TB
   AG <-.->|"brains"| BUS
   AG -->|"skills,<br/>chat queue"| MF["Minecraft Java adapter<br/>Mineflayer + pathfinder"]
   AG -.->|"llm / self brains<br/>(proxy optional)"| LLM["LLM providers<br/>Claude · Codex<br/>OpenCode · API"]
-  MF --> NF["NeoForge platform<br/>handshake · registries<br/>tolerant parser"]
-  NF --> SRV[("Minecraft server<br/>NeoForge 1.21.1")]
+  MF --> NF["Server platform<br/>NeoForge: handshake · registries<br/>tolerant parser<br/>(or vanilla · Paper)"]
+  NF --> SRV[("Minecraft server<br/>NeoForge 1.21.1 · vanilla · Paper")]
   classDef run fill:#f1f5f9,stroke:#475569,color:#0f172a
   classDef brain fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
   classDef lock fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
@@ -69,8 +70,8 @@ flowchart TB
 ```
 
 Brains decide, skills provide actions, the action lock arbitrates the body, the
-[game adapter](./adapters.md) is the game, and its NeoForge platform gets everything into a
-modded server. [Variants](/concepts/variants-profiles) pick skills and brains; [profiles](/guide/profiles) and
+[game adapter](./adapters.md) is the game, and its server platform (NeoForge by default,
+`MC_PLATFORM` picks vanilla or Paper) gets everything into the server. [Variants](/concepts/variants-profiles) pick skills and brains; [profiles](/guide/profiles) and
 fleets pick who, where and how many.
 
 ## Agent
@@ -85,11 +86,13 @@ get the bot as `ctx.bot`. The agent owns:
 - rate-limited chat (`say`, `whisper`, `reply`), since vanilla kicks for spam, optionally
   [humanized](../guide/profiles#humanize-player-like-timing)
 - persistent storage (`agent.storage`, JSON under `data/bots/<username>/`)
-- the [journal](../guide/journal) (`agent.journal`): typed facts about what happened, with rollups
+- the [event journal](../guide/journal) (`agent.journal`, JSONL under `data/bots/<username>/journal/`): typed facts about what happened, with rollups
 - learned [protected areas](./world#protected-areas) (`agent.protectedAreas`) per server
 - `observe()`: a JSON snapshot of the bot and surroundings, extended by skills and brains
-- the [event journal](/guide/journal) (`agent.journal`, JSONL under `data/bots/<username>/journal/`), see [Event journal](../guide/journal.md)
-- events: `session`, `sessionEnd`, `chat`, `serverMessage`, `actionStart`, `actionEnd`, `llmUsage`, `chatOut`, `protectedArea`
+- events: `session`, `sessionEnd`, `chat`, `serverMessage`, `actionStart`, `actionEnd`, `llmUsage`, `chatOut`, `protectedArea`, `stopped`, `settingsChanged`, `gameModeChanged`
+
+The negotiating step is the NeoForge platform's handshake; on vanilla and Paper the bot goes
+straight from login to configuration.
 
 ```mermaid
 stateDiagram-v2
@@ -145,6 +148,7 @@ Only one exclusive action runs at a time. Callers have priorities (`PRIORITY` in
 | [scene](/guide/scenes) | 25 |
 | llm | 30 |
 | behavior (armed survival behaviours) | 35 |
+| hooks (`HOOK_PRIORITY` in src/context/hooks.ts) | 40 |
 | player | 50 |
 | reflex | 60 |
 | system | 100 |
@@ -209,7 +213,13 @@ Several brains run at once and negotiate through priorities. Shipped:
 
 - `commandBrain()` maps chat to actions: every action is a command; positional args in schema
   order, `key=value` works, last string param takes the rest of the line.
-- `reflexes()` handles self-defence and auto-eat at reflex priority.
+- `reflexes()` (`src/adapters/minecraft-java/brains/reflexes.ts`) handles self-defence, ranged
+  defence, auto-eat, armour and totem swaps and the water clutch at reflex priority.
+- `hooksBrain()` runs the context pack's [hooks.yaml](/guide/context-pack#hooks-yaml):
+  event-to-action rules without an LLM, at priority 40.
+- `intentsBrain()` turns plain-language owner commands into actions without an LLM; next to an
+  LLM brain it fills in while the model can't think or takes the simple requests itself. See
+  [Intents](../guide/intents.md).
 - `behaviorsBrain()` runs [armed behaviours](/guide/behaviors) (keep_fed, stay_safe, follow_owner...) that owners,
   LLMs and hooks switch on at runtime. See [Behaviours](../guide/behaviors.md).
 - `npcBrain()` keeps NPCs busy on their own: scored behaviours at npc priority, backs off for

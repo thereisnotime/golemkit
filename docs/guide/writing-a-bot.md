@@ -49,11 +49,13 @@ just run guard
 | `canDig` | let the pathfinder break blocks |
 | `settings` | anything you want; read it with `agent.settings` |
 | `onSpawn(agent, bot)` | runs after every spawn |
+| `adapter` | the game to play (an `AdapterFactory`); Minecraft Java by default |
 
 ## Picking skills
 
-`standardSkills()` gives status, movement, combat, survival, inventory and gather. Mix your
-own:
+`standardSkills()` gives status, config, movement, combat, survival, inventory, gather, journal
+and bodyguard; `extendedSkills()` adds crafting, farming, food, building and the rest (see
+[Skills](/skills)). Mix your own:
 
 ```ts
 import { movement, combat, status } from '../src/skills/index.ts'
@@ -68,7 +70,9 @@ prints what a specific bot ends up with.
 | brain | for |
 |---|---|
 | `commandBrain()` | player assistant: every action becomes a `!command` |
-| `reflexes()` | fight back when hit, eat when hungry |
+| `reflexes()` | fight back when hit (melee and ranged), eat when hungry |
+| `behaviorsBrain()` | [armed behaviours](/guide/behaviors) such as keep_fed and stay_safe |
+| `intentsBrain()` | plain-language owner commands without an LLM ([Intents](/guide/intents)) |
 
 More brains (NPC loops, LLM agents, [scenes](/guide/scenes)) plug in the same way; see their guides.
 A typical layering:

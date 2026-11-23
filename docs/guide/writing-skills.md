@@ -45,7 +45,7 @@ What you get for free:
 
 | `ctx.` | |
 |---|---|
-| `bot` | the mineflayer bot for this session |
+| `bot` | the game client for this session (`GameClient`; with Minecraft Java, the mineflayer bot) |
 | `agent` | the Agent (settings, storage, chat, [fleet](/concepts/architecture#fleets-and-multiple-servers), other actions) |
 | `signal` | AbortSignal: fires on preemption, `!stop`, death or disconnect |
 | `caller` | who asked: `{ kind: 'player' \| 'brain' \| 'reflex' \| 'system', name }` |
@@ -60,6 +60,7 @@ What you get for free:
 | `longRunning` | `false` | runs until stopped (follow, guard); resumed after being preempted |
 | `aliases` | | extra command names |
 | `internal` | `false` | hidden from `!help` and LLM tools (e.g. actions only [reflexes](/concepts/world#reflexes) use) |
+| `capabilities` | the skill's | what the game must support (`move`, `dig`, `place`, ...); agents whose [adapter](/concepts/adapters#capabilities) lacks one leave the action out |
 
 ### Honour the signal
 
@@ -87,6 +88,7 @@ import { defineSkill } from '../core/index.ts'
 export const lighting = () => defineSkill({
   name: 'lighting',
   description: 'Torches and light.',
+  capabilities: ['move', 'inventory', 'place'],  // default for its actions
   actions: [bringTorch, placeTorch],
   plugins: [],                                   // mineflayer plugins, loaded once per session
   setup (agent, bot) {                           // every session, after spawn
@@ -112,7 +114,9 @@ bots can pass options (`lighting({ minLight: 7 })`).
 
 ## Testing
 
-Pure logic goes in `test/*.test.ts` (`node --test`). To exercise an action against the real
+Keep decisions that don't need the bot in a pure module next to the skill, the way
+`foodPlan.ts`, `searchPlan.ts`, `ranged-plan.ts` and `techniques.ts` do, and test them in
+`test/*.test.ts` (`node --test`). To exercise an action against the real
 server, drive an agent from a script; see `scripts/probe.ts`:
 
 ```ts

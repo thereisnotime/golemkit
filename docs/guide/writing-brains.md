@@ -48,6 +48,7 @@ started, [reflexes](/concepts/world#reflexes) can interrupt it, and other brains
 | `npc` | 20 | NPC routines |
 | `scene` | 25 | Scene choreography (sceneBrain), above NPC routines |
 | `llm` | 30 | LLM decisions |
+| `behavior` | 35 | armed survival behaviours (keep_fed, stay_safe) |
 | `player` | 50 | chat commands |
 | `reflex` | 60 | self-defence, eating |
 | `system` | 100 | boot scripts, admin |
@@ -66,12 +67,14 @@ started, [reflexes](/concepts/world#reflexes) can interrupt it, and other brains
 | `agent.on('serverMessage', text)` | joins, deaths, advancements, system text |
 | `agent.on('actionStart' \| 'actionEnd', ...)` | what the body is doing |
 | `agent.on('session' \| 'sessionEnd', ...)` | connection lifecycle |
-| `bot.on(...)` | anything mineflayer emits (register in `session`, remove in the cleanup) |
+| `agent.adapter.on(...)` | game events any adapter emits: `playerJoined`, `hurt`, `death`, `kicked`, ... (game-agnostic) |
+| `bot.on(...)` | anything mineflayer emits (register in `session`, remove in the cleanup; Minecraft only) |
 | `agent.fleet.subscribe(agent, fn)` | messages from other bots on the same server |
 
 `agent.observe()` returns a JSON snapshot (position, health, food, time, nearby entities,
 inventory, current action, plus whatever skills add). It's what an [LLM brain](/guide/llm-brain) sends to the
-model, and handy for any decision logic.
+model, and handy for any decision logic. For a brain that should work on any game, read
+`agent.adapter` (`self()`, `entities()`, `time()`, `players()`) instead of `bot`.
 
 ## Talking
 
