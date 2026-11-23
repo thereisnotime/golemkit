@@ -193,6 +193,10 @@ flowchart TB
 - The back-off is per level: while an LLM holds the body, `npc` and `idle` behaviours are
   paused, `behavior`-level ones are not. A player, hook or reflex pauses everything.
 - Disarming or reconfiguring a running behaviour stops it at once.
+- A behaviour that keeps dropping out ("no longer applies") within 10 s of starting is held
+  back after the second flip in a row: for 5 s (doubling per flip, up to 60 s) it only starts
+  with a score of at least `flipBypassScore` (75), so real dangers still get through. See the
+  [NPC brain](/guide/npc-brain) for the knobs.
 - `follow_owner` and `guard_owner` run the long-running `follow` / `guard` actions. That is
   fine here: the controller still re-scores every tick and interrupts them when something
   scores higher, and a preempted action of ours is dropped rather than resumed behind the
@@ -200,8 +204,8 @@ flowchart TB
 
 ### Reflexes and stay_safe
 
-`reflexes()` reacts to being hit: fight back, retreat at 8 health or less, eat when food is
-carried. `stay_safe` acts earlier and on what reflexes don't cover: backing off at 10 health
+`reflexes()` reacts to being hit: fight back, retreat at 8 health or less (not from mobs that
+outrun the bot, see `combat.fightFastMobs`; always from a warden), eat when food is carried. `stay_safe` acts earlier and on what reflexes don't cover: backing off at 10 health
 before the next hit, pillaring up when surrounded (only if it can place blocks and carries
 dirt/cobblestone/planks), leaving water when mobs are near, going home at night. Both use
 the same `retreat`/`flee` actions and the reflex always outranks the behaviour, so they
@@ -238,9 +242,10 @@ pillagers, witches, blazes, ghasts, drowned with tridents); the details are unde
   4 s when healthy, 8 s at 12+ and 15 s below. After a fight that went badly it hides 3 s at full
   health and up to 15 s at 8 or less, and gets back to work early when healthy and out of sight.
 - **Danger zones**: each shooter (range + 8 around it, 5 minutes) and patrol (32 blocks, 10
-  minutes) it dealt with is remembered, and `find_target` scouting and `chop_wood_loop`'s
-  `chop_tree` keep out of those zones, so the bot doesn't walk back into the patrol once it's quiet.
-  `dangerMemory(agent).isInDanger(pos)` (from `core`) is there for other jobs.
+  minutes) it dealt with is remembered (`src/core/danger.ts`), and `find_target` scouting,
+  `chop_wood_loop`'s `chop_tree`, `find_food` waypoints, keep_fed's food spots and trips and
+  `hunt`'s extra reach effort keep out of those zones, so the bot doesn't walk back into the
+  patrol once it's quiet. `dangerMemory(agent).isInDanger(pos)` (from `core`) is there for other jobs.
 - `stay_safe` takes cover itself (score 91, above a starving `keep_fed`) when a shooter has a
   line to the bot and it is at 12 health or less, or outnumbered for its gear score. Turn it off
   with `ranged: false` (stay_safe) or `rangedDefense: false` (reflexes).
@@ -374,12 +379,26 @@ runs a guard phase for each in one session. The bot's own hits taken and deaths
 are counted in every phase. In the guard phase the bodyguard whispers its warnings to the
 tester, so nobody else on the server sees them.
 
+Two more modes test the bot on its own (no tester, reflexes and stay_safe only). `--duel
+zombie,skeleton,creeper,vindicator` keeps `--duel-count` (2) of one kind alive 8 to 12 blocks
+around the spot, refilled 3 s after each kill, for `--minutes` per kind, and counts kills, deaths
+and health lost per kill. `--clutch N` does N drops from `--clutch-height` (22) blocks with a water
+bucket, then N stands on a fire block, and removes the water and fire afterwards.
+
+Other options: `--seed` (1), `--sword stone|iron` (iron), `--tester-food` (8), `--interval` (30 s
+between waves), `--cap` (8 alive), `--time day|night`, `--phantoms` (a phantom every third wave),
+`--force` (run on a spot that isn't flat and dry). The accounts come from `GUARD_BOT`,
+`GUARD_TESTER` and `DIRECTOR` in `.env`, results go to `GUARD_BENCH_DIR`, and the player the
+bots keep away from is `MC_OWNER` (default Robin).
+
 ```sh
 just guard-bench --scout                      # check the spot (flat, dry) and Robin's distance
 just guard-bench                              # 1250 445, 2 repeats x 3 phases x 4 min
 just guard-bench 1250 445 --minutes 4 --repeats 3 --armour --tag mytest
 just guard-bench --phases follow --waves ranged --minutes 3   # the bot's own survival under fire
 just guard-bench --phases guard --no-pull --minutes 3         # the bodyguard without pulling aggro
+just guard-bench --duel zombie,creeper --minutes 2 --repeats 3   # the bot alone, two of a kind
+just guard-bench --clutch 5                   # water bucket: 5 drops, 5 fires
 just guard-bench --cleanup                    # kill tagged mobs, clear both players
 ```
 
@@ -604,8 +623,9 @@ flowchart TB
   `found:carrot` / `found:potato` / `found:village`, `food:village_farm`, `food:animals`.
   The pure `rankFoodPlaces` orders them by distance divided by a trust weight (the profile's
   places and its own farms 1.5, crop fields 1.2, villages 1, animals 0.6), and leaves out
-  places in another dimension, in a remembered danger zone, closer than `radius` (rung 2 sees
-  those), or visited lately. There it harvests ripe crops and replants (the whole field for a
+  places in another dimension, in a remembered danger zone, closer than 48 blocks or `radius`,
+  whichever is more (rung 2 sees those), or visited lately. Places within 48 blocks of each other
+  count as one. There it harvests ripe crops and replants (the whole field for a
   listed place or its own farm, otherwise only crops by a village), hunts animals beyond the
   breeders, breaks a little grass when short of seeds, bakes bread, eats, and walks back home.
   A place is then left alone for 20 minutes (45 when it had nothing or couldn't be reached).
@@ -664,15 +684,17 @@ flowchart TB
   (within 128 blocks), break grass when the farm is smaller than `farmSize` and short of
   seeds, start a farm once it has `minSeeds` (even with animals around: a farm is long-term
   food), and breed animals near home (within 64 blocks of it) when it has their food: wheat
-  for cows and sheep, seeds for chickens (keeping `minSeeds`), carrots for pigs. Breeding
+  for cows and sheep, seeds for chickens (keeping `minSeeds`), carrots, potatoes or beetroot
+  for pigs. Breeding
   keeps the herd up so hunting with `keepBreeders` doesn't wipe it out. Each chore then
   rests a few minutes (longer after a failure).
 - **Danger:** far trips stop on the same signals `stay_safe` acts on: shooters calling for
   cover (`stay_safe`'s `ranged` danger), 3 or more hostiles within 6 blocks, mobs near while
   at 8 health or less, or standing in a remembered danger zone. `find_food` drops waypoints
-  in a danger zone or whose way out from home passes through one. The zones come from the
-  safety code's `isInDanger(pos)` helper through a small adapter (`src/skills/food-danger.ts`,
-  `useDangerZones`); until that helper is registered nothing counts as a zone.
+  in a danger zone or whose way out from home passes through one. The zones are the ones the
+  [ranged reflex](#ranged-safety) remembers, read through a small adapter
+  (`src/skills/food-danger.ts`, `useDangerZones`) that `src/skills/ranged.ts` registers when it
+  loads; without the ranged skill nothing counts as a zone.
 - **6 · critical:** at food 6 or less with nothing left to try it tells its owner once (a
   whisper, at most every 10 minutes) and does nothing risky; `stay_safe` keeps it out of
   trouble.
@@ -705,6 +727,23 @@ flowchart TB
 !behavior_configure keep_fed rings=40,100,200 ringMemoryMinutes=30
 !behavior_configure keep_fed startFarm=false keepBreeders=false
 ```
+
+`scripts/food-test.ts` checks the ladder on a live server. The bot is `FOOD_BOT` (FoodTest),
+owned by `FOOD_TESTER` (FoodTester); it can't be made hungry without ops, so `run` arms keep_fed
+with `below: 20`, and rings from `FOOD_RINGS` (default 48,120,250). Run with `MC_LOG_LEVEL=debug`
+and `MC_LOG_DIR=logs` to get the ladder lines in `logs/FoodTest.log`.
+
+```sh
+node scripts/food-test.ts run 760 45 30     # walk there, empty the inventory, set home, arm stay_safe + keep_fed, watch 30 min
+node scripts/food-test.ts farm 800 -40      # start_farm there, no behaviours
+node scripts/food-test.ts tend 12           # back to the last farm: gather 12 seeds, tend_farm
+node scripts/food-test.ts seeds 900 300 10  # gather_seeds at a grassy spot away from bases
+node scripts/food-test.ts report            # farms and food spots it remembered
+node scripts/food-test.ts remove            # break the crops, fences and torches of its farms
+```
+
+`FOOD_FARM_SETUP=true` also arms `farm_setup` in `run`; `FOOD_EMPTY=true` empties the inventory
+before `farm`.
 
 ### farm_setup
 
