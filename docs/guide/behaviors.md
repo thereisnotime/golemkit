@@ -996,7 +996,8 @@ about 72 in iron with a shield and a sword) of 15 + `gearPerThreat` (12) per poi
 killed by 3 skeletons in a cave (4.5 points, 69 needed) waits while it is naked and goes in
 iron.
 
-On go it runs `recover_items` at score 72: above chores, food and stay_safe's night trip home
+On go it runs `prepare_trip` first when it has 90 seconds or more to spare (food from the
+pantry, a weapon; every check waived, so it never stops the trip), then `recover_items` at score 72: above chores, food and stay_safe's night trip home
 (70), below water (78), mobs (80) and low health (88+), so it starts right after the respawn.
 The trip sprints there in legs (`travel`) and gives up when the drops would despawn before it
 arrives, at `giveUpHealth` or less, or when the mobs around the spot (within 24 blocks of it)
@@ -1245,7 +1246,7 @@ Looks after food on its own, climbing a ladder when hungry (or hurt and too hung
 
 ### `recover_drops`
 
-*survival · priority behavior (35) · needs `recover_items` · uses `go_home` when present*
+*survival · priority behavior (35) · needs `recover_items` · uses `go_home`, `prepare_trip` when present*
 
 After a death, goes back for the dropped things before they despawn (5 minutes): only when they can still be had (not lava, void, deep water or another dimension, close enough for the time left at walking speed) and the spot is safe enough for its gear (the killer and the hostiles reported there; night counts). Waits while it isn't, gives up when the despawn gets close, it gets hurt badly or the spot is a danger zone; picks the items up, puts armour and weapon back on, goes home and says what came back ("got back 23 of 31 items: stone sword, ..."). Once per death, right after the respawn, below immediate safety.
 

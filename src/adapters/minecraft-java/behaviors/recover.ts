@@ -15,6 +15,8 @@ import { ownerTarget, flatDist } from './util.ts'
 export const RECOVER_SCORE = 72
 /** Trips per death: one cut short by a fight or a danger can be picked up again while time is left. */
 const MAX_ATTEMPTS = 3
+/** Time to spare (despawn minus walk and margin) from which prepare_trip runs first. */
+const PREP_SPARE_MS = 90_000
 
 const options = z.object({
   maxDistance: z.number().min(16).max(2000).default(RECOVER_DEFAULTS.maxDistance).describe('farthest death spot worth a trip, in blocks'),
@@ -43,7 +45,7 @@ export const recoverDrops = defineBehavior({
     'back ("got back 23 of 31 items: stone sword, ..."). Once per death, right after the respawn, below immediate safety.',
   options,
   requires: ['recover_items'],
-  uses: ['go_home'],
+  uses: ['go_home', 'prepare_trip'],
   priority: 'behavior',
   create (o: Options, { agent }) {
     const plan: RecoverOptions = {
@@ -94,6 +96,12 @@ export const recoverDrops = defineBehavior({
         const r = decide(bot, Date.now())
         if (!r) return { ok: true, message: 'nothing to recover' }
         if (r.dec.do !== 'go') return { ok: r.dec.do === 'wait', message: r.dec.why }
+        // the trip prep (pantry food, a weapon) when there is time to spare; never a reason not to go
+        const spare = r.dec.leftMs - r.dec.etaMs - o.marginSeconds * 1000
+        if (agent.getAction('prepare_trip') && spare >= PREP_SPARE_MS) {
+          const p = await ctx.act('prepare_trip', { purpose: 'getting my things back', kind: 'travel', distance: r.dec.distance, waive: ['weapon', 'food', 'health'] })
+          log.debug(`recover_drops: prepare_trip: ${p.message}`)
+        }
         const res = await ctx.act('recover_items', { force: true, radius: o.radius, max_distance: o.maxDistance, give_up_health: o.giveUpHealth })
         if (!r.d.handled) markHandled(r.d, res.message) // recover_items refused: no second try
         tell(bot, res.message.replace(/^not going back: /, 'not going back for my things: '))
