@@ -324,7 +324,7 @@ Attack a player the PvP mode allows (revenge, targets or all; never owners, frie
 
 ### `pvp`
 
-PvP mode (owners only): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.
+PvP mode (owners only; anyone may turn it off or lower it): off (never fight players; also ends every fight and hunt) | defend (only fight back) | revenge (also go after whoever killed or attacked us) | targets (attack players on the target list) | all (attack every player in range except owners and friends). No mode: show the mode, targets and grudges.
 
 *non-exclusive*
 
