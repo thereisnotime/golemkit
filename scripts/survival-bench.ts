@@ -133,7 +133,8 @@ async function director (): Promise<Director> {
     })
   })
   let lost = false
-  agent.on('sessionEnd', reason => { lost = true; log(`${DIRECTOR} lost its session: ${reason}`) })
+  let stopping = false
+  agent.on('sessionEnd', reason => { lost = true; if (!stopping) log(`${DIRECTOR} lost its session: ${reason}`) })
   await connect(agent)
   // kicked (someone else logged in as the director): stop here; the pending clean-up stays for the next try
   const cmd = async (c: string) => {
@@ -150,7 +151,7 @@ async function director (): Promise<Director> {
     }
     return null
   }
-  return { agent, cmd, ask, stop: async () => { await agent.stop().catch(() => {}) } }
+  return { agent, cmd, ask, stop: async () => { stopping = true; await agent.stop().catch(() => {}) } }
 }
 
 const posRe = /\[(-?[\d.]+)d, (-?[\d.]+)d, (-?[\d.]+)d\]/

@@ -1248,6 +1248,32 @@ second run finds fewer trees); `--spread 200` moves them to fresh ground at the 
 different terrain, so keep the same `--seed` on both sides. Stuck loops and failure counts are
 the most useful signal for fixing things: they point at the behaviour and the message.
 
+**Baseline** (mc02, 23 Nov 2026, start 1607 62 782, kit none, Pax's behaviours without the LLM,
+1 in-game day = 20 real minutes, one run each). The start has no tree within 32 blocks and water
+and ice nearby. "Pre-merge" ran before trips, asking for help and `light_home` were merged;
+"baseline" with them, on the code this page describes.
+
+| tag | started at | deaths (causes) | food min | health min | tool tier | logs / cobble / food | distance | failures | help asks |
+|---|---|---|---|---|---|---|---|---|---|
+| pre-merge-2026-11-23 | 7695 (noon) | 3 (drowned, shot by Skeleton, drowned) | 12 | 0.3 | none | 0 / 0 / 0 | 899 | 29 | - |
+| baseline-2026-11-23 | 15295 (night) | 0 | 20 | 20 | none | 0 / 0 / 0 | 3 | 12 | 1 |
+
+How to read it:
+
+- Neither run got a single log: with no tree within 32 blocks, `upgrade_tools` fails ("no natural
+  tree within 32 blocks") and nothing else fetches wood while `chop_wood_loop` is off, so the bot
+  ends the day with no tools, no food and no bed.
+- Pre-merge it walked 900 blocks looking for food (sheep, crops) with nothing in hand and died
+  three times: drowned twice while scouting by water, shot once by a skeleton at dusk. A 52 s
+  event-loop stall in the first minutes cost it one disconnect.
+- With trips it never left: `prepare_trip` refused every food trip ("no weapon, no food to take
+  along"), so it stood at home all day. Safe, but stuck: it can't get a weapon or food without
+  wood, and can't get wood without a trip. After 15 minutes it asked its owner for logs, the one
+  help ask. The two runs also started at different times of day (noon against night), which
+  alone changes a lot; read them as two stories, not as a measured change.
+- Next steps these point at: let a bot with nothing go out for wood by day (a short, close trip
+  without the weapon and food requirement), or let `upgrade_tools` search further than 32 blocks.
+
 ## Capabilities
 
 A behaviour lists the actions it `requires`; if the bot lacks one it is skipped with a
