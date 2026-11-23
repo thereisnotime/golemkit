@@ -59,6 +59,12 @@ guard-bench *args:
     @echo "{{BOLD}}{{BLUE}}==> guard benchmark {{args}}{{NORMAL}}"
     node --env-file-if-exists=.env scripts/guard-bench.ts {{args}}
 
+# Survival benchmark: a test bot with a profile's behaviours alone for N in-game days (--compare a b)
+[group('debug')]
+survival-bench *args:
+    @echo "{{BOLD}}{{BLUE}}==> survival benchmark {{args}}{{NORMAL}}"
+    node --env-file-if-exists=.env scripts/survival-bench.ts {{args}}
+
 # Forget learned NeoForge channels (relearned on next join)
 [group('debug')]
 reset-channels:

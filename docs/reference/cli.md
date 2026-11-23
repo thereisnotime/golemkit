@@ -20,6 +20,7 @@ scopeNote: "run, fleet and list are game-agnostic; probes, live tests and benchm
 | debug | `just probe` | connect once, print the world snapshot, quit |
 | debug | `just chat-test "!help,!pos"` | join as a second player and send commands |
 | debug | `just guard-bench [args]` | bodyguard mob-wave benchmark on a live server |
+| debug | `just survival-bench [args]` | [survival benchmark](/guide/behaviors#survival-benchmark-just-survival-bench): a test bot alone for N in-game days; `--compare a b` |
 | debug | `just smoke-test [args]` | live smoke test with test accounts |
 | debug | `just replay-record [args]` | record a short session for the packet replay test |
 | debug | `just reset-channels` | forget learned NeoForge channels (`data/channels-*.json`) |

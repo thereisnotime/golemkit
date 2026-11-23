@@ -1160,6 +1160,92 @@ The `light_up` action does one area on demand ("light up around farm:1"): `place
 torches would go. `light_area` is the older, simpler behaviour: a torch next to the bot
 when it stands somewhere dark.
 
+## Survival benchmark: `just survival-bench`
+
+`scripts/survival-bench.ts` measures how well a bot gets by on its own. A fresh test bot
+(SurviveTest) gets a real profile's behaviours and settings (Pax's by default) without the LLM
+brain and is left alone far from everything for a number of in-game days; the numbers say how
+often it died and of what, whether it stayed fed, how far it got with tools and gathering, and
+where its behaviours got stuck. Run it before and after a change to a behaviour and compare.
+
+How a run goes. ClaudeTest (an op) is the director, but only for the setup and the clean-up; it
+logs out in between, and waits while another script has the account online. It checks that the
+start is 300+ blocks from the world spawn, the fortress, the village and every online player
+(`--force` skips the player check), finds a dry open surface block near `--start`, and, with the
+bot online but brainless: survival mode, clears its inventory, full health and food, teleports
+it there, sets its spawnpoint there (a death respawns it at the start, not at world spawn) and
+gives the `--kit`. Then the bot starts with a fresh data directory (no remembered places, trees
+or chests) and its home at the start, and runs for `--days` x 20 real minutes. The time of day
+and the gamerules are never touched: the in-game time at start and end is recorded instead, so
+a run that starts at dusk is a harder run.
+
+The profile is adapted for a test bot: its owner is the director (so any help whispers go there,
+not to you), `follow_owner` and `bodyguard` are off, `keep_fed` has no `foodPlaces` and there is
+no `settings.storage` (no trips to the village or to Pax's pantry), `keep_spawn_bed` doesn't ask
+players to sleep and `idle_antics` doesn't chat, and no context pack is loaded (it would share
+Pax's MEMORY.md and hooks). `--llm` keeps the profile's LLM brain (its own variant and login).
+
+```sh
+just survival-bench                                   # 1 day at 1600 800, Pax's behaviours, no kit
+just survival-bench --days 2 --kit stone --tag stone-kit
+just survival-bench --start 1700,900 --repeats 3 --spread 200 --tag fix-a
+just survival-bench --profile apprentice --terrain-note "dense forest"
+just survival-bench --compare baseline-2026-11-23 fix-a   # before/after table from results.jsonl
+just survival-bench --summary fix-a                   # the runs of one tag
+just survival-bench --cleanup                         # finish the clean-up of a run that broke
+```
+
+Options: `--days N` (1), `--minutes M` (overrides the length, for a quick check), `--start x,z`
+(1600,800), `--kit none|stone|iron` (none; stone: stone pickaxe, axe, sword, shovel and 8
+bread; iron: iron tools, shield, iron armour and 16 bread), `--repeats N` (1), `--spread R`
+(0: every repeat starts at the same spot; R > 0: repeats after the first start at a point R
+blocks away picked by `--seed`), `--seed` (1), `--profile name` (pax), `--llm`, `--tag`,
+`--terrain-note "text"` (free text stored with the run), `--stuck N` (5: a failure seen more
+than N times is a stuck loop). Accounts come from `SURVIVAL_BOT` and `DIRECTOR`, the data
+directory from `SURVIVAL_BENCH_DIR` (`data/survival-bench`). Ctrl-C ends the run early and
+still cleans up.
+
+Clean-up, after every run and also after a failed one: the bench notes the exact position of
+every block the bot places (a block that appears within 6 blocks of it right after it placed
+or used something), and the director removes those, only where the same block is still there.
+It kills dropped items and experience at the start, the death spots and those blocks, clears
+the bot's inventory and effects, puts its spawnpoint back to world spawn and disconnects it.
+What it can't undo is printed: blocks the bot broke (felled trees, dug ground, from its
+journal), placed blocks that changed since (a sapling that grew, a crop eaten), and the
+difference when the journal counted more placed blocks than the bench noted. A run that broke
+before its clean-up leaves `pending-cleanup.json`; `--cleanup` or the next run finish it.
+
+One JSON line per run goes to `data/survival-bench/results.jsonl` (the bot's own journal and
+store stay in `data/survival-bench/runs/<time>-<tag>-<n>/`). What the columns mean:
+
+| metric | what it is |
+|---|---|
+| deaths, deathCauses | deaths during the run, each with the death report's cause (else the journal's), the action it was doing and where |
+| aliveS, firstDeathS | seconds alive (dead time between death and respawn left out); seconds to the first death, none when it lived |
+| foodMin, foodMean, foodZeroS | lowest food bar, its time-weighted mean while alive, seconds spent at 0 (starving) |
+| healthMin | lowest health seen while alive |
+| toolTierMax | best tool it carried at any point: 0 none, 1 wood (or gold), 2 stone, 3 iron, 4 diamond, 5 netherite |
+| gathered | logs, cobblestone and food items picked up or crafted (journal item_gained; picking up its own drops after a death counts again) |
+| spawnSet | a "Respawn point set" message, or a spawnpoint other than the start at the end (a bed) |
+| failures, failuresBy | failed actions, by caller and action (`behaviors:find_food`) |
+| stuckLoops | the same failure, numbers folded, more than `--stuck` times: a behaviour retrying something that won't work |
+| distance, maxFromStart, minY | blocks walked (sampled every 2 s, teleports left out), farthest from the start, lowest y |
+| whispers, chatLines, said | whispers and public lines it sent, the first 20 of them |
+| disconnects, maxLagS | sessions lost during the run (kicks, timeouts), and the longest event-loop stall |
+| playersNear | other players it saw within 200 blocks (a run with company isn't a clean run) |
+| placed, removed, notRemoved, broken | the clean-up: positions noted, removed, changed since; blocks it broke |
+| series | food, health and tool tier once a minute |
+
+How to read the noise. One run is one story: where the trees and animals are, whether it
+started at noon or dusk, which mobs spawned. A single death or a dozen logs either way means
+little. Run 3 or more per side (`--repeats 3`), same `--start`, `--days`, `--kit` and time of
+day as far as you can, and look at `--compare`: it calls a difference better or worse only
+when it is larger than the noise (the larger of the two standard deviations, or with one run a
+side 25% of the larger mean, at least 1), else `~`. Repeats on the same spot deplete it (the
+second run finds fewer trees); `--spread 200` moves them to fresh ground at the cost of
+different terrain, so keep the same `--seed` on both sides. Stuck loops and failure counts are
+the most useful signal for fixing things: they point at the behaviour and the message.
+
 ## Capabilities
 
 A behaviour lists the actions it `requires`; if the bot lacks one it is skipped with a
