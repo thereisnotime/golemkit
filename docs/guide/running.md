@@ -12,15 +12,15 @@ just run buddy --username Helper --owners Robin,friend --dig
 ```
 
 `<bot>` is a [profile](./profiles) (`profiles/<name>.yaml` or `.yml`) or, if there is none by
-that name, a variant in `variants/` (`variants/buddy.ts` or `variants/buddy/index.ts`) or a path
-to one. Flags override the profile and the bot definition for this instance:
+that name, a [variant](/concepts/variants-profiles) in `variants/` (`variants/buddy.ts` or `variants/buddy/index.ts`) or a path
+to one. Flags override the [profile](/guide/profiles) and the bot definition for this instance:
 
 | flag | meaning |
 |---|---|
 | `--username`, `-u` | Minecraft username |
 | `--owners a,b` | only these players may command it |
 | `--dig` | let it break blocks (pathfinding through walls, `collect`) |
-| `--host`, `--port` | server, overriding `.env` and the profile's `server:` |
+| `--host`, `--port` | server, overriding `.env` and the profile's `server:` (in a fleet they rank lower, see below) |
 
 Logging flags (`-v`, `-q`, `-l`, `--log-format`, `--log-file`, `--log-dir`) are listed in the
 [CLI reference](/reference/cli#node-src-cli-ts). `just dev <bot>` restarts the bot when you save a file.
@@ -63,16 +63,27 @@ Per-bot keys: `profile` or `variant` (`bot` is the older name for `variant`), `s
 gets a number suffix. A single top-level `server:` block (no `servers:`) also works for
 one-server fleets.
 
-Server keys: `host`, `port`, `auth`, `version`, `platform`, `staggerMs`. Anything a server
-leaves out comes from the environment (and `--host`/`--port`). The top-level `staggerMs`
-(default 5000) applies to servers without their own. A top-level `logging:` block sets
-[logging](./logging#in-a-fleet-file) for the whole process. Fleet files expand `${VAR}` and
-`${VAR:-default}` like [profiles](./profiles#personal-values-from-the-environment).
+Server keys: `host`, `port`, `auth`, `version`, `platform`, `staggerMs`. The top-level
+`staggerMs` (default 5000) applies to servers without their own. A top-level `logging:` block
+sets [logging](./logging#in-a-fleet-file) for the whole process. Fleet files expand `${VAR}` and
+`${VAR:-default}` like [profiles](./profiles#personal-values-from-the-environment). Unlike a
+profile, a fleet file gets no warning for keys it doesn't know; they are dropped.
 
 For a `profile:` entry, the fleet's `owners`, `canDig`, `username` and `settings` override the
-profile. The fleet also decides the server: what its `servers:` entry sets wins over the
-profile's `server:` block, which only fills the keys the fleet leaves out (say `platform` or
-`version`), and the environment fills the rest. `--username`, `--owners` and `--dig` only apply to `run`, not to fleets.
+profile (`settings.llm` is merged key by key, other settings groups are replaced whole).
+
+The fleet decides where its bots connect. For each connection key, the first of these that sets
+it wins:
+
+1. the fleet's `servers:` entry (or the single `server:` block)
+2. the profile's `server:` block, for `profile:` entries (useful for `platform` or `version`)
+3. `--host` / `--port` on the command line
+4. the environment (`MC_HOST`, `MC_PORT`, `MC_AUTH`, `MC_VERSION`, `MC_PLATFORM`) and the defaults
+
+So `--host` only reaches bots whose server entry and profile leave `host` out; this differs
+from `run`, where the flags beat the profile. The startup line per server
+(`mc02 (host:port): McBuddy, Helper1`) shows the fleet's address, before profiles fill in.
+`--username`, `--owners` and `--dig` only apply to `run`, not to fleets.
 
 ## Several servers
 
@@ -88,9 +99,11 @@ bots:
   - { variant: buddy, username: McBuddy, server: creative }
 ```
 
-Servers start in parallel; logins are staggered per server. Each server gets its own learned
-NeoForge channel cache, and when a username runs on more than one server its data goes to
-`data/bots/<server>/<username>`. Bots only coordinate with bots on the same server.
+Servers start in parallel; logins are staggered per server. Each `host:port` gets its own
+learned NeoForge channel cache (`data/channels-<host>-<port>.json`). As soon as a fleet lists
+more than one server, every bot's data goes to `data/bots/<server>/<username>` (instead of
+`data/bots/<username>`), so the same username on two servers keeps two journals and memories.
+Bots only coordinate with bots on the same server.
 
 Only run fleets on servers you own or where the admins agreed to bots. Most public servers
 ban them.

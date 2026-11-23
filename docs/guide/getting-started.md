@@ -35,13 +35,15 @@ The first connection to a NeoForge server takes a few seconds longer: the bot is
 couple of times while it learns the server's mod channels, then caches them in `data/`.
 
 ```
-22:39:58 McBuddy starting: 6 skills, 20 actions, brains: command, reflexes
+22:39:58 McBuddy starting: 9 skills, 46 actions, brains: command, reflexes, intents
 22:39:58 McBuddy connecting to localhost:25565 (offline), 210 known NeoForge channels
 22:39:59 McBuddy spawned at 541 53 58 (overworld, survival)
 ```
 
-In game, say `!help`. Try `!come`, `!follow`, `!guard`, `!pos`. Whispers work without the `!`.
-`!help follow` explains one command.
+In game, say `!help`. Try `!come`, `!follow`, `!guard`, `!pos`. Whispers work without the `!`,
+and the buddy [variant](/concepts/variants-profiles) also understands plain phrases like "follow me" ([intents](./intents)).
+`!help follow` explains one command. `just bots` lists the other variants, [profiles](/guide/profiles) and [fleets](/concepts/architecture#fleets-and-multiple-servers),
+and `just actions <name>` the commands one of them knows.
 
 ## Point it at another server
 

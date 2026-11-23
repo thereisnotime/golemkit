@@ -56,7 +56,7 @@ can't change their own.
 | `combat.revengeMinutes` | 0–1440 | how long a grudge lasts (default 30; 0 = no grudges) |
 | `combat.revengeKills` | 1–100 | a grudge is forgiven after this many kills (default 1) |
 | `combat.revengeIgnoresOdds` | on/off | revenge fights start even when the gear check says it would lose (default off) |
-| `combat.spareProtected` | on/off | leave players in protected areas alone in the attacking modes (default on) |
+| `combat.spareProtected` | on/off | leave players in [protected areas](/concepts/world#protected-areas) alone in the attacking modes (default on) |
 | `combat.taunts` | on/off | a short public line after winning a PvP fight (default off) |
 | `combat.pvpEngage` | 2–64 | start PvP fights with players within this many blocks (default 16) |
 | `combat.pvpChase` | 4–256 | give up a PvP chase this far from where the fight started (default 48) |
@@ -78,7 +78,7 @@ can't change their own.
 | `askHelp.failures` | 1–100 | failures of the same kind before it asks (default 3) |
 | `askHelp.minutes` | 0–1440 | ...spread over at least this many minutes (default 10) |
 | `askHelp.maxPerHour` | 0–60 | help messages per hour at most, over all behaviours (default 3) |
-| `askHelp.tell` | owners / say | whisper the owners who are online, or public chat |
+| `askHelp.tell` | owners / say | whisper the owners who are online, or public chat (default owners) |
 | `askHelp.thanks` | on/off | say "sorted, thanks" once when something it asked about works again (default off) |
 | `askHelp.llm` | on/off | let the LLM brain know it asked (no extra turn unless `triggers.events.stuck`; default on) |
 | `trips.enabled` | on/off | [trips](./behaviors#trips) that behaviours start: prepare (food from own chests, weapon, health) and turn back when food or daylight runs short (default on) |
@@ -92,14 +92,14 @@ can't change their own.
 | `trips.speed` | 0.5–10 | walking speed used for the way home, blocks per second (default 3) |
 | `trips.minDistance` | 0–1024 | walks shorter than this many blocks are not trips (default 64) |
 | `trips.ownerOrders` | on/off | also prepare and budget actions an owner ordered (default off) |
-| `inventoryMemory.enabled` | on/off | [container memory](./search#container-memory): keep what it saw in chests across restarts and keep it right (journal changes, notice chests moved or broken); off = in memory only (default off) |
+| `inventoryMemory.enabled` | on/off | [container memory](./search#container-memory): keep what it saw in chests across restarts and keep it right ([journal](/guide/journal) changes, notice chests moved or broken); off = in memory only (default off) |
 | `inventoryMemory.maxAgeHours` | 0.1–720 | sightings older than this are hints, re-checked before relying on them (default 24) |
 | `inventoryMemory.indexOwn` | on/off | by day, look into its own and configured chests near home now and then ([check_storage](./behaviors#container-memory-check-storage)) and say when the pantry runs low (default off) |
 | `inventoryMemory.refreshMinutes` | 1–1440 | check_storage looks into a chest not seen inside for this long (default 60) |
 | `inventoryMemory.radius` | 4–256 | check_storage: chests within this many blocks of home (default 48) |
 | `inventoryMemory.lowFood` | 0–1000 | tell the owners when the pantry holds fewer food items than this (default 8, 0 = never) |
 | `inventoryMemory.grumble` | on/off | grumble once in chat when its own chest is raided, moved or broken (default off) |
-| `inventoryMemory.grumbleTo` | owners / say | whisper the owners online, or public chat |
+| `inventoryMemory.grumbleTo` | owners / say | whisper the owners online, or public chat (default owners) |
 | `inventoryMemory.grumbleHours` | 0–168 | at most one grumble per chest this often (default 3) |
 | `humanize.enabled` | on/off | player-like reaction and typing delays |
 | `humanize.typoRate` | 0–1 | chance of a typo per message |
@@ -134,9 +134,13 @@ can't change their own.
 | `worldedit.maxBlocks` | number | largest region a WorldEdit action may change (default 50000) |
 | `retry.actions.<action>` | 0–10 | extra attempts after a failed action |
 
-In a profile, the `reflexes.*` values go under `reflexes:`, the `combat.*` values under
-`settings: combat:`, the `mining.*` values under `settings: mining:` and the `trips.*` values under `settings: trips:` (a top-level `combat:`
-key is ignored with a warning, and unknown keys under either get one); see
+In a profile, the `reflexes.*` values go under `reflexes:`, the `askHelp.*` values under the
+top-level `askHelp:` key, and the `combat.*`, `mining.*`, `trips.*` and `inventoryMemory.*`
+values under `settings:` (`settings: { combat: { pvp: defend } }`). A top-level `combat:` key
+is ignored with a warning, and so is any key under `settings.combat`, `settings.mining`,
+`settings.trips` or `settings.inventoryMemory` that is not in the table above (see
+[Profiles](./profiles#format)). An `askHelp:` map turns asking for help on unless it says
+`enabled: false`, and `inventoryMemory: true` is short for `{ enabled: true }`. See
 [Reflexes](/concepts/world#reflexes). The techniques behind the `combat.*` toggles are described
 in [Movement, protection and combat](/concepts/world#skilled-player-techniques).
 

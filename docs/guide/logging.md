@@ -40,15 +40,19 @@ Loggers are hierarchical, `<username>/<component>/...`:
 | `McBuddy/server` | system messages: joins, deaths, advancements (debug) |
 | `McBuddy/neoforge` | server platform: handshake, channel learning (debug), skipped packets (trace); named after the platform, so `McBuddy/vanilla` or `McBuddy/paper` with `MC_PLATFORM=vanilla` or `paper` |
 | `McBuddy/journal` | the [event journal](./journal): write and rollup failures, retention, summaries |
-| `McBuddy/<brain>` | brains log under their own name (e.g. `McBuddy/npc`) |
+| `McBuddy/<brain>` | brains log under their own name: `McBuddy/npc`, `McBuddy/behaviors` (also [keep_fed](/guide/behaviors) chores and recover_drops), `McBuddy/hooks`, `McBuddy/intents`, `McBuddy/scene`, `McBuddy/self` and `McBuddy/self/learn` |
+| `McBuddy/llm`, `McBuddy/llm/tools` | the [LLM brain](./llm-brain): turns, budgets, tool calls |
+| `McBuddy/context` | [context pack](./context-pack) loading |
+| `McBuddy/recover`, `McBuddy/search` | the bot's own deaths and drops; deaths of other players seen by search |
 | `fleet` | fleet messages between bots (debug) |
 | `golemkit` | CLI and process-level messages |
+| `golemkit/profile` | [profile](/guide/profiles) warnings, such as `unknown key ... (ignored)` for keys the [profile](./profiles) schema doesn't know |
 
 ## Levels
 
 `trace` < `debug` < `info` < `warn` < `error`, plus `silent`.
 
-`MC_LOG_LEVEL` takes a **level spec**: a default level plus overrides per logger, comma
+`MC_LOG_LEVEL` (default `info`; the older `MC_DEBUG=true` means `debug`) takes a **level spec**: a default level plus overrides per logger, comma
 separated (the same idea as `RUST_LOG`):
 
 ```bash
@@ -85,7 +89,7 @@ Shortcuts on the CLI: `-v` (debug), `-q` (warn), `-l <spec>`.
 
 ```bash
 MC_LOG_FILE=logs/golemkit.log     # everything in one file
-MC_LOG_DIR=logs                   # one file per bot: logs/McBuddy.log, logs/_system.log
+MC_LOG_DIR=logs                   # one file per bot: logs/McBuddy.log; golemkit and fleet go to logs/_system.log
 MC_LOG_FILE_FORMAT=json           # files in JSON (console stays pretty)
 MC_LOG_MAX_SIZE_MB=20             # rotate at this size (0 = never)
 MC_LOG_MAX_FILES=5                # keep name.log.1 ... name.log.5
@@ -138,7 +142,8 @@ in pretty/plain and stay structured in JSON.
 ## Secrets
 
 Values (8 characters or longer) of environment variables whose names end in `KEY`, `TOKEN`,
-`SECRET` or `PASSWORD` are replaced with `***` in every output, console and files.
+`SECRET` or `PASSWORD` are replaced with `***` in every output, console and files. Code can add
+more literal strings (4 characters or longer) with `configureLogging({ redact: [...] })`.
 
 ## Crashes
 

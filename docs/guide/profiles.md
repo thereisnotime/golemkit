@@ -18,7 +18,7 @@ just run pax -v      # same, with debug logging
 
 ## Personal values from the environment
 
-Profiles, their context packs (AGENTS.md, USER.md, skills, hooks.yaml), fleet files and scene
+Profiles, their context packs (AGENTS.md, USER.md, skills, hooks.yaml), [fleet files](/guide/running#a-fleet) and scene
 files expand `${NAME}` and `${NAME:-default}` from the environment, after loading `.env`.
 Variants and scripts read the environment directly (`envOr('NAME', 'default')` from core);
 `.env` is loaded as soon as core is imported, also without `--env-file`. Keep owner names and token
@@ -87,13 +87,13 @@ journal:                      # optional, event journal settings (on by default)
 | `respectBuilds` | leave blocks that look player-made alone (default off). Lands in `settings.respectBuilds` |
 | `selfAware` | show the bot its own variant, profile, model and settings each turn (default on) |
 | `npcMode` | what runs while the LLM is paused (quota, budget): `false`, or `{ arm: { behaviour: options } }`, see [Behaviours](./behaviors) |
-| `askHelp` | when a behaviour keeps failing the same way, tell the owners once what would help: `true`, or options (`failures`, `minutes`, `tell`, `thanks`, `quietHours`, ...), see [asking for help](./behaviors#asking-for-help). Lands in `settings.askHelp` |
+| `askHelp` | when a behaviour keeps failing the same way, tell the owners once what would help: `true`, or options (`failures`, `minutes`, `tell`, `thanks`, `quietHours`, ...; a map turns it on unless it has `enabled: false`), see [asking for help](./behaviors#asking-for-help). Lands in `settings.askHelp`; default off |
 | `server` | per-bot server override: `host`, `port`, `auth`, `version`, `platform` (`neoforge`, `vanilla`, `paper`; same as `MC_PLATFORM`) |
 | `intents` | [plain-language commands](/guide/intents) without the LLM: `mode`, `threshold`, `layers`, ... Lands in `settings.intents` |
 | `llm` | [LLM brain](/guide/llm-brain) settings: provider, model, effort, login, token source, `listen`, `immersive`, aliases, budget, [goals](/guide/goals-and-building) |
 | `reflexes` | eat/retreat thresholds and `rangedDefense`, e.g. `retreatBelow: 0` to stand its ground ([details](../concepts/world#reflexes)) |
 | `retry`, `humanize`, `journal`, `context` | see the sections below and the linked guides |
-| `settings` | anything the variant's skills/brains read |
+| `settings` | anything the variant's skills/brains read, e.g. `combat`, `mining`, `trips`, `storage.chests` (the pantry), `inventoryMemory`; see [Settings the skills read](../reference/config#settings-the-skills-read) |
 | `logging` | applied when the profile is run on its own |
 | `journal` | [event journal](/guide/journal): types, caps, retention, optional LLM summary; `false` turns it off. See [Event journal](./journal) |
 | `context` | [context pack](/guide/context-pack) dir (default: `profiles/<name>/` if it exists), see [Context packs](./context-pack) |
@@ -106,9 +106,9 @@ A key the profile format doesn't know (a typo such as `retreatBelo`, or `combat:
 level instead of under `settings:`) is ignored with a warning naming the file and the key, e.g.
 `profiles/pax.yaml: unknown key combat (ignored); combat toggles go under settings: combat:`.
 The same goes for unknown keys under `settings: combat:`, `settings: mining:`, `settings: trips:`
-and `settings: inventoryMemory:` ([container memory](./search#container-memory)). Free-form maps (`settings`,
-`behaviors`, `llm.budget`) and extra `llm` keys are not checked; `intents`, `journal` and
-`context` reject unknown keys with an error.
+and `settings: inventoryMemory:` ([container memory](./search#container-memory)). Free-form maps (`settings`
+apart from those four, `behaviors`, `llm.budget`) and extra top-level `llm` keys are not checked;
+`askHelp`, `intents`, `journal` and `context` reject unknown keys with an error.
 
 ## LLM listening modes
 

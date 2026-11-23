@@ -115,7 +115,12 @@ and keep the variant's other LLM options.
 Two exceptions: CLI flags (`--username`, `--owners`, `--dig`) only exist for `run`, so in a
 fleet the entry is the top layer; and for the server, the fleet's `servers:` entry wins over a
 profile's `server:` block, which only fills the keys the fleet leaves out (`platform`,
-`version`, ...); anything neither sets comes from the environment.
+`version`, ...); anything neither sets comes from the environment. `--host` and `--port` win
+over the profile with `run`, but in a fleet they only replace the environment's values.
+
+Fleet `defaults.settings` and an entry's `settings` replace whole top-level keys of the
+profile's settings (only `settings.llm` merges key by key), so an entry with
+`settings: { combat: { pvp: defend } }` drops the profile's other `combat` values.
 
 ## When to make what
 
@@ -123,5 +128,5 @@ profile's `server:` block, which only fills the keys the fleet leaves out (`plat
 - **Same kind of bot, different identity/config** (another name, owner, model, server,
   persona): a new **profile**. No code.
 - **Several bots at once**: a **fleet** listing profiles and/or variants.
-- **A second LLM account**: a new **login** (`just llm-login claude --login .auth/alt`) and point
+- **A second LLM account**: a new **login** (`node scripts/llm-login.ts claude --profile .auth/alt`) and point
   a profile's `llm.login` at it.

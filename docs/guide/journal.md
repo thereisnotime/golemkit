@@ -55,7 +55,7 @@ coordinates).
 | `death` | the bot died | `cause`, `killer`, `weapon`, `message` (the server's death message), `healthBefore`, `action` (what it was doing), `lost` (inventory it carried), `lostCount` |
 | `respawn` | back alive | `keptInventory` |
 | `damage` | health dropped; aggregated per source over 10 s | `source` (entity, `environment`, `starvation`, `unknown`), `amount`, `hits`, `healthAfter` |
-| `kill` | an entity the bot hit died within 10 s, or a death message names the bot as killer | `entity` |
+| `kill` | an entity the bot hit died within 10 s, or a death message names the bot as killer | `entity`; from a death message also `how` (the cause) and `weapon` |
 | `item_gained` / `item_lost` | net inventory change after 2 s of quiet (moving items between slots nets to nothing) | `items` (`{ name: count }`, modded names as the server registry has them), `action` |
 | `block_broken` / `block_placed` | per 16x16 column, reported 30 s after the first | `blocks`, `count`, `area` |
 | `chat_in` / `chat_out` | public chat heard / sent | `from`, `message` |
@@ -64,27 +64,30 @@ coordinates).
 | `goal` | a goals system emits `goal` on the agent or calls `journal.record('goal', ...)` | free-form (`goal`, `status`, ...) |
 | `player_seen` | a player comes into view (once per player per 10 min) | `player`, `distance` |
 | `player_joined` / `player_left` | real joins and leaves (not the list replayed on spawn) | `player` |
-| `place_visited` | entering a 64x64 region not visited in the last 30 min, coming within 12 blocks of a named place (`remember_place`, `set_home`), or changing dimension | `region` / `place` / `dimension`, `new` |
+| `place_visited` | entering a 64x64 region (`placeRegion`) not visited in the last 30 min, coming within 12 blocks of a named place (`remember_place`, `set_home`), or changing dimension | `region` and `new` (first visit) / `place` / `dimension` and `reason` |
 | `advancement` | "X has made the advancement [Y]" | `advancement`, `player`, `self` |
 | `protected_area` | the server refused a block break and the area is now avoided | |
 | `food_spot` | `find_food` / `keep_fed` saw huntable animals, a village farm or water to farm by (also kept as places `food:animals`, `food:village_farm`, `food:water`) | `kind`, `count`, `animals` |
 | `farm_started` | `start_farm` planted a new farm (also a place `farm:<n>`) | `name`, `size`, `crop`, `tilled`, `planted` |
 | `found` | a [search](/guide/search) (`find_target`, `search`) found what it was looking for (also a place `found:<target>`) | `target`, `what`, `count`, `how`, `note` |
-| `container_changed` | [container memory](/guide/search#container-memory) on: a container it opened holds something else than it remembered (someone took or added things), or half of a double chest was broken | `block`, `label`, `gone`, `added`, `since`, `own`, `note`, `text` |
+| `container_changed` | [container memory](/guide/search#container-memory) on (`settings.inventoryMemory`): a container it opened holds something else than it remembered (someone took or added things), or half of a double chest was broken | `block`, `label`, `gone`, `added`, `since`, `own`, `note`, `text` |
 | `container_gone` | container memory on: a remembered container is gone or another block (found on arrival or seen in view) | `block`, `label`, `found`, `how` (`arrived`/`in view`), `held`, `since`, `own`, `movedTo`, `text` |
 | `connect` / `disconnect` | each session | `server`, `gameMode` / `reason` (kick text when kicked) |
-| `llm_turn` | after every LLM turn | `provider`, `model`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `toolCalls`, `ms`, `ok`, `trigger` if the brain reports one |
-| `help` | a behaviour kept failing and asked the owners for help, or works again after asking ([asking for help](/guide/behaviors#asking-for-help)) | `status` (`asked`/`sorted`), `behavior`, `reason`, `goal`, `help`, `failures`, `tried`, `to`, `message` / `minutes` |
+| `llm_turn` | after every LLM turn | `provider`, `model`, `billing`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `toolCalls`, `ms`, `ok`; when known `trigger`, `costUsd`, `reportedCostUsd`, `estimated`, `proxy` ([LLM usage](#llm-usage)) |
+| `help` | a behaviour kept failing and asked the owners for help (`settings.askHelp`), or works again after asking ([asking for help](/guide/behaviors#asking-for-help)) | `status`, `behavior`, `reason`, `goal`; `asked` adds `help`, `failures`, `tried`, `to`, `message`; `sorted` adds `minutes` since the ask |
 | `journal_dropped` | a type went over its per-minute cap | `type`, `count` |
 
-Death messages are parsed from the vanilla wording ("Pax was slain by Zombie Villager", "Pax
-hit the ground too hard while trying to escape Skeleton", "Pax tried to swim in lava", about
-50 [variants](/concepts/variants-profiles)). If none arrives within 3 seconds, the death is still recorded with the last
-damage source as the cause.
+Death messages are parsed from the vanilla en_us wording ("Pax was slain by Zombie Villager",
+"Pax hit the ground too hard while trying to escape Skeleton", "Pax tried to swim in lava"; 46
+patterns in `src/core/journal/deathMessages.ts`) into a short `cause` (`slain`, `shot`,
+`explosion`, `fall`, `lava`, `drowning`, `starvation`, ...), the `killer` and the `weapon`. If
+no message arrives within 3 seconds, the death is still recorded: `cause` is then the entity
+that hurt the bot in the last 3 seconds, `environment`, or `unknown`.
 
 The same cause goes beyond the journal: the adapter emits a `deathCause` event with a report
-(the cause in chat form such as "slain by Zombie", the server message, the damage sources of
-the last 15 seconds, hostiles within 8 blocks, the action that held the body, health before
+(the cause in chat form such as "slain by Zombie", or without a server message what the last
+hit was: "fell", "burned in lava", "drowned", "starved"; the server message, the damage sources
+of the last 15 seconds, hostiles within 8 blocks, the action that held the body, health before
 the last hit, the position). Hooks get it as `{cause}`, `{killer}`, `{deathMessage}` and
 `{deathDetail}` on `death` ([context pack](/guide/context-pack)), the LLM brain's death event
 carries it with an instruction to report it as it is, and `observe` shows it as `lastDeath`
@@ -103,8 +106,8 @@ them all, or `journal.actions.skip` to drop specific ones.
 ## Files
 
 The journal lives in the bot's data directory: `data/bots/<username>/`, or
-`data/bots/<server>/<username>/` when a [fleet](./running#several-servers) runs the same
-username on several servers.
+`data/bots/<server>/<username>/` when the bot runs in a [fleet](./running#several-servers)
+that lists more than one server.
 
 ```
 data/bots/<username>/journal/
@@ -122,7 +125,7 @@ dropped is counted in one `journal_dropped` event per type and minute.
 | type | cap/min | | type | cap/min |
 |---|---|---|---|---|
 | `chat_in` | 40 | | `action` | 40 |
-| `chat_out`, `whisper`, `llm_turn` | 30 | | `damage`, `block_*` | 12 |
+| `chat_out`, `whisper`, `llm_turn`, `journal_dropped` | 30 | | `damage`, `block_*` | 12 |
 | `item_gained`, `item_lost`, `death`, `player_seen` | 20 | | `place_visited` | 10 |
 | anything else (`default`) | 60 | | | |
 
@@ -169,10 +172,10 @@ The journal skill's actions are chat commands and LLM tools like every other act
 
 | action | |
 |---|---|
-| `recall_events` (`!events`) | recent events, filtered: `type` (`death`, `chat`, `items`, `blocks`, `players`, `actions`, `places`, `combat`, `connections`, `food`, `finds` (search finds), `help` / `stuck` (help requests), `chests` / `containers` / `storage` (container changes), `llm` or any type), `since` (`30m`, `1h`, `today`, `yesterday`, `2026-11-20`; default 24 h), `player`, `near` (`"x y z"` or `"x z"`, optional radius), `text`, `limit`, `fleet` |
-| `last_death` (`!death`) | where, when, what killed it, what it was doing, what it lost and whether the drops may still be there (items despawn 5 minutes after death) |
+| `recall_events` (`!events`, `!journal`) | recent events, filtered: `type` (`death` / `deaths`, `chat`, `items`, `blocks`, `players`, `actions`, `places`, `combat`, `connections`, `food`, `finds` (search finds), `help` / `stuck` (help requests), `chests` / `containers` / `storage` (container changes), `llm` or any type), `since` (`30m`, `1h`, `today`, `yesterday`, `2026-11-20`; default 24 h), `player`, `near` (`"x y z"` or `"x z"`, optional radius), `text`, `limit`, `fleet` |
+| `last_death` (`!death`, `!where_died`) | where, when, what killed it, what it was doing, what it lost and whether the drops may still be there (items despawn 5 minutes after death) |
 | `history` (`!summary`) | a summary of `today`, `yesterday`, a date, `3h`, or hours today like `10-12` |
-| `goto_death` | walk back to the last death position and pick up the drops (exclusive, long-running) |
+| `goto_death` | walk back to the last death position and pick up the drops (exclusive, long-running); refuses when nothing was lost, the drops are over 5 minutes old, or the bot died twice within 12 blocks of there in the last 10 minutes |
 
 ```
 <Robin> !last_death
@@ -188,6 +191,11 @@ The journal skill's actions are chat commands and LLM tools like every other act
 ```
 
 The tool results also carry the full events (or the rollup section) as data.
+
+`goto_death` is the plain trip back. `recover_items` (the `recovery` skill in `extendedSkills()`) does it with more
+care (its own items first, armour and weapon back on), and the `recover_drops` behaviour runs it
+on its own after a death when the drops can still be had and the spot is safe enough; see
+[Death drops](/guide/behaviors#death-drops-recover-drops).
 
 ### In the observation
 
@@ -220,7 +228,7 @@ Without `since`, `query` looks back 7 days. `limit: 0` returns everything that m
 
 ## Configuration
 
-`settings.journal` in a variant, or the `journal:` key in a [profile](/guide/profiles):
+`settings.journal` in a [variant](/concepts/variants-profiles), or the `journal:` key in a [profile](/guide/profiles):
 
 ```yaml
 journal:

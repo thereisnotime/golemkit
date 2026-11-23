@@ -5,14 +5,18 @@ scopeNote: "LLM, logging and storage settings are game-agnostic; MC_* connection
 
 # Configuration
 
-Precedence, lowest to highest: environment (`.env`) → variant (bot definition) → profile →
+Precedence, lowest to highest: environment (`.env`) → [variant](/concepts/variants-profiles) (bot definition) → [profile](/guide/profiles) →
 [fleet](/concepts/architecture#fleets-and-multiple-servers) `defaults` → fleet bot entry → CLI flags
 (see [Precedence](/concepts/variants-profiles#precedence)). In-game changes to
-[feature toggles](../guide/live-config) win over all of these until reset. In a fleet, the
-server entry's keys win over a profile's `server:` block, which only fills the gaps.
+[feature toggles](../guide/live-config) win over all of these until reset.
+
+Connection settings (`host`, `port`, `auth`, `version`, `platform`) layer differently. With
+`run`: environment < the profile's `server:` < `--host`/`--port`. In a fleet: environment (with
+`--host`/`--port` on top of it) < the profile's `server:` < the fleet's `servers:` entry, so the
+fleet decides where its bots connect and a profile only fills the keys the fleet leaves out.
 
 `.env` in the working directory is loaded on start when it exists (no `--env-file` needed);
-copy it from `.env.example`. Profiles, context packs, fleet and scene files expand `${NAME}` and
+copy it from `.env.example`. Profiles, context packs, fleet and [scene](/guide/scenes) files expand `${NAME}` and
 `${NAME:-default}` from the environment (see [Profiles](../guide/profiles#personal-values-from-the-environment)).
 
 ## Environment
@@ -26,7 +30,7 @@ copy it from `.env.example`. Profiles, context packs, fleet and scene files expa
 | `MC_PLATFORM` | `neoforge` | server platform: `neoforge`, `vanilla` or `paper` (also `server.platform` in a profile); NeoForge also works on vanilla servers |
 | `MC_OWNERS` | (everyone) | comma-separated players allowed to command bots |
 | `MC_OWNER` | | your Minecraft name, used by the stock profiles as `${MC_OWNER:-Robin}` and by the live test scripts as the player to keep away from |
-| `MC_OAUTH_TOKEN_VAR` | `CLAUDE_CODE_OAUTH_TOKEN` | variable holding the Claude subscription token (pax and apprentice profiles) |
+| `MC_OAUTH_TOKEN_VAR` | `CLAUDE_CODE_OAUTH_TOKEN` | variable holding the Claude subscription token (pax and [apprentice](/guide/self-improver) profiles) |
 | `MC_OAUTH_TOKEN_FILE` | `~/.config/golemkit/secrets.env` | dotenv file to read only that variable from |
 | `MC_PREFIX` | `!` | chat command prefix |
 | `MC_CAN_DIG` | `false` | let bots break blocks |
@@ -56,7 +60,11 @@ copy it from `.env.example`. Profiles, context packs, fleet and scene files expa
 bots take their name from the profile, `--username` or the variant. The LLM variables
 (`MC_LLM_*`, `MC_CLAUDE_*`, `MC_CODEX_*`, `MC_OPENCODE_*`, `MC_OPENAI_*`, `ANTHROPIC_API_KEY`,
 `CLAUDE_CODE_OAUTH_TOKEN`) are listed in `.env.example` and described in the
-[LLM brain](../guide/llm-brain) guide.
+[LLM brain](../guide/llm-brain) guide. The login directory variables are `MC_CLAUDE_LOGIN`,
+`MC_CODEX_LOGIN` and `MC_OPENCODE_LOGIN`; the `MC_*_PROFILE` names in `.env.example` are the
+older spelling and still work. `MC_CLAUDE_OAUTH_TOKEN_VAR` and `MC_CLAUDE_OAUTH_TOKEN_FILE` set
+the subscription token source for every bot that runs `claude-subscription` (a profile's
+`llm.oauthTokenVar` / `llm.oauthTokenFile` win over them).
 
 ## Profile keys
 
@@ -70,19 +78,40 @@ All optional except `variant`; see [Profiles](../guide/profiles).
 | `username`, `description`, `persona`, `owners`, `canDig`, `server` | identity, permissions, server override (`host`, `port`, `auth`, `version`, `platform`; in a fleet only for keys the fleet's server leaves out) | [Profiles](../guide/profiles) |
 | `respectBuilds`, `selfAware` | leave player-made blocks alone (default off); show the bot its own setup each turn (default on) | [Feature toggles](../guide/live-config) |
 | `npcMode` | behaviours to arm while the LLM is paused, or `false` | [NPC mode](../guide/behaviors#npc-mode-when-the-llm-can-t-think) |
-| `behaviors` | armed behaviours and their options | [Behaviours](../guide/behaviors) |
-| `intents` | plain-language commands without the LLM: mode, layers, strategy | [Plain-language commands](../guide/intents) |
+| `askHelp` | `true`/`false` or `{ enabled, failures, minutes, forgetMinutes, perReasonMinutes, maxPerHour, tell, llm, thanks, quietHours, observeMinutes }`; lands in `settings.askHelp`. Default off; an options map turns it on unless it says `enabled: false` | [Asking for help](../guide/behaviors#asking-for-help) |
+| `behaviors` | [armed behaviours](/guide/behaviors) and their options | [Behaviours](../guide/behaviors) |
+| `intents` | [plain-language commands](/guide/intents) without the LLM: mode, layers, strategy | [Plain-language commands](../guide/intents) |
 | `worldedit` | `true`/`false` or `{ enabled, maxBlocks, ownersOnly, replyMs }` | [WorldEdit](../guide/worldedit) |
 | `building` | library, creative, ask | [Blueprint libraries](../guide/blueprints#building-policy) |
 | `blueprints` | extra blueprint folders | [Blueprint libraries](../guide/blueprints#libraries) |
 | `llm` | provider, model, effort, login, token source, proxy, listen, immersive, aliases, budget | [LLM brain](../guide/llm-brain) |
 | `context` | [context pack](/guide/context-pack) directory (default `profiles/<name>/`) | [Context pack](../guide/context-pack) |
 | `humanize` | reaction/typing delays, stand still while typing, typos, fidgeting | [Profiles](../guide/profiles#humanize-player-like-timing) |
-| `reflexes` | `selfDefense`, `autoEat`, `eatBelow`, `retreatBelow`, `waterFightAbove`, `rangedDefense` | [Movement, protection, combat](../concepts/world#reflexes) |
+| `reflexes` | `selfDefense` (on), `autoEat` (on), `eatBelow` (15), `retreatBelow` (8, 0 = never), `waterFightAbove` (14), `rangedDefense` (on); a variant's own reflex defaults sit under the profile's | [Movement, protection, combat](../concepts/world#reflexes) |
 | `retry` | action, LLM and reconnect retries | [Profiles](../guide/profiles#retries) |
 | `journal` | journal on/off, types, retention, summaries | [Journal](../guide/journal) |
-| `settings` | free-form values for skills and brains, e.g. `settings.combat` for the `combat.*` toggles, `settings.road`, `settings.pathfinder`, `settings.storage.chests` (configured chests), `settings.inventoryMemory` (container memory: `enabled`, `maxAgeHours`, `refreshMinutes`, `indexOwn`, `radius`, `lowFood`, `grumble`, `grumbleTo`, `grumbleHours`) | [Writing a variant](../guide/writing-a-bot), [Container memory](../guide/search#container-memory) |
+| `settings` | free-form values for skills and brains; the common ones are listed below | [Writing a variant](../guide/writing-a-bot) |
 | `logging` | level spec, format, files | [Logging](../guide/logging) |
+
+### Settings the skills read
+
+Each group's keys, ranges and defaults are in the [feature toggles](../guide/live-config#what-can-be-changed)
+table; the same keys work in the profile under `settings:` and live with `!config_set`.
+
+| key | what | default |
+|---|---|---|
+| `settings.combat` | the `combat.*` toggles: mob fight techniques (all on, `maxChase` 16) and [PvP](../concepts/world#pvp) (`pvp: off`, `friends`, `targets`, `revengeMinutes`, `pvpEngage`, ...) | PvP `off` |
+| `settings.mining` | the `mining.*` toggles: [safe mining](../guide/progression#safe-mining) readiness depth, weapon, food, gear, climb-out thresholds, torches | `safe: true`, `safeDepth: 8`, `minFood: 3`, `gear: none`, `retreatBelow: 10`, `retreatHostiles: 2` |
+| `settings.trips` | the `trips.*` toggles: [trips](../guide/behaviors#trips) top-up and turn-back rules | `enabled: true`, `food: 8`, `minFood: 4`, `minHealth: 12`, `turnBackAt: 0.5` |
+| `settings.storage.chests` | the pantry: chests the bot may take from as its own, as `[x, y, z]`, `{ x, y, z }` or `"x y z"` | none |
+| `settings.inventoryMemory` | [container memory](../guide/search#container-memory): `true`/`false` or `{ enabled, maxAgeHours, refreshMinutes, indexOwn, radius, lowFood, grumble, grumbleTo, grumbleHours }` | `enabled: false`, `maxAgeHours: 24`, `indexOwn: false` |
+| `settings.pathfinder.thinkTimeoutMs` | planning time per path (ms) | 10000 |
+| `settings.road`, `settings.build`, `settings.world.spawnProtection` | [roads](../guide/roads), creative builds, spawn-protection radius | see the toggles |
+
+Unknown keys under `settings.combat`, `settings.mining`, `settings.trips` and
+`settings.inventoryMemory` are ignored with a warning (`profiles/pax.yaml: unknown key
+settings.mining.depth (ignored)`), as are unknown top-level keys and unknown keys in the other
+declared blocks; see [Profiles](../guide/profiles#format). Other `settings` maps are not checked.
 
 ## Files and directories
 
@@ -93,12 +122,12 @@ All optional except `variant`; see [Profiles](../guide/profiles).
 | `fleet.yaml` | your fleet (gitignored); `fleets/example.yaml` is the template |
 | `data/channels-<host>-<port>.json` | learned NeoForge channels per server (NeoForge platform) |
 | `data/protected-<host>-<port>.json` | learned [protected areas](/concepts/world#protected-areas) (spawn, claims) per server |
-| `data/registries-<host>-<port>.json` | the server's item / entity / block registries (from the NeoForge registry sync) |
-| `data/bots/<username>/store.json` | per-bot storage (`agent.storage`; container memory under `containers.memory`) |
+| `data/registries-<host>-<port>.json` | the server's item / entity / block registries (from the NeoForge [registry sync](/concepts/neoforge#_4-modded-item-and-entity-names)) |
+| `data/bots/<username>/store.json` | per-bot storage (`agent.storage`: own chests under `search.ownChests`, container memory under `containers.memory`, in-game toggle changes under `settings.overrides`) |
 | `data/bots/<username>/journal/` | journal: daily JSONL files and `rollups/` |
+| `data/bots/<server>/<username>/` | the same per-bot data, when a fleet runs on several servers |
 | `data/models/` | cached model for the [intents embeddings layer](../guide/intents) |
 | `profiles/<name>/` | context pack (AGENTS.md, USER.md, MEMORY.md, skills/, hooks.yaml) |
 | `.auth/<login>/` | isolated LLM CLI logins (`just llm-login`) |
-| `data/bots/<server>/<username>/` | same, when a username runs on several servers |
 | `.auth/` | Microsoft auth token cache |
 | `logs/` | log files when `MC_LOG_DIR=logs` (gitignored) |
