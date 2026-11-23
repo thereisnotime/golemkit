@@ -718,7 +718,7 @@ under [Skilled-player techniques](./world.md#skilled-player-techniques), toggles
 | Cooldown timing, crit jumps, sprinted first hit, spacing, strafing | fight loop | `combat.crits`, `combat.strafe` |
 | W-tap sprint hits when knockback is worth more or no crit is possible | fight loop | `combat.sprintReset` |
 | Sweep hits when mobs bunch around the target | fight loop | `combat.sweep` |
-| Shield between slow swings against melee, never against axes; disabled-shield tracking | fight loop | `combat.shieldMelee` |
+| Shield between slow swings against melee; disabled-shield tracking after an axe hit | fight loop | `combat.shieldMelee` |
 | Shield against a creeper blast that can't be outrun | fight loop | `combat.shieldMelee` |
 | Totem into the offhand at 8 health or in a lethal fall | reflexes | `combat.totem` |
 | Golden apple mid-fight at 8 health (12 when surrounded) | fight loop | `combat.goldenApple` |

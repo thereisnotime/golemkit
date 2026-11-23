@@ -42,7 +42,7 @@ can't change their own.
 | `combat.maxChase` | 2–64 | stop chasing a mob this many blocks from where the fight started (default 16) |
 | `combat.sprintReset` | on/off | W-tap: sprint into ground hits for knockback when a crit isn't possible or knockback is worth more (default on) |
 | `combat.sweep` | on/off | with a sword, plain ground hits when mobs bunch around the target, so the sweep hits them all (default on) |
-| `combat.shieldMelee` | on/off | shield up against melee mobs between slow swings, and against a lit creeper it can't outrun; never against axes (default on) |
+| `combat.shieldMelee` | on/off | shield up against melee mobs between slow swings, and against a lit creeper it can't outrun; an axe hit is blocked, then the shield is down 5 s (default on) |
 | `combat.totem` | on/off | totem of undying into the offhand at 8 health or less, or in a fall that could kill (default on) |
 | `combat.goldenApple` | on/off | eat a golden apple mid-fight at 8 health or less, 12 when surrounded (default on) |
 | `combat.waterClutch` | on/off | water bucket against fall damage and to put out fire, scooped back up (default on) |

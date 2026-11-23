@@ -21,15 +21,15 @@ Before each fully charged melee hit the bot SHALL choose a sweep when it holds a
 - **THEN** it lets go of sprint after each hit and presses it again shortly before the next charge completes (W-tap)
 
 ### Requirement: Shield against melee between swings
-With `combat.shieldMelee` on and a shield in the offhand, the bot SHALL raise the shield against the melee mob it fights while its next swing is more than 350 ms away, and lower it just before the swing. It SHALL NOT raise it against axe users or while the shield is disabled.
+With `combat.shieldMelee` on and a shield in the offhand, the bot SHALL raise the shield against the melee mob it fights while its next swing is more than 350 ms away, and lower it just before the swing. It SHALL NOT raise it while the shield is disabled (after blocking an axe hit, for the cooldown the server sends).
 
 #### Scenario: Zombie, iron axe in hand
 - **WHEN** the bot has just swung an iron axe (1.1 s cooldown) at a zombie 2 blocks away
 - **THEN** the shield goes up until shortly before the axe is charged again
 
 #### Scenario: Vindicator
-- **WHEN** the bot fights a vindicator
-- **THEN** it does not raise the shield against it
+- **WHEN** a vindicator's axe hits the raised shield
+- **THEN** the hit does no damage and the bot fights without the shield for the next 5 s
 
 #### Scenario: Totem in the offhand at low health
 - **WHEN** a totem is in the offhand and health is 10 or less

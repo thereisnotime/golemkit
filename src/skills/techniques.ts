@@ -4,7 +4,7 @@
 //   sprintReset  W-tap: re-sprint into ground hits for extra knockback when no crit is possible
 //   sweep        plain ground sword hits when mobs bunch around the target (sweep attack)
 //   shieldMelee  shield up against melee mobs between slow swings, and against a creeper that
-//                can't be outrun; never against axe users (an axe hit disables it for 5 s)
+//                can't be outrun; an axe hit is still blocked, then the shield is down for 5 s
 //   totem        a totem of undying goes into the offhand at low health or in a lethal fall
 //   goldenApple  eat a golden apple mid-fight at low health instead of waiting for a lull
 //   waterClutch  water bucket against a damaging fall, and to put out fire
@@ -55,7 +55,7 @@ export const SPRINT_LEAD_MS = 150
 
 // ---- shield ----
 
-/** Mobs whose melee hit is an axe: a shield blocking it is disabled for 5 s, so it isn't raised against them. */
+/** Mobs whose melee hit is an axe: the hit is blocked, then the shield is disabled for 5 s (set_cooldown). */
 export const SHIELD_BREAKERS = new Set(['vindicator', 'piglin_brute'])
 /** A shield needs 5 ticks after it goes up before it blocks. */
 export const SHIELD_DELAY_MS = 250
@@ -68,14 +68,14 @@ export function breaksShields (name: string | undefined, held?: string | null): 
 /**
  * Raise the shield against a melee attacker between swings: only while the next swing is far
  * enough off that the shield is up long enough to count (5 ticks to raise, lowered a tick before
- * the hit), the attacker is close and facing us, and it doesn't carry an axe.
+ * the hit) and the attacker is close. Against an axe (vindicators, brutes, players) it still pays:
+ * the axe hit is blocked in full, then the shield is down for 5 s, which `disabled` reports.
  */
 export function shieldAgainstMelee (s: {
   enabled: boolean, hasShield: boolean, attacker: string, attackerHeld?: string | null, dist: number,
   cooldownLeftMs: number, disabled?: boolean
 }): boolean {
   if (!s.enabled || !s.hasShield || s.disabled) return false
-  if (breaksShields(s.attacker, s.attackerHeld)) return false
   if (s.attacker === 'creeper') return false // handled by creeperEscape
   if (s.dist > 3.5) return false
   return s.cooldownLeftMs > SHIELD_DELAY_MS + 100

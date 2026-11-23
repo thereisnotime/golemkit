@@ -234,10 +234,10 @@ loop, `defend` and the reflexes. Each one has a live toggle, on by default excep
   completes, so every such hit carries the sprint knockback, not only the first one.
 - **Shield timing** (`combat.shieldMelee`): between swings, when the next one is more than 350 ms
   away, the shield goes up against the melee mob it fights (a shield needs 5 ticks to start
-  blocking) and comes down 60 ms before the charge completes. Never against axe users
-  (vindicators, piglin brutes, players with an axe), never while the shield is disabled (the
-  bot watches `set_cooldown` for the shield item), and a totem that went into the offhand for low
-  health is not swapped out for it.
+  blocking) and comes down 60 ms before the charge completes. Axe users (vindicators, piglin
+  brutes, players with an axe) are blocked too: the axe hit does no damage, then the shield is
+  disabled for 5 s, which the bot reads from the server's `set_cooldown` for the shield and
+  waits out. A totem that went into the offhand for low health is not swapped out for it.
 - **Creeper behind the shield**: a lit fuse the bot can't outrun is faced with the shield up
   while backing off; a blocked explosion does no damage. "Can't outrun": distance plus 2 blocks
   per second (walking away from a creeper that follows) over the rest of the 1.5 s fuse stays

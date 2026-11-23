@@ -39,8 +39,8 @@ test('shield against melee: between slow swings, never against axes or creepers'
   const s = { enabled: true, hasShield: true, attacker: 'zombie', dist: 2, cooldownLeftMs: 600 }
   assert.equal(shieldAgainstMelee(s), true)
   assert.equal(shieldAgainstMelee({ ...s, cooldownLeftMs: 300 }), false, 'not up long enough to count before the swing')
-  assert.equal(shieldAgainstMelee({ ...s, attacker: 'vindicator' }), false, 'an axe disables it')
-  assert.equal(shieldAgainstMelee({ ...s, attacker: 'player', attackerHeld: 'diamond_axe' }), false)
+  assert.equal(shieldAgainstMelee({ ...s, attacker: 'vindicator' }), true, 'the axe hit is blocked, then the shield is down')
+  assert.equal(shieldAgainstMelee({ ...s, attacker: 'vindicator', disabled: true }), false, 'disabled by the last axe hit')
   assert.equal(shieldAgainstMelee({ ...s, attacker: 'player', attackerHeld: 'diamond_sword' }), true)
   assert.equal(shieldAgainstMelee({ ...s, attacker: 'creeper' }), false)
   assert.equal(shieldAgainstMelee({ ...s, dist: 5 }), false)

@@ -35,7 +35,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'combat.maxChase', description: 'stop chasing a mob this many blocks from where the fight started', schema: z.number().min(2).max(64) },
   { key: 'combat.sprintReset', description: 'W-tap: let go of sprint after a hit and sprint into the next one for knockback when a crit is not possible or knockback is worth more', schema: bool },
   { key: 'combat.sweep', description: 'with a sword, plain ground hits (no jump) when mobs bunch around the target, so the sweep hits them all', schema: bool },
-  { key: 'combat.shieldMelee', description: 'raise the shield against melee mobs between slow swings, and against a lit creeper it cannot outrun (never against axes)', schema: bool },
+  { key: 'combat.shieldMelee', description: 'raise the shield against melee mobs between slow swings, and against a lit creeper it cannot outrun (an axe hit is blocked, then the shield is down 5 s)', schema: bool },
   { key: 'combat.totem', description: 'move a totem of undying into the offhand at 8 health or less, or in a fall that could kill', schema: bool },
   { key: 'combat.goldenApple', description: 'eat a golden apple mid-fight at 8 health or less (12 when surrounded) instead of waiting for a lull', schema: bool },
   { key: 'combat.waterClutch', description: 'water bucket against fall damage (placed just before landing, then scooped up) and to put out fire', schema: bool },
