@@ -7,7 +7,7 @@ import { z, needsSurvival, type Agent } from '../../../core/index.ts'
 import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import { getHome, sameDimension } from '../../../skills/navigation.ts'
 import { inventoryCounts } from '../../../skills/toolkit.ts'
-import { knownContainers, knownAt, ownChests, configuredChests } from '../../../skills/containers.ts'
+import { knownContainers, knownAt, ownChests, configuredChests, missingChest } from '../../../skills/containers.ts'
 import { huntRefusal } from '../../../skills/combat.ts'
 import { getSpawn, checkSpawnBed, ownBedsNear, spawnBedState, shearable } from '../../../skills/bed.ts'
 import {
@@ -39,12 +39,12 @@ const options = z.object({
 type Options = z.infer<typeof options>
 
 /** Own and configured chests within `range` of home with what the bot last saw in them. */
-function chestsNearHome (agent: Agent, home: { x: number, z: number }, range: number): OwnChest[] {
+function chestsNearHome (agent: Agent, bot: Bot, home: { x: number, z: number }, range: number): OwnChest[] {
   const seen = knownContainers(agent)
   const own = [...ownChests(agent), ...configuredChests(agent)]
   return own
-    .filter(p => Math.hypot(p.x - home.x, p.z - home.z) <= range)
-    .map(p => ({ ...p, contents: knownAt(seen, p)?.contents ?? {} }))
+    .filter(p => Math.hypot(p.x - home.x, p.z - home.z) <= range && !missingChest(bot, p))
+    .map(p => { const k = knownAt(seen, p); return { ...p, contents: k?.contents ?? {}, ...(k ? {} : { unknown: true }) } })
 }
 
 function sheepCounts (bot: Bot, radius: number, spare: number, agent: Agent): { shearable: number, huntable: number } {
@@ -73,7 +73,7 @@ export const keepSpawnBed = defineBehavior({
     'below safety and food, above idle; backs off with a reason ("no sheep found within 250").',
   options,
   requires: ['place_bed', 'set_spawn'],
-  uses: ['go_home', 'withdraw', 'craft', 'shear', 'hunt', 'find_food'],
+  uses: ['go_home', 'withdraw', 'check_chests', 'craft', 'shear', 'hunt', 'find_food'],
   needs: { place: true },
   priority: 'npc',
   create (o: Options, { agent }) {
@@ -95,7 +95,7 @@ export const keepSpawnBed = defineBehavior({
         spawnBed: spawnBedState(bot, spawn),
         ownBed: own ? own.pos : null,
         inv: inventoryCounts(bot),
-        chests: home ? chestsNearHome(agent, home, 32) : [],
+        chests: home ? chestsNearHome(agent, bot, home, 32) : [],
         shearable: sheep.shearable,
         huntable: sheep.huntable,
         night: !isDay(bot),
@@ -151,6 +151,8 @@ export const keepSpawnBed = defineBehavior({
             const at = r.data as { x: number, y: number, z: number }
             return ctx.act('set_spawn', { x: at.x, y: at.y, z: at.z, ...sleepParams() })
           }
+          case 'look':
+            return ctx.act('check_chests', { x: step.at.x, y: step.at.y, z: step.at.z })
           case 'withdraw':
             return ctx.act('withdraw', { item: step.item, count: step.count, x: step.from.x, y: step.from.y, z: step.from.z })
           case 'craft':

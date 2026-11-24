@@ -282,7 +282,11 @@ export function bestWool (inv: Record<string, number>): { colour: string, count:
   return best
 }
 
-export interface OwnChest extends Pos { contents: Record<string, number> }
+export interface OwnChest extends Pos {
+  contents: Record<string, number>
+  /** Never looked inside (contents is empty only because it doesn't know). */
+  unknown?: boolean
+}
 
 export interface BedWorld {
   now: number
@@ -318,6 +322,8 @@ export type BedStep =
   | { do: 'use', bed: Pos, why: string }
   | { do: 'place', item: string, why: string }
   | { do: 'withdraw', item: string, count: number, from: Pos, why: string }
+  /** Look inside one of its chests near home it never opened (a bed or wool may be in it). */
+  | { do: 'look', at: Pos, why: string }
   | { do: 'craft', item: string, count: number, why: string }
   | { do: 'shear', why: string }
   | { do: 'hunt', count: number, why: string }
@@ -351,6 +357,9 @@ export function nextBedStep (w: BedWorld, o: BedStepOptions = {}): BedStep | nul
       const item = Object.keys(c.contents).find(k => isBedItem(k) && (c.contents[k] ?? 0) > 0)
       if (item) return { do: 'withdraw', item, count: 1, from: { x: c.x, y: c.y, z: c.z }, why: `a ${item} in my chest` }
     }
+    // a chest by home it never looked into may hold a bed: look before crafting or waiting for day
+    const unknown = w.chests.find(c => c.unknown)
+    if (unknown) return { do: 'look', at: { x: unknown.x, y: unknown.y, z: unknown.z }, why: `my chest at ${unknown.x} ${unknown.y} ${unknown.z} may hold a bed; I haven't looked inside yet` }
   }
   if (!w.can.craft) return { do: 'stuck', why: 'no bed and I can\'t craft one' }
   const wool = bestWool(w.inv)

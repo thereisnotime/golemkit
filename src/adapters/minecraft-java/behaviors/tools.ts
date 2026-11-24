@@ -4,7 +4,7 @@
 import type { Bot } from 'mineflayer'
 import { z, needsSurvival, itemName } from '../../../core/index.ts'
 import { defineBehavior } from '../../../brains/behaviors/types.ts'
-import { nextToolUpgrade, senseNearby, heldTier, miningGate, type Nearby } from '../../../skills/progression.ts'
+import { nextToolUpgrade, senseNearby, heldTier, miningGate, chestWants, type Nearby } from '../../../skills/progression.ts'
 import { miningState } from '../../../skills/mining.ts'
 import { inventoryCounts, toolTier, usablePlankUnits, type ToolKind } from '../../../skills/toolkit.ts'
 
@@ -37,7 +37,8 @@ export const keepToolsUpgraded = defineBehavior({
   description: 'Keeps tools usable and moving up the tiers when the bot is idle: re-crafts a worn or broken pickaxe/axe/shovel/sword, ' +
     'makes stone tools as soon as it can mine 3 cobblestone, then a furnace, iron (smelted with coal or charcoal) and diamond tools, up to `upTo`. ' +
     'A sword comes right after the pickaxe (wooden while there is no cobblestone). Short of wood it takes logs or planks from its own chests nearby, ' +
-    'otherwise it raises a wood need that chop_wood_loop picks up, and retries as soon as the wood is there. Gathering steps need digging enabled. ' +
+    'otherwise it raises a wood need that chop_wood_loop picks up, and retries as soon as the wood is there. Iron, coal, cobblestone and diamonds the next steps need, ' +
+    'and a shield or armour it lacks, come out of its own and configured chests near home first (then gear_up puts them on). Gathering steps need digging enabled. ' +
     'Safe mining: not ready to go underground (no weapon, food, or the shield/armour mining.gear asks for) it only takes ore near the surface and leaves deep ore alone until the kit changes.',
   options: z.object({
     upTo: z.enum(['stone', 'iron', 'diamond']).default('iron').describe('highest tier to work towards'),
@@ -54,6 +55,7 @@ export const keepToolsUpgraded = defineBehavior({
     let lastNeed: string | undefined
     let quietAt = 0
     let notReady = false
+    let chestSensed: { at: number, key: string, want: boolean } | null = null
     const nearby = (bot: Bot, now: number): Nearby => {
       if (!sensed || now - sensed.at > o.senseSeconds * 1000) {
         const ctx = { bot, agent, signal: new AbortController().signal, log: agent.log }
@@ -61,12 +63,27 @@ export const keepToolsUpgraded = defineBehavior({
       }
       return sensed.nearby
     }
+    // iron, coal, cobblestone or gear (a shield, armour) in its chests near home that the next steps could use
+    const fromChests = (bot: Bot, now: number, inv: Record<string, number>): boolean => {
+      const key = Object.entries(inv).map(([k, v]) => `${k}:${v}`).join(',')
+      if (!chestSensed || chestSensed.key !== key || now - chestSensed.at > o.senseSeconds * 1000) {
+        let want = false
+        try {
+          const ctx = { bot, agent, signal: new AbortController().signal, log: agent.log }
+          want = Object.keys(chestWants(ctx, { upTo: o.upTo, armour: o.armour, mining: miningGate(miningState(bot, agent.settings), o.safeMining) }).want).length > 0
+        } catch {}
+        chestSensed = { at: now, key, want }
+      }
+      return chestSensed.want
+    }
     const want = (bot: Bot, now: number) => {
       if (!bot.entity || !needsSurvival(bot)) return null
       const worn = wornTools(bot, o.minDurability)
       if (worn.length) return { worn: worn[0]! }
       const inv = inventoryCounts(bot)
       const step = nextToolUpgrade(inv, nearby(bot, now), bot.game?.gameMode, { upTo: o.upTo, armour: o.armour, mining: miningGate(miningState(bot, agent.settings), o.safeMining) })
+      // nothing it can do from here, or only gathering: its chests may have what the step needs
+      if ((!step || step.do === 'gather') && bot.game?.gameMode !== 'creative' && fromChests(bot, now, inv)) return { step: step ?? null, chest: true }
       if (!step || (step.do === 'gather' && !agent.canDig)) {
         if (now - quietAt > 300_000) {
           quietAt = now

@@ -10,7 +10,9 @@ import { TOOL_SHAPE, toolTier, inventoryCounts, plankUnits, usablePlankUnits, en
 import { craftItem, smeltItem } from './crafting.ts'
 import { collectBlocks } from './gather.ts'
 import { fellTree } from './woodcutting.ts'
-import { takeWoodFromOwnChests, fmtTally } from './containers.ts'
+import { takeWoodFromOwnChests, takeItemsFromOwnChests, chestView, chestTotals, fmtTally } from './containers.ts'
+import { gearWant } from './storagePlan.ts'
+import { heldCounts, equipGear } from './gear.ts'
 import { mineStone, miningState, depthOk, type MiningState } from './mining.ts'
 import { notReadyText, shieldWouldDo } from './minePlan.ts'
 import { creativeGet } from './mods.ts'
@@ -209,6 +211,41 @@ function ironStep (inv: Record<string, number>, nearby: Nearby, kinds: ToolKind[
   return null
 }
 
+/**
+ * What to take out of its own chests for the tool and armour upgrades still ahead (`chest` is
+ * what its chests near home hold): cobblestone for stone tools below stone, iron ingots then raw
+ * iron for every iron tool and armour piece still to make (and the shield safe mining wants
+ * first), coal or charcoal to smelt the raw iron it will hold, diamonds for diamond tools. Only
+ * what is short after what it carries. Pure.
+ */
+export function upgradeTakes (inv: Record<string, number>, chest: Record<string, number>, opts: UpgradeOptions = {}): Record<string, number> {
+  const upTo = opts.upTo ?? 'iron'
+  const kinds = opts.kinds ?? DEFAULT_KINDS
+  const out: Record<string, number> = {}
+  const take = (name: string, n: number) => { const t = Math.min(Math.max(0, Math.floor(n)), chest[name] ?? 0); if (t > 0) out[name] = (out[name] ?? 0) + t; return t }
+  const belowStone = kinds.filter(k => TIER_RANK[heldTier(inv, k)]! < 2)
+  if (belowStone.length) take('cobblestone', belowStone.reduce((n, k) => n + TOOL_SHAPE[k].head, 0) - count(inv, STONE_HEADS))
+  if (upTo === 'stone') return out
+  const wantIron = kinds.filter(k => TIER_RANK[heldTier(inv, k)]! < 3)
+  const armour = opts.armour ? Object.keys(ARMOUR).filter(a => !inv[a]) : []
+  const shield = opts.mining?.shieldFirst && !inv.shield ? 1 : 0
+  const ingotNeed = wantIron.reduce((n, k) => n + TOOL_SHAPE[k].head, 0) + armour.reduce((n, a) => n + ARMOUR[a]!, 0) + shield
+  let missing = ingotNeed - (inv.iron_ingot ?? 0) - (inv.raw_iron ?? 0)
+  if (missing > 0) missing -= take('iron_ingot', missing)
+  if (missing > 0) take('raw_iron', missing)
+  const raw = (inv.raw_iron ?? 0) + (out.raw_iron ?? 0)
+  if (raw > 0) {
+    let fuel = Math.ceil(raw / 8) - fuelItems(inv)
+    if (fuel > 0) fuel -= take('coal', fuel)
+    if (fuel > 0) take('charcoal', fuel)
+  }
+  if (upTo === 'diamond') {
+    const wantDiamond = kinds.filter(k => TIER_RANK[heldTier(inv, k)]! < 4)
+    if (wantDiamond.length) take('diamond', wantDiamond.reduce((n, k) => n + TOOL_SHAPE[k].head, 0) - (inv.diamond ?? 0))
+  }
+  return out
+}
+
 /** Steps that cost next to nothing (craft from what is held, or mine a few cobblestone for stone tools). */
 export function isCheapStep (s: UpgradeStep): boolean {
   if (s.do === 'craft' || s.do === 'creative_get') return true
@@ -345,6 +382,31 @@ export interface UpgradeRun extends UpgradeOptions {
 
 const ORE_ITEMS = new Set(['raw_iron', 'coal', 'diamond'])
 
+/** What its chests near home could give for the upgrades and gear ahead (upgradeTakes + gearWant); empty when nothing. */
+export function chestWants (ctx: Ctx, opts: UpgradeOptions = {}): { want: Record<string, number>, unknown: number } {
+  const { bot, agent } = ctx
+  const view = chestView(agent, bot)
+  if (!view.length) return { want: {}, unknown: 0 }
+  const t = chestTotals(view)
+  const inv = inventoryCounts(bot)
+  const mining = opts.mining ?? miningGate(miningState(bot, agent.settings), true)
+  const want = { ...upgradeTakes(inv, t.has, { ...opts, mining }), ...gearWant(heldCounts(bot), t.has) }
+  return { want, unknown: t.unknown }
+}
+
+/**
+ * Takes from its own and configured chests near home what the next upgrades need (iron, coal,
+ * cobblestone, diamonds) and gear it lacks (a shield, armour pieces), then puts the gear on.
+ */
+export async function chestTopUp (ctx: Ctx, opts: UpgradeOptions = {}): Promise<{ took: Record<string, number>, notes: string[] }> {
+  const { want } = chestWants(ctx, opts)
+  if (!Object.keys(want).length) return { took: {}, notes: [] }
+  const r = await takeItemsFromOwnChests(ctx, want, 128, {}, chestView(ctx.agent, ctx.bot))
+  if (Object.keys(r.took).some(k => k === 'shield' || /_(helmet|chestplate|leggings|boots)$/.test(k))) await equipGear(ctx.bot).catch(() => [])
+  ctx.log.info?.(`upgrade_tools: took ${fmtTally(r.took)} from my chests${r.notes.length ? ` (${r.notes.join('; ')})` : ''}`)
+  return { took: r.took, notes: r.notes }
+}
+
 /**
  * Does the upgrade steps it can do now, one after another, until nothing is left, a step
  * fails or makes no progress. Reports every step truthfully.
@@ -358,6 +420,10 @@ export async function upgradeTools (ctx: Ctx, opts: UpgradeRun = {}): Promise<Ac
   let lastKey = ''
   let notReady = false
   let tripTried = false
+  if (!opts.cheapOnly && needsSurvival(bot)) {
+    const r = await chestTopUp(ctx, opts).catch(e => { checkAborted(ctx.signal); return { took: {}, notes: [(e as Error).message] } })
+    if (Object.keys(r.took).length) done.push(`took ${fmtTally(r.took)} from my chests`)
+  }
   for (let i = 0; i < (opts.maxSteps ?? 12); i++) {
     checkAborted(ctx.signal)
     const inv = inventoryCounts(bot)
