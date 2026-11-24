@@ -30,6 +30,10 @@ export function headInWater (bot: Bot): boolean {
 // farm at night) overwrote Pax's air: the reflex saw high air while Pax drowned and fired 8 points
 // late, and `air` read "got air" from someone else and swam off with none. trackOwnAir keeps the
 // bot's own value from its own metadata and puts it back after every entity_metadata packet.
+// Upstream: fixed on mineflayer master by PrismarineJS/mineflayer#4052 (not in 4.39.0). Since
+// 1.19.3 the server also omits air while it is full, so after joining or a respawn oxygenLevel is
+// stale or undefined (PrismarineJS/mineflayer#4224): this tracker resets to 20 on respawn and
+// treats "no air seen yet" as 20. Drop it once a release has both.
 
 const ownAir = new WeakMap<Bot, number>()
 
