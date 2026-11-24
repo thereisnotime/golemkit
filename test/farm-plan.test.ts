@@ -133,6 +133,12 @@ const bare: FoodWorld = {
   herd: 0, food: 15, health: 12, canScout: true, canStartFarm: true, hasFarm: false, seeds: 0, grass: false, searches: [], now: NOW
 }
 
+test('ladder: seeds in its chests count like grass for the farm seeds step', () => {
+  const farm = { ...bare, food: 10, searches: [{ radius: 250, at: NOW - MIN, found: false }], hasFarm: true, farmEmpty: 30, seeds: 1, farmWork: 0 }
+  assert.notEqual(planFood(farm, opts).step, 'seeds', 'no grass and no chest seeds')
+  assert.equal(planFood({ ...farm, chestSeeds: 35 }, opts).step, 'seeds')
+})
+
 test('ladder: not urgent, the farm comes before a long search; hungry, food comes first', () => {
   const farmed = { ...bare, hasFarm: true, farmWork: 6, seeds: 6 }
   const d = planFood(farmed, opts)

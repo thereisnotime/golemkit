@@ -30,7 +30,7 @@ import { wornArmorPoints } from '../../../skills/gear.ts'
 import { escorting } from '../../../skills/bodyguard.ts'
 import { rangedDanger } from './safety.ts'
 import { pickFuel } from '../../../skills/crafting.ts'
-import { knownContainers, configuredChests, sameContainer } from '../../../skills/containers.ts'
+import { knownContainers, configuredChests, sameContainer, chestView, chestTotals } from '../../../skills/containers.ts'
 import { getPlaces, sameDimension } from '../../../skills/navigation.ts'
 import { dist, hostilesNear } from './util.ts'
 import { helpDesk } from '../../../brains/npc/help.ts'
@@ -238,6 +238,15 @@ function nearFarmWork (agent: Agent, bot: Bot, o: O, range: number): { farm: Far
   return work ? { farm, work } : null
 }
 
+/** Seeds it saw in its own and configured chests near home (0 without gather_seeds, which takes them). */
+export function chestSeedCount (agent: Agent, bot: Bot): number {
+  if (!agent.getAction('gather_seeds')) return 0
+  try {
+    const t = chestTotals(chestView(agent, bot))
+    return Object.entries(t.has).filter(([k]) => /_seeds$/.test(k)).reduce((n, [, v]) => n + v, 0)
+  } catch { return 0 }
+}
+
 /** Breeding is worth it here: near home (or no home), a pair, and their food (seeds kept back). */
 function breedHere (agent: Agent, bot: Bot, inv: Record<string, number>, keepSeeds: number): boolean {
   if (!agent.getAction('breed')) return false
@@ -370,6 +379,7 @@ export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
     health,
     seeds,
     grass: !!agent.canDig && !!agent.getAction('gather_seeds') && grass(),
+    chestSeeds: chestSeedCount(agent, bot),
     farmEmpty: agent.getAction('plant') ? farmEmpty : 0,
     farmGrowing,
     ...(farmWork !== undefined ? { farmWork, farmSeedsWanted } : {}),
@@ -402,6 +412,7 @@ export function senseChores (agent: Agent, bot: Bot, o: O): ChoreWorld {
     canStartFarm: !!agent.getAction('start_farm') && !!agent.canDig,
     seeds: seedCount(inv),
     grass,
+    chestSeeds: chestSeedCount(agent, bot),
     farmDistance: farm ? Math.round(Math.hypot(farm.x - pos.x, farm.z - pos.z)) : null,
     farmWork: near ? farmWorkCount(near.work) : 0,
     farmSeedsWanted: near?.work.seedsWanted ?? 0,
@@ -492,7 +503,7 @@ async function foodTripTo (ctx: BehaviorContext, o: O, place: ReturnType<typeof 
   }
   // seeds for its own farm: wheat harvests bring some; break a little grass when short
   if (agent.canDig && agent.getAction('gather_seeds') && seedCount(invOf(bot)) < o.minSeeds && breakableGrass(agent, bot, 32).length) {
-    const r = await ctx.act('gather_seeds', { count: o.minSeeds - seedCount(invOf(bot)), radius: 32, maxMinutes: 2 })
+    const r = await ctx.act('gather_seeds', { count: o.minSeeds - seedCount(invOf(bot)), radius: 32, maxMinutes: 2, fromChests: false })
     if (r.ok) got.push(r.message)
   }
   if (has('wheat') >= 3 && agent.getAction('craft')) {
@@ -698,7 +709,7 @@ export const keepFed = defineBehavior({
       // say why it is idle between meals, at most every 5 minutes, so an idle bot is explainable from the log
       if (!chore && sensed && Date.now() - idleLoggedAt > 300_000) {
         idleLoggedAt = Date.now()
-        agent.log.child('behaviors').debug(`keep_fed chores: nothing to do (${sensed.night ? 'night' : 'day'}, food ${sensed.food}, seeds ${sensed.seeds}, grass in reach ${sensed.grass}, farm ${sensed.hasFarm ? `${sensed.farmSize}x${sensed.farmSize}, ${sensed.farmWork} cells of work` : 'none'}, breeding ${sensed.canBreed}${sensed.danger ? ', danger' : ''})`)
+        agent.log.child('behaviors').debug(`keep_fed chores: nothing to do (${sensed.night ? 'night' : 'day'}, food ${sensed.food}, seeds ${sensed.seeds}${sensed.chestSeeds ? ` (+${sensed.chestSeeds} in my chests)` : ''}, grass in reach ${sensed.grass}, farm ${sensed.hasFarm ? `${sensed.farmSize}x${sensed.farmSize}, ${sensed.farmWork} cells of work` : 'none'}, breeding ${sensed.canBreed}${sensed.danger ? ', danger' : ''})`)
       }
       return chore
     }

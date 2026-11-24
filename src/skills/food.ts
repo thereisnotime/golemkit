@@ -19,6 +19,7 @@ import { collectBlocks } from './gather.ts'
 import { craftItem, pickFuel } from './crafting.ts'
 import { planFarmWork, farmWorkCount, oddSize, type FarmCell, type FarmGrid, type FarmWork } from './farmPlan.ts'
 import { inDangerZone, wayThroughDanger } from './food-danger.ts'
+import { takeItemsFromOwnChests, chestView, chestTotals } from './containers.ts'
 import {
   seedStopReason, seedLimits, scoutWaypoints, scoutStopReason, nextWaypoint, sectorsText, compass, sectorOf, mergeSpot, markSpotEmpty, rankSpots, dryWaypoint,
   chooseFarmSite, plotLayout, pickFarmSeed, seedCount, breedPlan, BREED_FOOD, DEFAULT_SCOUT_LIMITS,
@@ -705,7 +706,7 @@ export async function breakPlantsFor (ctx: Pick<ActionContext, 'bot' | 'agent' |
       failsInRow = 0
     } catch (e) {
       checkAborted(signal)
-      if (e instanceof DigRefusedError) agent.markProtected(target.position)
+      if (e instanceof DigRefusedError) agent.markProtected(target.position, { crop: true })
       skip.add(target.position.toString())
       failsInRow++
       continue
@@ -922,7 +923,7 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
       if (await tillAt(bot, vec(bot, c.x, c.y, c.z), signal)) tilled++
     } catch (e) {
       checkAborted(signal)
-      if (e instanceof DigRefusedError) { agent.markProtected(c); if (++refused >= 2) break }
+      if (e instanceof DigRefusedError) { agent.markProtected(c, { crop: true }); if (++refused >= 2) break }
     }
   }
   if (!tilled) return fail(`could not till anything at ${fmtPos(site.water)}${refused ? ' (the server refused: protected?)' : ''}`)
@@ -1014,9 +1015,11 @@ const startFarmAction = defineAction({
 // ------------------------------------------------------------------ tend_farm
 
 /** The seed for a farm: its own crop's seed when carried, else what there is most of. */
+const FARM_SEED: Record<string, string> = { wheat: 'wheat_seeds', carrot: 'carrot', potato: 'potato', beetroot: 'beetroot_seeds' }
+
 function seedForFarm (bot: Bot, farm: Farm): string | null {
   const inv = inventory(bot)
-  const own = ({ wheat: 'wheat_seeds', carrot: 'carrot', potato: 'potato', beetroot: 'beetroot_seeds' } as Record<string, string>)[farm.crop]
+  const own = FARM_SEED[farm.crop]
   return own && (inv[own] ?? 0) > 0 ? own : pickFarmSeed(inv)
 }
 
@@ -1024,12 +1027,13 @@ const tendFarm = defineAction({
   name: 'tend_farm',
   description: 'Look after its own farm (farm:1, farm:2...): put the water back if it is gone (with a bucket), plant bare farmland, ' +
     'till trampled dirt again and plant it, and grow the plot a ring at a time towards `size` around its water with the seeds ' +
-    'it has, keeping `seedReserve` seeds for replanting. Use harvest for ripe crops. Needs digging enabled for tilling.',
+    'it has, keeping `seedReserve` seeds for replanting; short of seeds it takes them from its own and configured chests near home first. Use harvest for ripe crops. Needs digging enabled for tilling.',
   params: z.object({
     farm: z.string().optional().describe('which farm (farm:1...); default the nearest'),
     size: z.number().int().min(3).max(9).default(9).describe('side of the square to grow the farm towards (one water block keeps 9x9 wet)'),
     seedReserve: z.number().int().min(0).max(32).default(4).describe('seeds kept for replanting: new cells only from seeds beyond these'),
     maxCells: z.number().int().min(1).max(80).default(40).describe('cells to plant or till at most this run'),
+    fromChests: z.boolean().default(true).describe('short of seeds: take them from its own and configured chests near home first'),
     spawnClearance: z.number().min(0).max(256).default(48).describe('never till within this distance of the world spawn')
   }),
   longRunning: true,
@@ -1037,6 +1041,17 @@ const tendFarm = defineAction({
     const { bot, agent, signal, log } = ctx
     const farm = p.farm ? getFarms(agent).find(f => f.name === p.farm!.toLowerCase()) : nearestFarm(agent, bot)
     if (!farm) return fail(p.farm ? `I have no farm called ${p.farm}` : 'I have no farm of my own (start_farm makes one)')
+    // short of seeds for the farm: its chests near home first (the walk to the farm passes home anyway)
+    let fromChest = ''
+    if (p.fromChests) {
+      const pre = farmWorkFor(agent, bot, farm, { targetSize: p.size, seedReserve: p.seedReserve, clearance: p.spawnClearance })
+      const seed = FARM_SEED[farm.crop] ?? 'wheat_seeds'
+      const want = pre ? pre.seedsWanted : Math.max(0, p.seedReserve * 2 - seedCount(inventory(bot)))
+      if (want > 0) {
+        const got = await seedsFromChests(ctx, seed, want)
+        if (got.took) fromChest = `took ${got.took} ${seed} from my chest`
+      }
+    }
     if (Math.hypot(farm.x - bot.entity.position.x, farm.z - bot.entity.position.z) > 8) {
       try { await travel(bot, { x: farm.x, y: farm.y + 1, z: farm.z }, signal, { range: 4 }) } catch (e) { checkAborted(signal); return fail(`couldn't get to ${farm.name}: ${(e as Error).message}`) }
     }
@@ -1044,7 +1059,7 @@ const tendFarm = defineAction({
     if (!work) return fail(`${farm.name} isn't loaded`)
     log.debug('tend_farm: plan', { farm: farm.name, size: work.size, target: work.target, plant: work.plant.length, retill: work.retill.length, extend: work.extend.length, water: !!work.water, reason: work.reason })
     if (!farmWorkCount(work)) return fail(`${farm.name} (${work.size}x${work.size}, ${work.farmland} farmland): ${work.reason}`)
-    const done: string[] = []
+    const done: string[] = fromChest ? [fromChest] : []
 
     if (work.water) {
       const hole = vec(bot, work.water.x, work.water.y, work.water.z)
@@ -1086,7 +1101,7 @@ const tendFarm = defineAction({
           if (await plantOn(bot, soil, seed, signal).catch(() => false)) n++
         } catch (e) {
           checkAborted(signal)
-          if (e instanceof DigRefusedError) { agent.markProtected(c); if (++refused >= 2) break }
+          if (e instanceof DigRefusedError) { agent.markProtected(c, { crop: true }); if (++refused >= 2) break }
         }
       }
       return n
@@ -1105,7 +1120,7 @@ const tendFarm = defineAction({
     const size = Math.max(farm.size, after?.size ?? work.size)
     saveFarm(agent, { ...farm, size, tended: Date.now() })
     const state = after ? `now ${after.size}x${after.size} with ${after.farmland} farmland, ${seedCount(inventory(bot))} seeds left` : ''
-    const changed = done.filter(t => !t.startsWith('no hoe'))
+    const changed = done.filter(t => !t.startsWith('no hoe') && !t.startsWith('took '))
     if (!changed.length) return fail(`${farm.name}: ${done.join(', ') || `could not do any of: ${work.reason}`}`)
     return ok(`${farm.name}: ${done.join(', ')}${state ? `; ${state}` : ''}`, { planted, size: after?.size, farmland: after?.farmland })
   }
@@ -1113,27 +1128,49 @@ const tendFarm = defineAction({
 
 // ------------------------------------------------------------------ gather_seeds, forage
 
+/**
+ * Seeds out of its own and configured chests near home (settings.storage.chests and the ones it
+ * placed), up to `want`, only when a chest near home is known to hold some or was never looked
+ * into. Returns how many it took.
+ */
+export async function seedsFromChests (ctx: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>, seed: string, want: number): Promise<{ took: number, note?: string }> {
+  if (want <= 0) return { took: 0 }
+  const view = chestView(ctx.agent, ctx.bot)
+  const t = chestTotals(view)
+  if (!(t.has[seed] ?? 0) && !t.unknown) return { took: 0 }
+  const r = await takeItemsFromOwnChests(ctx, { [seed]: want }, 128, {}, view).catch(e => { checkAborted(ctx.signal); return { took: {} as Record<string, number>, units: 0, notes: [(e as Error).message] } })
+  if (r.notes.length) ctx.log.debug('seeds from chests', { notes: r.notes })
+  return { took: r.took[seed] ?? 0, ...(r.notes.length ? { note: r.notes.join('; ') } : {}) }
+}
+
 const gatherSeeds = defineAction({
   name: 'gather_seeds',
   description: 'Get seeds for a farm by breaking surface grass and ferns nearby (open to the sky and near its own height, never cave grass; wheat seeds drop about 1 in 8) and picking them up. ' +
     'Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. ' +
-    'Skips protected areas and the world spawn. Needs digging enabled.',
+    'Skips protected areas and the world spawn. First takes wheat seeds from its own and configured chests near home (fromChests). Needs digging enabled for the grass.',
   params: z.object({
     count: z.number().int().min(1).max(64).default(10).describe('seeds to get'),
+    fromChests: z.boolean().default(true).describe('take seeds from its own and configured chests near home before breaking grass'),
     radius: z.number().min(4).max(128).default(32).describe('how far to look for grass'),
     maxMinutes: z.number().min(0.5).max(10).default(3).describe('give up after this long'),
     spawnClearance: z.number().min(0).max(256).default(48).describe('never break grass this close to the world spawn')
   }),
   longRunning: true,
   async run (ctx, p): Promise<ActionResult> {
-    if (!ctx.agent.canDig) return fail('I need digging enabled to break grass')
-    const got = await breakPlantsFor(ctx, p.count, p.spawnClearance, p.maxMinutes * 60_000, p.radius)
+    const before = seedCount(inventory(ctx.bot))
+    const chest = p.fromChests ? await seedsFromChests(ctx, 'wheat_seeds', p.count) : null
+    const fromChest = chest?.took ? `took ${chest.took} wheat seeds from my chest` : ''
+    const short = p.count - (seedCount(inventory(ctx.bot)) - before)
+    if (short <= 0) return ok(`${fromChest} (have ${seedCount(inventory(ctx.bot))})`, { seeds: chest?.took ?? 0, total: seedCount(inventory(ctx.bot)), fromChests: chest?.took ?? 0, broken: 0, grassLeft: true })
+    if (!ctx.agent.canDig) return chest?.took ? ok(`${fromChest}; I need digging enabled to break grass for the rest`, { fromChests: chest.took }) : fail('I need digging enabled to break grass')
+    const got = await breakPlantsFor(ctx, short, p.spawnClearance, p.maxMinutes * 60_000, p.radius)
+    if (chest?.took && !got.broken) return ok(`${fromChest}; no grass I may break for the rest (have ${seedCount(inventory(ctx.bot))})`, { fromChests: chest.took, total: seedCount(inventory(ctx.bot)), grassLeft: false })
     const total = seedCount(inventory(ctx.bot))
     const data = { seeds: got.seeds, total, broken: got.broken, dropped: got.dropped, grassLeft: got.grassLeft, stopped: got.stopped }
     if (!got.broken) return fail(`no grass I may break within ${p.radius} blocks (have ${total} seeds)`, data)
     const drops = got.dropped === got.seeds ? '' : `, ${got.dropped} seed drop${got.dropped === 1 ? '' : 's'} seen`
-    const text = `broke ${got.broken} grass in ${Math.round(got.ms / 1000)}s for ${got.seeds} of ${p.count} seeds${drops} (have ${total}); stopped: ${got.stopped}`
-    return got.seeds > 0 ? ok(text, data) : fail(text, data)
+    const text = `${fromChest ? `${fromChest}, ` : ''}broke ${got.broken} grass in ${Math.round(got.ms / 1000)}s for ${got.seeds} of ${short} seeds${drops} (have ${total}); stopped: ${got.stopped}`
+    return got.seeds > 0 || chest?.took ? ok(text, { ...data, fromChests: chest?.took ?? 0 }) : fail(text, data)
   }
 })
 
@@ -1203,7 +1240,7 @@ const forage = defineAction({
           await pickupNearby(bot, signal, { radius: 5, item: 'kelp', maxMs: 5000 }).catch(() => 0)
         } catch (e) {
           checkAborted(signal)
-          if (e instanceof DigRefusedError) agent.markProtected(at)
+          if (e instanceof DigRefusedError) agent.markProtected(at, { crop: true })
           log.debug('forage: could not cut kelp', { at: fmtPos(at), error: (e as Error).message })
         }
       }

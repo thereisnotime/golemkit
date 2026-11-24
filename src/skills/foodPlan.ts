@@ -449,6 +449,8 @@ export interface FoodWorld {
   seeds?: number
   /** Grass close by to break for wheat seeds (and the bot may dig). */
   grass?: boolean
+  /** Seeds it saw in its own and configured chests near home (gather_seeds takes those first). */
+  chestSeeds?: number
   /** Empty farmland on its own farm, in range. */
   farmEmpty?: number
   /** Crops on its own farm that are planted but not ripe yet. */
@@ -700,7 +702,7 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
     if (critical && forageNow && ok('forage')) return d('forage', 'farm', `food ${w.food}/20, ${(w.forage ?? 0) > 0 ? 'berries or kelp' : 'leaves for apples'} in range while nothing else works`, { apples: (w.apples ?? 0) > 0 })
     if (w.hasFarm && work > 0 && ok('plant')) return d('plant', 'farm', `${farmWhy}; ${work} cells on its farm to plant, re-till or grow, ${seeds} seeds`)
     const farmShort = (w.farmEmpty ?? 0) > seeds || (w.farmSeedsWanted ?? 0) > 0
-    if (dayOrBold && w.grass && ok('seeds') && ((w.hasFarm && farmShort) || (!w.hasFarm && w.canStartFarm && w.seeds !== undefined && seeds < minSeeds))) {
+    if (dayOrBold && (w.grass || (w.chestSeeds ?? 0) > 0) && ok('seeds') && ((w.hasFarm && farmShort) || (!w.hasFarm && w.canStartFarm && w.seeds !== undefined && seeds < minSeeds))) {
       return d('seeds', 'farm', `${farmWhy}; ${seeds} seeds, breaking grass for more`)
     }
     if (!w.hasFarm && w.canStartFarm && dayOrBold && ok('start_farm')) return d('start_farm', 'farm', `${farmWhy}; ${seeds} seeds, starting a farm`)
@@ -788,6 +790,8 @@ export interface ChoreWorld {
   seeds: number
   /** Grass close by to break for seeds (and gather_seeds is there). */
   grass: boolean
+  /** Seeds it saw in its own and configured chests near home (gather_seeds takes those before breaking grass). */
+  chestSeeds?: number
   /** Distance to its nearest farm, or null. */
   farmDistance: number | null
   /** Farm work it can do now (planFarmWork's count), when the farm is loaded. */
@@ -857,11 +861,11 @@ export function farmChore (w: ChoreWorld, o: ChoreOptions): { chore: FoodChore, 
       // seedsWanted = cells to fill + reserve - seeds; above the reserve means cells it has no seeds for
       // (with seeds in hand, tend_farm would already have planted them)
       const emptyCells = w.farmSeedsWanted > (o.seedReserve ?? 4)
-      if (w.farmSeedsWanted > 0 && (w.farmSize < w.farmTarget || emptyCells) && w.grass && ok('seeds')) return { chore: 'seeds', reason: `farm ${w.farmSize}x${w.farmSize} (target ${w.farmTarget}x${w.farmTarget}) is ${w.farmSeedsWanted} seeds short, ${w.seeds} in hand` }
+      if (w.farmSeedsWanted > 0 && (w.farmSize < w.farmTarget || emptyCells) && (w.grass || (w.chestSeeds ?? 0) > 0) && ok('seeds')) return { chore: 'seeds', reason: `farm ${w.farmSize}x${w.farmSize} (target ${w.farmTarget}x${w.farmTarget}) is ${w.farmSeedsWanted} seeds short, ${w.seeds} in hand${w.chestSeeds ? `, ${w.chestSeeds} in my chests` : ''}` }
     }
     if (!w.hasFarm && w.canStartFarm) {
       if (w.seeds >= o.minSeeds && ok('start_farm')) return { chore: 'start_farm', reason: `no farm yet and ${w.seeds} seeds` }
-      if (w.grass && ok('seeds')) return { chore: 'seeds', reason: `no farm yet, ${w.seeds} of ${o.minSeeds} seeds` }
+      if ((w.grass || (w.chestSeeds ?? 0) > 0) && ok('seeds')) return { chore: 'seeds', reason: `no farm yet, ${w.seeds} of ${o.minSeeds} seeds${w.chestSeeds ? `, ${w.chestSeeds} in my chests` : ''}` }
     }
   }
   if (o.breed && w.canBreed && ok('breed')) return { chore: 'breed', reason: 'a pair near home and food for them' }
