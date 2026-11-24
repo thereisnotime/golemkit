@@ -3,9 +3,14 @@
 export function setupDiagramZoom (): void {
   const decorate = () => {
     document.querySelectorAll<HTMLElement>('.mermaid').forEach(box => {
-      if (box.dataset.zoomReady || !box.querySelector('svg')) return
-      box.dataset.zoomReady = '1'
+      // the mermaid plugin re-renders a diagram's innerHTML after it first appears, which drops a
+      // button added earlier: check for the button itself, not a "done" flag on the box
+      if (!box.querySelector('svg') || box.querySelector(':scope > .diagram-zoom-btn')) return
       box.classList.add('zoomable-diagram')
+      if (!box.dataset.zoomReady) {
+        box.dataset.zoomReady = '1'
+        box.addEventListener('dblclick', () => open(box))
+      }
       const btn = document.createElement('button')
       btn.className = 'diagram-zoom-btn'
       btn.type = 'button'
@@ -14,7 +19,6 @@ export function setupDiagramZoom (): void {
       btn.textContent = '⤢'
       btn.addEventListener('click', e => { e.stopPropagation(); open(box) })
       box.appendChild(btn)
-      box.addEventListener('dblclick', () => open(box))
     })
   }
   const open = (box: HTMLElement) => {
