@@ -113,6 +113,8 @@ behind an adapter interface, so the core, brains and intents don't depend on Min
 | Going back for its own drops after a death (`recover_drops`, `recover_items`) | ✅ | live test in [behaviours](docs/guide/behaviors.md#death-drops-recover_drops) |
 | Death cause reports for hooks and the LLM | ✅ | causes show up in the survival benchmark; [journal](docs/guide/journal.md#what-is-recorded) |
 | Container memory (`settings.inventoryMemory`, `check_storage`, `where_stored`) | ✅ | live run in [search](docs/guide/search.md#container-memory) |
+| Air reflex: gets air when drowning (breaks ice above, swims to an opening, climbs out of flooded shafts), paths kept out from under ice | ✅ | live tests in [world](docs/concepts/world.md#air) |
+| Chest roles (`storage.chests` pantry / storage / gear): food stays in the pantry, gear and seeds are taken from chests, its own storage chest when full | ✅ | live test in [search](docs/guide/search.md#chest-roles) |
 | Respawn bed at home (`keep_spawn_bed`, sleep asks) | 🧪 | live script `scripts/bed-test.ts`, no recorded run yet |
 | Spawn-proofing (`light_home`, `light_up`, farms included) | 🧪 | live script `scripts/light-test.ts`, no recorded run yet |
 | Search and fetch (`find_target`, `bring_item`, `fetch_drops`) | 🧪 | ores and water found live; hunting, shearing and re-runs: 🚧 [search-gaps](openspec/changes/search-gaps/proposal.md) |
