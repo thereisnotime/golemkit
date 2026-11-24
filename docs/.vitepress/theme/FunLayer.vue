@@ -33,7 +33,8 @@ let ids = 0
 function toast (text: string): void {
   const t = { id: ++ids, text }
   toasts.value = [...toasts.value.slice(-2), t]
-  window.setTimeout(() => { toasts.value = toasts.value.filter(x => x !== t) }, 2800)
+  // compare ids: the array holds Vue proxies, so `x !== t` never matched and toasts piled up
+  window.setTimeout(() => { toasts.value = toasts.value.filter(x => x.id !== t.id) }, 2800)
 }
 const onToast = (e: Event) => toast(String((e as CustomEvent).detail))
 

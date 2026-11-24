@@ -5,7 +5,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { golemSvg } from './golem-svg'
 import { QUIPS, shuffleBag } from './pax-lines'
-import { reducedMotion, type GolemAct } from './fun'
+import type { GolemAct } from './fun'
 
 const svg = golemSvg('hero')
 const root = ref<HTMLButtonElement>()
@@ -64,7 +64,7 @@ function onMove (e: PointerEvent): void {
 
 onMounted(() => {
   window.addEventListener('golem:act', onAct)
-  if (!reducedMotion()) window.addEventListener('pointermove', onMove, { passive: true })
+  window.addEventListener('pointermove', onMove, { passive: true })
 })
 onBeforeUnmount(() => {
   window.removeEventListener('golem:act', onAct)

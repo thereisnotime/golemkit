@@ -4,8 +4,8 @@ scope: core
 
 # Easter eggs
 
-You found the page about the hidden things. They are small, local to your browser, make no sound
-and stop moving when your system asks for reduced motion.
+You found the page about the hidden things. They are small, local to your browser and make no sound.
+
 
 - Press the golem on the home page. Pax says one of the lines it really says in game when it is
   idle or when someone raids its chests.

@@ -1,5 +1,5 @@
 // Small easter eggs for the docs site, client-only (called from enhanceApp behind a window check).
-// No sounds, no network, nothing stored. Everything that moves checks prefers-reduced-motion.
+// No sounds, no network, nothing stored. Animations ignore the OS reduced-motion setting on purpose (owner's call).
 //
 //   - up up down down left right left right b a: pixel confetti and a tiny golem walks by
 //   - type "pax" anywhere outside a text field: the hero golem waves (or a toast on other pages)
@@ -10,7 +10,6 @@ import { golemSvg } from './golem-svg'
 
 export type GolemAct = 'wave' | 'dance'
 
-export const reducedMotion = (): boolean => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
 /** Shows a short toast (FunLayer.vue renders them). */
 export function toast (text: string): void {
@@ -38,7 +37,10 @@ function confetti (): void {
     const b = document.createElement('span')
     const size = 6 + Math.round(Math.random() * 3) * 2
     b.style.cssText = `left:${Math.random() * 100}vw;width:${size}px;height:${size}px;background:${COLORS[i % COLORS.length]};` +
-      `animation-duration:${1.4 + Math.random() * 1.2}s;animation-delay:${Math.random() * 0.5}s;--drift:${(Math.random() - 0.5) * 160}px;--spin:${Math.round(Math.random() * 4) * 90}deg`
+      `--drift:${(Math.random() - 0.5) * 160}px;--spin:${Math.round(Math.random() * 4) * 90}deg`
+    // !important so VitePress's reduced-motion rule (1 ms animations) doesn't cut the fall short
+    b.style.setProperty('animation-duration', `${1.4 + Math.random() * 1.2}s`, 'important')
+    b.style.setProperty('animation-delay', `${Math.random() * 0.5}s`, 'important')
     box.append(b)
   }
   document.body.append(box)
@@ -85,7 +87,7 @@ export function setupFun (): void {
       seq = []
       toast('cheat code accepted: +1 golem')
       golemAct('dance', 'is this... a dance party?')
-      if (!reducedMotion()) { confetti(); walker() }
+      confetti(); walker()
     }
     word = (word + (k.length === 1 ? k : ' ')).slice(-3)
     if (word === 'pax') {

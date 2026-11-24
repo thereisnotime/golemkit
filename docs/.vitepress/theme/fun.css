@@ -1,5 +1,5 @@
 /* Personality layer: the hero golem, "Pax says", XP bar, toasts, easter eggs, 404.
-   Motion is short and stepped (pixel feel) and all of it stops under prefers-reduced-motion. */
+   Motion is short and stepped (pixel feel) and runs whatever the OS motion setting says (the owner wants the animations). */
 
 /* ---------- the golem (hero, 404, walker) ---------- */
 .golem-svg { display: block; width: 100%; height: 100%; overflow: visible; transform-origin: 50% 100%; }
@@ -133,16 +133,38 @@
 .golem-404-home:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--vp-c-brand-1); }
 .golem-404-home:focus-visible { outline: 2px solid var(--vp-c-text-1); outline-offset: 3px; }
 
-/* ---------- reduced motion: everything holds still ---------- */
-@media (prefers-reduced-motion: reduce) {
-  .golem-svg, .golem-svg *, .golem-bubble, .fun-toast, .xp-fill, .golem-404-home,
-  .VPFeatures .VPFeature, .VPFeatures .VPFeature::after { animation: none !important; transition: none !important; }
-  .VPFeatures a.VPFeature:hover, .VPFeatures a.VPFeature:focus-visible, .golem-404-home:hover, .golem-404-home:active { transform: none; }
-}
-
 /* the footer's "psst" link to the easter eggs page: quiet until you hover it */
 .VPFooter .psst { margin-left: 0.4em; color: var(--vp-c-text-3); text-decoration: none; font-size: 0.9em; }
 .VPFooter .psst:hover, .VPFooter .psst:focus-visible { color: var(--vp-c-brand-1); text-decoration: underline; }
 
 /* the hero text column sits above the image; lift the image while the bubble is showing */
 .VPHero .image:has(.golem-bubble.shown) { position: relative; z-index: 11; }
+
+/* ---------- animate even when the OS asks for reduced motion ----------
+   VitePress's base.css cuts every animation to 1 ms and every transition to 0 s under
+   prefers-reduced-motion (`* { ... !important }`). The owner wants the animations regardless, so
+   ours are restated with !important here; the class selectors outrank VitePress's `*`. Keep this
+   in step with the rules above. The confetti's per-piece duration/delay is set inline with
+   !important in fun.ts. */
+@media (prefers-reduced-motion: reduce) {
+  .golem-svg .g-eyes { animation: golem-blink 5.6s infinite !important; }
+  .golem-svg .g-flower { animation: golem-sway 3.4s ease-in-out infinite alternate !important; }
+  .golem-svg .g-glow { transition: opacity 0.4s !important; }
+  .golem-btn.is-poke .golem-svg { animation: golem-poke 0.26s steps(2) !important; }
+  .golem-btn.is-wave .golem-svg { animation: golem-wave 1.2s steps(6) !important; }
+  .golem-btn.is-dance .golem-svg { animation: golem-dance 0.5s steps(2) 4 !important; }
+  .golem-bubble { transition: opacity 0.18s steps(3), transform 0.18s steps(3), visibility 0s 0.18s !important; }
+  .VPFeatures .VPFeature { transition: transform 0.15s steps(3), box-shadow 0.15s steps(3), border-color 0.15s !important; }
+  .VPFeatures .VPFeature::after { transition: opacity 0.15s steps(2) !important; }
+  .pax-says { transition: border-color 0.2s !important; }
+  .xp-bar.full .xp-fill { animation: xp-flash 0.3s steps(1) 4 !important; }
+  .fun-toast { animation: toast-in 0.2s steps(3) !important; }
+  .fun-confetti span { animation-name: fun-fall !important; animation-timing-function: steps(28) !important; animation-fill-mode: forwards !important; animation-iteration-count: 1 !important; }
+  .golem-walker { animation: fun-walk 7s linear forwards !important; }
+  .golem-walker .golem-svg { animation: fun-step 0.36s steps(2) infinite !important; }
+  .golem-404 .g-look { animation: golem-look 4.8s steps(1) infinite !important; }
+  .golem-404 .g-lantern { animation: golem-sway 2.6s ease-in-out infinite alternate !important; }
+  .golem-404 .g-light { animation: lantern-flicker 1.6s steps(2) infinite alternate !important; }
+  .golem-404-home { transition: transform 0.1s steps(2), box-shadow 0.1s steps(2) !important; }
+  .slot-word.slot-roll { animation: slot-roll 0.42s cubic-bezier(.2,.8,.2,1) !important; }
+}

@@ -1,6 +1,6 @@
 // Slot-machine words: <span class="slot" data-words="Minecraft:now|Luanti:soon|...">Minecraft</span>
 // cycles through the words with a vertical roll. ":now" / ":try" / ":soon" / ":idea" add a small status badge
-// so the homepage never claims a game or platform works before it does. Respects reduced motion.
+// so the homepage never claims a game or platform works before it does.
 type Word = { text: string, status: string }
 
 const BADGE: Record<string, string> = { now: 'works today', try: 'untested', soon: 'on the roadmap', idea: 'idea' }
@@ -34,13 +34,11 @@ function start (el: HTMLElement): void {
     badge.dataset.status = w.status
   }
   show(words[0]!)
-  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   const period = Number(el.dataset.period ?? 2600)
   const timer = window.setInterval(() => {
     if (!el.isConnected) { window.clearInterval(timer); return }
     i = (i + 1) % words.length
     show(words[i]!)
-    if (reduced) return
     // restart the roll-in animation (a CSS keyframe, so a missed frame never leaves it hidden)
     word.classList.remove('slot-roll')
     void word.offsetWidth
