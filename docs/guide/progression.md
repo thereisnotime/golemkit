@@ -157,6 +157,26 @@ same top-up runs once and the plan is made again, so a full pantry ends that wai
 the trip budget applies (half the food it left with, daylight for the walk home), and after a
 turn-back it walks home and says so. `chop_tree` rings past 64 blocks are trips the same way.
 
+### Iron and gear from its chests
+
+Before planning, `upgrade_tools` takes what the steps ahead need out of its own and configured
+chests near home (the pure `upgradeTakes` in `src/skills/progression.ts` and `gearWant` in
+`src/skills/storagePlan.ts`), counting only what it doesn't already carry:
+
+- cobblestone for every tool still below stone;
+- iron ingots, then raw iron, for every iron tool still to make, the iron armour with `armour`,
+  and the shield safe mining wants first;
+- coal, then charcoal, to smelt the raw iron it will hold (one per 8);
+- diamonds with `up_to=diamond`;
+- a shield when it has none, and an iron, diamond or netherite piece for each armour slot it
+  neither wears nor carries; these go on right away.
+
+`keep_tools_upgraded` runs for this even when the plan has nothing else to do (no ore in sight),
+going by [container memory](/guide/search#container-memory): it walks over only when it saw the
+items there. On Pax that is the 9 iron ingots and the shield in the second chest by home. Iron and
+fuel it carries are kept out of [deposit_when_full](/guide/behaviors#storing-at-home-deposit-when-full)
+until the iron tools and armour are done.
+
 ## Where it runs
 
 | what | when | how far |

@@ -795,6 +795,14 @@ flowchart TB
   broken for apples (about 1 in 200 leaves) plus apples lying around. When the wheat is ripe,
   rung 2 harvests it and rung 1 bakes the bread. Fishing is not done: there is no fishing
   action yet.
+- **Seeds from its chests first:** `gather_seeds` (`fromChests`, default on) and `tend_farm`
+  (`fromChests`, when the farm is short of seeds) first take wheat seeds (or the farm's own
+  seed) out of its own and configured chests near home, up to what the farm needs plus
+  `seedReserve`; only the rest comes from grass. Chests known to hold seeds go first, then ones
+  it never looked into. The chores (`farmChore`) and the ladder's farm seeds step count seeds
+  seen in those chests like grass in reach, so a farm with 1 seed and 35 in the pantry gets
+  them even with no grass around (`keep_fed chores` logs `seeds 1 (+35 in my chests)`). The
+  seeds picked up on a food trip far from home come from grass only.
 - **Seed gathering:** `gather_seeds` keeps breaking grass until it has the seeds it wants, its
   time is up (`seedMinutes`, default 4), the grass it may break within `seedRange` of where it
   started runs out, or a break budget (about 24 blocks per seed wanted, 48 to 400) is used. It
@@ -931,6 +939,14 @@ hungry (keep_fed's job), and only in survival. `farm_loop` can tend the same fie
 and back for the rings past 64, skipping protected areas and remembered danger zones. Details in
 [tool progression](/guide/progression#the-wood-ladder).
 
+`keep_tools_upgraded` also takes what the next upgrades need from its own and configured chests
+near home: iron ingots, then raw iron for every iron tool (and armour piece, with `armour`) still
+to make, coal or charcoal to smelt that raw iron, cobblestone for stone tools, diamonds with
+`upTo: diamond`, and a shield or armour piece it lacks (iron or better), which it then puts on.
+It scores for this even when the plan has no other step (no ore in sight), from container
+memory only, so it walks to a chest only when it saw the items there. Details in
+[tool progression](/guide/progression#iron-and-gear-from-its-chests).
+
 `keep_tools_upgraded` takes wood from the bot's own chests when the next tool needs some. When
 there is none there and no tree within 32 blocks, it sets the `wood` need on the [blackboard](/concepts/architecture#fleets-and-multiple-servers):
 `chop_wood_loop` then scores 38 instead of 30 (and runs even with `keep` logs in stock) until it
@@ -985,6 +1001,46 @@ settings:
   trips: { food: 8, minFood: 4, minHealth: 12, turnBackAt: 0.5, foodFloor: 6, daylightMarginS: 60 }
 ```
 
+## Storing at home: deposit_when_full
+
+`deposit_when_full` runs when the inventory is nearly full (`threshold`, default 0.85) and there
+is something it can spare. The pure planners are in `src/skills/storagePlan.ts`.
+
+It never stores (`depositKeep`): tools, armour, shields, beds, food, items in `keep`, arrows
+when it has a bow, seeds up to `seeds` per kind (default 32, for its farm), iron (ingots, raw
+iron) and coal or charcoal while iron tools or, with `armour` (default on), iron armour are still
+to make, and a small crafting stock: 8 logs, 16 planks, 16 sticks, 16 cobblestone, 16 coal, a
+crafting table, a furnace, a bucket, 2 chests and its torches.
+
+Where the rest goes (`planDeposit`), one chest per round, planning again after each:
+
+- the pantry takes food only; a configured chest's role comes from `settings.storage.chests`
+  (see [chest roles](/guide/search#chest-roles)): the first one is the pantry unless roles say otherwise;
+- its own placed chests come first (ones already holding that item first), then configured
+  storage chests; a gear chest only takes gear (tools, armour, beds, ingots, diamonds, raw ores);
+- chests in protected areas are left alone; a chest it never looked into counts as having
+  room, after the known ones; others' chests are never used;
+- all full: `place_chest` puts down a new chest of its own near home (crafted from 8 planks when
+  it has none) and the round goes on there. `placeChest: false` turns that off.
+
+`place_chest` picks the spot with `planChestSpot`: a free cell with a full block under it and air
+above (a chest needs it to open), within `range` (default 6) of home but not on the home spot,
+not on a path, farmland, slab or stairs, not beside a door, gate, trapdoor, path, another chest
+(it would join it), furnace, table or bed, not in a one-wide passage, not in a protected area, a
+danger zone or its farm, with somewhere to stand. Spots under a roof (most likely the owner's
+room) are used only when nothing outside works; against a wall and nearer wins. It is
+remembered as its own storage chest.
+
+With no chest of its own near home and no home, it falls back to the nearest chest (never a
+pantry for anything but food). With `place` or `x y z` it uses that chest, still keeping what it
+needs. The `deposit` action has the same pantry rule when no position is given, and takes exact
+counts with `items` (`{"snowball": 16}`).
+
+```yaml
+behaviors:
+  deposit_when_full: { threshold: 0.85, seeds: 32, armour: true, placeChest: true }
+```
+
 ## Respawn point: keep_spawn_bed
 
 `keep_spawn_bed` keeps a bed at home and the respawn point on it, so a death ends at home
@@ -1009,13 +1065,14 @@ backs off (60 s, doubling up to 30 min) when a step fails:
 
 1. click its own bed near home (`set_spawn`); after a long trip it walks home first
 2. place a bed from the inventory (`place_bed`), then click it
-3. take a bed out of its own chests near home
+3. take a bed out of its own chests near home; a chest near home it never looked into is opened
+   first (`check_chests` at that chest), by day or night, since a bed may be in it
 4. craft one: 3 wool of one colour and 3 planks of one kind (planks from a log first); no wood
    raises the `wood` need for `chop_wood_loop`
 5. take wool from its chests when that makes 3 of one colour
 6. shear sheep (`shear`); with 2 iron ingots and no shears it makes shears first
 7. hunt woolly sheep (`hunt animal=sheep`), sparing `spareSheep` adults
-8. by day, search the `rings` around home for sheep (`find_food` with sheep only); a ring searched
+8. by day only, search the `rings` around home for sheep (`find_food` with sheep only); a ring searched
    all the way round without sheep is skipped for `ringMemoryMinutes` (one cut short by nightfall
    is searched again). With every ring empty it stops with "no sheep found
    within 250" and tries again when the oldest empty ring is forgotten.
@@ -1661,7 +1718,7 @@ Walks back home when it strays too far by day, and stays close to home at night.
 
 ### `keep_spawn_bed`
 
-*routine · priority npc (20) · needs `place_bed`, `set_spawn`, block placing · uses `go_home`, `withdraw`, `craft`, `shear`, `hunt`, `find_food` when present*
+*routine · priority npc (20) · needs `place_bed`, `set_spawn`, block placing · uses `go_home`, `withdraw`, `check_chests`, `craft`, `shear`, `hunt`, `find_food` when present*
 
 Keeps a bed at home and the respawn point on it, so after a death it comes back at home. Knows whether the point is set (server messages, where it respawns); if not: uses its own bed near home, else places one from the inventory or its chests, else crafts one (3 wool of one colour + 3 planks; wool by shearing, shears from 2 iron, or hunting sheep, searching rings for sheep by day), then right-clicks it. At night that is a short sleep: it waits a few seconds and asks players still up to go to bed. Never breaks a bed; below safety and food, above idle; backs off with a reason ("no sheep found within 250").
 
@@ -1683,9 +1740,9 @@ Keeps a bed at home and the respawn point on it, so after a death it comes back 
 
 ### `deposit_when_full`
 
-*work · priority npc (20) · needs `deposit` · uses `goto_place`, `goto` when present*
+*work · priority npc (20) · needs `deposit` · uses `goto_place`, `goto`, `place_chest` when present*
 
-When the inventory is nearly full, walks to a chest (a remembered place, coordinates, or the nearest one), stores everything except tools, armour, food and kept items, then walks back. Arm it for long gathering jobs.
+When the inventory is nearly full, stores what it does not need in its own chests near home, then walks back. Keeps tools, armour, shields, the bed, food, seeds for its farm, iron and fuel while tools or armour are to make, and a small crafting stock. The pantry (settings.storage.chests role pantry, the first one by default) only ever gets food; its own placed chests come first, then configured storage, gear chests only take gear. When they are all full it puts down a new chest of its own near home (outside, off paths and doors). With place or x y z it uses that chest instead.
 
 | option | type | default | description |
 |---|---|---|---|
@@ -1695,6 +1752,9 @@ When the inventory is nearly full, walks to a chest (a remembered place, coordin
 | `y` | number |  |  |
 | `z` | number |  |  |
 | `keep` | list | `[]` | items never to store |
+| `seeds` | integer (0..256) | `32` | seeds of each kind kept for its farm |
+| `armour` | boolean | `true` | keep iron while iron armour is still to make (as well as iron tools) |
+| `placeChest` | boolean | `true` | put down a new chest of its own near home when its chests are full |
 | `returnBack` | boolean | `true` | walk back to where it was afterwards |
 
 ### `farm_setup`
@@ -1799,7 +1859,7 @@ Spawn-proofs home, its own farms and listed places: by day, every so often (soon
 
 *work · priority npc (20) · needs `upgrade_tools` · uses `craft` when present*
 
-Keeps tools usable and moving up the tiers when the bot is idle: re-crafts a worn or broken pickaxe/axe/shovel/sword, makes stone tools as soon as it can mine 3 cobblestone, then a furnace, iron (smelted with coal or charcoal) and diamond tools, up to `upTo`. A sword comes right after the pickaxe (wooden while there is no cobblestone). Short of wood it takes logs or planks from its own chests nearby, otherwise it raises a wood need that chop_wood_loop picks up, and retries as soon as the wood is there. Gathering steps need digging enabled. Safe mining: not ready to go underground (no weapon, food, or the shield/armour mining.gear asks for) it only takes ore near the surface and leaves deep ore alone until the kit changes.
+Keeps tools usable and moving up the tiers when the bot is idle: re-crafts a worn or broken pickaxe/axe/shovel/sword, makes stone tools as soon as it can mine 3 cobblestone, then a furnace, iron (smelted with coal or charcoal) and diamond tools, up to `upTo`. A sword comes right after the pickaxe (wooden while there is no cobblestone). Short of wood it takes logs or planks from its own chests nearby, otherwise it raises a wood need that chop_wood_loop picks up, and retries as soon as the wood is there. Iron, coal, cobblestone and diamonds the next steps need, and a shield or armour it lacks, come out of its own and configured chests near home first (then gear_up puts them on). Gathering steps need digging enabled. Safe mining: not ready to go underground (no weapon, food, or the shield/armour mining.gear asks for) it only takes ore near the surface and leaves deep ore alone until the kit changes.
 
 | option | type | default | description |
 |---|---|---|---|

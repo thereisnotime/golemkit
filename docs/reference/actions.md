@@ -10,7 +10,7 @@ scopeNote: "Generated from the skills: most are Minecraft; the journal and confi
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-28 skills, 123 actions.
+28 skills, 124 actions.
 
 ## blueprint-library
 
@@ -460,7 +460,7 @@ Storing items in and taking them out of chests and barrels.
 
 ### `deposit`
 
-Put items into the nearest chest/barrel (or the one at x y z). item="all" stores everything except tools, armour, food and anything in keep.
+Put items into the nearest chest/barrel (or the one at x y z). item="all" stores everything except tools, armour, food and anything in keep; `items` stores exactly those counts. Without x y z it never picks the pantry (settings.storage.chests role pantry) for anything but food.
 
 *aliases: `store`*
 
@@ -469,6 +469,7 @@ Put items into the nearest chest/barrel (or the one at x y z). item="all" stores
 | `item` | string |  | `"all"` | item name, or "all" |
 | `count` | integer (..9007199254740991) |  |  | how many; default all of them |
 | `keep` | array |  |  | item names never to store |
+| `items` | object |  |  | exact items and counts to store, e.g. {"snowball": 16}; overrides item and count |
 | `x` | number |  |  | container x; omit all three to use the nearest chest/barrel |
 | `y` | number |  |  |  |
 | `z` | number |  |  |  |
@@ -508,6 +509,9 @@ Look inside its own chests (ones it placed) and the configured ones (settings.st
 | `radius` | integer (4..256) |  | `48` | chests within this many blocks of home |
 | `max` | integer (1..8) |  | `3` | chests to look into this time |
 | `all` | boolean |  | `false` | also chests it looked into lately |
+| `x` | integer (-9007199254740991..9007199254740991) |  |  | look into just this one of its chests (with y and z) |
+| `y` | integer (-9007199254740991..9007199254740991) |  |  |  |
+| `z` | integer (-9007199254740991..9007199254740991) |  |  |  |
 
 ### `where_stored`
 
@@ -518,6 +522,14 @@ Say where an item is stored, from what the bot remembers seeing in chests and ba
 | param | type | required | default | description |
 |---|---|---|---|---|
 | `item` | string | yes |  | item name or a word of it, e.g. iron, bread, oak_log |
+
+### `place_chest`
+
+Put down a new chest of its own near home (crafted from 8 planks when it has none): a free spot outside within `range` blocks of home, off paths and farmland, not beside a door, another chest, the farm, or in a protected area; inside (the owner's room) only when nothing outside works. Remembers it as its own storage chest.
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `range` | integer (2..16) |  | `6` | how far from home to look for a spot |
 
 ## crafting
 
@@ -626,7 +638,7 @@ Start a small farm of its own: picks grass or dirt by water near home (or a plac
 
 ### `tend_farm`
 
-Look after its own farm (farm:1, farm:2...): put the water back if it is gone (with a bucket), plant bare farmland, till trampled dirt again and plant it, and grow the plot a ring at a time towards `size` around its water with the seeds it has, keeping `seedReserve` seeds for replanting. Use harvest for ripe crops. Needs digging enabled for tilling.
+Look after its own farm (farm:1, farm:2...): put the water back if it is gone (with a bucket), plant bare farmland, till trampled dirt again and plant it, and grow the plot a ring at a time towards `size` around its water with the seeds it has, keeping `seedReserve` seeds for replanting; short of seeds it takes them from its own and configured chests near home first. Use harvest for ripe crops. Needs digging enabled for tilling.
 
 *long-running*
 
@@ -636,17 +648,19 @@ Look after its own farm (farm:1, farm:2...): put the water back if it is gone (w
 | `size` | integer (3..9) |  | `9` | side of the square to grow the farm towards (one water block keeps 9x9 wet) |
 | `seedReserve` | integer (0..32) |  | `4` | seeds kept for replanting: new cells only from seeds beyond these |
 | `maxCells` | integer (1..80) |  | `40` | cells to plant or till at most this run |
+| `fromChests` | boolean |  | `true` | short of seeds: take them from its own and configured chests near home first |
 | `spawnClearance` | number (0..256) |  | `48` | never till within this distance of the world spawn |
 
 ### `gather_seeds`
 
-Get seeds for a farm by breaking surface grass and ferns nearby (open to the sky and near its own height, never cave grass; wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. Needs digging enabled.
+Get seeds for a farm by breaking surface grass and ferns nearby (open to the sky and near its own height, never cave grass; wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. First takes wheat seeds from its own and configured chests near home (fromChests). Needs digging enabled for the grass.
 
 *long-running*
 
 | param | type | required | default | description |
 |---|---|---|---|---|
 | `count` | integer (1..64) |  | `10` | seeds to get |
+| `fromChests` | boolean |  | `true` | take seeds from its own and configured chests near home before breaking grass |
 | `radius` | number (4..128) |  | `32` | how far to look for grass |
 | `maxMinutes` | number (0.5..10) |  | `3` | give up after this long |
 | `spawnClearance` | number (0..256) |  | `48` | never break grass this close to the world spawn |

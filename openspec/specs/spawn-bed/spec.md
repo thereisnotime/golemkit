@@ -17,11 +17,15 @@ The spawn_bed skill SHALL keep a respawn record in storage (`spawnBed`) with sta
 - **THEN** the record is set at that bed
 
 ### Requirement: Getting a bed
-While the respawn point is not a bed within homeRange + 2 blocks of home (or that bed is gone), keep_spawn_bed SHALL take the first step that applies: click its own bed near home; place a bed from the inventory and click it; take a bed from its own chests near home; craft a bed from 3 wool of one colour and 3 planks of one kind (crafting planks from a log first); take wool from its chests when that makes 3 of one colour; shear sheep; craft shears from 2 iron ingots when woolly sheep are in sight; hunt woolly sheep sparing spareSheep adults; by day, search the next ring around home for sheep. Without a home, with home in the Nether or the End, or away from home's dimension it SHALL do nothing.
+While the respawn point is not a bed within homeRange + 2 blocks of home (or that bed is gone), keep_spawn_bed SHALL take the first step that applies: click its own bed near home; place a bed from the inventory and click it; take a bed from its own chests near home; look inside one of its chests near home it never opened (by day or night, since a bed may be in it); craft a bed from 3 wool of one colour and 3 planks of one kind (crafting planks from a log first); take wool from its chests when that makes 3 of one colour; shear sheep; craft shears from 2 iron ingots when woolly sheep are in sight; hunt woolly sheep sparing spareSheep adults; by day, search the next ring around home for sheep. Without a home, with home in the Nether or the End, or away from home's dimension it SHALL do nothing.
 
 #### Scenario: Wool but no wood
 - **WHEN** the bot holds 3 white wool and no planks or logs
 - **THEN** it stops with "I have the wool for a bed but no wood for 3 planks" and sets the blackboard need wood
+
+#### Scenario: Bed in a chest it never opened, at night
+- **WHEN** it is night, the bot has no bed, and its configured chest by home (placed by the owner, never looked into) holds a red bed
+- **THEN** it walks home and looks inside that chest (check_chests at that position), takes the red bed and places it, instead of "it is night; I look for sheep by day"
 
 #### Scenario: Bed broken
 - **WHEN** the respawn bed's block is loaded and is air, and the bot holds a red bed

@@ -150,7 +150,7 @@ flowchart TD
       chests: ["120 64 -30", [130, 64, -30]]
   ```
 
-  Nobody else's chest is opened for taking, whatever `respectBuilds` says. Which chest it tries
+  Each entry can also carry a role (see [chest roles](#chest-roles)). Nobody else's chest is opened for taking, whatever `respectBuilds` says. Which chest it tries
   first comes from what it remembers seeing inside them; with [container memory](#container-memory)
   on that survives a restart, and an old sighting still sends it to the chest but is checked on
   the spot.
@@ -166,6 +166,34 @@ flowchart TD
 - **Delivery** watches the player's `playerCollect` events for 4 s after the toss, so "gave" means
   the player picked it up. Items that weren't picked up, or fewer than asked, make the result a
   failure that says so.
+
+### Chest roles
+
+`settings.storage.chests` entries are `[x, y, z]`, `"x y z"`, `{ x, y, z }` or
+`{ at: [x, y, z], role: pantry | storage | gear }` (`at` takes the same three forms). Without a
+role the first chest is the pantry and the others are storage, so old profiles keep working.
+Chests the bot placed itself are storage.
+
+```yaml
+settings:
+  storage:
+    chests:
+      - { at: [559, 69, -47], role: pantry }   # food only
+      - { at: [561, 69, -47], role: gear }     # tools, armour, beds, ingots, diamonds, raw ores
+      - [565, 69, -47]                         # storage: anything
+```
+
+| role | what [deposit_when_full](/guide/behaviors#storing-at-home-deposit-when-full) puts in | what it takes out |
+|---|---|---|
+| `pantry` | food only (the `deposit` action without a position also skips it for anything else) | food for meals and trips, seeds for its farm, anything it needs |
+| `storage` | anything it can spare, after its own placed chests | anything it needs |
+| `gear` | gear only | anything it needs |
+
+Taking from its chests near home (within `inventoryMemory.radius` of home, default 48): wood and
+iron, coal, cobblestone, diamonds, a shield and armour for [keep_tools_upgraded](/guide/progression#iron-and-gear-from-its-chests),
+seeds for `gather_seeds` and `tend_farm`, a bed or wool for `keep_spawn_bed`, food for keep_fed and
+trips. Chests known to hold the item go first, then ones it never looked into. `check_chests x y z`
+looks into one of its chests on demand.
 
 ## Container memory
 

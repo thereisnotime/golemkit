@@ -103,6 +103,13 @@ gather_seeds SHALL keep breaking the nearest grass it may break, working outward
 - **WHEN** a seeds chore got 1 of 5 seeds when its time ran out and breakable grass is still in reach
 - **THEN** the seeds chore is offered again after 3 minutes, not 20
 
+### Requirement: Seeds from its chests
+gather_seeds (`fromChests`, default true) and tend_farm (`fromChests`, when the farm is short of seeds) SHALL first take the farm's seed (wheat seeds for gather_seeds) from its own and configured chests near home, up to what is wanted, chests known to hold seeds first, then ones it never looked into, and break grass only for the rest. The between-meals chores and the ladder's farm seeds step SHALL count seeds seen in those chests (container memory) like grass in reach. The seeds a food trip picks up far from home SHALL come from grass only.
+
+#### Scenario: Seeds in the pantry
+- **WHEN** the 9x9 farm has 1 seed planted short of 80 cells, no grass is in reach and the pantry by home holds 35 wheat seeds
+- **THEN** the seeds chore runs, gather_seeds takes the seeds from the pantry and tend_farm plants them
+
 ### Requirement: Reaching animals
 When hunt can't get to an animal on foot (and `reach` is on, the default), it SHALL try once more with the budget from the pure `reachEffort`: up to 16 scaffolding blocks it carries (dirt, cobblestone and other stone, planks) for bridges and, for an animal above it, a pillar, and digging through or down when digging is allowed, within 45 seconds. It SHALL refuse, and say why, for an animal in a protected area or a remembered danger zone, by lava, more than 48 blocks away or more than 24 blocks above or below, or when it may neither dig nor place (or has no blocks and may not dig). While trying, the pathfinder SHALL NOT break or place in a protected area or danger zone, SHALL NOT walk through a danger zone, and SHALL NOT break a block with water or lava under it. An animal it still can't reach SHALL be left alone for 5 minutes and the hunt result SHALL say what it tried.
 

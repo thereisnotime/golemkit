@@ -1005,7 +1005,7 @@
     },
     {
       "name": "deposit",
-      "description": "Put items into the nearest chest/barrel (or the one at x y z). item=\"all\" stores everything except tools, armour, food and anything in keep.",
+      "description": "Put items into the nearest chest/barrel (or the one at x y z). item=\"all\" stores everything except tools, armour, food and anything in keep; `items` stores exactly those counts. Without x y z it never picks the pantry (settings.storage.chests role pantry) for anything but food.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1025,6 +1025,18 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "items": {
+            "description": "exact items and counts to store, e.g. {\"snowball\": 16}; overrides item and count",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
             }
           },
           "x": {
@@ -1115,6 +1127,22 @@
             "default": false,
             "description": "also chests it looked into lately",
             "type": "boolean"
+          },
+          "x": {
+            "description": "look into just this one of its chests (with y and z)",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "y": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "z": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         }
       }
@@ -1134,6 +1162,22 @@
         "required": [
           "item"
         ]
+      }
+    },
+    {
+      "name": "place_chest",
+      "description": "Put down a new chest of its own near home (crafted from 8 planks when it has none): a free spot outside within `range` blocks of home, off paths and farmland, not beside a door, another chest, the farm, or in a protected area; inside (the owner's room) only when nothing outside works. Remembers it as its own storage chest.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "default": 6,
+            "description": "how far from home to look for a spot",
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 16
+          }
+        }
       }
     },
     {
@@ -1386,7 +1430,7 @@
     },
     {
       "name": "tend_farm",
-      "description": "Look after its own farm (farm:1, farm:2...): put the water back if it is gone (with a bucket), plant bare farmland, till trampled dirt again and plant it, and grow the plot a ring at a time towards `size` around its water with the seeds it has, keeping `seedReserve` seeds for replanting. Use harvest for ripe crops. Needs digging enabled for tilling. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "description": "Look after its own farm (farm:1, farm:2...): put the water back if it is gone (with a bucket), plant bare farmland, till trampled dirt again and plant it, and grow the plot a ring at a time towards `size` around its water with the seeds it has, keeping `seedReserve` seeds for replanting; short of seeds it takes them from its own and configured chests near home first. Use harvest for ripe crops. Needs digging enabled for tilling. (Long-running: starts in the background and keeps going until stopped or replaced.)",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1415,6 +1459,11 @@
             "minimum": 1,
             "maximum": 80
           },
+          "fromChests": {
+            "default": true,
+            "description": "short of seeds: take them from its own and configured chests near home first",
+            "type": "boolean"
+          },
           "spawnClearance": {
             "default": 48,
             "description": "never till within this distance of the world spawn",
@@ -1427,7 +1476,7 @@
     },
     {
       "name": "gather_seeds",
-      "description": "Get seeds for a farm by breaking surface grass and ferns nearby (open to the sky and near its own height, never cave grass; wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. Needs digging enabled. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "description": "Get seeds for a farm by breaking surface grass and ferns nearby (open to the sky and near its own height, never cave grass; wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. First takes wheat seeds from its own and configured chests near home (fromChests). Needs digging enabled for the grass. (Long-running: starts in the background and keeps going until stopped or replaced.)",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1437,6 +1486,11 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 64
+          },
+          "fromChests": {
+            "default": true,
+            "description": "take seeds from its own and configured chests near home before breaking grass",
+            "type": "boolean"
           },
           "radius": {
             "default": 32,
@@ -4435,7 +4489,7 @@
     },
     {
       "name": "deposit",
-      "description": "Put items into the nearest chest/barrel (or the one at x y z). item=\"all\" stores everything except tools, armour, food and anything in keep.",
+      "description": "Put items into the nearest chest/barrel (or the one at x y z). item=\"all\" stores everything except tools, armour, food and anything in keep; `items` stores exactly those counts. Without x y z it never picks the pantry (settings.storage.chests role pantry) for anything but food.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4455,6 +4509,18 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "items": {
+            "description": "exact items and counts to store, e.g. {\"snowball\": 16}; overrides item and count",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
             }
           },
           "x": {
@@ -4545,6 +4611,22 @@
             "default": false,
             "description": "also chests it looked into lately",
             "type": "boolean"
+          },
+          "x": {
+            "description": "look into just this one of its chests (with y and z)",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "y": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "z": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         }
       }
@@ -4564,6 +4646,22 @@
         "required": [
           "item"
         ]
+      }
+    },
+    {
+      "name": "place_chest",
+      "description": "Put down a new chest of its own near home (crafted from 8 planks when it has none): a free spot outside within `range` blocks of home, off paths and farmland, not beside a door, another chest, the farm, or in a protected area; inside (the owner's room) only when nothing outside works. Remembers it as its own storage chest.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "default": 6,
+            "description": "how far from home to look for a spot",
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 16
+          }
+        }
       }
     },
     {
@@ -4816,7 +4914,7 @@
     },
     {
       "name": "tend_farm",
-      "description": "Look after its own farm (farm:1, farm:2...): put the water back if it is gone (with a bucket), plant bare farmland, till trampled dirt again and plant it, and grow the plot a ring at a time towards `size` around its water with the seeds it has, keeping `seedReserve` seeds for replanting. Use harvest for ripe crops. Needs digging enabled for tilling. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "description": "Look after its own farm (farm:1, farm:2...): put the water back if it is gone (with a bucket), plant bare farmland, till trampled dirt again and plant it, and grow the plot a ring at a time towards `size` around its water with the seeds it has, keeping `seedReserve` seeds for replanting; short of seeds it takes them from its own and configured chests near home first. Use harvest for ripe crops. Needs digging enabled for tilling. (Long-running: starts in the background and keeps going until stopped or replaced.)",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4845,6 +4943,11 @@
             "minimum": 1,
             "maximum": 80
           },
+          "fromChests": {
+            "default": true,
+            "description": "short of seeds: take them from its own and configured chests near home first",
+            "type": "boolean"
+          },
           "spawnClearance": {
             "default": 48,
             "description": "never till within this distance of the world spawn",
@@ -4857,7 +4960,7 @@
     },
     {
       "name": "gather_seeds",
-      "description": "Get seeds for a farm by breaking surface grass and ferns nearby (open to the sky and near its own height, never cave grass; wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. Needs digging enabled. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "description": "Get seeds for a farm by breaking surface grass and ferns nearby (open to the sky and near its own height, never cave grass; wheat seeds drop about 1 in 8) and picking them up. Keeps going, patch by patch out to the radius, until it has the seeds, the time is up or the grass runs out. Skips protected areas and the world spawn. First takes wheat seeds from its own and configured chests near home (fromChests). Needs digging enabled for the grass. (Long-running: starts in the background and keeps going until stopped or replaced.)",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4867,6 +4970,11 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 64
+          },
+          "fromChests": {
+            "default": true,
+            "description": "take seeds from its own and configured chests near home before breaking grass",
+            "type": "boolean"
           },
           "radius": {
             "default": 32,

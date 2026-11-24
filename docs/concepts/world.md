@@ -78,11 +78,18 @@ sequenceDiagram
   B->>S: dig dirt at 545 70 45
   S-->>B: block_change:<br/>dirt is back
   B->>P: markProtected(545 70 45)
-  P->>P: new zone (radius 20),<br/>save data/<br/>protected-host-port.json
+  P->>P: a second refusal nearby,<br/>5 s to 5 min later:<br/>new zone (radius 20),<br/>save data/<br/>protected-host-port.json
   P->>PF: digging inside<br/>zones costs ∞,<br/>re-plan now
   Note over B,PF: collect / chop_tree skip blocks in zones,<br/>walk out once if everything nearby<br/>is protected
 ```
 
+- One refusal is only a suspect: a lag rollback looks the same. A zone needs a second refusal
+  within 8 blocks, 5 seconds to 5 minutes after the first (a rollback reverts several blocks at
+  once, so refusals in the same burst count once), or a confirmed one (a refused placement inside
+  vanilla spawn protection). The pure check is `refusalVerdict` in `src/core/protection.ts`.
+- Crop, farmland and plant breaks (tilling and planting in `tend_farm` and `start_farm`, grass
+  broken for seeds, kelp) never make a zone (`markProtected(pos, { crop: true })`): a harvest
+  rollback during lag once put a false zone over Pax's farm.
 - Zones are saved per server and loaded on every start, for every bot on that server.
 - `agent.protectedAreas.isProtected(pos)`, `agent.markProtected(pos)` from code.
 - `digBlock()` (skills/world.ts) throws `DigRefusedError` on a refusal; skills that dig use it.

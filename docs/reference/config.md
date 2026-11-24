@@ -114,7 +114,7 @@ table; the same keys work in the profile under `settings:` and live with `!confi
 | `settings.combat` | the `combat.*` toggles: mob fight techniques (all on, `maxChase` 16) and [PvP](../concepts/world#pvp) (`pvp: off`, `friends`, `targets`, `revengeMinutes`, `pvpEngage`, ...) | PvP `off` |
 | `settings.mining` | the `mining.*` toggles: [safe mining](../guide/progression#safe-mining) readiness depth, weapon, food, gear, climb-out thresholds, torches | `safe: true`, `safeDepth: 8`, `minFood: 3`, `gear: none`, `retreatBelow: 10`, `retreatHostiles: 2` |
 | `settings.trips` | the `trips.*` toggles: [trips](../guide/behaviors#trips) top-up and turn-back rules | `enabled: true`, `food: 8`, `minFood: 4`, `minHealth: 12`, `turnBackAt: 0.5` |
-| `settings.storage.chests` | chests the bot may take from as its own, as `[x, y, z]`, `{ x, y, z }` or `"x y z"`; with the chests it placed, the ones near home are the pantry | none |
+| `settings.storage.chests` | chests the bot may take from as its own, as `[x, y, z]`, `{ x, y, z }`, `"x y z"` or `{ at: [x, y, z], role: pantry \| storage \| gear }`; without roles the first is the pantry (food only) and the others storage ([chest roles](/guide/search#chest-roles)) | none |
 | `settings.inventoryMemory` | [container memory](../guide/search#container-memory): `true`/`false` or `{ enabled, maxAgeHours, refreshMinutes, indexOwn, radius, lowFood, grumble, grumbleTo, grumbleHours }` | `enabled: false`, `maxAgeHours: 24`, `indexOwn: false` |
 | `settings.pathfinder.thinkTimeoutMs` | planning time per path (ms) | 10000 |
 | `settings.road`, `settings.build`, `settings.world.spawnProtection` | [roads](../guide/roads), creative builds, spawn-protection radius | see the toggles |

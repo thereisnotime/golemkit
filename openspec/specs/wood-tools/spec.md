@@ -30,6 +30,13 @@ When the next upgrade step needs logs, upgrade_tools SHALL first take logs, then
 - **WHEN** an own chest 10 blocks away holds spruce logs and the bot needs sticks
 - **THEN** it takes logs from the chest and crafts the tool
 
+### Requirement: Iron and gear from its chests
+Before planning, upgrade_tools SHALL take from its own and configured chests near home (not in a protected area) what the upgrades still ahead need beyond what it carries (`upgradeTakes`): cobblestone for tools below stone, iron ingots then raw iron for iron tools, iron armour with `armour` and a safe-mining shield, coal then charcoal to smelt the raw iron (one per 8), diamonds with up_to diamond; and a shield when it has none plus an iron-or-better piece for each empty armour slot (`gearWant`), which it SHALL put on. keep_tools_upgraded SHALL run for this, from container memory, even when the plan has no other step.
+
+#### Scenario: Ingots in the second chest
+- **WHEN** the bot has stone tools, no ore in sight, and its chest by home holds 9 iron ingots and a shield
+- **THEN** keep_tools_upgraded runs, takes the 9 ingots and the shield, puts the shield in the offhand and crafts iron tools
+
 ### Requirement: Wood need and prompt retry
 keep_tools_upgraded SHALL set the blackboard need `wood` when upgrade_tools fails with need 'wood' and clear it otherwise. chop_wood_loop SHALL score 38 instead of 30 while the need is set, even with `keep` logs in stock, and clear the need when a run brings wood. A behaviour MAY define retryKey; when a failed behaviour's key differs from its value at the failure, at least 10 seconds after it, the failure back-off SHALL end. keep_tools_upgraded's key SHALL be the usable wood it holds after a wood failure.
 
