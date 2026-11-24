@@ -6,6 +6,7 @@ import { reachBlock, placeAt, findFreeSpot, findItem, countItem, gotoWithin } fr
 import { stationSpotBlocked, leaveSpawnPoint, inSpawnProtection, refusedPlacementText, isPlacementRefusal, spotKey, SPAWN_PROTECTION, type StationRules } from './stationPlan.ts'
 import { makeRoom, dropsNear } from './efficiency.ts'
 import { pickupNearby } from './pickup.ts'
+import { inWater, reachDryLand } from './navigation.ts'
 
 const TABLE_SEARCH = 16
 const FURNACE_SEARCH = 32
@@ -137,6 +138,15 @@ export async function placeStation (bot: Bot, item: 'crafting_table' | 'furnace'
   return `could not place a ${item.replace('_', ' ')}: ${why}`
 }
 
+/**
+ * Gets out of the water before opening a furnace or crafting table: Pax smelted charcoal afloat in
+ * a flooded shaft and sank while the furnace window stayed open. True when on dry ground.
+ */
+export async function dryFooting (bot: Bot, signal: AbortSignal): Promise<boolean> {
+  if (!inWater(bot)) return true
+  try { return await reachDryLand(bot, signal) } catch (e) { checkAborted(signal); return false }
+}
+
 /** Nearest crafting table, or one we place (from inventory, or crafted from planks). */
 async function getTable (bot: Bot, signal: AbortSignal): Promise<{ table: Block, placed: boolean } | string> {
   const tableId = bot.registry.blocksByName.crafting_table.id
@@ -204,6 +214,7 @@ export async function craftItem (bot: Bot, signal: AbortSignal, item: string, co
     if (typeof got === 'string') return fail(got)
     table = got.table
     placed = got.placed
+    await dryFooting(bot, signal)
     await reachBlock(bot, table.position, signal)
   }
 
@@ -261,6 +272,9 @@ export async function smeltItem (bot: Bot, signal: AbortSignal, log: { debug: (m
   const input = findItem(bot, item)
   if (!input) return fail(`no ${item} to smelt`)
   count = Math.min(count, countItem(bot, item))
+  // the furnace window stays open for ~10 s an item: never with the bot afloat (and a furnace put
+  // down from the water goes on the rim of a flooded hole)
+  if (!await dryFooting(bot, signal)) return fail(`I'm in the water at ${fmtPos(bot.entity.position)} and can't get out; not smelting here`)
 
   let placed: Block['position'] | null = null
   let furnaceBlock = bot.findBlock({ matching: bot.registry.blocksByName.furnace.id, maxDistance: FURNACE_SEARCH })
@@ -272,8 +286,9 @@ export async function smeltItem (bot: Bot, signal: AbortSignal, log: { debug: (m
     furnaceBlock = put
     placed = furnaceBlock.position
   }
-  await reachBlock(bot, furnaceBlock.position, signal)
   const data = placed ? { placed: { x: placed.x, y: placed.y, z: placed.z } } : {}
+  await reachBlock(bot, furnaceBlock.position, signal)
+  if (inWater(bot)) return fail(`the only spot that reaches the furnace at ${fmtPos(furnaceBlock.position)} is in the water; not smelting there`, data)
 
   const furnace = await bot.openFurnace(furnaceBlock)
   try {

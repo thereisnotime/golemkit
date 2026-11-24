@@ -3,6 +3,7 @@ import type { ActionContext, ActionResult } from '../core/index.ts'
 import { defineSkill, defineAction, z, noParams, ok, fail, goals, goto, fmtPos, sleep, checkAborted, itemName } from '../core/index.ts'
 import { findItem, placeAt, digBlock, DigRefusedError } from './world.ts'
 import { air } from './air.ts'
+import { floodsIfDug } from './airPlan.ts'
 
 /** Cheap full blocks that don't fall, for pillars and emergency shelters. */
 const FILLER = /^(dirt|coarse_dirt|grass_block|rooted_dirt|mud|clay|cobblestone|cobbled_deepslate|mossy_cobblestone|netherrack|stone|deepslate|andesite|diorite|granite|calcite|tuff|blackstone|basalt|end_stone|sandstone|red_sandstone|terracotta|.*_terracotta|.*_planks|.*_log|snow_block)$/
@@ -296,6 +297,9 @@ const bunker = defineAction({
       const under = bot.blockAt(feet.offset(0, -2, 0))
       if (!below || below.boundingBox !== 'block' || below.name === 'bedrock' || below.hardness === null || below.hardness < 0) break
       if (!under || under.boundingBox !== 'block' || /water|lava/.test(under.name)) break // don't open into a cave or liquid
+      // nor beside water or ice: Pax's bunker by the frozen farm pond flooded and it drowned in it later
+      const flood = floodsIfDug(SIDES.map(([dx, dz]) => bot.blockAt(below.position.offset(dx, 0, dz))?.name))
+      if (flood) { log.debug(`bunker: stopped digging at ${fmtPos(below.position)}, ${flood}`); break }
       try {
         const tool = (bot.pathfinder as any).bestHarvestTool?.(below)
         if (tool) await bot.equip(tool, 'hand').catch(() => {})

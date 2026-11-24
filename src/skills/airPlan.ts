@@ -221,3 +221,138 @@ export function waterStepCost (above: (dy: number) => AirCell): number {
   }
   return submerged ? SUBMERGED_COST : 0
 }
+
+// ---- out of a flooded shaft ----
+// Pax drowned in its own bunker shaft by the farm after it had flooded: once it had air at the
+// surface it could not climb out (the rim too high to swim-jump onto) and the pathfinder sank it
+// again. `shaftExit` picks the next step from where the feet are: out (dry ground beside it), climb
+// onto a ledge level with the feet, raise the floor by placing blocks in the water under the feet
+// (up to the top water cell: the bot itself fills that one), pillar up (jump and place, dry feet
+// only), or dig the blocks out of the wall above a side block to make a step (no blocks, or still
+// in the top water cell). Repeated until out.
+
+export type ShaftStep =
+  | { act: 'out', why: string }
+  | { act: 'ledge', ledge: V, why: string }
+  | { act: 'fill', at: V, why: string }
+  | { act: 'pillar', why: string }
+  | { act: 'notch', dig: V[], ledge: V, why: string }
+  | { act: 'clear', dig: V, why: string }
+  | { act: 'none', why: string }
+
+export interface ShaftInputs {
+  /** The block the feet are in. */
+  feet: V
+  cell (p: V): AirCell
+  /** Has a block to place (dirt, cobblestone, planks). */
+  blocks: boolean
+  /** How far down to look for the floor when filling. Default 4. */
+  maxFill?: number
+}
+
+const free = (c: AirCell) => c.kind === 'air'
+const passable = (c: AirCell) => c.kind === 'air' || c.kind === 'water'
+
+/**
+ * Is the bot boxed in: the water it floats in (at the feet's level) is a pit of at most `max`
+ * cells with no dry way out at that level? An open lake is not: there it swims to land.
+ */
+export function boxedIn (feet: V, cell: (p: V) => AirCell, max = 4): boolean {
+  if (cell(feet).kind !== 'water') return false
+  const seen = new Set<string>([key(feet)])
+  const queue: V[] = [feet]
+  for (let i = 0; i < queue.length; i++) {
+    const p = queue[i]!
+    for (const [dx, dz] of SIDES) {
+      const q = add(p, dx, 0, dz)
+      if (seen.has(key(q))) continue
+      const c = cell(q)
+      if (c.kind === 'unknown') return false
+      if (c.kind === 'water') {
+        seen.add(key(q))
+        if (seen.size > max) return false
+        queue.push(q)
+      } else if (c.kind === 'air') {
+        return false // open beside the water: it can swim out there
+      }
+    }
+  }
+  return true
+}
+
+export function shaftExit (inp: ShaftInputs): ShaftStep {
+  const f = inp.feet
+  const c = inp.cell
+  const feetCell = c(f)
+  // out: dry feet, and a side it can walk onto (ground under it, room for the body)
+  if (feetCell.kind === 'air' && c(add(f, 0, -1, 0)).kind === 'solid') {
+    for (const [dx, dz] of SIDES) {
+      if (free(c(add(f, dx, 0, dz))) && free(c(add(f, dx, 1, dz))) && c(add(f, dx, -1, dz)).kind === 'solid') {
+        return { act: 'out', why: `out: dry ground at ${f.x + dx} ${f.y} ${f.z + dz}` }
+      }
+    }
+  }
+  // getting onto a ledge level with the feet lifts the head a block: room above the head first
+  const above = c(add(f, 0, 2, 0))
+  const roomUp = passable(above)
+  // a ledge level with the feet (or a step down): something to stand on with room for the body
+  for (const ly of [f.y, f.y - 1]) {
+    if (ly === f.y && !roomUp) continue
+    for (const [dx, dz] of SIDES) {
+      const g = c(add(f, dx, ly - f.y, dz))
+      if (g.kind !== 'solid') continue
+      if (free(c(add(f, dx, ly - f.y + 1, dz))) && free(c(add(f, dx, ly - f.y + 2, dz)))) {
+        return { act: 'ledge', ledge: add(f, dx, ly - f.y, dz), why: `a ledge at ${f.x + dx} ${ly} ${f.z + dz}` }
+      }
+    }
+  }
+  const below = c(add(f, 0, -1, 0))
+  const headroom = roomUp
+  // a block right above the head (a furnace on the rim, a slab): out of the way first
+  if (!roomUp) {
+    if (above.kind === 'solid' && above.breakable && c(add(f, 0, 3, 0)).kind !== 'water') return { act: 'clear', dig: add(f, 0, 2, 0), why: `${above.name ?? 'a block'} right above the head: dig it out of the way` }
+    return { act: 'none', why: `${above.name ?? 'a block'} right above the head and I can't break it` }
+  }
+  if (inp.blocks) {
+    // pillar from dry feet only: in water the jump never lifts the feet a block clear of their cell
+    if (below.kind === 'solid' && feetCell.kind === 'air' && headroom) return { act: 'pillar', why: 'the rim is too high: pillar up' }
+    if (passable(below)) {
+      // the floor under the water: fill the lowest free cell above it
+      const maxFill = inp.maxFill ?? 4
+      for (let d = 2; d <= maxFill + 1; d++) {
+        const p = add(f, 0, -d, 0)
+        const k = c(p)
+        if (k.kind === 'solid') return { act: 'fill', at: add(p, 0, 1, 0), why: `the rim is too high: raise the floor (a block at ${p.y + 1})` }
+        if (k.kind === 'unknown') break
+      }
+    }
+  }
+  // no blocks: dig a notch into the wall above a side block, the cheapest first
+  let best: { dig: V[], ledge: V, cost: number } | null = null
+  for (const [dx, dz] of SIDES) {
+    const g = add(f, dx, 0, dz)
+    if (c(g).kind !== 'solid') continue
+    const cells = [add(g, 0, 1, 0), add(g, 0, 2, 0)]
+    if (c(add(g, 0, 3, 0)).kind === 'water') continue // it would flood
+    let cost = 0
+    const dig: V[] = []
+    let ok = true
+    for (const p of cells) {
+      const k = c(p)
+      if (k.kind === 'air') continue
+      if (k.kind !== 'solid' || !k.breakable) { ok = false; break }
+      if (SIDES.some(([ax, az]) => c(add(p, ax, 0, az)).kind === 'water')) { ok = false; break }
+      dig.push(p)
+      cost += k.digMs ?? 1000
+    }
+    if (ok && dig.length && (!best || cost < best.cost)) best = { dig, ledge: g, cost }
+  }
+  if (best) return { act: 'notch', dig: best.dig, ledge: best.ledge, why: `the rim is too high and no blocks: dig a step into the wall at ${best.ledge.x} ${best.ledge.y + 1} ${best.ledge.z}` }
+  return { act: 'none', why: inp.blocks ? 'no floor to build on and no wall to dig a step into' : 'no blocks to build with and no wall to dig a step into' }
+}
+
+/** Water, ice or lava among the blocks beside a cell about to be dug: it would flood (bunkers). */
+export function floodsIfDug (sideNames: Array<string | undefined>): string | null {
+  const hit = sideNames.find(n => !!n && (/^(water|lava|bubble_column)$/.test(n) || isIce(n)))
+  return hit ? `${hit} beside it` : null
+}

@@ -4,7 +4,7 @@ import type { Bot } from 'mineflayer'
 import type { Agent } from '../core/index.ts'
 import {
   defineSkill, defineAction, z, noParams, ok, fail, goals, fmtPos, nearestHostile,
-  checkAborted, travel, swimUp
+  checkAborted, travel, swimUp, oxygen
 } from '../core/index.ts'
 import { gotoWithin as walkWithin, GotoTimeoutError } from './world.ts'
 import { prepareTripAction } from './trip.ts'
@@ -112,11 +112,17 @@ export function findStandable (bot: Bot, x: number, y: number, z: number, span =
   return null
 }
 
-function inWater (bot: Bot): boolean {
-  const p = bot.entity.position
-  if (bot.blockAt(p)?.name === 'water' || bot.blockAt(p.offset(0, 1, 0))?.name === 'water') return true
+/** In water from the blocks at the feet, the head and below, and whether it stands (pure, for tests). */
+export function inWaterAt (b: { feet?: string, head?: string, below?: string, onGround: boolean }): boolean {
+  if (b.feet === 'water' || b.head === 'water') return true
   // bobbing at the surface (a jump out of a hole in the ice): it sinks back once it stops swimming
-  return !bot.entity.onGround && bot.blockAt(p.offset(0, -1, 0))?.name === 'water'
+  return !b.onGround && b.below === 'water'
+}
+
+/** In water or bobbing on it (sinks once it stops swimming). */
+export function inWater (bot: Bot): boolean {
+  const p = bot.entity.position
+  return inWaterAt({ feet: bot.blockAt(p)?.name, head: bot.blockAt(p.offset(0, 1, 0))?.name, below: bot.blockAt(p.offset(0, -1, 0))?.name, onGround: !!bot.entity.onGround })
 }
 
 /**
@@ -132,7 +138,7 @@ export async function reachDryLand (bot: Bot, signal: AbortSignal): Promise<bool
       const spot = findStandable(bot, Math.floor(p.x) + dx, Math.floor(p.y), Math.floor(p.z) + dz, 6)
       if (!spot || bot.blockAt(at(bot, spot.x, spot.y, spot.z))?.name === 'water') continue
       // under water and short of air: up for a breath before the next try (the pathfinder walks lake beds)
-      if (((bot as { oxygenLevel?: number }).oxygenLevel ?? 20) < 12) await swimUp(bot, signal)
+      if (oxygen(bot) < 12) await swimUp(bot, signal)
       // the exact spot: within 1 of a spot on the ice is still in the hole
       await gotoWithin(bot, new goals.GoalBlock(spot.x, spot.y, spot.z), signal, 20000).catch(() => { checkAborted(signal); return false })
       if (!inWater(bot)) return true

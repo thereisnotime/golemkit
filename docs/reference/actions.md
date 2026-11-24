@@ -1314,13 +1314,13 @@ Hide from phantoms and other mobs: dig straight down 3 blocks, seal the hole abo
 
 ### `air`
 
-Get air when drowning: swim up, break ice or a roof above the head, or swim to the nearest opening, then get to dry land (used by reflexes).
+Get air when drowning: swim up, break ice or a roof above the head, or swim to the nearest opening, then get out of the water (climb a ledge, build or dig out of a shaft, or swim to dry land) (used by reflexes).
 
 *internal*
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `land` | boolean |  | `true` | swim to dry land afterwards |
+| `land` | boolean |  | `true` | get out of the water afterwards |
 
 ## woodcutting
 

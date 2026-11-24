@@ -20,7 +20,7 @@ import { holdStill, fidget } from './humanize.ts'
 import { inDanger } from './danger.ts'
 import { JournalCapture } from './journal-capture.ts'
 import { watchDeaths } from './deaths.ts'
-import { waterStepExclusion } from './air.ts'
+import { waterStepExclusion, trackOwnAir } from './air.ts'
 import { LIQUID_COST } from '../../skills/airPlan.ts'
 import './types.ts'
 
@@ -102,6 +102,8 @@ export class MinecraftJavaAdapter implements GameAdapter {
       }
     }
     this.platform.afterPlugins?.(bot, { ...ctx, settings: agent.settings })
+    // mineflayer copies every entity's air into bot.oxygenLevel; keep the bot's own (air.ts)
+    this.sessionCleanups.push(trackOwnAir(bot))
     bot.once('login', () => this.platform.onLogin?.(bot, { ...ctx, settings: agent.settings }))
 
     bot.once('spawn', () => {

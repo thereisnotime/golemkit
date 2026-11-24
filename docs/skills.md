@@ -102,7 +102,7 @@ See [Bodyguard](/guide/behaviors#bodyguard).
 | `pillar` | Emergency escape: jump and place blocks underneath, out of reach of mobs. |
 | `climb_out` | Get out of a pit, shaft or cave straight up to open sky; without blocks it carves steps into the wall. |
 | `bunker` *dig* | Hide from phantoms and other mobs: dig down 3 blocks, seal the hole, wait for morning or until no hostiles are near, then climb out. |
-| `air` | Get air when drowning: swim up, break ice or a roof above the head, or swim to the nearest opening, then get to dry land (internal, used by [reflexes](/concepts/world#air), `reflexes.air`). |
+| `air` | Get air when drowning: swim up, break ice or a roof above the head, or swim to the nearest opening, then get out of the water: climb a ledge, build or dig out of a shaft, or swim to dry land (internal, used by [reflexes](/concepts/world#air), `reflexes.air`). |
 
 ### inventory
 | action | |

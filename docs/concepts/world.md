@@ -590,9 +590,19 @@ reflexes:
 
 ### Air
 
-Every 250 ms the reflexes check the bot's air. With the eyes in water (or a bubble column) and the
+Every 250 ms the reflexes check the bot's air, whatever action runs (a furnace or crafting
+window open included). With the eyes in water (or a bubble column) and the
 air at or below `reflexes.airBelow` (default 10 of 20; 13 at 12 health or less, 16 at 6 or less,
-since drowning takes 2 health a second) they stop whatever runs and start `air`. On 23 Nov 2026
+since drowning takes 2 health a second) they stop whatever runs and start `air`.
+
+The air is the bot's own: mineflayer (4.39) copies the air of every entity whose metadata changes
+into `bot.oxygenLevel`, so a zombie dipping in and out of a pond near the bot was read as the
+bot's air. On 23 Nov 2026 that made the reflex fire at 2 of 20 instead of 10 while Pax smelted
+charcoal afloat in a flooded shaft by its farm, and `air` then read "got air" from the zombie and
+swam off with none; Pax drowned. `trackOwnAir` (`src/adapters/minecraft-java/air.ts`, installed
+for every session) keeps the bot's air from its own metadata packets only and puts
+`bot.oxygenLevel` back after every other entity's packet; `test/air-own.test.ts` loads
+mineflayer's real entities plugin and shows both the bug and the fix. On 23 Nov 2026
 Pax drowned in the frozen lake by its home: the eat reflex and `prepare_trip` (walking to its
 pantry) took turns while the air ran out, and the old swim-up only jumped straight up, which does
 nothing under ice.
@@ -613,12 +623,37 @@ nothing under ice.
 - **none** (sealed in, chunks not loaded): swim up anyway.
 
 Digging sideways into a wall doesn't help under water (the water flows into the hole), so the
-pocket is always dug upwards. It stops at 18 of 20 air (16 with the head out of water), then
-climbs onto a ledge right beside it (the edge of the hole in the ice: swimming into it with jump
-held gives the jump out of water, which the pathfinder doesn't plan), or else swims to dry land
-within 12 blocks, so the bot doesn't sink again; it goes back for air if it runs low on the way.
-A shaft whose rim is more than a block above the water can't be climbed that way; the bot then
-treads water there and the reflex starts again if the air runs low.
+pocket is always dug upwards. An open furnace or crafting table window is closed first. Every
+re-plan goes to the debug log of `<bot>/action/air` with its kind and target (`air 10/20 at 1099
+92 400: up to 1099 95 400: open water up to 95`). It stops at 18 of 20 air (16 with the head out
+of water); getting air always comes first, and whenever the air drops below 12 again on the way
+out it goes back up. Then it gets out of the water:
+
+- onto a ledge right beside it (the edge of the hole in the ice: swimming into it with jump
+  held gives the jump out of water, which the pathfinder doesn't plan);
+- out of a pit or shaft whose rim is too high for that (the surface water is 4 cells or less
+  with walls around it), one `shaftExit` step at a time (`airPlan.ts`): raise the floor by placing
+  dirt, cobblestone, planks or logs in the water under the feet, up to the top water cell (the
+  bot is in that one itself, and no jump in water lifts it clear to fill it), dig two blocks out
+  of the wall above a side block to make a step and climb into it, pillar up from dry feet, and
+  so on until it stands on dry ground beside it. Without blocks it digs steps all the way up.
+  Walls that are protected, unbreakable or have water behind them are not dug;
+- or else swims to dry land within 12 blocks, so the bot doesn't sink again.
+
+Smelting and crafting at a table get out of the water first (`dryFooting` in
+`skills/crafting.ts`): smelting keeps the furnace window open for about 10 s an item, and it
+refuses when the only spot that reaches the furnace is in the water. The flooded shaft Pax died
+in was its own bunker, dug next to the frozen farm pond; `bunker` now stops digging where water,
+ice or lava is beside the hole.
+
+Live test of the shaft: `node --env-file=.env scripts/air-shaft-test.ts <x> <z>
+[smelt,window,noblocks]` builds a 1x1 shaft in the air, 3 water with the rim 2 above it and a
+furnace on the rim, with a zombie drowning in a sealed pit next to it, and removes everything
+afterwards. On mc02 (24 Nov 2026): asked to smelt afloat, the bot refused; put at the bottom with
+the furnace window open, the reflex fired at 10 of 20 (the zombie's air no longer counted),
+closed the window, surfaced, filled two blocks under itself, dug a step into the wall, dug the
+furnace above it out of the way, pillared once and stood on the rim 14 s later (lowest air 9, no
+damage); with only a shovel and a pickaxe in dirt walls it dug its way out in 12 s.
 
 Live test: `node --env-file=.env scripts/air-test.ts <x> <z> [ice,roof]` builds a 4-deep tank in
 the air with an ice ceiling, then one with a stone roof and an opening 4 blocks to the side,

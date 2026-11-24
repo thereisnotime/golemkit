@@ -24,7 +24,57 @@ export function headInWater (bot: Bot): boolean {
   return eye.y < b.position.y + height
 }
 
-export const oxygen = (bot: Bot): number => (bot as { oxygenLevel?: number }).oxygenLevel ?? 20
+// ---- the bot's own air ----
+// mineflayer (4.39 entities.js) copies the air_supply of EVERY entity whose metadata changes into
+// bot.oxygenLevel, not just the bot's own. A mob dipping in and out of water near the bot (Pax's
+// farm at night) overwrote Pax's air: the reflex saw high air while Pax drowned and fired 8 points
+// late, and `air` read "got air" from someone else and swam off with none. trackOwnAir keeps the
+// bot's own value from its own metadata and puts it back after every entity_metadata packet.
+
+const ownAir = new WeakMap<Bot, number>()
+
+/** Air (0..20) in an entity_metadata packet for `myId`, or null (another entity, or no air in it). */
+export function ownAirFrom (packet: { entityId?: number, metadata?: Array<{ key: number, value: unknown }> }, myId: number | undefined, airKey: number): number | null {
+  if (myId === undefined || packet?.entityId !== myId || !Array.isArray(packet.metadata)) return null
+  const m = packet.metadata.find(x => x?.key === airKey)
+  return m && typeof m.value === 'number' ? Math.round(m.value / 15) : null
+}
+
+/** The metadata index of air_supply for players in this registry (1 since 1.9). */
+function airKeyOf (bot: Bot): number {
+  const keys = (bot.registry as { entitiesByName?: Record<string, { metadataKeys?: string[] }> } | undefined)?.entitiesByName?.player?.metadataKeys
+  const i = keys ? keys.indexOf('air_supply') : -1
+  return i >= 0 ? i : 1
+}
+
+/**
+ * Tracks the bot's own air and keeps bot.oxygenLevel honest (see above). Call once per session,
+ * after mineflayer's plugins are loaded (its listener runs first, this one fixes it up after).
+ */
+export function trackOwnAir (bot: Bot): () => void {
+  const client = (bot as unknown as { _client: { on: Function, off?: Function, removeListener?: Function } })._client
+  const key = airKeyOf(bot)
+  ownAir.delete(bot)
+  const onMeta = (packet: { entityId?: number, metadata?: Array<{ key: number, value: unknown }> }) => {
+    const mine = ownAirFrom(packet, bot.entity?.id, key)
+    if (mine !== null) ownAir.set(bot, mine)
+    // not sent yet: the server only sends air once it differs from full
+    ;(bot as { oxygenLevel?: number }).oxygenLevel = ownAir.get(bot) ?? 20
+  }
+  // a new life (or dimension) starts with full air, and the server says nothing until it drops
+  const onRespawn = () => { ownAir.delete(bot); (bot as { oxygenLevel?: number }).oxygenLevel = 20 }
+  client.on('entity_metadata', onMeta)
+  bot.on('respawn', onRespawn)
+  bot.on('death', onRespawn)
+  return () => {
+    ;(client.off ?? client.removeListener)?.call(client, 'entity_metadata', onMeta)
+    bot.off('respawn', onRespawn)
+    bot.off('death', onRespawn)
+  }
+}
+
+/** The bot's own air, 0..20 (trackOwnAir), else what mineflayer says. */
+export const oxygen = (bot: Bot): number => ownAir.get(bot) ?? (bot as { oxygenLevel?: number }).oxygenLevel ?? 20
 
 export interface AirOptions {
   /** May break blocks (agent.canDig). Default: the pathfinder's canDig. */
@@ -113,6 +163,8 @@ export interface AirResult {
 export async function getAir (bot: Bot, signal: AbortSignal, o: AirOptions = {}): Promise<AirResult> {
   try { bot.pathfinder.setGoal(null) } catch {}
   bot.clearControlStates()
+  // a furnace or crafting table left open (smelting when the air ran out): close it first
+  closeWindow(bot, o.log)
   const broke: string[] = []
   const did = new Set<string>()
   let last = ''
@@ -132,7 +184,8 @@ export async function getAir (bot: Bot, signal: AbortSignal, o: AirOptions = {})
         continue
       }
       const plan = planAir(bot, o)
-      if (plan.why !== last) { o.log?.(`air ${oxygen(bot)}/20: ${plan.act}: ${plan.why}`); last = plan.why }
+      const said = describePlan(plan)
+      if (said !== last) { o.log?.(`air ${oxygen(bot)}/20 at ${fmtV(bot.entity.position)}: ${said}`); last = said }
       if (plan.act === 'up' || plan.act === 'none') {
         did.add(plan.act === 'up' ? 'swam up' : 'swam up blind')
         bot.setControlState('jump', true)
@@ -187,6 +240,27 @@ export async function getAir (bot: Bot, signal: AbortSignal, o: AirOptions = {})
   parts.push(okNow ? 'got air' : `still short of air (${oxygen(bot)}/20)`)
   const where = roof ? (isIce(roof) ? 'under ice' : `under ${roof}`) : 'under water'
   return { ok: okNow, summary: `out of air ${where}: ${parts.join(', ')}`, broke }
+}
+
+const fmtV = (p: { x: number, y: number, z: number }) => `${Math.floor(p.x)} ${Math.floor(p.y)} ${Math.floor(p.z)}`
+
+/** The plan in one line for the debug log: kind, target and why. */
+export function describePlan (plan: AirPlan): string {
+  switch (plan.act) {
+    case 'up': return `up to ${fmtV(plan.to)}: ${plan.why}`
+    case 'break': return `break ${plan.name} at ${fmtV(plan.block)}: ${plan.why}`
+    case 'swim': return `swim to ${fmtV(plan.to)} via ${fmtV(plan.next)}: ${plan.why}`
+    default: return `none: ${plan.why}`
+  }
+}
+
+/** Closes an open container window (a furnace, a crafting table). True when one was open. */
+export function closeWindow (bot: Bot, log?: (msg: string) => void): boolean {
+  const w = bot.currentWindow
+  if (!w) return false
+  try { bot.closeWindow(w) } catch {}
+  log?.(`air: closed the ${(w as { type?: string }).type ?? 'open'} window first`)
+  return true
 }
 
 /** The first solid block within 6 above the head, if any (for the summary). */

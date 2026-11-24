@@ -88,7 +88,7 @@ With `combat.waterClutch` on and a water bucket, the bot SHALL place water just 
 - **THEN** it does not try the bucket
 
 ### Requirement: Air when drowning
-With `reflexes.air` on (default), when the bot's eyes are in water or a bubble column and its air is at or below `reflexes.airBelow` (default 10 of 20; 3 earlier at 12 health or less, 6 earlier at 6 or less), the reflexes SHALL stop the current action and start `air`, which takes the cheapest way to a breath, re-planned every tick: straight up when the water above is open; breaking ice or another breakable block within 4 blocks above the head (never in a protected area, never with `canDig` off); swimming to the nearest opening or air pocket within 8 blocks; swimming up when nothing else is found. It SHALL stop at 18 of 20 air, then swim to dry land within 12 blocks. The reflex referee SHALL let `air` take the body from any reflex, and SHALL let nothing but `water_bucket` take it from `air`. `travel`'s low-air stop SHALL use the same planner.
+With `reflexes.air` on (default), when the bot's eyes are in water or a bubble column and its air is at or below `reflexes.airBelow` (default 10 of 20; 3 earlier at 12 health or less, 6 earlier at 6 or less), the reflexes SHALL stop the current action and start `air`, which takes the cheapest way to a breath, re-planned every tick: straight up when the water above is open; breaking ice or another breakable block within 4 blocks above the head (never in a protected area, never with `canDig` off); swimming to the nearest opening or air pocket within 8 blocks; swimming up when nothing else is found. The check SHALL run on its own timer whatever action holds the body, an open furnace or crafting window included, and `air` SHALL close such a window first. The air SHALL be the bot's own (from its own entity metadata), never another entity's. It SHALL stop at 18 of 20 air, then get out of the water: onto a ledge beside it; out of a pit or shaft whose rim is too high (raise the floor with blocks, dig a step into the wall, pillar from dry feet, until on dry ground); else to dry land within 12 blocks; back up for air first whenever the air drops below 12 on the way. Every re-plan SHALL be logged at debug level with its kind and target. The reflex referee SHALL let `air` take the body from any reflex, and SHALL let nothing but `water_bucket` take it from `air`. `travel`'s low-air stop SHALL use the same planner.
 
 #### Scenario: Under ice
 - **WHEN** the bot is 3 blocks under a frozen lake with 10 of 20 air and no hole nearby
@@ -102,9 +102,28 @@ With `reflexes.air` on (default), when the bot's eyes are in water or a bubble c
 - **WHEN** the ice above is in a protected area
 - **THEN** it does not break it and swims to another opening
 
+#### Scenario: A mob's air
+- **WHEN** a zombie near the bot is drowning while the bot breathes
+- **THEN** the bot's air stays at 20 and the reflex does not start
+
+#### Scenario: Smelting when the air runs out
+- **WHEN** the bot sinks into a flooded shaft with a furnace window open and its air reaches 10
+- **THEN** the reflex starts `air`, which closes the window and swims up
+
+#### Scenario: Rim too high
+- **WHEN** the bot has its air back in a 1x1 shaft whose rim is 2 blocks above the water
+- **THEN** it fills the water under it with a block it carries, digs a step into the wall and climbs out onto the rim
+
 #### Scenario: Eating while drowning
 - **WHEN** the eat reflex wants the body while `air` runs
 - **THEN** it is held back until the air is back
+
+### Requirement: Dry footing for stations
+Smelting, and crafting at a crafting table, SHALL first get the bot out of the water. Smelting SHALL refuse when the bot can't get out or when the only spot that reaches the furnace is in the water. `bunker` SHALL NOT dig a cell with water, ice or lava beside it.
+
+#### Scenario: Asked to smelt while afloat
+- **WHEN** the bot floats in a flooded shaft it can't leave and is asked to smelt at a furnace on the rim
+- **THEN** it refuses ("I'm in the water ... not smelting here") instead of opening the furnace
 
 ### Requirement: Paths keep out of water
 The pathfinder movements used by `goto`, `travel`, `go_home` and the reach movements SHALL prefer a dry path: water costs 3 per block instead of 1, more with water above it, more again under a roof within 4 blocks, and much more (30) under ice.
