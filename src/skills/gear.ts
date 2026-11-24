@@ -83,3 +83,14 @@ export const gearUp = defineAction({
     return done.length ? ok(`equipped ${done.join(', ')} (${wornArmorPoints(bot)} armour points)`) : fail('could not equip anything')
   }
 })
+
+/** Items carried, worn and in the offhand, by name. */
+export function heldCounts (bot: Bot): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const i of bot.inventory?.items?.() ?? []) out[i.name] = (out[i.name] ?? 0) + i.count
+  for (const i of [...Object.values(SLOT_INDEX), OFFHAND]) {
+    const w = bot.inventory?.slots?.[i]
+    if (w) out[w.name] = (out[w.name] ?? 0) + w.count
+  }
+  return out
+}

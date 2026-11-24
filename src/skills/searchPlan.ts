@@ -499,14 +499,35 @@ export function isOwnChest (p: Pos, own: readonly Pos[], configured: readonly Po
 
 /** Positions from settings.storage.chests: [x, y, z] arrays, {x, y, z} objects or "x y z" strings. Junk is skipped. */
 export function parseChestList (v: unknown): Pos[] {
+  return parseChestRoles(v).map(({ x, y, z }) => ({ x, y, z }))
+}
+
+/** What a configured chest is for: pantry (food only), storage (anything), gear (tools, armour, beds, ingots). */
+export type ChestRole = 'pantry' | 'storage' | 'gear'
+export const CHEST_ROLES: readonly ChestRole[] = ['pantry', 'storage', 'gear']
+
+function chestPos (e: unknown): number[] | null {
+  if (typeof e === 'string') return e.trim().split(/[\s,]+/).map(Number)
+  if (Array.isArray(e)) return e.map(Number)
+  if (e && typeof e === 'object') return [Number((e as Pos).x), Number((e as Pos).y), Number((e as Pos).z)]
+  return null
+}
+
+/**
+ * settings.storage.chests with roles. Each entry is `[x, y, z]`, `"x y z"`, `{ x, y, z }` or
+ * `{ at: [x, y, z] | "x y z" | { x, y, z }, role: pantry | storage | gear }`. Without a role the
+ * first chest is the pantry and the others are storage. Bad entries are skipped. Pure.
+ */
+export function parseChestRoles (v: unknown): (Pos & { role: ChestRole })[] {
   if (!Array.isArray(v)) return []
-  const out: Pos[] = []
+  const out: (Pos & { role: ChestRole })[] = []
   for (const e of v) {
-    let p: number[] | null = null
-    if (typeof e === 'string') p = e.trim().split(/[\s,]+/).map(Number)
-    else if (Array.isArray(e)) p = e.map(Number)
-    else if (e && typeof e === 'object') p = [Number((e as Pos).x), Number((e as Pos).y), Number((e as Pos).z)]
-    if (p && p.length === 3 && p.every(Number.isFinite)) out.push({ x: Math.floor(p[0]!), y: Math.floor(p[1]!), z: Math.floor(p[2]!) })
+    const obj = e && typeof e === 'object' && !Array.isArray(e) ? e as { at?: unknown, role?: unknown } : null
+    const p = chestPos(obj && 'at' in obj ? obj.at : e)
+    if (!p || p.length !== 3 || !p.every(Number.isFinite)) continue
+    const given = typeof obj?.role === 'string' ? obj.role.toLowerCase() as ChestRole : null
+    const role: ChestRole = given && CHEST_ROLES.includes(given) ? given : out.length === 0 ? 'pantry' : 'storage'
+    out.push({ x: Math.floor(p[0]!), y: Math.floor(p[1]!), z: Math.floor(p[2]!), role })
   }
   return out
 }

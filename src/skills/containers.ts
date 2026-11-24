@@ -3,7 +3,13 @@ import type { Block } from 'prismarine-block'
 import type { Item } from 'prismarine-item'
 import { defineSkill, defineAction, z, ok, fail, goals, fmtPos, itemName, checkAborted, sleep, travel, type Agent, type ActionResult } from '../core/index.ts'
 import { vec, reachBlock, within, gotoWithin } from './world.ts'
-import { parseChestList } from './searchPlan.ts'
+import { parseChestList, parseChestRoles, type ChestRole } from './searchPlan.ts'
+import { isToolOrArmor, planDeposit, depositable, chestTakes, planChestSpot, type DepositChest, type DepositNeeds, type DepositPlan, type TakeChest } from './storagePlan.ts'
+import { craftItem } from './crafting.ts'
+import { ensurePlanks } from './toolkit.ts'
+import { placeAt, isReplaceable, isPlaceFace } from './world.ts'
+import type { CellAt } from './bedPlan.ts'
+import { inDangerZone } from './food-danger.ts'
 import { woodToTake, woodValue } from './treePlan.ts'
 import {
   ContainerBook, memorySettings, scopeKey, posKey, parseKey, freshness, observeContents, chestPartner, chestHalves,
@@ -15,11 +21,7 @@ const SEARCH = 32
 const SETTLE_MS = 150
 export const CONTAINER_RE = /^(chest|trapped_chest|barrel|.*shulker_box)$/
 
-const TOOL_RE = /(_pickaxe|_axe|_shovel|_hoe|_sword|_helmet|_chestplate|_leggings|_boots)$|^(shears|bow|crossbow|trident|shield|fishing_rod|flint_and_steel|mace|elytra|totem_of_undying)$/
-
-export function isToolOrArmor (name: string): boolean {
-  return TOOL_RE.test(name)
-}
+export { isToolOrArmor }
 
 /**
  * Which inventory items a deposit moves. item="all" moves everything except tools, armour,
@@ -119,9 +121,8 @@ function isFoodName (bot: Bot | null, name: string): boolean {
 /** "pantry at 559 69 -47", "my chest at ...", "chest at ...". */
 function labelOf (agent: Agent, bot: Bot | null, p: Pos, e: ContainerEntry): string {
   const alt = e.alt ? parseKey(e.alt) : null
-  const configured = configuredChests(agent).some(c => samePos(c, p) || (!!alt && samePos(c, alt)))
-  const food = Object.keys(e.contents ?? {}).some(n => isFoodName(bot, n))
-  const what = configured ? (food ? 'pantry' : 'storage chest') : ownChests(agent).some(c => samePos(c, p) || (!!alt && samePos(c, alt))) ? 'my chest' : e.block.replace(/_/g, ' ')
+  const configured = configuredChestRoles(agent).find(c => samePos(c, p) || (!!alt && samePos(c, alt)))
+  const what = configured ? (configured.role === 'pantry' ? 'pantry' : configured.role === 'gear' ? 'gear chest' : 'storage chest') : ownChests(agent).some(c => samePos(c, p) || (!!alt && samePos(c, alt))) ? 'my chest' : e.block.replace(/_/g, ' ')
   return `${what} at ${posKey(p)}`
 }
 
@@ -352,7 +353,7 @@ export function whereStored (agent: Agent, item: string, now = Date.now()): Wher
   return whereIs(b.list(scopeOf(agent, bot)), item, now, memoryOptions(agent).maxAgeHours * 3_600_000, from ? { x: from.x, y: from.y, z: from.z } : undefined)
 }
 
-function findContainer (bot: Bot, at?: { x?: number, y?: number, z?: number }, agent?: Agent): Block | string {
+function findContainer (bot: Bot, at?: { x?: number, y?: number, z?: number }, agent?: Agent, skip?: (b: Block) => boolean): Block | string {
   if (at && at.x !== undefined && at.y !== undefined && at.z !== undefined) {
     const b = bot.blockAt(vec(bot, at.x, at.y, at.z))
     if (!b) return `${at.x} ${at.y} ${at.z} is not loaded`
@@ -363,7 +364,12 @@ function findContainer (bot: Bot, at?: { x?: number, y?: number, z?: number }, a
     return b
   }
   const ids = Object.values(bot.registry.blocksByName).filter(b => CONTAINER_RE.test(b.name)).map(b => b.id)
-  return bot.findBlock({ matching: ids, maxDistance: SEARCH }) ?? `no chest or barrel within ${SEARCH} blocks`
+  if (!skip) return bot.findBlock({ matching: ids, maxDistance: SEARCH }) ?? `no chest or barrel within ${SEARCH} blocks`
+  const me = bot.entity.position
+  const found = bot.findBlocks({ matching: ids, maxDistance: SEARCH, count: 32 })
+    .sort((a, b) => a.distanceTo(me) - b.distanceTo(me))
+    .map(p => bot.blockAt(p)).find((b): b is Block => !!b && !skip(b))
+  return found ?? `no chest or barrel within ${SEARCH} blocks that takes these (the pantry only takes food)`
 }
 
 /**
@@ -401,6 +407,74 @@ export function ownChests (agent: Agent): Pos[] {
 export function configuredChests (agent: Agent): Pos[] {
   const s = (agent.settings as { storage?: { chests?: unknown } } | undefined)?.storage
   return parseChestList(s?.chests)
+}
+
+/** Chests listed in the profile with their role (the first is the pantry unless roles say otherwise). */
+export function configuredChestRoles (agent: Agent): (Pos & { role: ChestRole })[] {
+  const s = (agent.settings as { storage?: { chests?: unknown } } | undefined)?.storage
+  return parseChestRoles(s?.chests)
+}
+
+/** The role of one of its chests: configured ones by the profile, the ones it placed are storage. Null: not one of its chests. */
+export function chestRole (agent: Agent, p: Pos, alt?: Pos | null): ChestRole | null {
+  const c = configuredChestRoles(agent).find(c => samePos(c, p) || (!!alt && samePos(c, alt)))
+  if (c) return c.role
+  return ownChests(agent).some(c => samePos(c, p) || (!!alt && samePos(c, alt))) ? 'storage' : null
+}
+
+/** Remembers a chest it put down as its own storage. */
+export function addOwnChest (agent: Agent, p: Pos): void {
+  const st = (agent as AgentLike).storage
+  if (!st) return
+  const own = ownChests(agent)
+  if (own.some(c => samePos(c, p))) return
+  st.set(OWN_CHESTS_KEY, [...own, { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z) }].slice(-64))
+}
+
+/**
+ * Its own and configured chests within `radius` of home (or of the bot without a home), with
+ * what it last saw inside (null: never looked), for the take planners (storagePlan.chestTakes).
+ * Protected ones are left out; nearest to the bot first.
+ */
+export function chestView (agent: Agent, bot: Bot, radius = memoryOptions(agent).radius): TakeChest[] {
+  const center = homeOf(agent, bot) ?? bot.entity?.position
+  if (!center || !bot.entity) return []
+  const known = knownContainers(agent)
+  const me = bot.entity.position
+  return uniquePositions([...ownChests(agent), ...configuredChests(agent)])
+    .filter(p => Math.hypot(p.x - center.x, p.z - center.z) <= radius && !agent.protectedAreas?.isProtected?.(p as any) && !missingChest(bot, p))
+    .filter((p, i, a) => { const k = knownAt(known, p); return !k || a.findIndex(q => knownAt(known, q) === k) === i })
+    .map(p => { const k = knownAt(known, p); return { ...p, contents: k ? k.contents : null } })
+    .sort((a, b) => Math.hypot(a.x - me.x, a.z - me.z) - Math.hypot(b.x - me.x, b.z - me.z))
+}
+
+/** Sum of what its chests near home hold (chestView), and how many it never looked into. */
+export function chestTotals (chests: readonly TakeChest[]): { has: Record<string, number>, unknown: number } {
+  const has: Record<string, number> = {}
+  let unknown = 0
+  for (const c of chests) {
+    if (!c.contents) { unknown++; continue }
+    for (const [k, v] of Object.entries(c.contents)) has[k] = (has[k] ?? 0) + v
+  }
+  return { has, unknown }
+}
+
+/**
+ * Takes the items in `want` (name -> count) out of its own and configured chests within `range`
+ * of the bot, chests known to hold them first, then ones it never looked into; leaves `reserve`
+ * (name -> count) in each chest. Returns what it took.
+ */
+export async function takeItemsFromOwnChests (ctx: { bot: Bot, agent: Agent, signal: AbortSignal }, want: Record<string, number>, range = 64, reserve: Record<string, number> = {}, chests?: Pos[]): Promise<{ took: Record<string, number>, units: number, notes: string[] }> {
+  const total = Object.values(want).reduce((a, b) => a + b, 0)
+  if (total <= 0) return { took: {}, units: 0, notes: [] }
+  return takeFromOwnChests(ctx, total, range, n => (want[n] ?? 0) > 0 ? 1 : 0, (contents, _left, took) => {
+    const out: Record<string, number> = {}
+    for (const [k, n] of Object.entries(want)) {
+      const t = Math.min(n - (took[k] ?? 0), (contents[k] ?? 0) - (reserve[k] ?? 0))
+      if (t > 0) out[k] = t
+    }
+    return out
+  }, chests)
 }
 
 /**
@@ -441,7 +515,7 @@ export function foodToTake (contents: Record<string, number>, want: number, poin
  */
 async function takeFromOwnChests (
   ctx: { bot: Bot, agent: Agent, signal: AbortSignal }, want: number, range: number,
-  value: (name: string) => number, toTake: (contents: Record<string, number>, left: number) => Record<string, number>,
+  value: (name: string) => number, toTake: (contents: Record<string, number>, left: number, took: Record<string, number>) => Record<string, number>,
   chests?: Pos[]
 ): Promise<{ took: Record<string, number>, units: number, notes: string[] }> {
   const { bot, agent, signal } = ctx
@@ -481,7 +555,7 @@ async function takeFromOwnChests (
     try { win = await openAt(bot, b, signal) } catch (e) { checkAborted(signal); notes.push((e as Error).message); continue }
     try {
       const contents = opened(agent, bot, b, win.containerItems())
-      const plan = toTake(contents, want - units)
+      const plan = toTake(contents, want - units, took)
       for (const [name, n] of Object.entries(plan)) {
         checkAborted(signal)
         const item = win.containerItems().find(i => itemName(i) === name)
@@ -512,23 +586,39 @@ const isFoodFn = (bot: Bot) => {
   return (name: string) => !!foods[name]
 }
 
+/** A configured pantry chest (role pantry), by either half. */
+function isPantry (agent: Agent, block: Block): boolean {
+  const { key, alt } = halvesOf(block)
+  return chestRole(agent, key, alt) === 'pantry'
+}
+
 const deposit = defineAction({
   name: 'deposit',
-  description: 'Put items into the nearest chest/barrel (or the one at x y z). item="all" stores everything except tools, armour, food and anything in keep.',
+  description: 'Put items into the nearest chest/barrel (or the one at x y z). item="all" stores everything except tools, armour, food and anything in keep; ' +
+    '`items` stores exactly those counts. Without x y z it never picks the pantry (settings.storage.chests role pantry) for anything but food.',
   params: z.object({
     item: z.string().default('all').describe('item name, or "all"'),
     count: z.number().int().positive().optional().describe('how many; default all of them'),
     keep: z.array(z.string()).optional().describe('item names never to store'),
+    items: z.record(z.string(), z.number().int().positive()).optional().describe('exact items and counts to store, e.g. {"snowball": 16}; overrides item and count'),
     ...coords
   }),
   aliases: ['store'],
   async run ({ bot, agent, signal, log }, p): Promise<ActionResult> {
-    const items = selectDeposits(bot.inventory.items().map(i => ({ name: itemName(i), type: i.type, count: i.count })), {
-      item: p.item, keep: p.keep, isFood: isFoodFn(bot)
-    })
-    if (!items.length) return fail(p.item === 'all' ? 'nothing to store' : `no ${p.item}`)
-    const block = findContainer(bot, p, agent)
+    const held = bot.inventory.items().map(i => ({ name: itemName(i), type: i.type, count: i.count }))
+    let items = p.items
+      ? held.filter(i => (p.items![i.name] ?? 0) > 0)
+      : selectDeposits(held, { item: p.item, keep: p.keep, isFood: isFoodFn(bot) })
+    if (!items.length) return fail(p.items ? 'none of those items to store' : p.item === 'all' ? 'nothing to store' : `no ${p.item}`)
+    const isFood = isFoodFn(bot)
+    const allFood = items.every(i => isFood(i.name))
+    const block = findContainer(bot, p, agent, allFood ? undefined : b => isPantry(agent, b))
     if (typeof block === 'string') return fail(block)
+    // into the pantry (asked for by position): only the food
+    if (!allFood && isPantry(agent, block)) {
+      items = items.filter(i => isFood(i.name))
+      if (!items.length) return fail(`the ${block.name} at ${fmtPos(block.position)} is the pantry: food only`)
+    }
     const win = await openAt(bot, block, signal)
     const stored: Record<string, number> = {}
     let full = false
@@ -541,11 +631,12 @@ const deposit = defineAction({
         e.count += i.count
         byType.set(i.type, e)
       }
-      let left = p.count ?? Infinity
+      let left = p.items ? Infinity : p.count ?? Infinity
       for (const [type, e] of byType) {
         checkAborted(signal)
         if (left <= 0) break
-        const n = Math.min(e.count, left)
+        const n = Math.min(e.count, left, p.items ? p.items[e.name] ?? 0 : Infinity)
+        if (n <= 0) continue
         const before = win.containerCount(type, null)
         let err: Error | null = null
         try {
@@ -563,14 +654,115 @@ const deposit = defineAction({
           failed.push(e.name)
         }
       }
+      if (win.firstEmptyContainerSlot() === null) full = true
       remember(agent, bot, block, win.containerItems())
     } finally {
       win.close()
     }
     const what = fmtTally(stored)
     const skipped = failed.length ? `, couldn't move ${failed.join(', ')}` : ''
-    if (what === 'empty') return fail(full ? 'that container is full' : `stored nothing${skipped}`)
-    return ok(`stored ${what} in ${block.name} at ${fmtPos(block.position)}${full ? ' (it is full now)' : ''}${skipped}`, stored)
+    const at = { x: block.position.x, y: block.position.y, z: block.position.z }
+    if (what === 'empty') return fail(full ? 'that container is full' : `stored nothing${skipped}`, { full, at })
+    return ok(`stored ${what} in ${block.name} at ${fmtPos(block.position)}${full ? ' (it is full now)' : ''}${skipped}`, { ...stored, ...(full ? { full: true } : {}) })
+  }
+})
+
+// ------------------------------------------------------------------ storing at home
+
+/**
+ * Its own and configured chests within `radius` of home (or the bot), with role, what it saw
+ * inside and distance, for planDeposit. Others' chests are never in the list.
+ */
+export function depositChests (agent: Agent, bot: Bot, radius = memoryOptions(agent).radius): DepositChest[] {
+  const center = homeOf(agent, bot) ?? bot.entity?.position
+  if (!center || !bot.entity) return []
+  const known = knownContainers(agent)
+  const me = bot.entity.position
+  const own = ownChests(agent)
+  const cfg = configuredChestRoles(agent)
+  const all = [...cfg.map(c => ({ p: { x: c.x, y: c.y, z: c.z }, role: c.role, own: false })), ...own.map(p => ({ p, role: 'storage' as ChestRole, own: true }))]
+  const out: DepositChest[] = []
+  for (const c of all) {
+    if (Math.hypot(c.p.x - center.x, c.p.z - center.z) > radius || missingChest(bot, c.p)) continue
+    const k = knownAt(known, c.p)
+    // the same chest listed twice (configured and placed, or both halves): first one wins (configured)
+    if (out.some(o => samePos(o, c.p) || (!!k && knownAt(known, o) === k))) continue
+    out.push({
+      ...c.p, role: c.role, own: c.own, contents: k ? k.contents : null, ...(k?.alt ? { double: true } : {}),
+      ...(agent.protectedAreas?.isProtected?.(c.p as any) ? { protected: true } : {}),
+      distance: Math.hypot(c.p.x - me.x, c.p.y - me.y, c.p.z - me.z)
+    })
+  }
+  return out
+}
+
+/** Stack size of an item (64 when the registry doesn't know it). */
+function stackSizeFn (bot: Bot): (name: string) => number {
+  return (name: string) => (bot.registry.itemsByName as Record<string, { stackSize?: number }>)[name]?.stackSize ?? 64
+}
+
+/** What deposit_when_full does next: which chest takes what, or place a new chest. */
+export function homeDepositPlan (agent: Agent, bot: Bot, needs: Omit<DepositNeeds, 'isFood'>, o: { canPlace: boolean, radius?: number }): { plan: DepositPlan, items: Record<string, number> } {
+  const isFood = isFoodFn(bot)
+  const inv: Record<string, number> = {}
+  for (const i of bot.inventory.items()) inv[itemName(i)] = (inv[itemName(i)] ?? 0) + i.count
+  const items = depositable(inv, { ...needs, isFood })
+  const plan = planDeposit(items, depositChests(agent, bot, o.radius), { isFood, stackSize: stackSizeFn(bot), canPlace: o.canPlace && !!homeOf(agent, bot) })
+  return { plan, items }
+}
+
+/** Takes for a want list from its chests near home (storagePlan.chestTakes over chestView). */
+export function plannedTakes (agent: Agent, bot: Bot, want: Record<string, number>, reserve: Record<string, number> = {}, radius?: number): ReturnType<typeof chestTakes> {
+  return chestTakes(want, chestView(agent, bot, radius), reserve)
+}
+
+function cellReader (bot: Bot): CellAt {
+  return (x, y, z) => {
+    const b = bot.blockAt(vec(bot, x, y, z))
+    if (!b) return null
+    const liquid = /water|lava|bubble_column/.test(b.name)
+    return { name: b.name, solid: b.boundingBox === 'block' && isPlaceFace(b) && !liquid, free: isReplaceable(b.name) && !liquid }
+  }
+}
+
+const placeChest = defineAction({
+  name: 'place_chest',
+  capabilities: ['place', 'craft'],
+  description: 'Put down a new chest of its own near home (crafted from 8 planks when it has none): a free spot outside within `range` blocks of home, ' +
+    'off paths and farmland, not beside a door, another chest, the farm, or in a protected area; inside (the owner\'s room) only when nothing outside works. ' +
+    'Remembers it as its own storage chest.',
+  params: z.object({
+    range: z.number().int().min(2).max(16).default(6).describe('how far from home to look for a spot')
+  }),
+  async run ({ bot, agent, signal }, p): Promise<ActionResult> {
+    const home = homeOf(agent, bot)
+    if (!home) return fail('no home set (set_home): I put my chests by home')
+    if (Math.hypot(home.x - bot.entity.position.x, home.z - bot.entity.position.z) > 24) {
+      try { await travel(bot, home, signal, { range: 3 }) } catch (e) { checkAborted(signal); return fail(`couldn't get home: ${(e as Error).message}`) }
+    }
+    if (!bot.inventory.items().some(i => itemName(i) === 'chest')) {
+      await ensurePlanks(bot, signal, 8)
+      const r = await craftItem(bot, signal, 'chest', 1)
+      if (!r.ok) return fail(`no chest and couldn't craft one: ${r.message}`)
+    }
+    const farms = ((agent as AgentLike).storage?.get<{ x: number, z: number, size?: number }[]>('farms', []) ?? [])
+    const avoid = (q: Pos) => agent.protectedAreas.isProtected(q as any) || inDangerZone(agent, q) ||
+      farms.some(f => Math.max(Math.abs(q.x - f.x), Math.abs(q.z - f.z)) <= Math.ceil((f.size ?? 9) / 2) + 1)
+    const spot = planChestSpot(home, cellReader(bot), { range: p.range, avoid })
+    if (!spot) return fail(`no free spot for a chest within ${p.range} blocks of home (needs a floor, air above, away from doors, paths and other chests)`)
+    try {
+      await placeAt(bot, 'chest', vec(bot, spot.at.x, spot.at.y, spot.at.z), signal)
+    } catch (e) {
+      checkAborted(signal)
+      return fail(`couldn't place the chest at ${posKey(spot.at)}: ${(e as Error).message}`)
+    }
+    await sleep(300, signal)
+    const b = bot.blockAt(vec(bot, spot.at.x, spot.at.y, spot.at.z))
+    if (!b || !CONTAINER_RE.test(b.name)) return fail(`placing a chest at ${posKey(spot.at)} did nothing`)
+    addOwnChest(agent, spot.at)
+    noteSeen(agent, bot, b, 'placed by me')
+    book(agent)!.put(scopeOf(agent, bot), spot.at, { block: b.name, contents: {}, at: Date.now(), verifiedAt: Date.now() })
+    return ok(`placed a chest of my own at ${posKey(spot.at)}${spot.indoors ? ' (inside: nothing free outside)' : ''}`, spot.at)
   }
 })
 
@@ -688,6 +880,14 @@ export function storageDue (agent: Agent, bot: Bot, radius: number, now = Date.n
   return checkDue(chests, lookup, now, refreshMs, { x: me.x, y: me.y, z: me.z })
 }
 
+/** Not a container any more where the world is loaded and in view (a configured chest broken or never placed). */
+export function missingChest (bot: Bot, p: Pos): boolean {
+  try {
+    const b = bot.blockAt(vec(bot, p.x, p.y, p.z))
+    return !!b && !CONTAINER_RE.test(b.name)
+  } catch { return false }
+}
+
 function uniquePositions (list: Pos[]): Pos[] {
   return list.filter((p, i, a) => a.findIndex(q => q.x === p.x && q.y === p.y && q.z === p.z) === i)
 }
@@ -724,10 +924,15 @@ const checkChests = defineAction({
   params: z.object({
     radius: z.number().int().min(4).max(256).default(48).describe('chests within this many blocks of home'),
     max: z.number().int().min(1).max(8).default(3).describe('chests to look into this time'),
-    all: z.boolean().default(false).describe('also chests it looked into lately')
+    all: z.boolean().default(false).describe('also chests it looked into lately'),
+    x: z.number().int().optional().describe('look into just this one of its chests (with y and z)'),
+    y: z.number().int().optional(),
+    z: z.number().int().optional()
   }),
   async run ({ bot, agent, signal }, p): Promise<ActionResult> {
-    const due = storageDue(agent, bot, p.radius, Date.now(), p.all)
+    const one = p.x !== undefined && p.y !== undefined && p.z !== undefined ? { x: p.x, y: p.y, z: p.z } : null
+    if (one && !chestRole(agent, one)) return fail(`the chest at ${posKey(one)} is not one of mine`)
+    const due = one ? [one] : storageDue(agent, bot, p.radius, Date.now(), p.all)
     if (!due.length) {
       const low = pantryReport(agent, bot, p.radius)
       return ok(`every chest near home was checked lately${low ? `; ${low.text}` : ''}`, { checked: [], low })
@@ -802,7 +1007,7 @@ export const containers = () => defineSkill({
   name: 'containers',
   capabilities: ['move', 'containers'],
   description: 'Storing items in and taking them out of chests and barrels.',
-  actions: [deposit, withdraw, listContainer, checkChests, whereStoredAction],
+  actions: [deposit, withdraw, listContainer, checkChests, whereStoredAction, placeChest],
   setup: (agent, bot) => setupMemory(agent, bot as Bot),
   observe: (_agent, bot) => {
     const ids = Object.values(bot.registry.blocksByName).filter(b => CONTAINER_RE.test(b.name)).map(b => b.id)

@@ -9,6 +9,9 @@ import { isPlaceFace, vec } from '../../../skills/world.ts'
 import { resolveCenter, isDay, countWhere, dist, flatDist } from './util.ts'
 import { WOOD_NEED } from './tools.ts'
 import { DEFAULT_TREE_RINGS } from '../../../skills/treePlan.ts'
+import { depositable, ironStillNeeded } from '../../../skills/storagePlan.ts'
+import { homeDepositPlan, depositChests } from '../../../skills/containers.ts'
+import { heldCounts } from '../../../skills/gear.ts'
 
 // ------------------------------------------------------------------ collect_drops
 
@@ -50,8 +53,11 @@ export const depositWhenFull = defineBehavior({
   name: 'deposit_when_full',
   capabilities: ['move', 'containers'],
   category: 'work',
-  description: 'When the inventory is nearly full, walks to a chest (a remembered place, coordinates, or the nearest one), ' +
-    'stores everything except tools, armour, food and kept items, then walks back. Arm it for long gathering jobs.',
+  description: 'When the inventory is nearly full, stores what it does not need in its own chests near home, then walks back. ' +
+    'Keeps tools, armour, shields, the bed, food, seeds for its farm, iron and fuel while tools or armour are to make, and a small crafting stock. ' +
+    'The pantry (settings.storage.chests role pantry, the first one by default) only ever gets food; its own placed chests come first, then configured storage, ' +
+    'gear chests only take gear. When they are all full it puts down a new chest of its own near home (outside, off paths and doors). ' +
+    'With place or x y z it uses that chest instead.',
   options: z.object({
     threshold: z.number().min(0.3).max(1).default(0.85).describe('share of inventory slots used that counts as full'),
     place: z.string().optional().describe('remembered place where the chest is'),
@@ -59,32 +65,86 @@ export const depositWhenFull = defineBehavior({
     y: z.number().optional(),
     z: z.number().optional(),
     keep: z.array(z.string()).default([]).describe('items never to store'),
+    seeds: z.number().int().min(0).max(256).default(32).describe('seeds of each kind kept for its farm'),
+    armour: z.boolean().default(true).describe('keep iron while iron armour is still to make (as well as iron tools)'),
+    placeChest: z.boolean().default(true).describe('put down a new chest of its own near home when its chests are full'),
     returnBack: z.boolean().default(true).describe('walk back to where it was afterwards')
   }),
   requires: ['deposit'],
-  uses: ['goto_place', 'goto'],
+  uses: ['goto_place', 'goto', 'place_chest'],
   priority: 'npc',
   create (o, { agent }) {
+    const needs = (bot: Bot) => ({ keep: o.keep, seeds: o.seeds, iron: ironStillNeeded(heldCounts(bot), o.armour) })
+    const toStore = (bot: Bot) => {
+      const isFood = (n: string) => !!(bot.registry as any)?.foodsByName?.[n]
+      const inv: Record<string, number> = {}
+      for (const i of bot.inventory?.items?.() ?? []) inv[i.name] = (inv[i.name] ?? 0) + i.count
+      return depositable(inv, { ...needs(bot), isFood })
+    }
     return {
       cooldownMs: 30_000,
       failureCooldownMs: 60_000,
       maxFailureCooldownMs: 600_000,
-      score: ({ bb, current }) => bb.needs.inventoryFull >= o.threshold || (current === 'deposit_when_full') ? 45 : 0,
+      score: ({ bot, bb, current }) => {
+        if (current === 'deposit_when_full') return 45
+        return bb.needs.inventoryFull >= o.threshold && Object.keys(toStore(bot as Bot)).length ? 45 : 0
+      },
       async run (ctx) {
-        const start = ctx.bot.entity.position.floored()
+        const bot = ctx.bot as Bot
+        const start = bot.entity.position.floored()
+        const back = async () => {
+          if (o.returnBack && agent.getAction('goto') && dist(start, bot.entity.position) > 6) await ctx.act('goto', { x: start.x, y: start.y, z: start.z })
+        }
         const at = o.x !== undefined && o.y !== undefined && o.z !== undefined ? { x: o.x, y: o.y, z: o.z } : null
-        if (o.place) {
-          const r = await ctx.act('goto_place', { name: o.place })
-          if (!r.ok) return r
-        } else if (at && dist(at, ctx.bot.entity.position) > 24 && agent.getAction('goto')) {
-          const r = await ctx.act('goto', at)
-          if (!r.ok) return r
+        if (o.place || at) {
+          // the chest it was told to use
+          if (o.place) {
+            const r = await ctx.act('goto_place', { name: o.place })
+            if (!r.ok) return r
+          } else if (at && dist(at, bot.entity.position) > 24 && agent.getAction('goto')) {
+            const r = await ctx.act('goto', at)
+            if (!r.ok) return r
+          }
+          const items = toStore(bot)
+          if (!Object.keys(items).length) return { ok: true, message: 'nothing I can spare to store' }
+          const res = await ctx.act('deposit', { items, ...(at ?? {}) })
+          await back()
+          return res
         }
-        const res = await ctx.act('deposit', { item: 'all', ...(o.keep.length ? { keep: o.keep } : {}), ...(at ?? {}) })
-        if (o.returnBack && agent.getAction('goto') && dist(start, ctx.bot.entity.position) > 6) {
-          await ctx.act('goto', { x: start.x, y: start.y, z: start.z })
+        const done: string[] = []
+        let last: { ok: boolean, message: string } | null = null
+        const canPlace = o.placeChest && agent.settings.canPlace !== false && !!agent.getAction('place_chest')
+        for (let i = 0; i < 4; i++) {
+          const { plan } = homeDepositPlan(agent, bot, needs(bot), { canPlace })
+          if (plan.do === 'nothing') {
+            if (i === 0 && !depositChests(agent, bot).length) {
+              // no chests of its own and no home to put one by: the nearest chest (never the pantry for non-food)
+              const items = toStore(bot)
+              if (Object.keys(items).length) last = await ctx.act('deposit', { items })
+            } else if (!done.length) last = { ok: false, message: plan.why }
+            break
+          }
+          if (plan.do === 'place') {
+            agent.log.info(`deposit_when_full: ${plan.why}, putting down a new chest`)
+            const r = await ctx.act('place_chest', {})
+            if (!r.ok) { last = { ok: false, message: `${plan.why}; ${r.message}` }; break }
+            done.push(r.message)
+            continue
+          }
+          if (dist(plan.at, bot.entity.position) > 24 && agent.getAction('goto')) {
+            const r = await ctx.act('goto', { ...plan.at })
+            if (!r.ok) { last = r; break }
+          }
+          const r = await ctx.act('deposit', { items: plan.items, ...plan.at })
+          last = r
+          if (r.ok) done.push(r.message)
+          // full or partly stored: plan again with what the chest really holds now
+          if (!Object.keys(toStore(bot)).length) break
+          if (!r.ok && !(r.data as { full?: boolean } | undefined)?.full) break
         }
-        return res
+        await back()
+        if (done.length) return { ok: true, message: done.join('; ') }
+        return last ?? { ok: false, message: 'nothing stored' }
       }
     }
   }
