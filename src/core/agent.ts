@@ -578,9 +578,10 @@ export class Agent extends TypedEmitter<AgentEvents> {
    * Records that the server refused a block break here (spawn protection, a claim). The
    * pathfinder stops planning digs in that area and re-plans right away.
    */
-  markProtected (pos: { x: number, y: number, z: number }, opts: { confirmed?: boolean } = {}): void {
+  markProtected (pos: { x: number, y: number, z: number }, opts: { confirmed?: boolean, crop?: boolean } = {}): void {
     if (!this.protectedAreas.add(pos, opts)) {
-      this.log.debug('break refused once here (lag or protection), watching for a second refusal', { at: fmtPos(pos) })
+      if (opts.crop) this.log.debug('crop or plant break rolled back (lag), not a protected area', { at: fmtPos(pos) })
+      else this.log.debug('break refused once here (lag or protection), watching for a second refusal', { at: fmtPos(pos) })
       return
     }
     this.emit('protectedArea', pos)
