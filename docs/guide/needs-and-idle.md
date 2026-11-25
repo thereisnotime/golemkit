@@ -213,3 +213,13 @@ one is `src/adapters/minecraft-java/needs/`; the pure parts are `planNeeds` and 
 farm remembered under the start, which on the ice scenario is frozen over; the result line has the
 site events (`sites`), the searches (`searches`), the chores that ran (`choresRun`) and the farms it
 knows at the end (`farmsAtEnd`). See [Survival benchmark](./behaviors#survival-benchmark-just-survival-bench).
+
+First run (2026-11-25, `--scenario ice --bad-farm --kit stone --minutes 15`, tag `needs-ice`): on
+the first check farm:1 was marked flooded ("55 of 80 cells are ice") and dropped. A new farm
+never got started: the snowy beach has no water that doesn't freeze and the bot had no bucket,
+so after 3 tries over 15 minutes the help desk whispered the owner "Water near home would help".
+The gear search started with no iron in sight and turned back on daylight (25 s left, 17 blocks
+from home). Chores that ran: top_up_wood, scout_nearby. The bot then spent five minutes in the air
+reflex in the frozen lake and died four times at night (creepers, zombies) with stone tools and no
+shelter. That makes the ice start a hard case for the air reflex and for night safety, separate from
+this layer.
