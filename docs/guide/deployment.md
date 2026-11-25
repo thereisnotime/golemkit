@@ -92,11 +92,14 @@ view-distance 10) over an hour by its home:
 | the embeddings intent layer (`intents.layers` with `use: embeddings`) | about 110 MB more RSS from the first chat line it classifies (ONNX model, native memory) |
 | an LLM turn with `claude-subscription` | a Claude Code child process for the turn, 220 MB just to start, more with a long context; it exits after the turn |
 
+The last two were measured on their own: Pax had nobody to talk to during the hour, so it never
+loaded the model or ran a turn. `GOLEM_MEMLOG` shows both (`other` and `kids`) when they happen.
+
 The process does not grow without bound in normal play; the peaks are LLM turns, because each
 one runs a Claude Code process next to the bot. Ways to lower it:
 
-- `settings.world.viewDistance` (live toggle `world.viewDistance`): `short` (8) keeps about 290
-  columns instead of 450, `tiny` (6) about 170 (roughly 90 KB each). The bot then sees trees,
+- `settings.world.viewDistance` (live toggle `world.viewDistance`): `short` (8) keeps about 310
+  columns instead of 450 (measured with Pax), `tiny` (6) about 170 (roughly 90 KB each). The bot then sees trees,
   food and mobs less far; searches beyond the loaded area need a trip either way.
 - Leave the embeddings layer out of `intents.layers` when patterns and the LLM are enough.
 - An API provider (`anthropic`, `openai`) instead of a CLI provider runs no child process.
