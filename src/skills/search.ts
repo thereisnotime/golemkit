@@ -19,6 +19,7 @@ import { craftItem, smeltItem } from './crafting.ts'
 import { gatherMaterials, plankFuel } from './materials.ts'
 import { fellTree } from './woodcutting.ts'
 import { mineStone } from './mining.ts'
+import { miningSettings } from './minePlan.ts'
 import { upgradeTools } from './progression.ts'
 import { toolTier, bestToolIn } from './toolkit.ts'
 import { CROPS, isMature, plantOn } from './farming.ts'
@@ -261,6 +262,8 @@ export function lookFor (agent: Agent, bot: Bot, t: ResolvedTarget, radius: numb
   }
   const matching = ids(bot, t.blocks)
   if (!matching.length) return null
+  const safeDepth = miningSettings((agent.settings as { mining?: unknown } | undefined)?.mining).safeDepth
+  const shallow = (p: { x: number, y: number, z: number }) => { const sy = surfaceY(bot, p.x, p.z); return sy === null || sy - p.y <= safeDepth }
   // logs well under the surface are a mineshaft or a buried structure, not a tree
   const logs = t.fetch === 'chop'
   const found = bot.findBlocks({
@@ -269,8 +272,8 @@ export function lookFor (agent: Agent, bot: Bot, t: ResolvedTarget, radius: numb
     count: 64,
     ...(t.ripe ? { useExtraInfo: (b: Block) => isMature(b.name, (b.getProperties() as Record<string, unknown>).age) && cropAllowed(agent, bot, floorPos(b.position)) } : {})
   }).filter(p => { if (!logs) return true; const sy = surfaceY(bot, p.x, p.z); return sy === null || sy - p.y <= 12 })
-    // ores with exposed: only blocks with an open face (a cave wall, a cliff), not ore buried in rock
-    .filter(p => !(o.exposed && t.ore) || OPEN_FACES.some(([dx, dy, dz]) => /^(air|cave_air|water)$/.test(bot.blockAt(p.offset(dx!, dy!, dz!))?.name ?? '')))
+    // ores with exposed: only blocks with an open face (a cliff, a shallow cave) within mining.safeDepth of the surface, ore it can mine without going deep
+    .filter(p => !(o.exposed && t.ore) || (OPEN_FACES.some(([dx, dy, dz]) => /^(air|cave_air|water)$/.test(bot.blockAt(p.offset(dx!, dy!, dz!))?.name ?? '')) && shallow(p)))
   if (!found.length) return null
   // prefer one outside protected areas (it can be fetched), but report the nearest either way
   const free = found.find(p => !agent.protectedAreas?.isProtected(p))
@@ -763,7 +766,7 @@ const findTarget = defineAction({
     go: z.boolean().default(false).describe('walk there and stay, instead of coming back to report'),
     prospect: z.boolean().default(false).describe('ores: strip mine for it when none is in sight (always on with bring)'),
     at_night: z.boolean().default(false).describe('also scout at night (dangerous)'),
-    exposed: z.boolean().default(false).describe('ores: only count ore with an open face (a cave wall, a cliff), not ore buried in rock')
+    exposed: z.boolean().default(false).describe('ores: only count ore with an open face (a cliff, a shallow cave) within mining.safeDepth of the surface, not ore buried in rock or deep in a cave')
   }),
   longRunning: true,
   async run (ctx, p): Promise<ActionResult> {

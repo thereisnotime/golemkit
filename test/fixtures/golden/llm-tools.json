@@ -1668,7 +1668,7 @@
           },
           "exposed": {
             "default": false,
-            "description": "ores: only count ore with an open face (a cave wall, a cliff), not ore buried in rock",
+            "description": "ores: only count ore with an open face (a cliff, a shallow cave) within mining.safeDepth of the surface, not ore buried in rock or deep in a cave",
             "type": "boolean"
           }
         },
@@ -5165,7 +5165,7 @@
           },
           "exposed": {
             "default": false,
-            "description": "ores: only count ore with an open face (a cave wall, a cliff), not ore buried in rock",
+            "description": "ores: only count ore with an open face (a cliff, a shallow cave) within mining.safeDepth of the surface, not ore buried in rock or deep in a cave",
             "type": "boolean"
           }
         },

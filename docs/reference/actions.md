@@ -1163,7 +1163,7 @@ Find something and report where it is: blocks and families (iron, diamonds, coal
 | `go` | boolean |  | `false` | walk there and stay, instead of coming back to report |
 | `prospect` | boolean |  | `false` | ores: strip mine for it when none is in sight (always on with bring) |
 | `at_night` | boolean |  | `false` | also scout at night (dangerous) |
-| `exposed` | boolean |  | `false` | ores: only count ore with an open face (a cave wall, a cliff), not ore buried in rock |
+| `exposed` | boolean |  | `false` | ores: only count ore with an open face (a cliff, a shallow cave) within mining.safeDepth of the surface, not ore buried in rock or deep in a cave |
 
 ### `bring_item`
 

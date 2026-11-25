@@ -83,7 +83,8 @@ scores above 15, it is day, the bot has a stone pickaxe or better and digging is
    food or daylight runs short;
 2. `find_target iron exposed=true go=true` within `needs.search.radius` (160) blocks and
    `minutes` (6): what it sees, then `found:iron` from memory, then a spiral scout on the surface
-   that skips protected areas, danger zones and water. Only ore with an open face counts;
+   that skips protected areas, danger zones and water. Only ore with an open face within
+   `mining.safeDepth` (8) of the surface counts (a cliff, a shallow cave), so it is ore it may mine;
 3. `upgrade_tools` at the find, under the [safe-mining](./progression#safe-mining) rules (deeper
    than `mining.safeDepth` only when ready), with the air reflex and climb-out as always;
 4. `go_home`.
