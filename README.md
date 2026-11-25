@@ -66,6 +66,9 @@ behind an adapter interface, so the core, brains and intents don't depend on Min
   creative builds by hand or by command, road and stair planning, optional WorldEdit.
 - **Stay configurable.** Variants, saved profiles, armable behaviours, live toggles
   (`!config_set`) that change behaviour without a restart, fleets of bots in one process.
+- **Say what it's doing.** `just status Pax` or `!status` ("why are you idle?") shows what it
+  is doing and why, how long since it last got anywhere, health and the last failure; a bot
+  stuck for 10 minutes whispers its owner what it is trying and why it can't.
 - **Keep a record.** A journal of deaths (with the real cause), items, actions, help asks and
   LLM token usage, with daily rollups, analysis scripts and live benchmarks (guard, PvP,
   survival).
@@ -111,6 +114,7 @@ behind an adapter interface, so the core, brains and intents don't depend on Min
 | Trips (`settings.trips`, `prepare_trip`, turn back on food or daylight) | ✅ | seen in the survival benchmark; [trips](docs/guide/behaviors.md#trips) |
 | Asking the owners for help (`askHelp`) | ✅ | [asking for help](docs/guide/behaviors.md#asking-for-help) |
 | Going back for its own drops after a death (`recover_drops`, `recover_items`) | ✅ | live test in [behaviours](docs/guide/behaviors.md#death-drops-recover_drops) |
+| Status snapshot (`just status`, `!status`, `status.json`) and stuck alerts (`settings.status`) | 🧪 | unit tested, no live run recorded yet; [status](docs/guide/status.md) |
 | Death cause reports for hooks and the LLM | ✅ | causes show up in the survival benchmark; [journal](docs/guide/journal.md#what-is-recorded) |
 | Container memory (`settings.inventoryMemory`, `check_storage`, `where_stored`) | ✅ | live run in [search](docs/guide/search.md#container-memory) |
 | Air reflex: gets air when drowning (breaks ice above, swims to an opening, climbs out of flooded shafts), paths kept out from under ice | ✅ | live tests in [world](docs/concepts/world.md#air) |
@@ -199,7 +203,7 @@ Guides worth starting with:
 - [Tool progression](docs/guide/progression.md): tools, mining, what to do when digging gives nothing
 - [Live config](docs/guide/live-config.md) and [profiles](docs/guide/profiles.md)
 - [NPC brain](docs/guide/npc-brain.md), [self-improving NPCs](docs/guide/self-improver.md), [scenes](docs/guide/scenes.md)
-- [Context packs](docs/guide/context-pack.md) and the [journal](docs/guide/journal.md)
+- [Context packs](docs/guide/context-pack.md), the [journal](docs/guide/journal.md) and [status and stuck alerts](docs/guide/status.md)
 - Concepts: [architecture](docs/concepts/architecture.md), [world, movement and combat](docs/concepts/world.md), [combat research](docs/concepts/combat-research.md)
 - [What is game-specific](docs/concepts/scope.md): which code is game-agnostic, Minecraft-specific or NeoForge-specific, and the [game adapters](docs/concepts/adapters.md) that keep them apart
 - Reference: [skills](docs/skills.md) and the generated [action reference](docs/reference/actions.md)
@@ -213,7 +217,7 @@ Positional args follow the parameter order, `key=value` works too (`!follow dist
 `!guard [player]` `!protect [player]` `!attack` `!defend` `!retreat [distance]` `!hunt [animal] [count]`
 `!gear_up` `!eat` `!sleep` `!wake` `!pillar [height]` `!climb_out` `!bunker` `!inventory`
 `!drop [item|all] [count]` `!equip <item>` `!collect <block> [count]` `!feed_player [player]`
-`!last_death` `!goto_death` `!recall_events` `!history [period]` `!pos` `!hp` `!say <text>`
+`!last_death` `!goto_death` `!recall_events` `!history [period]` `!pos` `!hp` `!status` `!say <text>`
 `!look_at [player]` `!look_around` `!jump` `!config_list` `!config_get <key>`
 `!config_set <key> <value>` `!config_reset [key]`
 `!pvp [mode]` `!attack_player <player>` `!spare_player <player>` `!hunt_player <player>` `!pvp_list`
