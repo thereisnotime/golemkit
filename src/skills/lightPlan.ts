@@ -38,6 +38,8 @@ export interface LightCell extends Pos {
   spawnable: boolean
   /** Block in the cell (air, short_grass, wheat...). */
   block: string
+  /** Snow layers in the cell when `block` is snow (1 is replaced by a torch placed there). */
+  layers?: number
   /** Block under it. */
   floor: string
   /** The floor's top can hold a torch (full sturdy block, nothing that opens a GUI). */
@@ -64,12 +66,18 @@ export interface TorchSpot extends Pos {
 const NO_TORCH_FLOOR = /^(farmland|dirt_path|soul_sand|soul_soil|mud)$|leaves$/
 const FREE_CELL = /^(air|cave_air)$/
 
+/** One layer of snow: a torch goes in its place. */
+export function thinSnow (c: Pick<LightCell, 'block' | 'layers'>): boolean {
+  return c.block === 'snow' && (c.layers ?? 1) <= 1
+}
+
 /** Why no torch can go in this cell, or null when one can (floor first, else on the wall). */
 export function torchSpotProblem (c: LightCell): string | null {
   if (c.offLimits) return 'off limits'
   if (c.water) return 'water'
   if (c.removed) return 'a torch there was taken away'
-  if (!FREE_CELL.test(c.block)) return `${c.block} is there`
+  // a single snow layer is replaced by whatever is placed into it, a torch too (SnowLayerBlock.canBeReplaced)
+  if (!FREE_CELL.test(c.block) && !thinSnow(c)) return `${c.block} is there`
   if (c.floor === 'farmland') return 'farmland'
   if (c.floor === 'dirt_path') return 'a path'
   if (c.nearDoor) return 'in front of a door'

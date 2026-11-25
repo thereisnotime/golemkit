@@ -20,7 +20,7 @@ import { inventoryCounts } from './toolkit.ts'
 import { spawnOf, getFarms, type Farm } from './food.ts'
 import { getHome, getPlaces, sameDimension } from './navigation.ts'
 import {
-  planTorches, placingOrder, torchSupplyStep, surfaceCells, spotProblems, LIGHT_LEVELS, LIT_STATE,
+  planTorches, placingOrder, torchSupplyStep, surfaceCells, spotProblems, thinSnow, LIGHT_LEVELS, LIT_STATE,
   type LightCell, type LightSource, type Pos, type TorchSpot, type TorchPlan
 } from './lightPlan.ts'
 
@@ -178,6 +178,7 @@ export function surveyLight (bot: Bot, agent: Agent, centre: Pos, radius: number
             sky,
             spawnable: floorFull && !(below as any).transparent && !NO_SPAWN_FLOOR.test(below.name),
             block: here.name,
+            ...(here.name === 'snow' ? { layers: Number((here.getProperties?.() as { layers?: number | string } | undefined)?.layers ?? 1) } : {}),
             floor: below.name,
             floorTorch: floorFull && isPlaceFace(below),
             wall,
@@ -216,7 +217,7 @@ async function placeTorch (bot: Bot, spot: TorchSpot, signal: AbortSignal): Prom
   const target = bot.blockAt(pos)
   if (!target) return 'not loaded'
   if (isTorchBlock(target.name)) return null
-  if (!/^(air|cave_air)$/.test(target.name)) return `${target.name} is there now`
+  if (!/^(air|cave_air)$/.test(target.name) && !thinSnow({ block: target.name, layers: Number((target.getProperties?.() as { layers?: number | string } | undefined)?.layers ?? 1) })) return `${target.name} is there now`
   const ref = bot.blockAt(vec(bot, spot.against.x, spot.against.y, spot.against.z))
   if (!isPlaceFace(ref)) return 'the block to put it on is gone'
   if (!within(bot, pos, REACH - 0.3)) {

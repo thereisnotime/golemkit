@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   planTorches, torchSpotProblem, torchFor, estimateLight, torchSupplyStep, plankFor, lightCheckDue, placingOrder, manhattan,
-  surfaceCells, spotProblems,
+  surfaceCells, spotProblems, thinSnow,
   type LightCell, type LightSource
 } from '../src/skills/lightPlan.ts'
 
@@ -295,4 +295,13 @@ test('approachPoint: a farm is approached on the ring side facing the bot, not a
   assert.deepEqual(approachPoint(farm, { x: 560, z: -46 }), { x: 561, y: 63, z: -26 })
   assert.deepEqual(approachPoint(farm, { x: 600, z: -18 }), { x: 567, y: 63, z: -20 })
   assert.deepEqual(approachPoint({ ...farm, farmSize: undefined }, { x: 0, z: 0 }), { x: 561, y: 63, z: -20 })
+})
+
+test('torchSpotProblem: one snow layer takes a torch (it is replaced), deeper snow does not', () => {
+  const c = { x: 0, y: 64, z: 0, light: 0, spawnable: true, floor: 'grass_block', floorTorch: true }
+  assert.equal(torchSpotProblem({ ...c, block: 'snow', layers: 1 }), null)
+  assert.equal(torchSpotProblem({ ...c, block: 'snow' }), null, 'no layer count: one')
+  assert.equal(torchSpotProblem({ ...c, block: 'snow', layers: 3 }), 'snow is there')
+  assert.equal(thinSnow({ block: 'snow', layers: 1 }), true)
+  assert.equal(thinSnow({ block: 'air' }), false)
 })
