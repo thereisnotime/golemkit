@@ -1,5 +1,10 @@
 set dotenv-load := false
 
+# Node's compile cache keeps the type-stripped source between runs, so a bot start doesn't load
+# the TypeScript stripper (a wasm module, about 25 MB per process). NODE_COMPILE_CACHE= (empty)
+# or NODE_DISABLE_COMPILE_CACHE=1 turns it off. docs/guide/deployment.md#memory
+export NODE_COMPILE_CACHE := env("NODE_COMPILE_CACHE", justfile_directory() / "node_modules/.cache/node-compile")
+
 # Show available recipes
 [group('help')]
 default:
