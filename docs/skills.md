@@ -66,7 +66,7 @@ Non-exclusive actions (marked *ne*) run alongside whatever holds the body. Actio
 | `defend` | Fight back at the closest hostile (internal, used by reflexes). |
 | `hunt` | Hunt passive animals for food and pick up the drops. Never pets, named, tamed, leashed or baby animals, villagers or players, never in protected areas; fenced animals only with `pens=true`. `keepAtLeast` spares the last N adults of each kind. With `reach` (default on) it bridges, pillars or digs to an animal it can't walk to, never in protected areas or danger zones. |
 | `gear_up` *ne* | Wear the best armour in the inventory and put a totem of undying or a shield in the offhand (the reflexes run it when there is an upgrade, `combat.autoArmor`). |
-| `ranged_defense` | Answer mobs that shoot at the bot: shoot back, shield up and close in, take cover (or build some) and eat there, or back out of range, by health, gear and numbers (internal, used by reflexes and `stay_safe`). |
+| `ranged_defense` | Answer mobs that shoot at the bot: shoot back, shield up and close in, take cover (or build some, or dig in) and eat there, or back out of range, by health, gear and numbers (internal, used by reflexes and `stay_safe`). |
 | `water_bucket` | Land a long fall in water placed just before the ground, or put out fire, then scoop the water back up (internal, `combat.waterClutch`). |
 | `defend_player` | Fight back against a player who attacked the bot or the player it guards, with `combat.pvp` anything but `off`; never owners or `combat.friends` (internal). |
 | `pvp` *ne* | PvP mode (owners only): `off` (also the kill switch: ends every fight and hunt), `defend`, `revenge`, `targets`, `all`; no mode shows the status. |

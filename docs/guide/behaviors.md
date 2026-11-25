@@ -238,25 +238,39 @@ pillagers, witches, blazes, ghasts, drowned with tridents); the details are unde
   iron sword at full health (72.5) take on 4 pillagers but hide from 5, and hide from 4 once down to
   14 health; with a bow and arrows they take on more.
 - **Hiding** means walking behind a block within 8 blocks; with none there, **building cover**: a
-  1x2 wall of dirt, cobblestone, planks or whatever filler block it carries between itself and the
-  shooters (or a 1-2 block pillar with a wall on it, when that is quicker), if it may place blocks
-  and the cells aren't protected. It says so in the log (`ranged: building cover at ...`). Only
-  then cover up to 14 blocks out, and only then backing off, at most 24 blocks from where the
-  shooting started. At that cap it stands its ground with a bow, shield or weapon (at 8 health or less it keeps
-  going, up to 16 blocks more).
+  1x2 wall between itself and the shooters (or a 1-2 block pillar with a wall on it, when that is
+  quicker), if it may place blocks and the cells aren't protected. It builds with cobblestone or
+  dirt before logs and planks. Snow layers, grass and ferns are cells it places into, never blocks
+  it places against; snow 2+ layers deep only takes a block once dug out, so it digs that first
+  when digging is allowed. Before placing it stops, waits to stand still on the ground (it may
+  still be sliding from a sprint, on ice, or knocked back by a bolt) and plans the wall again from
+  there; a wall that fails says why in the log (`ranged: placed 0 of 2 blocks, giving up on
+  building here (could not place under itself: ...)`). With digging allowed (`canDig`) it can also
+  **dig in**: take the block under its feet out and stand in the hole, with a block or two toward
+  the shooters around it, so arrows from the side hit the ground. Never ice, ores, base blocks or a
+  protected floor, never over a drop, lava or water, and not with water or lava beside the hole.
+  Only then cover up to 14 blocks out, and only then backing off, at most 24 blocks from where the
+  shooting started, towards home when home lies roughly away from the shooters. At that cap it
+  stands its ground with a bow, shield or weapon (at 8 health or less it keeps going, up to 16
+  blocks more).
 - **Heavy fire** (outnumbered with too little gear, or 8 health or less) changes the order:
-  every second in sight is a hit from each shooter, so walking far to a cover spot or building a
-  wall in the open loses. Cover counts only when it can be reached before about one hit lands (5
-  blocks against 3 shooters, 8 against 2, at 0.3 hits per shooter per second and 5 blocks a
-  second), and a wall only when it can be finished as fast (2 blocks against 3 shooters). Failing
-  both it gets out of sight: it sprints away, up to 48 blocks from where the shooting started
-  instead of 24, towards home when home lies roughly away from the shooters, and with a shield it
-  blocks an arrow on the way when hurt or when at most 2 shoot. The log says so (`retreat (3
-  shooting at me, gear 24 of 65 needed; heavy fire, getting out of sight (cover 9 blocks off is
-  too slow))`). A slow cover or wall is only the fallback when it can't back off any further. A
-  cover spot where it gets hit anyway (a flank, arrows over the top) is left at once and not used
-  again. Pax died this way on 23 Nov 2026: food 12, stone sword, no armour, three skeletons, it
-  walked to cover and held it for 12 s while being shot.
+  every second in sight is a hit from each shooter (0.3 hits per shooter per second, 5 blocks a
+  second walking, 0.45 s per wall block, 0.6 s per pillar block, the dig time plus 0.35 s for
+  digging in). It takes whichever of cover, a wall where it stands or digging in leaves it the
+  shortest time in the open, as long as that is under 3 expected hits; against 3 pillagers a
+  2-block wall here (about 0.8 hits) beats cover 7 blocks off (1.3) or 15 blocks off (2.7). Only
+  when nothing is that quick does it get out of sight: it sprints away, up to 48 blocks from where
+  the shooting started instead of 24, towards home when home lies roughly away from the shooters,
+  and with a shield it blocks an arrow on the way when hurt or when at most 2 shoot. The log says
+  which (`build (3 shooting at me, gear 24 of 65 needed; heavy fire, building here (cover 15
+  blocks off is too slow))`). A cover spot where it gets hit anyway (a flank, arrows over the top)
+  is left at once and not used again. Pax died twice this way: on 23 Nov 2026 it walked to cover
+  and held it for 12 s while being shot by three skeletons, and on 25 Nov 2026 against three
+  pillagers in the snow its pillar wall failed and it flapped between "cover 7 blocks off is too
+  slow" and "cover 15 blocks off is too slow" retreats until it was shot.
+- It keeps a way of hiding for at least `commitSeconds` (2) before switching to another while it
+  still works, and logs a change of plan once rather than every pass. `ranged_defense` takes
+  `build` (on), `digIn` (on, still needs `canDig`) and `commitSeconds`.
 - Behind cover it eats; it never stands in the open eating while something shoots at it. It leaves
   cover as soon as the shooters are gone or, at 16+ health, nothing shoots at it, and stays at most
   4 s when healthy, 8 s at 12+ and 15 s below. After a fight that went badly it hides 3 s at full

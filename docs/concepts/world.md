@@ -430,17 +430,19 @@ flowchart TB
   CV -- yes --> CO["walk behind the block,<br/>eat there, fight what walks up"]
   CV -- no --> BL{"blocks to place<br/>and a wall that fits?"}
   BL -- yes --> W["build a 1x2 wall<br/>(or pillar + wall),<br/>hide behind it"]
-  BL -- no --> CF{"cover within 14?"}
+  BL -- no --> DI{"may dig, and a safe<br/>floor to dig out?"}
+  DI -- yes --> D["dig in: stand in a<br/>1-block hole, a block<br/>toward the shooters"]
+  DI -- no --> CF{"cover within 14?"}
   CF -- yes --> CO
-  CF -- no --> R["back off, straight away,<br/>at most 24 blocks from<br/>where it started"]
+  CF -- no --> R["back off, towards home<br/>when that is away from them,<br/>at most 24 blocks from<br/>where it started"]
   classDef a fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef d fill:#fef3c7,stroke:#d97706,color:#78350f
   classDef g fill:#dcfce7,stroke:#16a34a,color:#14532d
   classDef r fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
   class A a
-  class L,O,B,SH,CH,CV,BL,CF d
+  class L,O,B,SH,CH,CV,BL,DI,CF d
   class S,C,Z g
-  class H,CO,W,R r
+  class H,CO,W,D,R r
 ```
 
 - **Gear score** (`gearScore`, 0-100): armour points (35 for a full 20), a shield (20), the best
@@ -455,8 +457,8 @@ flowchart TB
   distance, with a penalty for walking towards them or ending within 4 blocks of one. If a
   shooter comes round and sees it again it looks for new cover; one walking up within 4 blocks
   is fought there.
-- **Building cover** (`planWall`): with no cover within 8, a filler block in the inventory (dirt,
-  cobblestone, planks, logs, stone...) and block placing allowed (`settings.canPlace`), it places a
+- **Building cover** (`planWall`): with no cover within 8, a filler block in the inventory
+  (cobblestone and dirt first, then stone, planks, logs...; `pickCoverBlock`) and block placing allowed (`settings.canPlace`), it places a
   wall where it stands: the cells around it that block the head and chest lines to every shooter,
   picked greedily (the cell that blocks most open lines first), each with something solid to place
   against (the block below goes in first). Against one shooter on flat ground that is 2 blocks, a
@@ -464,8 +466,10 @@ flowchart TB
   pillars up 1-2 blocks and walls from there, if that's cheaper (a pillar block counts double).
   Cells its body overlaps and cells in protected areas are never used, and the plan is capped at 6
   blocks (or what it carries). It logs `ranged: building cover at x y z: 2 cobblestone against the
-  skeleton`. A wall that turns out not to cover it (seen right away) or that couldn't be placed
-  isn't tried again for 10 s. The blocks stay where they are afterwards.
+  skeleton`. It first waits to stand still on the ground and plans again from there. Snow layers and
+  grass are cells it fills, never faces it places against (`coverCell`; deeper snow is dug out
+  first). A wall that turns out not to cover it (seen right away) or that couldn't be placed
+  isn't tried again for 10 s, and the log says why it couldn't. The blocks stay where they are afterwards.
 - **Hiding time**: behind cover it leaves as soon as every shooter is gone, or at 16+ health with
   nothing shooting at it, and at the latest after 4 s (health 16+), 8 s (12+) or 15 s (below).
   After a fight that went badly (it stopped to heal, got outnumbered or gave up) it hides for 3 s
@@ -477,13 +481,15 @@ flowchart TB
   those, or at 8 health or less, it may go 16 blocks further. Before backing off at all it looks for cover up to 14 blocks
   out, so cover wins over distance.
 - **Heavy fire** (`heavyFire`: outnumbered for its gear score, or 8 health or less) changes the
-  order in the chart: every second in sight is a hit from each shooter, so cover only counts when
-  it is quick to reach (`quickCover`) and a wall only when it is quick to build (`quickWall`),
-  both at about one expected hit. Otherwise it gets out of sight, up to 48 blocks (`FLEE_CAP`)
-  from where the shooting started, towards home when home lies roughly away from the shooters,
-  blocking an arrow with a shield on the way when it has one. A slow cover or wall is the
-  fallback only when it can't back off any further. The numbers and the benchmark are under
-  [Ranged safety](../guide/behaviors#ranged-safety).
+  order in the chart: every second in sight is a hit from each shooter, so it takes whichever of
+  cover, a wall where it stands or digging in (`digInRefusal`, `digInSeconds`) leaves it the
+  shortest time in the open (`exposureHits`), as long as that is under 3 expected hits
+  (`SLOW_HITS`). Only when nothing is that quick does it get out of sight, up to 48 blocks
+  (`FLEE_CAP`) from where the shooting started, towards home when home lies roughly away from the
+  shooters, blocking an arrow with a shield on the way when it has one. The slowest way of hiding
+  is the fallback when it can't back off any further. A choice is kept at least 2 s while it still
+  works (`holdDecision`), so it doesn't flap between backing off and a cover spot. The numbers and
+  the benchmark are under [Ranged safety](../guide/behaviors#ranged-safety).
 - **Danger zones** (`core/danger.ts`): every shooter it deals with is remembered where it was seen,
   with a radius of its range + 8 (24 for a skeleton), for 5 minutes after the last sighting; a
   patrol of 3+ is remembered at its middle with a radius of 32 for 10 minutes. Killing the only

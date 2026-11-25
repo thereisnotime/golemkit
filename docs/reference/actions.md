@@ -287,7 +287,9 @@ Deal with mobs shooting at the bot (skeletons, strays, bogged, pillagers, witche
 | param | type | required | default | description |
 |---|---|---|---|---|
 | `cover` | boolean |  | `false` | hide or back off instead of fighting, whatever the gear |
-| `build` | boolean |  | `true` | on open ground, place a few blocks (dirt, cobblestone, planks) for cover when there is none to walk to |
+| `build` | boolean |  | `true` | on open ground, place a few blocks (cobblestone, dirt, planks) for cover when there is none to walk to |
+| `digIn` | boolean |  | `true` | when digging is allowed, dig the block under its feet and stand in the hole (plus a block or two toward the shooters) when that is the quickest way out of sight |
+| `commitSeconds` | number (0..10) |  | `2` | keep a way of hiding (cover, wall, digging in, backing off) at least this long before switching to another, so it does not flap between them |
 | `maxSeconds` | number (5..120) |  | `45` | give up after this long |
 
 ### `water_bucket`
