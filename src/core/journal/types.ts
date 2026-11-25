@@ -15,6 +15,8 @@ export const JOURNAL_TYPES = [
   'container_changed', 'container_gone',
   /** A behaviour asked the owners for help, or it works again (settings.askHelp). */
   'help',
+  /** A place it depends on (farm, bed, chest, home) went bad or is fine again (site health). */
+  'site',
   /** Written by the journal itself when a type hit its per-minute cap. */
   'journal_dropped'
 ] as const

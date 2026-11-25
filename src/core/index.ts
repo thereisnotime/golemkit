@@ -52,3 +52,12 @@ export {
   beginTrip, activeTrip, endTrip, checkTrip, rethrowTurnBack, TripTurnBackError,
   type TripSettings, type TripKind, type TripKit, type TripPrep, type TripSample, type TripStart, type Trip
 } from './trip.ts'
+export {
+  NEED_NAMES, IDLE_MODES, SEARCH_DEFAULTS, IDLE_DEFAULTS, SITES_DEFAULTS, needsSettings, idleSettings, sitesSettings,
+  NeedsSettingsSchema, IdleSettingsSchema, SitesSettingsSchema,
+  type IdleMode, type NeedsSettings, type NeedSetting, type IdleSettings, type ChoreSetting, type SitesSettings, type SearchSettings
+} from './needs.ts'
+export {
+  SiteBook, siteBook, noteSiteCheck, recheckDue, checkDue, siteText, siteLabel, HARD_FAULTS,
+  type SiteFault, type SitePos, type SiteRef, type SiteVerdict, type SiteRecord, type SiteChange
+} from './sites.ts'

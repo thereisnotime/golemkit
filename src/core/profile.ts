@@ -19,6 +19,7 @@ import { LoggingSchema } from './fleetFile.ts'
 import { createLogger } from './log.ts'
 import { TOGGLES } from './toggles.ts'
 import { unknownKeys } from './schemaKeys.ts'
+import { NeedsSettingsSchema, IdleSettingsSchema, SitesSettingsSchema, IDLE_MODES } from './needs.ts'
 
 export const LlmProfileSchema = z.object({
   provider: z.string().optional().describe('claude-subscription | codex | anthropic | opencode | openai'),
@@ -101,6 +102,16 @@ export const ProfileSchema = z.object({
     stuckAlertMs: z.number().int().min(60_000).max(86_400_000).optional().describe('no progress for this long while it wants to do something = stuck, in ms (default 600000)'),
     alertMaxMs: z.number().int().min(60_000).max(7 * 86_400_000).optional().describe('largest gap between repeat alerts in ms (default 7200000)')
   }).strict()]).optional(),
+  /**
+   * Needs layer (docs/guide/needs-and-idle.md): standing drives (safety, food, gear, supplies, rest)
+   * that boost the behaviours serving them and go looking when nothing in sight can meet them.
+   * false turns it off. Lands in settings.needs.
+   */
+  needs: z.union([z.literal(false), NeedsSettingsSchema]).optional().describe('needs: boosts for urgent needs and bounded searches; false = off'),
+  /** What it does when nothing else scores: a mode name, or { mode, radius, exploreRadius, exploreMinutes, chores }. Lands in settings.idle. */
+  idle: z.union([z.enum(IDLE_MODES), IdleSettingsSchema]).optional().describe('idle mode: off | passive | idle | active | explore, or options'),
+  /** Site health: check the farm, bed, chests and home it depends on; mark, replace or report bad ones. false turns it off. Lands in settings.sites. */
+  sites: z.union([z.literal(false), SitesSettingsSchema]).optional().describe('site health checks; false = off'),
   persona: z.string().optional(),
   server: z.object({
     host: z.string().optional(),
@@ -279,6 +290,9 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (profile.journal !== undefined) settings.journal = profile.journal === false ? false : { ...(settings.journal as object | undefined), ...profile.journal }
   if (profile.retry) settings.retry = { ...(settings.retry as object | undefined), ...profile.retry }
   if (profile.behaviors) settings.behaviors = { ...(settings.behaviors as object | undefined), ...profile.behaviors }
+  if (profile.needs !== undefined) settings.needs = profile.needs === false ? { enabled: false } : { ...(settings.needs as object | undefined), ...profile.needs }
+  if (profile.idle !== undefined) settings.idle = typeof profile.idle === 'string' ? { ...(settings.idle as object | undefined), mode: profile.idle } : { ...(settings.idle as object | undefined), ...profile.idle }
+  if (profile.sites !== undefined) settings.sites = profile.sites === false ? { enabled: false } : { ...(settings.sites as object | undefined), ...profile.sites }
   if (profile.building) settings.building = profile.building
   if (profile.worldedit !== undefined) settings.worldedit = { ...(settings.worldedit as object | undefined), ...(typeof profile.worldedit === 'boolean' ? { enabled: profile.worldedit } : profile.worldedit) }
   if (profile.blueprints) {

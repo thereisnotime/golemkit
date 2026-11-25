@@ -57,6 +57,7 @@ export function fmtEvent (e: JournalEvent, now = Date.now()): string {
     case 'help': body = d.status === 'sorted'
       ? `${d.behavior} works again (asked for help ${d.minutes ?? '?'}m before)`
       : `asked ${(d.to ?? []).join(', ') || 'nobody'} for help with ${d.behavior}: ${cut(d.reason, 70)}${d.help ? `; needs ${cut(d.help, 60)}` : ''}`; break
+    case 'site': body = d.status === 'ok' ? `${d.kind} ${d.id} is fine again${at}` : `${d.kind} ${d.id} went bad${at}: ${cut(d.reason ?? d.fault, 80)}`; break
     case 'journal_dropped': body = `(${d.count} ${d.type} events not recorded, over the per-minute cap)`; break
     case 'rollup': body = `day summary ${d.date}: ${d.text}`; break
     default: body = `${e.type} ${cut(JSON.stringify(d), 80)}`
