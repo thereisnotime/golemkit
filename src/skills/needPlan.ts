@@ -87,15 +87,19 @@ export type FarmSiteCell = 'farmland' | 'tillable' | 'water' | 'ice' | 'other'
  * farmland and nothing it could till. Otherwise ok, also with nothing ripe (a growing farm
  * has no work and is fine).
  */
-export function farmSiteVerdict (cells: Record<string, FarmSiteCell>): SiteVerdict {
-  const entries = Object.entries(cells).filter(([k]) => k !== '0,0')
+export function farmSiteVerdict (cells: Record<string, FarmSiteCell>, land?: readonly string[]): SiteVerdict {
+  const centreIce = cells['0,0'] === 'ice'
+  // a shore farm: only the cells that were land when it was made count (the lake side was
+  // always water, which used to mark every shore farm flooded on its first check)
+  const keys = land?.length ? new Set(land.filter(k => k !== '0,0' && k in cells)) : null
+  const entries = Object.entries(cells).filter(([k]) => k !== '0,0' && (!keys || keys.has(k)))
   const n = entries.length
   if (!n) return { ok: false, fault: 'gone', reason: 'no ground where the farm was' }
   const wet = entries.filter(([, v]) => v === 'water' || v === 'ice').length
   const ice = entries.filter(([, v]) => v === 'ice').length
   const farmland = entries.filter(([, v]) => v === 'farmland').length
   const tillable = entries.filter(([, v]) => v === 'tillable').length
-  const centreIce = cells['0,0'] === 'ice'
+  if (keys && centreIce) return { ok: false, fault: 'flooded', reason: `the water froze (${farmland} farmland left dry)` }
   if (wet * 2 >= n || (centreIce && wet * 4 >= n)) {
     return { ok: false, fault: 'flooded', reason: `${wet} of ${n} cells are ${ice ? (ice === wet ? 'ice' : 'water or ice') : 'water'}${centreIce ? ', the water froze' : ''}` }
   }

@@ -21,6 +21,7 @@ import { planFarmWork, farmWorkCount, oddSize, type FarmCell, type FarmGrid, typ
 import { inDangerZone, wayThroughDanger } from './food-danger.ts'
 import { takeItemsFromOwnChests, chestView, chestTotals } from './containers.ts'
 import { nearBadSite, nextFarmName, FREEZE_TEMPERATURE } from './needPlan.ts'
+import { planColdWater, waterFreezes, coverItem, sideCell, iceSourceOk, farmingSettings, type FarmingSettings, type IceCandidate } from './coldFarmPlan.ts'
 import { siteBook } from '../core/sites.ts'
 import {
   seedStopReason, seedLimits, scoutWaypoints, scoutStopReason, nextWaypoint, sectorsText, compass, sectorOf, mergeSpot, markSpotEmpty, rankSpots, dryWaypoint,
@@ -41,6 +42,12 @@ export interface Farm extends Pos {
   created: number
   /** Last time it was harvested or checked (epoch ms). */
   tended?: number
+  /** Cells ("dx,dz" from the water) that were land when it was made: site health judges only these. */
+  land?: string[]
+  /** Where its water came from: a lake or pond, ice it broke, or a bucket. */
+  water?: 'natural' | 'ice' | 'bucket'
+  /** What keeps its water from freezing in a cold biome. */
+  keptOpen?: 'cover' | 'torch'
 }
 
 /** agent.storage when there is one (unit-test fakes may have none). */
@@ -557,15 +564,18 @@ const PLANTS = /^(short_grass|grass|tall_grass|fern|large_fern|dandelion|poppy|.
 const BUILD = /(_planks|cobblestone|stone_bricks|bricks|glass|_fence|_wall|door|torch|lantern|_bed$|chest|barrel|crafting_table|furnace|_slab|_stairs|wool|carpet|concrete|terracotta|rail|ladder|sign|hay_block|composter|bell|scaffolding|farmland)/
 /** Near a plot these rule it out: lava burns, ice means the water freezes there. */
 const HAZARD = /^(lava|ice|packed_ice|blue_ice|frosted_ice|powder_snow|magma_block|fire)$/
+const ICE = /^(ice|packed_ice|blue_ice|frosted_ice)$/
 const FENCES = /^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|bamboo|crimson|warped)_fence$/
 
 /** What a plot cell is (ground at y, the block above at y+1). */
-function cellKind (agent: Agent, bot: Bot, x: number, y: number, z: number, clearance: number): CellKind {
+function cellKind (agent: Agent, bot: Bot, x: number, y: number, z: number, clearance: number, iceAsWater = false): CellKind {
   if (offLimits(agent, bot, { x, y, z }, clearance)) return 'protected'
   const g = bot.blockAt(vec(bot, x, y, z))
   const a = bot.blockAt(vec(bot, x, y + 1, z))
   if (!g || !a) return 'other'
   if (g.name === 'water') return 'water'
+  // a frozen shore: the lake side is water under the ice (it hydrates once one block is open)
+  if (iceAsWater && ICE.test(g.name)) return 'water'
   if (g.name === 'farmland') return 'farmland'
   if (BUILD.test(g.name) || BUILD.test(a.name)) return 'build'
   if (TILLABLE.includes(g.name) && (a.name === 'air' || PLANTS.test(a.name))) return 'tillable'
@@ -594,10 +604,10 @@ function freezes (bot: Bot, p: { x: number, y: number, z: number }): boolean {
 }
 
 /** A candidate plot around a water block: plot cells plus a 3-block ring checked for builds/fields. */
-export function siteAt (agent: Agent, bot: Bot, water: Vec3, size: number, from: { x: number, z: number }, clearance: number): SiteCandidate {
+export function siteAt (agent: Agent, bot: Bot, water: Vec3, size: number, from: { x: number, z: number }, clearance: number, o: { iceAsWater?: boolean } = {}): SiteCandidate {
   const h = (size - 1) / 2
   const cells: Record<string, CellKind> = {}
-  for (let dx = -h; dx <= h; dx++) for (let dz = -h; dz <= h; dz++) cells[`${dx},${dz}`] = cellKind(agent, bot, water.x + dx, water.y, water.z + dz, clearance)
+  for (let dx = -h; dx <= h; dx++) for (let dz = -h; dz <= h; dz++) cells[`${dx},${dz}`] = cellKind(agent, bot, water.x + dx, water.y, water.z + dz, clearance, !!o.iceAsWater)
   // crops need light: a cell under a roof (little sky light) stays dark at night and mobs spawn on it.
   // Only when the chunk has light data at all (some servers send none: everything reads 0).
   const sky: Record<string, number> = {}
@@ -619,7 +629,7 @@ export function siteAt (agent: Agent, bot: Bot, water: Vec3, size: number, from:
       for (let dy = -1; dy <= 2; dy++) {
         const b = bot.blockAt(vec(bot, water.x + dx, water.y + dy, water.z + dz))
         if (b && BUILD.test(b.name)) { around.push(b.name === 'farmland' ? 'farmland' : 'build'); break }
-        if (b && HAZARD.test(b.name)) { around.push('hazard'); break }
+        if (b && HAZARD.test(b.name) && !(o.iceAsWater && ICE.test(b.name))) { around.push('hazard'); break }
       }
     }
   }
@@ -829,6 +839,137 @@ async function tillAt (bot: Bot, pos: Vec3, signal: AbortSignal): Promise<boolea
 
 const canPlace = (agent: Agent) => (agent.settings as { canPlace?: boolean } | undefined)?.canPlace !== false
 
+// ------------------------------------------------------------------ water in the cold (coldFarmPlan.ts)
+
+/** Ice at the surface near a point (open above, with land next to it at the same height), nearest first. */
+export function shoreIce (bot: Bot, center: Vec3, radius: number, count = 96): IceCandidate[] {
+  const ids = ['ice', 'packed_ice', 'blue_ice'].map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
+  if (!ids.length || typeof bot.findBlocks !== 'function') return []
+  const land = (p: Vec3) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => {
+    const n = bot.blockAt(p.offset(dx!, 0, dz!))
+    return !!n && TILLABLE.includes(n.name)
+  })
+  const out: IceCandidate[] = []
+  for (const p of bot.findBlocks({ point: center, matching: ids, maxDistance: radius, count: count * 4 })) {
+    if (!land(p)) continue
+    const above = bot.blockAt(p.offset(0, 1, 0))
+    const below = bot.blockAt(p.offset(0, -1, 0))
+    if (!above || !below) continue
+    const sky = (above as { skyLight?: number }).skyLight
+    out.push({ x: p.x, y: p.y, z: p.z, above: above.name, below: below.name, belowSolid: below.boundingBox === 'block', sky: typeof sky === 'number' ? sky : null })
+    if (out.length >= count) break
+  }
+  return out
+}
+
+/** The cold-water settings (settings.farming). */
+export function farmingOptions (agent: Agent): FarmingSettings {
+  return farmingSettings((agent.settings as { farming?: unknown } | undefined)?.farming)
+}
+
+/** Torches it carries, or could make now from coal/charcoal and a stick or planks. */
+function torchesAvailable (bot: Bot): number {
+  const t = countItem(bot, 'torch')
+  if (t) return t
+  const fuel = countItem(bot, 'coal') + countItem(bot, 'charcoal')
+  const wood = countItem(bot, 'stick') + bot.inventory.items().filter(i => itemName(i).endsWith('_planks')).reduce((n, i) => n + i.count, 0)
+  return fuel && wood ? 4 : 0
+}
+
+/** Holds a tool without Silk Touch (ice broken with it makes no water), or nothing. */
+async function holdNoSilk (bot: Bot): Promise<void> {
+  const silk = (i: any) => ((i?.enchants ?? []) as { name: string }[]).some(e => e.name === 'silk_touch')
+  const pick = bot.inventory.items().find(i => itemName(i).endsWith('_pickaxe') && !silk(i))
+  if (pick) { await bot.equip(pick, 'hand'); return }
+  if (silk(bot.heldItem)) await bot.unequip('hand').catch(() => {})
+}
+
+/**
+ * Gets a water source at the site's centre in the cold and keeps it from freezing
+ * (planColdWater): breaks the ice when it is ice, then puts a cheap block over the water (with a
+ * helper block on the shore cell next to it to place against, taken back after) or a torch on
+ * that shore cell. Returns what it did, or why it couldn't.
+ */
+export async function keepWaterOpen (ctx: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>, site: SiteCandidate, centre: 'ice' | 'water', fs: FarmingSettings): Promise<{ ok: boolean, how: 'none' | 'cover' | 'torch', message: string }> {
+  const { bot, agent, signal, log } = ctx
+  const w = vec(bot, site.water.x, site.water.y, site.water.z)
+  const cold = freezes(bot, site.water) || centre === 'ice'
+  const light = (bot.blockAt(w) as { light?: number } | null)?.light
+  const covered = bot.blockAt(w.offset(0, 1, 0))?.boundingBox === 'block'
+  const side = sideCell(site.cells as Record<string, string>)
+  let stored: Record<string, number> | undefined
+  try { stored = chestTotals(chestView(agent, bot)).has } catch {}
+  const plan = planColdWater({
+    centre,
+    freezes: waterFreezes({ cold, covered, blockLight: typeof light === 'number' ? light : 0 }),
+    mode: canPlace(agent) ? fs.protectWater : 'off',
+    inv: inventory(bot),
+    stored,
+    torches: canPlace(agent) ? torchesAvailable(bot) : 0,
+    side: !!side,
+    iceWater: fs.iceWater
+  })
+  if (!plan.ok) return { ok: false, how: 'none', message: plan.reason }
+  const done: string[] = []
+  const sidePos = side ? vec(bot, w.x + side[0], w.y + 1, w.z + side[1]) : null
+  for (const step of plan.steps) {
+    checkAborted(signal)
+    if (step === 'take_blocks') {
+      const item = coverItem(stored ?? {})
+      if (!item) continue
+      const r = await takeItemsFromOwnChests(ctx, { [item]: 2 }, 128, {}, chestView(agent, bot)).catch(e => { checkAborted(signal); return { took: {} as Record<string, number> } })
+      if ((r.took[item] ?? 0) >= 2) done.push(`took 2 ${item} from my chests`)
+    } else if (step === 'break_ice') {
+      // from the shore cell, never standing on the ice it breaks
+      if (sidePos) { try { await gotoWithin(bot, new goals.GoalBlock(sidePos.x, sidePos.y, sidePos.z), signal, 30_000) } catch (e) { checkAborted(signal) } }
+      const ice = bot.blockAt(w)
+      if (!ice || !ICE.test(ice.name)) return { ok: false, how: 'none', message: `the ice at ${fmtPos(w)} is gone (${ice?.name ?? 'not loaded'})` }
+      await holdNoSilk(bot)
+      try { await reachBlock(bot, w, signal, 3, 15_000); await digBlock(bot, ice, signal, 400) } catch (e) {
+        checkAborted(signal)
+        return { ok: false, how: 'none', message: `could not break the ice at ${fmtPos(w)}: ${(e as Error).message}` }
+      }
+      if (bot.blockAt(w)?.name !== 'water') return { ok: false, how: 'none', message: `broke the ice at ${fmtPos(w)} but got ${bot.blockAt(w)?.name ?? 'nothing'}, not water` }
+      done.push(`broke the ice at ${fmtPos(w)} for water`)
+    } else if (step === 'cover' && sidePos) {
+      const item = coverItem(inventory(bot))
+      if (!item) return { ok: false, how: 'none', message: 'no blocks left to cover the water' }
+      const over = w.offset(0, 1, 0)
+      try {
+        // nothing to place against over open water: a helper block on the shore cell next to it first
+        const snow = bot.blockAt(sidePos)
+        if (snow && snow.name === 'snow') await digBlock(bot, snow, signal)
+        await placeAt(bot, item, sidePos, signal)
+        await placeAt(bot, item, over, signal)
+        const helper = bot.blockAt(sidePos)
+        if (helper && helper.name === item) { await reachBlock(bot, sidePos, signal, 3, 15_000); await digBlock(bot, helper, signal) }
+        await pickupNearby(bot, signal, { radius: 4, maxMs: 4000 }).catch(() => 0)
+      } catch (e) {
+        checkAborted(signal)
+        log.debug('start_farm: could not cover the water', { error: (e as Error).message })
+      }
+      if (bot.blockAt(over)?.boundingBox !== 'block') return { ok: false, how: 'none', message: `could not put a block over the water at ${fmtPos(w)}` }
+      done.push(`covered it with ${item} so it doesn't freeze`)
+    } else if (step === 'torch' && sidePos) {
+      if (!countItem(bot, 'torch')) {
+        if (!countItem(bot, 'stick')) await craftItem(bot, signal, 'stick', 4).catch(() => null)
+        await craftItem(bot, signal, 'torch', 4).catch(() => null)
+      }
+      try {
+        const snow = bot.blockAt(sidePos)
+        if (snow && snow.name === 'snow') await digBlock(bot, snow, signal)
+        await placeAt(bot, 'torch', sidePos, signal)
+      } catch (e) {
+        checkAborted(signal)
+        return { ok: false, how: 'none', message: `could not put a torch by the water: ${(e as Error).message}` }
+      }
+      site.cells[`${side![0]},${side![1]}`] = 'other' // the torch stands there: not tilled
+      done.push(`put a torch next to it so it doesn't freeze`)
+    }
+  }
+  return { ok: true, how: plan.protection.how, message: done.join(', ') || plan.reason }
+}
+
 export interface StartFarmParams {
   place?: string
   x?: number
@@ -877,11 +1018,16 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
   const size = Math.max(3, Math.min(9, p.size % 2 ? p.size : p.size - 1))
   // farms that went bad (flooded, frozen, unreachable: site health) and their surroundings are left alone
   const badFarms = badFarmSites(agent)
+  // cold ground (coldFarmPlan.ts): water that would freeze is fine when it can be kept open
+  const fs = farmingOptions(agent)
+  const coldOk = fs.protectWater !== 'off' && canPlace(agent)
+  let source: 'natural' | 'ice' | 'bucket' = 'natural'
+  let iceKept: 'cover' | 'torch' | undefined
   const pick = (from: { x: number, y: number, z: number }) => {
     // within the radius first, then as far as the loaded chunks go
     for (const r of [...new Set([p.radius, Math.max(p.radius, 96)])]) {
       const waters = surfaceWater(bot, vec(bot, from.x, from.y, from.z), r, 160, true)
-        .filter(w => !nearBadSite(w, badFarms) && !freezes(bot, w))
+        .filter(w => !nearBadSite(w, badFarms) && (coldOk || !freezes(bot, w)))
       const best = chooseFarmSite(waters.map(w => siteAt(agent, bot, w, size, center!, p.spawnClearance)))
       if (best) return best
     }
@@ -900,6 +1046,25 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
       } catch (e) { checkAborted(signal) }
     }
   }
+  if (!site && fs.iceWater && agent.canDig) {
+    // a frozen shore or pond: break the ice over water (or ground) for a source, keep it open
+    const nether = !!dim && /nether/.test(dim)
+    for (const r of [...new Set([p.radius, Math.max(p.radius, 96)])]) {
+      const ice = shoreIce(bot, vec(bot, center.x, center.y, center.z), r)
+        .filter(c => iceSourceOk(c, { nether }) && !nearBadSite(c, badFarms) && !offLimits(agent, bot, c, p.spawnClearance))
+      const cands = ice.map(c => {
+        const cand = siteAt(agent, bot, vec(bot, c.x, c.y, c.z), size, center!, p.spawnClearance, { iceAsWater: true })
+        cand.cells['0,0'] = 'water'
+        return cand
+      })
+      const best = chooseFarmSite(cands)
+      if (!best) continue
+      const r2 = await keepWaterOpen(ctx, best, 'ice', fs)
+      if (r2.ok) { site = best; source = 'ice'; if (r2.how !== 'none') iceKept = r2.how; steps.push(r2.message); break }
+      steps.push(r2.message)
+      break
+    }
+  }
   if (!site && canPlace(agent)) {
     // carry water: fill a bucket if we only have an empty one
     if (!findItem(bot, 'water_bucket') && findItem(bot, 'bucket')) {
@@ -909,7 +1074,7 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
     if (findItem(bot, 'water_bucket')) {
       // dig a hole in flat grass and pour the water in
       const grass = bot.findBlocks({ point: vec(bot, center.x, center.y, center.z), matching: ['grass_block', 'dirt'].map(n => bot.registry.blocksByName[n]!.id), maxDistance: Math.min(32, p.radius), count: 96 })
-      const cands = grass.filter(g => !nearBadSite(g, badFarms) && !freezes(bot, g)).map(g => {
+      const cands = grass.filter(g => !nearBadSite(g, badFarms) && (coldOk || !freezes(bot, g))).map(g => {
         const c = siteAt(agent, bot, g, size, center!, p.spawnClearance)
         c.cells['0,0'] = 'water'
         return c
@@ -920,7 +1085,7 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
         try {
           const b = bot.blockAt(hole)
           if (b) { await reachBlock(bot, hole, signal); await digBlock(bot, b, signal) }
-          if (await pourWater(bot, hole, signal)) { site = dry; steps.push(`made a water hole at ${fmtPos(hole)}`) }
+          if (await pourWater(bot, hole, signal)) { site = dry; source = 'bucket'; steps.push(`made a water hole at ${fmtPos(hole)}`) }
         } catch (e) {
           checkAborted(signal)
           log.debug('start_farm: could not make water', { error: (e as Error).message })
@@ -928,10 +1093,24 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
       }
     }
   }
-  if (!site) return fail(`no flat grass next to water within ${Math.max(p.radius, 96)} blocks of ${centerName} that isn't protected or somebody's build, and no water bucket${steps.length ? ` (${steps.join(', ')})` : ''}`)
+  if (!site) return fail(`no flat grass next to water within ${Math.max(p.radius, 96)} blocks of ${centerName} that isn't protected or somebody's build, no frozen shore to open${fs.iceWater ? '' : ' (farming.iceWater is off)'}, and no water bucket${steps.length ? ` (${steps.join(', ')})` : ''}`)
+  // open water (a lake or a poured hole) in a cold biome: keep it from freezing too
+  let keptOpen: 'cover' | 'torch' | undefined
+  if (source === 'ice') keptOpen = iceKept
+  else if (freezes(bot, site.water)) {
+    const k = await keepWaterOpen(ctx, site, 'water', fs)
+    if (!k.ok) return fail(`the water at ${fmtPos(site.water)} would freeze: ${k.message}`)
+    if (k.how !== 'none') keptOpen = k.how
+    steps.push(k.message)
+  }
 
-  // seeds (the walk may take us away from the site; tilling walks back cell by cell)
+  // seeds (the walk may take us away from the site; tilling walks back cell by cell): its chests first
   let inv = inventory(bot)
+  if (seedCount(inv) < p.seeds) {
+    const got = await seedsFromChests(ctx, 'wheat_seeds', p.seeds - seedCount(inv)).catch(e => { checkAborted(signal); return { took: 0 } })
+    if (got.took) steps.push(`took ${got.took} wheat_seeds from my chests`)
+    inv = inventory(bot)
+  }
   if (seedCount(inv) < p.seeds) {
     const got = await breakPlantsFor(ctx, p.seeds - seedCount(inv), p.spawnClearance)
     inv = inventory(bot)
@@ -1019,7 +1198,8 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
   // remember it
   // never a name a bad farm still has (its site record is re-checked under that name)
   const name = nextFarmName([...getFarms(agent).map(f => f.name), ...farmSiteIds(agent)])
-  const farm: Farm = { name, x: site.water.x, y: site.water.y, z: site.water.z, dim, size, crop: cropName, created: Date.now(), tended: Date.now() }
+  const land = Object.entries(site.cells).filter(([k, v]) => k !== '0,0' && v === 'tillable').map(([k]) => k)
+  const farm: Farm = { name, x: site.water.x, y: site.water.y, z: site.water.z, dim, size, crop: cropName, created: Date.now(), tended: Date.now(), land, water: source, ...(keptOpen ? { keptOpen } : {}) }
   saveFarm(agent, farm)
   setPlace(agent, name, { x: farm.x, y: farm.y, z: farm.z, ...(dim ? { dimension: dim } : {}) })
   try { agent.journal?.record('farm_started', { name, size, crop: cropName, tilled, planted }, { pos: farm }) } catch {}

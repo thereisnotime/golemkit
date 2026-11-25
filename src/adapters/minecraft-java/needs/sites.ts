@@ -55,7 +55,8 @@ export function minecraftSites (agent: Agent): SiteProbe[] {
       if (!p || !dimOk(b, p.dim) || farFrom(b, p) || typeof b.blockAt !== 'function') return null
       const size = typeof site.data?.size === 'number' ? site.data.size : 9
       const cells = farmCells(b, { x: p.x, y: p.y, z: p.z, size })
-      return cells ? farmSiteVerdict(cells) : null
+      const land = Array.isArray(site.data?.land) ? (site.data.land as unknown[]).filter((k): k is string => typeof k === 'string') : undefined
+      return cells ? farmSiteVerdict(cells, land) : null
     },
     onBad (ctx, rec, replace) {
       if (!replace) return 'left on my list (sites.replace is off)'
