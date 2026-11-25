@@ -14,4 +14,6 @@ should keep a base running the way a player would.
 
 ## Status
 
-Proposed, not started.
+Mostly absorbed by [needs-and-idle](../needs-and-idle/proposal.md): the routine is the `active`
+idle mode's chore list, with per-chore time-of-day windows. Still open here: NPC mode using the
+routine as its default arm set.
