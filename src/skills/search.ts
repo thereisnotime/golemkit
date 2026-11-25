@@ -242,7 +242,7 @@ function liquidSources (bot: Bot, name: string, radius: number): Block[] {
 }
 
 /** What of the target is loaded around the bot within radius, nearest first, or null. */
-export function lookFor (agent: Agent, bot: Bot, t: ResolvedTarget, radius: number): Sighting | null {
+export function lookFor (agent: Agent, bot: Bot, t: ResolvedTarget, radius: number, o: { exposed?: boolean } = {}): Sighting | null {
   const here = bot.entity.position
   if (t.kind === 'structure') return t.structure === 'village' ? lookVillage(bot, radius) : lookPortal(bot, radius)
   if (t.kind === 'biome') return lookBiome(bot, t, radius)
@@ -269,6 +269,8 @@ export function lookFor (agent: Agent, bot: Bot, t: ResolvedTarget, radius: numb
     count: 64,
     ...(t.ripe ? { useExtraInfo: (b: Block) => isMature(b.name, (b.getProperties() as Record<string, unknown>).age) && cropAllowed(agent, bot, floorPos(b.position)) } : {})
   }).filter(p => { if (!logs) return true; const sy = surfaceY(bot, p.x, p.z); return sy === null || sy - p.y <= 12 })
+    // ores with exposed: only blocks with an open face (a cave wall, a cliff), not ore buried in rock
+    .filter(p => !(o.exposed && t.ore) || OPEN_FACES.some(([dx, dy, dz]) => /^(air|cave_air|water)$/.test(bot.blockAt(p.offset(dx!, dy!, dz!))?.name ?? '')))
   if (!found.length) return null
   // prefer one outside protected areas (it can be fetched), but report the nearest either way
   const free = found.find(p => !agent.protectedAreas?.isProtected(p))
@@ -276,6 +278,8 @@ export function lookFor (agent: Agent, bot: Bot, t: ResolvedTarget, radius: numb
   const name = bot.blockAt(at)?.name ?? t.blocks[0]!
   return { ...floorPos(at), what: t.ore ? `${name.replace(/_/g, ' ')}` : t.label, count: found.length, capped: found.length >= 64, ...(free ? {} : { note: 'in a protected area' }) }
 }
+
+const OPEN_FACES = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]
 
 // ------------------------------------------------------------------ the spiral scout (find_food's, generalised)
 
@@ -612,6 +616,8 @@ interface FindOptions {
   who?: string
   /** Deliver what was fetched to `who` (false when bring_item delivers itself). */
   deliver: boolean
+  /** Ores: only ones with an open face count. */
+  exposed?: boolean
 }
 
 interface FindOutcome { ok: boolean, message: string, at?: Pos, got?: Record<string, number> }
@@ -624,7 +630,7 @@ async function findEngine (ctx: Ctx, t: ResolvedTarget, o: FindOptions): Promise
   const dim = bot.game?.dimension
   const view = Math.min(o.radius, 96)
   const before = inventoryMap(bot)
-  const look = (r = view) => lookFor(agent, bot, t, r)
+  const look = (r = view) => lookFor(agent, bot, t, r, { exposed: o.exposed })
   const phases: SearchPhase[] = searchPhases(t, { prospect: o.prospect || (o.bring && !!t.ore), canDig: agent.canDig, feetY: origin.y })
   if (!phases.length) return { ok: false, message: `${t.label} isn't something lying around in the world${t.note ? `: ${t.note}` : ''}` }
   const secs = () => `${Math.round((Date.now() - t0) / 1000)}s`
@@ -756,7 +762,8 @@ const findTarget = defineAction({
     count: z.number().int().min(1).max(256).default(1).describe('how many to bring'),
     go: z.boolean().default(false).describe('walk there and stay, instead of coming back to report'),
     prospect: z.boolean().default(false).describe('ores: strip mine for it when none is in sight (always on with bring)'),
-    at_night: z.boolean().default(false).describe('also scout at night (dangerous)')
+    at_night: z.boolean().default(false).describe('also scout at night (dangerous)'),
+    exposed: z.boolean().default(false).describe('ores: only count ore with an open face (a cave wall, a cliff), not ore buried in rock')
   }),
   longRunning: true,
   async run (ctx, p): Promise<ActionResult> {
@@ -765,7 +772,7 @@ const findTarget = defineAction({
     if (p.bring && !needsSurvival(ctx.bot)) return fail(`in ${ctx.bot.game.gameMode} mode use creative_get instead of fetching`)
     const r = await findEngine(ctx, t, {
       radius: p.radius, maxMinutes: p.max_minutes, bring: p.bring, count: p.count, go: p.go, prospect: p.prospect, atNight: p.at_night,
-      who: askerOf(ctx), deliver: true
+      who: askerOf(ctx), deliver: true, exposed: p.exposed
     })
     return r.ok ? ok(r.message, { at: r.at, target: t.key, got: r.got }) : fail(r.message, { at: r.at, target: t.key })
   }

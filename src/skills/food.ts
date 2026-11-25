@@ -20,6 +20,8 @@ import { craftItem, pickFuel } from './crafting.ts'
 import { planFarmWork, farmWorkCount, oddSize, type FarmCell, type FarmGrid, type FarmWork } from './farmPlan.ts'
 import { inDangerZone, wayThroughDanger } from './food-danger.ts'
 import { takeItemsFromOwnChests, chestView, chestTotals } from './containers.ts'
+import { nearBadSite, nextFarmName, FREEZE_TEMPERATURE } from './needPlan.ts'
+import { siteBook } from '../core/sites.ts'
 import {
   seedStopReason, seedLimits, scoutWaypoints, scoutStopReason, nextWaypoint, sectorsText, compass, sectorOf, mergeSpot, markSpotEmpty, rankSpots, dryWaypoint,
   chooseFarmSite, plotLayout, pickFarmSeed, seedCount, breedPlan, BREED_FOOD, DEFAULT_SCOUT_LIMITS,
@@ -553,6 +555,8 @@ const findFood = defineAction({
 const PLANTS = /^(short_grass|grass|tall_grass|fern|large_fern|dandelion|poppy|.*_tulip|azure_bluet|oxeye_daisy|cornflower|allium|blue_orchid|lily_of_the_valley|dead_bush|sweet_berry_bush|snow)$/
 /** Blocks players place: a plot near these is somebody's base or farm. */
 const BUILD = /(_planks|cobblestone|stone_bricks|bricks|glass|_fence|_wall|door|torch|lantern|_bed$|chest|barrel|crafting_table|furnace|_slab|_stairs|wool|carpet|concrete|terracotta|rail|ladder|sign|hay_block|composter|bell|scaffolding|farmland)/
+/** Near a plot these rule it out: lava burns, ice means the water freezes there. */
+const HAZARD = /^(lava|ice|packed_ice|blue_ice|frosted_ice|powder_snow|magma_block|fire)$/
 const FENCES = /^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|bamboo|crimson|warped)_fence$/
 
 /** What a plot cell is (ground at y, the block above at y+1). */
@@ -572,11 +576,40 @@ function cellKind (agent: Agent, bot: Bot, x: number, y: number, z: number, clea
   return 'other'
 }
 
+/** Farm sites marked bad (site health), with their size. */
+function badFarmSites (agent: Agent): { x: number, z: number, size?: number }[] {
+  try {
+    return siteBook(agent).bad('farm').filter(r => r.pos).map(r => ({ x: r.pos!.x, z: r.pos!.z, size: typeof r.data?.size === 'number' ? r.data.size : 9 }))
+  } catch { return [] }
+}
+
+function farmSiteIds (agent: Agent): string[] {
+  try { return siteBook(agent).all().filter(r => r.kind === 'farm').map(r => r.id) } catch { return [] }
+}
+
+/** Water here freezes: a cold biome (snowy plains, frozen rivers, mountain tops). */
+function freezes (bot: Bot, p: { x: number, y: number, z: number }): boolean {
+  const t = (bot.blockAt?.(vec(bot, p.x, p.y, p.z)) as { biome?: { temperature?: number } } | null)?.biome?.temperature
+  return typeof t === 'number' && t < FREEZE_TEMPERATURE
+}
+
 /** A candidate plot around a water block: plot cells plus a 3-block ring checked for builds/fields. */
 export function siteAt (agent: Agent, bot: Bot, water: Vec3, size: number, from: { x: number, z: number }, clearance: number): SiteCandidate {
   const h = (size - 1) / 2
   const cells: Record<string, CellKind> = {}
   for (let dx = -h; dx <= h; dx++) for (let dz = -h; dz <= h; dz++) cells[`${dx},${dz}`] = cellKind(agent, bot, water.x + dx, water.y, water.z + dz, clearance)
+  // crops need light: a cell under a roof (little sky light) stays dark at night and mobs spawn on it.
+  // Only when the chunk has light data at all (some servers send none: everything reads 0).
+  const sky: Record<string, number> = {}
+  for (const k of Object.keys(cells)) {
+    const [dx, dz] = k.split(',').map(Number)
+    const up = bot.blockAt(vec(bot, water.x + dx!, water.y + 1, water.z + dz!))
+    // a bank one above the water: the light that counts is on top of it
+    const top = up && TILLABLE.includes(up.name) ? bot.blockAt(vec(bot, water.x + dx!, water.y + 2, water.z + dz!)) : up
+    const l = (top as { skyLight?: number } | null)?.skyLight
+    if (typeof l === 'number') sky[k] = l
+  }
+  if (Object.values(sky).some(l => l > 0)) for (const [k, l] of Object.entries(sky)) if (l < 10 && cells[k] === 'tillable') cells[k] = 'other'
   const around: CellKind[] = []
   const m = h + 3
   for (let dx = -m; dx <= m; dx++) {
@@ -586,6 +619,7 @@ export function siteAt (agent: Agent, bot: Bot, water: Vec3, size: number, from:
       for (let dy = -1; dy <= 2; dy++) {
         const b = bot.blockAt(vec(bot, water.x + dx, water.y + dy, water.z + dz))
         if (b && BUILD.test(b.name)) { around.push(b.name === 'farmland' ? 'farmland' : 'build'); break }
+        if (b && HAZARD.test(b.name)) { around.push('hazard'); break }
       }
     }
   }
@@ -841,10 +875,13 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
 
   // the site first (cheap, and no point collecting seeds without one): natural water first, then a remembered water spot, then water we bring
   const size = Math.max(3, Math.min(9, p.size % 2 ? p.size : p.size - 1))
+  // farms that went bad (flooded, frozen, unreachable: site health) and their surroundings are left alone
+  const badFarms = badFarmSites(agent)
   const pick = (from: { x: number, y: number, z: number }) => {
     // within the radius first, then as far as the loaded chunks go
     for (const r of [...new Set([p.radius, Math.max(p.radius, 96)])]) {
       const waters = surfaceWater(bot, vec(bot, from.x, from.y, from.z), r, 160, true)
+        .filter(w => !nearBadSite(w, badFarms) && !freezes(bot, w))
       const best = chooseFarmSite(waters.map(w => siteAt(agent, bot, w, size, center!, p.spawnClearance)))
       if (best) return best
     }
@@ -872,7 +909,7 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
     if (findItem(bot, 'water_bucket')) {
       // dig a hole in flat grass and pour the water in
       const grass = bot.findBlocks({ point: vec(bot, center.x, center.y, center.z), matching: ['grass_block', 'dirt'].map(n => bot.registry.blocksByName[n]!.id), maxDistance: Math.min(32, p.radius), count: 96 })
-      const cands = grass.map(g => {
+      const cands = grass.filter(g => !nearBadSite(g, badFarms) && !freezes(bot, g)).map(g => {
         const c = siteAt(agent, bot, g, size, center!, p.spawnClearance)
         c.cells['0,0'] = 'water'
         return c
@@ -980,8 +1017,8 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
   }
 
   // remember it
-  const n = getFarms(agent).length + 1
-  const name = `farm:${n}`
+  // never a name a bad farm still has (its site record is re-checked under that name)
+  const name = nextFarmName([...getFarms(agent).map(f => f.name), ...farmSiteIds(agent)])
   const farm: Farm = { name, x: site.water.x, y: site.water.y, z: site.water.z, dim, size, crop: cropName, created: Date.now(), tended: Date.now() }
   saveFarm(agent, farm)
   setPlace(agent, name, { x: farm.x, y: farm.y, z: farm.z, ...(dim ? { dimension: dim } : {}) })

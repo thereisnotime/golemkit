@@ -199,7 +199,8 @@ export type CellKind =
   | 'farmland' // already tilled: somebody's field (or ours)
   | 'build' // placed blocks: planks, cobblestone, glass, fences, torches, beds, chests...
   | 'protected'
-  | 'other' // sand, stone, a tree, a hole, a step up or down
+  | 'other' // sand, stone, a tree, a hole, a step up or down, a cell under a roof
+  | 'hazard' // lava or ice close by: burns, or the water freezes
 
 export interface SiteCandidate {
   /** The water block the plot is laid around. */
@@ -225,6 +226,7 @@ export function scoreSite (c: SiteCandidate, rules: Partial<SiteRules> = {}): nu
   const kinds = Object.values(c.cells)
   if (kinds.includes('protected') || c.around.includes('protected')) return null
   if (kinds.includes('build') || c.around.includes('build')) return null
+  if (kinds.includes('hazard') || c.around.includes('hazard')) return null
   if (!r.allowFarmland && (kinds.includes('farmland') || c.around.includes('farmland'))) return null
   const land = Object.entries(c.cells).filter(([k]) => k !== '0,0')
   const till = land.filter(([, v]) => v === 'tillable').length
