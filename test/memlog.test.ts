@@ -20,6 +20,7 @@ test('formatMemSample: megabytes, children only when known', () => {
   assert.equal(formatMemSample({ ...s, children: { count: 1, rss: 350 * M } }), 'rss 812M heap 310/402M ext 95M ab 80M other 315M kids 1/350M')
   assert.equal(formatMemSample({ ...s, children: null }), 'rss 812M heap 310/402M ext 95M ab 80M other 315M')
   assert.equal(formatMemSample({ ...s, swap: 40 * M }), 'rss 812M heap 310/402M ext 95M ab 80M other 315M swap 40M')
+  assert.equal(formatMemSample({ ...s, gc: { count: 40, ms: 12.4 } }), 'rss 812M heap 310/402M ext 95M ab 80M other 315M gc 40/12ms')
 })
 
 test('formatCounts and parseVmRss', () => {

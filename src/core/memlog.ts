@@ -4,6 +4,7 @@
 // variable is set; nothing runs then. Heap snapshots: start with
 // NODE_OPTIONS=--heapsnapshot-signal=SIGUSR2 and `kill -USR2 <pid>` (docs/guide/deployment.md#memory).
 import { readFileSync, readdirSync } from 'node:fs'
+import { PerformanceObserver } from 'node:perf_hooks'
 import type { Logger } from './log.ts'
 
 /** Seconds between samples from GOLEM_MEMLOG, or null when off (unset, 0, not a number). Minimum 5. */
@@ -24,13 +25,15 @@ export interface MemSample {
   swap?: number
   /** RSS of child processes (and theirs), bytes; null where /proc is missing. */
   children?: { count: number, rss: number } | null
+  /** Garbage collections since the previous sample and the time they took. */
+  gc?: { count: number, ms: number }
 }
 
 const MB = 1024 * 1024
 const mb = (n: number): string => `${Math.round(n / MB)}M`
 
 /**
- * One log line: `rss 812M heap 310/402M ext 95M ab 80M other 315M kids 1/350M`. `other` is RSS
+ * One log line: `rss 812M heap 310/402M ext 95M ab 80M other 315M kids 1/350M gc 40/12ms`. `other` is RSS
  * outside the JS heap and external memory: code, native allocations (malloc), thread stacks.
  */
 export function formatMemSample (s: MemSample): string {
@@ -38,6 +41,7 @@ export function formatMemSample (s: MemSample): string {
   const parts = [`rss ${mb(s.rss)}`, `heap ${Math.round(s.heapUsed / MB)}/${mb(s.heapTotal)}`, `ext ${mb(s.external)}`, `ab ${mb(s.arrayBuffers)}`, `other ${mb(other)}`]
   if (s.swap) parts.push(`swap ${mb(s.swap)}`)
   if (s.children) parts.push(`kids ${s.children.count}/${mb(s.children.rss)}`)
+  if (s.gc) parts.push(`gc ${s.gc.count}/${Math.round(s.gc.ms)}ms`)
   return parts.join(' ')
 }
 
@@ -88,9 +92,18 @@ export interface MemLogSource {
 
 /** Starts the sampler; returns a stop function. Sources are read on every sample. */
 export function startMemLog (opts: { intervalS: number, log: Logger, sources: () => MemLogSource[] }): () => void {
+  // GC count and pause time between samples: shows what a smaller young generation costs
+  let gc = { count: 0, ms: 0 }
+  let obs: PerformanceObserver | null = null
+  try {
+    obs = new PerformanceObserver(list => { for (const e of list.getEntries()) { gc.count++; gc.ms += e.duration } })
+    obs.observe({ entryTypes: ['gc'] })
+  } catch { obs = null }
   const tick = (): void => {
     const u = process.memoryUsage()
-    opts.log.info(formatMemSample({ ...u, swap: ownSwap(), children: childrenRss() }))
+    const g = obs ? gc : undefined
+    gc = { count: 0, ms: 0 }
+    opts.log.info(formatMemSample({ ...u, swap: ownSwap(), children: childrenRss(), gc: g }))
     for (const s of opts.sources()) {
       try { opts.log.info(formatCounts(s.name, s.counts())) } catch (e) { opts.log.warn(`${s.name}: ${(e as Error).message}`) }
     }
@@ -98,5 +111,5 @@ export function startMemLog (opts: { intervalS: number, log: Logger, sources: ()
   const t = setInterval(tick, opts.intervalS * 1000)
   t.unref()
   setTimeout(tick, 1000).unref()
-  return () => clearInterval(t)
+  return () => { clearInterval(t); obs?.disconnect() }
 }
