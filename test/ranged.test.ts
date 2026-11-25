@@ -354,23 +354,26 @@ test('heavy fire: exposure from the time in the open', () => {
   assert.ok(quickWall(5, 0, 1), 'five blocks against one shooter')
 })
 
-test('response under heavy fire: quick cover, else a quick wall, else get out of sight', () => {
+test('response under heavy fire: the quickest way of hiding, else get out of sight', () => {
   const s = (o: Partial<RangedState>) => rangedResponse(st({ ...paxGear, shooters: three(), ...o }))!
   assert.equal(s({ coverNear: true, coverDist: 3 }).act, 'cover', 'cover 3 blocks away')
-  const far = s({ coverNear: true, coverDist: 9 })
-  assert.equal(far.act, 'retreat', 'cover 9 blocks away is too slow with 3 shooting')
-  assert.match(far.why, /heavy fire/)
-  assert.match(far.why, /cover 9 blocks off is too slow/)
+  // far cover is still better than running in the open (1.8 s, 1.6 expected hits)
+  assert.equal(s({ coverNear: true, coverDist: 9 }).act, 'cover')
   assert.equal(s({ coverNear: false, canBuild: true, wallBlocks: 2 }).act, 'build', 'a 2-block wall is quick')
-  assert.equal(s({ coverNear: false, canBuild: true, wallBlocks: 5 }).act, 'retreat', 'a 5-block wall in the open is not')
-  assert.equal(s({ coverNear: true, coverDist: 9, canBuild: true, wallBlocks: 2 }).act, 'build', 'a quick wall beats a far spot')
-  // nowhere to back off to: the slow cover or wall is still better than the open
-  assert.equal(s({ coverNear: true, coverDist: 9, canRetreat: false }).act, 'cover')
-  assert.equal(s({ coverNear: false, canBuild: true, wallBlocks: 5, canRetreat: false }).act, 'build')
+  assert.equal(s({ coverNear: false, canBuild: true, wallBlocks: 5 }).act, 'build', 'a 5-block wall beats running')
+  const q = s({ coverNear: true, coverDist: 9, canBuild: true, wallBlocks: 2 })
+  assert.equal(q.act, 'build', 'a quick wall beats a far spot')
+  assert.match(q.why, /heavy fire, building here \(cover 9 blocks off is too slow\)/)
+  // too far for anything: get out of sight
+  const far = s({ coverNear: true, coverDist: 20 })
+  assert.equal(far.act, 'retreat')
+  assert.match(far.why, /heavy fire, getting out of sight \(cover 20 blocks off is too slow\)/)
+  // nowhere to back off to: the slow cover is still better than the open
+  assert.equal(s({ coverNear: true, coverDist: 20, canRetreat: false }).act, 'cover')
   // not heavy (good gear): the old order, any cover first
   assert.equal(rangedResponse(st({ armor: 15, health: 12, shooters: three().slice(0, 1), coverNear: true, coverDist: 12 }))!.act, 'cover')
   // the low-health hide is heavy too
-  assert.equal(rangedResponse(st({ health: 6, shooters: three(), coverNear: true, coverDist: 10 }))!.act, 'retreat')
+  assert.equal(rangedResponse(st({ health: 6, shooters: three(), coverNear: true, coverDist: 20 }))!.act, 'retreat')
 })
 
 test('flee point: towards home when it lies away from the shooters, else straight away', () => {

@@ -125,8 +125,12 @@ export interface RangedState {
   /** The wall plan's size: blocks to place and how many of them are a pillar under the bot. Unknown counts as one block. */
   wallBlocks?: number
   wallPillar?: number
+  /** It can dig the block under its feet and stand in the hole (digging allowed, safe floor below, no liquid around, not protected): seconds that takes, with the blocks it places after (digInSeconds). Unknown means it can't. */
+  digInSeconds?: number
   /** Backing off would still gain distance without passing the retreat cap. Default true. */
   canRetreat?: boolean
+  /** Backing off heads for home (it lies roughly away from the shooters), not just straight away. */
+  home?: boolean
   /** Combat flags: combat.ranged and combat.shield (default on). */
   useBow?: boolean
   useShield?: boolean
@@ -134,8 +138,14 @@ export interface RangedState {
   hide?: string
 }
 
-export type RangedAct = 'shoot' | 'shield_close' | 'charge' | 'cover' | 'build' | 'retreat'
-export interface RangedDecision { act: RangedAct, target: number | null, why: string }
+export type RangedAct = 'shoot' | 'shield_close' | 'charge' | 'cover' | 'build' | 'dig_in' | 'retreat'
+export interface RangedDecision {
+  act: RangedAct
+  target: number | null
+  why: string
+  /** For a retreat: towards home, or straight away from the shooters. */
+  toward?: 'home' | 'away'
+}
 
 /** Health at or below which the bot stops trading shots and hides or backs off. */
 export const RANGED_LOW_HEALTH = 8
@@ -242,8 +252,108 @@ export function quickCover (dist: number, shooters: number): boolean {
 
 /** A wall of `blocks` (`pillar` of them under the bot) can be finished before taking a hit, more or less. */
 export function quickWall (blocks: number, pillar: number, shooters: number): boolean {
-  const s = Math.max(0, blocks - pillar) * WALL_BLOCK_S + Math.max(0, pillar) * PILLAR_BLOCK_S
-  return exposureHits(s, shooters) < QUICK_HITS
+  return exposureHits(wallSeconds(blocks, pillar), shooters) < QUICK_HITS
+}
+
+/** Seconds in the open to build a wall of `blocks` (`pillar` of them under the bot). */
+export function wallSeconds (blocks: number, pillar: number): number {
+  return Math.max(0, blocks - pillar) * WALL_BLOCK_S + Math.max(0, pillar) * PILLAR_BLOCK_S
+}
+
+/**
+ * Expected hits under which a slow way of hiding (far cover, a bigger wall, digging in) still beats
+ * running: backing off is time in the open too, with the shooters following, and Pax died that way.
+ */
+export const SLOW_HITS = 3
+
+/** Digging in: the longest dig of the block under its feet worth trying under fire (ms). */
+export const DIG_IN_MAX_MS = 1500
+/** Seconds for dropping into the hole after the dig. */
+export const DIG_IN_DROP_S = 0.35
+
+/** Seconds in the open to dig in: the dig, the drop, then `blocks` blocks placed around the hole. */
+export function digInSeconds (digMs: number, blocks: number): number {
+  return Math.round((Math.max(0, digMs) / 1000 + DIG_IN_DROP_S + Math.max(0, blocks) * WALL_BLOCK_S) * 100) / 100
+}
+
+/** Floors it never digs out from under itself: unbreakable or slow, turns to water (ice), or the base's own blocks. */
+const NO_DIG_FLOOR = /^(bedrock|barrier|obsidian|crying_obsidian|reinforced_deepslate|end_portal_frame|ice|frosted_ice|farmland|spawner|.*_bed|chest|trapped_chest|barrel|.*shulker_box|crafting_table|furnace|blast_furnace|smoker|.*anvil|hopper|beacon|lodestone|respawn_anchor|.*_ore)$/
+/** Floors that hurt or swallow the bot once it drops onto them. */
+const BAD_HOLE_FLOOR = /^(lava|water|fire|soul_fire|magma_block|campfire|soul_campfire|cactus|powder_snow|pointed_dripstone|sweet_berry_bush)$/
+const FLUID = /^(water|lava|bubble_column)$/
+
+export interface DigInView {
+  /** Digging allowed (agent.canDig and the action's digIn option). */
+  canDig: boolean
+  /** The block under its feet, and whether it is a full solid block. */
+  floor: string | undefined
+  floorSolid: boolean
+  /** The block under that (the hole's floor), and whether it is a full solid block. */
+  below: string | undefined
+  belowSolid: boolean
+  /** The four blocks beside the floor block (the hole's walls) and the block its feet are in. */
+  sides: readonly (string | undefined)[]
+  feet: string | undefined
+  /** How long digging the floor takes with its best tool (ms), or null when it can't be dug. */
+  digMs: number | null
+  /** The floor block lies in a protected area. */
+  protected: boolean
+}
+
+/**
+ * Why it can't dig in here (stand in a 1-block hole, so shots from the side hit the ground), or
+ * null when it can: digging allowed, a solid floor that is quick to dig (DIG_IN_MAX_MS) and not
+ * ice, ore or a base block, not protected, a solid safe block under it (no drop, no void, no
+ * lava), and no water or lava beside the hole or at its feet that would flow in.
+ */
+export function digInRefusal (v: DigInView): string | null {
+  if (!v.canDig) return 'digging is off'
+  if (!v.floor || !v.floorSolid) return 'no solid floor'
+  if (NO_DIG_FLOOR.test(v.floor)) return `won't dig ${v.floor}`
+  if (v.protected) return 'protected area'
+  if (v.digMs === null || v.digMs > DIG_IN_MAX_MS) return `${v.floor} is too slow to dig`
+  if (!v.below || !v.belowSolid || BAD_HOLE_FLOOR.test(v.below)) return 'nothing safe to stand on under it'
+  if (v.feet && FLUID.test(v.feet)) return 'standing in liquid'
+  if (v.sides.some(b => b && FLUID.test(b))) return 'liquid beside the hole'
+  return null
+}
+
+/**
+ * Whether a cell can take a cover block: 'place' when it is empty or replaceable (air, grass, a
+ * single snow layer), 'dig' for deeper snow (2+ layers, which the server only replaces with snow)
+ * when it may dig, else null. Lava never.
+ */
+export function coverCell (c: { name: string | undefined, replaceable: boolean, layers?: number, canDig: boolean }): 'place' | 'dig' | null {
+  if (c.name === 'lava') return null
+  if (c.name === 'snow' && (c.layers ?? 1) > 1) return c.canDig ? 'dig' : null
+  return c.replaceable ? 'place' : null
+}
+
+/** Rough cells to choose the filler for cover from: stone and dirt first (cheap, quick to place), logs and planks last (worth more), snow blocks never first. */
+export function coverBlockRank (name: string): number {
+  if (/^(cobblestone|cobbled_deepslate|dirt|coarse_dirt|netherrack|stone|deepslate|andesite|diorite|granite|tuff|blackstone|mossy_cobblestone)$/.test(name)) return 0
+  if (/(_planks|_log|_wood|_stem)$/.test(name)) return 2
+  if (name === 'snow_block') return 3
+  return 1
+}
+
+/** The filler to build cover with: the best ranked one with enough for the wall (`need`), else the most plentiful. */
+export function pickCoverBlock (items: readonly { name: string, count: number }[], need = 2): string | null {
+  const by = new Map<string, number>()
+  for (const i of items) by.set(i.name, (by.get(i.name) ?? 0) + i.count)
+  const list = [...by].map(([name, count]) => ({ name, count }))
+  if (!list.length) return null
+  list.sort((a, b) => {
+    const ea = a.count >= need ? 0 : 1
+    const eb = b.count >= need ? 0 : 1
+    return ea - eb || coverBlockRank(a.name) - coverBlockRank(b.name) || b.count - a.count
+  })
+  return list[0]!.name
+}
+
+/** Its feet cell for planning: the block layer most of its feet are in (on a path block or farmland it is the layer above). */
+export function feetCellY (y: number): number {
+  return Math.floor(y + 0.25)
 }
 
 /**
@@ -265,12 +375,16 @@ export function shieldWhileFleeing (s: { shield: boolean, incoming: boolean, sin
  *  - a shield: raise it and close in on the nearest;
  *  - a weapon, health 14+ and at most 2 shooters: charge the nearest in a zig-zag;
  *  - otherwise hide.
- * Hiding means cover when there is some nearby, else building cover when it can, else backing
- * off; when backing off would pass the retreat cap (canRetreat false) it stands its ground with
- * the bow, shield or weapon it has, except at RANGED_LOW_HEALTH or less, where it backs off anyway.
- * Under heavy fire (heavyFire) cover counts only when it is quick to reach (quickCover) and a wall
- * only when it is quick to finish (quickWall); otherwise it gets out of sight by backing off, and
- * a slow cover or wall is the fallback only when it can't back off any further.
+ * Hiding means cover when there is some nearby, else building cover when it can, else digging in
+ * (standing in a 1-block hole, digInSeconds), else backing off (towards home when home lies away
+ * from the shooters); when backing off would pass the retreat cap (canRetreat false) it stands its
+ * ground with the bow, shield or weapon it has, except at RANGED_LOW_HEALTH or less, where it backs
+ * off anyway.
+ * Under heavy fire (heavyFire) every second in sight counts: it takes whichever of cover, a wall
+ * where it stands or digging in leaves it the shortest time in the open (exposureHits), as long as
+ * that is under SLOW_HITS expected hits; walking to far cover loses to a 2-block wall here. Only
+ * when none of them is that quick does it get out of sight by backing off, and the slowest way of
+ * hiding is the fallback when it can't back off any further.
  */
 export function rangedResponse (s: RangedState): RangedDecision | null {
   const active = activeShooters(s.shooters)
@@ -280,24 +394,37 @@ export function rangedResponse (s: RangedState): RangedDecision | null {
   const shield = s.shield && s.useShield !== false
   const heavy = heavyFire(s)
   const n = Math.max(active.length, s.patrol)
-  const coverQuick = s.coverNear && (!heavy || quickCover(s.coverDist ?? 0, n))
-  const wallQuick = !!s.canBuild && (!heavy || quickWall(s.wallBlocks ?? 1, s.wallPillar ?? 0, n))
+  // each way of hiding with its time in the open (stable order: cover, build, dig in)
+  const ways: { act: 'cover' | 'build' | 'dig_in', s: number, what: string }[] = []
+  if (s.coverNear) ways.push({ act: 'cover', s: (s.coverDist ?? 0) / COVER_WALK_BPS, what: `cover ${Math.round(s.coverDist ?? 0)} blocks off` })
+  if (s.canBuild) ways.push({ act: 'build', s: wallSeconds(s.wallBlocks ?? 1, s.wallPillar ?? 0), what: `a ${s.wallBlocks ?? 1}-block wall` })
+  if (s.digInSeconds !== undefined) ways.push({ act: 'dig_in', s: s.digInSeconds, what: 'digging in' })
+  const retreat = (why: string): RangedDecision => s.home
+    ? { act: 'retreat', target: nearest.id, why: `${why}, towards home`, toward: 'home' }
+    : { act: 'retreat', target: nearest.id, why, toward: 'away' }
   const hide = (why: string): RangedDecision => {
-    if (coverQuick) return { act: 'cover', target: nearest.id, why }
-    if (wallQuick) return { act: 'build', target: nearest.id, why }
-    if (heavy && s.canRetreat !== false) {
-      const slow = s.coverNear ? `cover ${Math.round(s.coverDist ?? 0)} blocks off` : s.canBuild ? `a ${s.wallBlocks ?? 1}-block wall` : ''
-      return { act: 'retreat', target: nearest.id, why: `${why}; heavy fire, getting out of sight${slow ? ` (${slow} is too slow)` : ''}` }
+    if (heavy) {
+      const best = [...ways].sort((a, b) => a.s - b.s)[0]
+      if (best && exposureHits(best.s, n) < SLOW_HITS) {
+        const skipped = ways.filter(w => w.act !== best.act && w.act === 'cover')
+        const here = best.act === 'build' ? 'building here' : best.act === 'dig_in' ? 'digging in here' : 'the nearest cover'
+        return { act: best.act, target: nearest.id, why: `${why}; heavy fire, ${here}${skipped.length ? ` (${skipped[0]!.what} is too slow)` : ''}` }
+      }
+      if (s.canRetreat !== false) {
+        const slow = ways.map(w => w.what).join(', ')
+        return retreat(`${why}; heavy fire, getting out of sight${slow ? ` (${slow} is too slow)` : ''}`)
+      }
+      if (best) return { act: best.act, target: nearest.id, why: `${why}, nowhere left to back off` }
+    } else if (ways.length) {
+      return { act: ways[0]!.act, target: nearest.id, why }
     }
-    if (s.coverNear) return { act: 'cover', target: nearest.id, why }
-    if (s.canBuild) return { act: 'build', target: nearest.id, why }
     // at the cap it stands its ground, unless it is about to die: then it keeps running (the caller allows a little more)
     if (s.canRetreat === false && s.health > RANGED_LOW_HEALTH) {
       if (bow && nearest.dist >= 5) return { act: 'shoot', target: nearest.id, why: `${why}, nowhere left to back off` }
       if (shield) return { act: 'shield_close', target: nearest.id, why: `${why}, nowhere left to back off` }
       if (s.melee && s.health > RANGED_LOW_HEALTH && nearest.name !== 'ghast') return { act: 'charge', target: nearest.id, why: `${why}, nowhere left to back off` }
     }
-    return { act: 'retreat', target: nearest.id, why }
+    return retreat(why)
   }
   if (s.hide) return hide(s.hide)
   if (s.health <= RANGED_LOW_HEALTH) return hide(`health ${Math.ceil(s.health)}`)
@@ -313,6 +440,23 @@ export function rangedResponse (s: RangedState): RangedDecision | null {
   if (shield) return { act: 'shield_close', target: nearest.id, why: `shield up, closing on the ${nearest.name}` }
   if (s.melee && s.health >= 14 && active.length <= 2 && nearest.name !== 'ghast') return { act: 'charge', target: nearest.id, why: `charging the ${nearest.name}` }
   return hide(`no bow or shield against the ${nearest.name}`)
+}
+
+/** Minimum time a way of hiding is kept before switching to another (ms). */
+export const COMMIT_MS = 2000
+const HIDE_ACTS: ReadonlySet<RangedAct> = new Set(['cover', 'build', 'dig_in', 'retreat'])
+
+/**
+ * Hysteresis between ways of hiding: a cover / build / dig-in / retreat choice made less than
+ * `commitMs` ago is kept while it is still possible (`possible`), so the bot doesn't flap between
+ * backing off and a cover spot many times a second. Fighting back (shoot, shield, charge) and a
+ * choice that is no longer possible switch at once.
+ */
+export function holdDecision (prev: { d: RangedDecision, at: number } | null, next: RangedDecision, now: number, possible: (act: RangedAct) => boolean, commitMs = COMMIT_MS): RangedDecision {
+  if (!prev || prev.d.act === next.act) return next
+  if (!HIDE_ACTS.has(prev.d.act) || !HIDE_ACTS.has(next.act)) return next
+  if (now - prev.at >= commitMs || !possible(prev.d.act)) return next
+  return { ...prev.d, target: next.target }
 }
 
 // ---- how long to hide ----
