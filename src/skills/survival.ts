@@ -84,35 +84,53 @@ const pillar = defineAction({
   }
 })
 
+/** Whether an item is a cheap filler block (FILLER), for callers that rank their own pick. */
+export function isFiller (name: string): boolean {
+  return FILLER.test(name)
+}
+
+/**
+ * The cell its feet are in: floor(y), or the layer above when it stands on a block lower than a
+ * full one (a path block, farmland, soul sand: floor(y) is that block itself).
+ */
+function feetCell (bot: Bot) {
+  const p = bot.entity.position.floored()
+  return bot.blockAt(p)?.boundingBox === 'block' ? p.offset(0, 1, 0) : p
+}
+
 /**
  * Jumps and places `block` underneath, `height` times (stops at a ceiling or when out of blocks).
- * Returns how many blocks it rose. The pillar action's body, also used to build cover.
+ * Returns how many blocks it rose. The pillar action's body, also used to build cover. Waits
+ * (briefly) to be on the ground before each jump, since a jump only starts from the ground; `log`
+ * hears why it stopped early.
  */
-export async function pillarUp (bot: Bot, signal: AbortSignal, block: string, height: number): Promise<number> {
-  const at = (dy: number) => bot.blockAt(bot.entity.position.floored().offset(0, dy, 0))
+export async function pillarUp (bot: Bot, signal: AbortSignal, block: string, height: number, log?: (why: string) => void): Promise<number> {
   const up = bot.entity.position.floored().scaled(0).offset(0, 1, 0)
   let placed = 0
+  const stop = (why: string) => { log?.(why); return placed }
   try {
     await bot.look(bot.entity.yaw, -Math.PI / 2, true)
     for (let i = 0; i < height; i++) {
       checkAborted(signal)
-      if (at(2)?.boundingBox !== 'empty') break // ceiling
+      const settle = Date.now() + 600
+      while (!bot.entity.onGround && Date.now() < settle) await sleep(50, signal)
+      const feet = feetCell(bot)
+      if (bot.blockAt(feet.offset(0, 2, 0))?.boundingBox !== 'empty') return stop('a block above the head')
       const it = findItem(bot, block)
-      if (!it) break
+      if (!it) return stop(`no ${block} left`)
       await bot.equip(it, 'hand')
-      const ground = at(-1)
-      if (!ground || ground.boundingBox !== 'block') break
-      const floorY = Math.floor(bot.entity.position.y)
+      const ground = bot.blockAt(feet.offset(0, -1, 0))
+      if (!ground || ground.boundingBox !== 'block') return stop(`nothing solid under the feet (${ground?.name ?? 'unloaded'})`)
       bot.setControlState('jump', true)
       const until = Date.now() + 1500
-      while (bot.entity.position.y < floorY + 1.05 && Date.now() < until) await sleep(50, signal)
+      while (bot.entity.position.y < feet.y + 1.05 && Date.now() < until) await sleep(50, signal)
       try {
         await bot.placeBlock(ground, up)
         placed++
-      } catch {
+      } catch (e) {
         await sleep(200, signal)
         if (bot.blockAt(ground.position.offset(0, 1, 0))?.boundingBox === 'block') placed++
-        else break
+        else return stop(`could not place under itself: ${(e as Error).message}`)
       } finally {
         bot.setControlState('jump', false)
       }

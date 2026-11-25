@@ -11,7 +11,7 @@ const pax = { armor: 0, shield: false, melee: true, weaponDamage: 5 }
 let ids = 1
 const sh = (o: Partial<ShooterView> = {}): ShooterView => ({ id: ids++, name: 'pillager', dist: 10, los: true, ...o })
 const three = () => [sh({ dist: 9 }), sh({ dist: 11 }), sh({ dist: 13 })]
-const st = (o: Partial<RangedState>): RangedState => ({ health: 14, armor: 0, bow: false, shield: false, melee: true, shooters: [], patrol: 0, coverNear: false, ...pax, ...o })
+const st = (o: Partial<RangedState>): RangedState => ({ health: 14, bow: false, shooters: [], patrol: 0, coverNear: false, ...pax, ...o })
 
 test('heavy fire, cover 7 blocks off: build a 2-block wall here instead', () => {
   const d = rangedResponse(st({ shooters: three(), coverNear: true, coverDist: 7, canBuild: true, wallBlocks: 2 }))!

@@ -21,12 +21,15 @@ import { weaponFlags, hasRanged, readyShield, bestMeleeDamage, blockWithShield }
 import { getHome, sameDimension } from './navigation.ts'
 import { wornArmorPoints } from './gear.ts'
 import { facingTowards } from './guard-plan.ts'
-import { fillerBlock, pillarUp } from './survival.ts'
-import { placeAt, isReplaceable } from './world.ts'
+import type { Block } from 'prismarine-block'
+import { isFiller, pillarUp } from './survival.ts'
+import { placeAt, isReplaceable, digBlock } from './world.ts'
+import { equipFor, toolKindFor, bestToolIn } from './toolkit.ts'
 import {
   isShooter, incoming, patrolCount, rangedResponse, activeShooters, findCover, cappedRetreat, canEatUnderFire, shooterRange,
   hideMs, stillHiding, leaveCover, planWall, heavyFire, shieldWhileFleeing, gearOf, ILLAGERS, PROJECTILES, RETREAT_CAP, FLEE_CAP,
-  type ShooterView, type RangedDecision, type V3, type WallPlan, type GearView
+  coverCell, pickCoverBlock, feetCellY, digInRefusal, digInSeconds, holdDecision,
+  type ShooterView, type RangedDecision, type RangedAct, type V3, type WallPlan, type GearView
 } from './ranged-plan.ts'
 
 const EYE = 1.62
@@ -277,48 +280,151 @@ export function coverFor (bot: Bot, shooters: readonly Entity[], radius = 8, ski
 
 const shooterEyes = (shooters: readonly Entity[]) => shooters.map(s => ({ x: s.position.x, y: s.position.y + (s.height ?? 1.8) * 0.85, z: s.position.z }))
 
+/** Snow layers in a block (1 for anything else). */
+const layersOf = (b: Block | null | undefined): number => {
+  if (b?.name !== 'snow') return 1
+  const l = Number((b.getProperties?.() as { layers?: number } | undefined)?.layers)
+  return Number.isFinite(l) && l > 0 ? l : 1
+}
+
+/** The filler to build cover with: cobblestone or dirt before logs and planks (pickCoverBlock). */
+export function coverBlock (bot: Bot): string | null {
+  return pickCoverBlock(bot.inventory.items().filter(i => isFiller(i.name)).map(i => ({ name: i.name, count: i.count })))
+}
+
 /**
  * Where to put blocks for cover where the bot stands (planWall), or null: needs block placing
- * allowed (settings.canPlace), a filler block in the inventory (dirt, cobblestone, planks...) and
- * cells outside protected areas.
+ * allowed (settings.canPlace), a filler block in the inventory (cobblestone, dirt, planks, logs...)
+ * and cells outside protected areas. Snow layers, grass and ferns are cells it places into, never
+ * blocks it places against; deeper snow (2+ layers) only when it may dig it out first. `feet`
+ * plans from another spot (the bottom of a hole it is about to dig), `gone` is a cell taken as
+ * empty there.
  */
-export function coverWallFor (bot: Bot, agent: Agent, shooters: readonly Entity[]): (WallPlan & { block: string }) | null {
+export function coverWallFor (bot: Bot, agent: Agent, shooters: readonly Entity[], opts: { feet?: V3, gone?: V3, maxPillar?: number, maxBlocks?: number } = {}): (WallPlan & { block: string }) | null {
   if ((agent.settings as { canPlace?: boolean } | undefined)?.canPlace === false) return null
-  const block = fillerBlock(bot)
+  const block = coverBlock(bot)
   if (!block) return null
   const me = bot.entity.position
+  const isGone = (x: number, y: number, z: number) => !!opts.gone && opts.gone.x === x && opts.gone.y === y && opts.gone.z === z
   const at = (x: number, y: number, z: number) => bot.blockAt(me.clone().set(x, y, z))
-  const solid = (x: number, y: number, z: number) => at(x, y, z)?.boundingBox === 'block'
+  const solid = (x: number, y: number, z: number) => !isGone(x, y, z) && at(x, y, z)?.boundingBox === 'block'
   const placeable = (x: number, y: number, z: number) => {
+    if (isGone(x, y, z)) return false
     const b = at(x, y, z)
-    return !!b && isReplaceable(b.name) && b.name !== 'lava' && !agent.protectedAreas?.isProtected({ x, y, z })
+    if (!b || agent.protectedAreas?.isProtected({ x, y, z })) return false
+    return !!coverCell({ name: b.name, replaceable: isReplaceable(b.name), layers: layersOf(b), canDig: agent.canDig })
   }
   const count = bot.inventory.items().filter(i => i.name === block).reduce((n, i) => n + i.count, 0)
-  const plan = planWall({ bot: me, shooters: shooterEyes(shooters), solid, placeable, maxBlocks: Math.min(6, count) })
+  const feet = opts.feet ?? { x: me.x, y: feetCellY(me.y), z: me.z }
+  const plan = planWall({ bot: feet, shooters: shooterEyes(shooters), solid, placeable, maxBlocks: Math.min(opts.maxBlocks ?? 6, count), maxPillar: opts.maxPillar })
   return plan ? { ...plan, block } : null
 }
 
-/** Places a wall plan's blocks (pillar first). Returns how many went in. */
-async function buildWall (bot: Bot, plan: WallPlan & { block: string }, signal: AbortSignal): Promise<number> {
+/** Stops walking and waits (briefly) until it stands still on the ground, so a plan made now still fits. */
+async function settle (bot: Bot, signal: AbortSignal, ms = 800): Promise<void> {
+  bot.pathfinder.setGoal(null)
+  bot.clearControlStates()
+  const until = Date.now() + ms
+  while (Date.now() < until) {
+    const v = bot.entity.velocity
+    if (bot.entity.onGround && Math.hypot(v.x, v.z) < 0.03) return
+    await sleep(50, signal)
+  }
+}
+
+/** Digs deep snow (2+ layers) out of a cell so a block can go there; true when the cell takes a block now. */
+async function clearSnow (bot: Bot, agent: Agent, x: number, y: number, z: number, signal: AbortSignal): Promise<boolean> {
+  const b = bot.blockAt(bot.entity.position.clone().set(x, y, z))
+  if (!b || b.name !== 'snow' || layersOf(b) <= 1) return true
+  if (!agent.canDig || agent.protectedAreas?.isProtected({ x, y, z })) return false
+  await equipFor(bot, b)
+  await digBlock(bot, b, signal)
+  return isReplaceable(bot.blockAt(b.position)?.name)
+}
+
+/**
+ * Places a wall plan's blocks (pillar first). Returns how many went in and, when it stopped early,
+ * why. It has to be standing still where the plan was made (the caller settles and plans again).
+ */
+async function buildWall (bot: Bot, agent: Agent, plan: WallPlan & { block: string }, signal: AbortSignal): Promise<{ placed: number, why?: string }> {
   bot.pathfinder.setGoal(null)
   bot.clearControlStates()
   let placed = 0
   if (plan.pillar) {
-    const up = await pillarUp(bot, signal, plan.block, plan.pillar)
+    const f = plan.blocks[0]!
+    if (!await clearSnow(bot, agent, f.x, f.y, f.z, signal)) return { placed, why: 'deep snow under the feet' }
+    let why = ''
+    const up = await pillarUp(bot, signal, plan.block, plan.pillar, w => { why = w })
     placed += up
-    if (up < plan.pillar) return placed
+    if (up < plan.pillar) return { placed, why: why || 'the pillar stopped' }
   }
   for (const c of plan.blocks.slice(plan.pillar)) {
     checkAborted(signal)
     try {
+      if (!await clearSnow(bot, agent, c.x, c.y, c.z, signal)) return { placed, why: `deep snow at ${c.x} ${c.y} ${c.z}` }
       await placeAt(bot, plan.block, bot.entity.position.clone().set(c.x, c.y, c.z), signal)
       placed++
     } catch (e) {
       checkAborted(signal)
-      break
+      return { placed, why: `${c.x} ${c.y} ${c.z}: ${(e as Error).message}` }
     }
   }
-  return placed
+  return { placed }
+}
+
+// ---- digging in ----
+
+/** How long digging a block takes with the best tool it carries (ms), or null when it can't be dug. */
+function digMsFor (bot: Bot, b: Block): number | null {
+  if (b.diggable === false) return null
+  const items = bot.inventory.items()
+  const kind = toolKindFor(b as any)
+  const name = kind ? bestToolIn(items.map(i => i.name), kind) : null
+  const tool = name ? items.find(i => i.name === name) : bot.heldItem
+  try {
+    const ms = b.digTime(tool?.type ?? null, bot.game?.gameMode === 'creative', false, false, (tool as any)?.enchants ?? [], [])
+    return Number.isFinite(ms) ? ms : null
+  } catch { return null }
+}
+
+export interface DigIn { floor: Block, seconds: number, wall: (WallPlan & { block: string }) | null }
+
+/**
+ * Digging in where it stands: the block under its feet comes out and it stands in the hole, with
+ * the blocks around the hole (if any) that it still needs against the shooters (coverWallFor from
+ * the bottom of the hole). Null when digging is off, the floor is unsafe or protected
+ * (digInRefusal), or the hole wouldn't cover it.
+ */
+export function digInFor (bot: Bot, agent: Agent, shooters: readonly Entity[]): DigIn | null {
+  if (!bot.entity.onGround) return null
+  const me = bot.entity.position
+  const fy = feetCellY(me.y)
+  const at = (dx: number, y: number, dz: number) => bot.blockAt(me.clone().set(Math.floor(me.x) + dx, y, Math.floor(me.z) + dz))
+  const floor = at(0, fy - 1, 0)
+  const below = at(0, fy - 2, 0)
+  if (!floor) return null
+  const refusal = digInRefusal({
+    canDig: agent.canDig,
+    floor: floor.name,
+    floorSolid: floor.boundingBox === 'block',
+    below: below?.name,
+    belowSolid: below?.boundingBox === 'block',
+    sides: [at(1, fy - 1, 0), at(-1, fy - 1, 0), at(0, fy - 1, 1), at(0, fy - 1, -1)].map(b => b?.name),
+    feet: at(0, fy, 0)?.name,
+    digMs: digMsFor(bot, floor),
+    protected: !!agent.protectedAreas?.isProtected(floor.position)
+  })
+  if (refusal) return null
+  const feet = { x: Math.floor(me.x) + 0.5, y: fy - 1, z: Math.floor(me.z) + 0.5 }
+  const gone = { x: floor.position.x, y: floor.position.y, z: floor.position.z }
+  const wall = coverWallFor(bot, agent, shooters, { feet, gone, maxPillar: 0, maxBlocks: 4 })
+  if (!wall) {
+    // no blocks to place: only when the hole alone covers head and chest
+    const solid = (x: number, y: number, z: number) => !(x === gone.x && y === gone.y && z === gone.z) && bot.blockAt(me.clone().set(x, y, z))?.boundingBox === 'block'
+    const bare = planWall({ bot: feet, shooters: shooterEyes(shooters), solid, placeable: () => false, maxPillar: 0 })
+    if (!bare || bare.blocks.length) return null
+  }
+  return { floor, seconds: digInSeconds(digMsFor(bot, floor) ?? 0, wall?.blocks.length ?? 0), wall: wall && wall.blocks.length ? wall : null }
 }
 
 /** Notes the shooters (and the patrol) around as danger zones for the bot's other jobs. */
@@ -355,7 +461,9 @@ export const rangedDefense = defineAction({
     'depending on health, gear and how many there are. Used by the reflexes and stay_safe.',
   params: z.object({
     cover: z.boolean().default(false).describe('hide or back off instead of fighting, whatever the gear'),
-    build: z.boolean().default(true).describe('on open ground, place a few blocks (dirt, cobblestone, planks) for cover when there is none to walk to'),
+    build: z.boolean().default(true).describe('on open ground, place a few blocks (cobblestone, dirt, planks) for cover when there is none to walk to'),
+    digIn: z.boolean().default(true).describe('when digging is allowed, dig the block under its feet and stand in the hole (plus a block or two toward the shooters) when that is the quickest way out of sight'),
+    commitSeconds: z.number().min(0).max(10).default(2).describe('keep a way of hiding (cover, wall, digging in, backing off) at least this long before switching to another, so it does not flap between them'),
     maxSeconds: z.number().min(5).max(120).default(45).describe('give up after this long')
   }),
   internal: true,
@@ -370,16 +478,21 @@ export const rangedDefense = defineAction({
     let kills = 0
     let ate = 0
     let built = 0
+    let dug = 0
     let quietSince = 0
     let hideUntil = 0 // after a failed charge or a heal stop, hide for a while (hideMs by health)
     const badCover = new Set<string>() // spots that turned out to be in sight after all
     let buildFailed = 0 // a wall that didn't cover (or couldn't be placed): don't try again at once
+    let digFailed = 0 // the same for digging in
     let lastBlock = 0 // last shield block while backing off
     let blocked = 0
     let last = ''
+    let lastAt = 0
+    let prev: { d: RangedDecision, at: number } | null = null
+    // one line per change of plan (and a reminder every 5 s), not one per pass with a new distance in it
     const note = (d: RangedDecision) => {
-      const k = `${d.act}:${d.why}`
-      if (k !== last) { last = k; log.info(`ranged: ${d.act} (${d.why})`); if (!done.includes(d.act)) done.push(d.act) }
+      if (d.act !== last || Date.now() - lastAt > 5000) { last = d.act; lastAt = Date.now(); log.info(`ranged: ${d.act} (${d.why})`) }
+      if (!done.includes(d.act)) done.push(d.act)
     }
     // behind cover (found or built): eat, fight what walks up, leave when healthy and out of sight
     const holdCover = async (spotKey: string): Promise<'left' | 'exposed' | 'fought'> => {
@@ -462,15 +575,19 @@ export const rangedDefense = defineAction({
           useBow: flags.ranged,
           useShield: flags.shield
         }
-        // heavy fire: get well out of sight (further than the usual cap), towards home when that is away from them
+        // heavy fire: get well out of sight (further than the usual cap); backing off heads home when that is away from them
         const heavy = heavyFire(gear)
-        const home = heavy ? getHome(agent) : undefined
+        const home = getHome(agent)
         const safe = home && sameDimension(bot, home) ? home : null
-        const away = cappedRetreat(origin, here, ents.map(e => e.position), Math.min(28, Math.max(...s.active.map(x => shooterRange(x.name))) + 6), heavy ? FLEE_CAP : RETREAT_CAP, safe)
-        // a wall is planned even with cover in reach: under heavy fire a far spot can lose to a quick wall
+        const shotAt = ents.map(e => e.position)
+        const away = cappedRetreat(origin, here, shotAt, Math.min(28, Math.max(...s.active.map(x => shooterRange(x.name))) + 6), heavy ? FLEE_CAP : RETREAT_CAP, safe)
+        const homeward = !!(away && safe && Math.hypot(safe.x - here.x, safe.z - here.z) >= 6 &&
+          Math.hypot(away.x - safe.x, away.z - safe.z) < Math.hypot(here.x - safe.x, here.z - safe.z) - 1)
+        // a wall (and a hole) is planned even with cover in reach: under heavy fire a far spot loses to a quick wall
         const wall = p.build && Date.now() > buildFailed && (!cover || heavy) ? coverWallFor(bot, agent, ents) : null
-        if (!cover && !wall) cover = coverFor(bot, ents, 14, badCover)
-        const d = rangedResponse({
+        const dig = p.digIn && agent.canDig && Date.now() > digFailed && (!cover || heavy) ? digInFor(bot, agent, ents) : null
+        if (!cover && !wall && !dig) cover = coverFor(bot, ents, 14, badCover)
+        const fresh = rangedResponse({
           ...gear,
           hide,
           coverNear: !!cover,
@@ -478,9 +595,14 @@ export const rangedDefense = defineAction({
           canBuild: !!wall,
           wallBlocks: wall?.blocks.length,
           wallPillar: wall?.pillar,
-          canRetreat: !!away
+          digInSeconds: dig?.seconds,
+          canRetreat: !!away,
+          home: homeward
         })
-        if (!d) { await sleep(200, signal); continue }
+        if (!fresh) { await sleep(200, signal); continue }
+        const possible = (a: RangedAct) => a === 'cover' ? !!cover : a === 'build' ? !!wall : a === 'dig_in' ? !!dig : a === 'retreat' ? !!away : true
+        const d = holdDecision(prev, fresh, Date.now(), possible, p.commitSeconds * 1000)
+        if (!prev || prev.d.act !== d.act) prev = { d, at: Date.now() }
         note(d)
         const target = s.active.find(x => x.id === d.target)?.e ?? s.active[0]!.e
 
@@ -506,20 +628,54 @@ export const rangedDefense = defineAction({
         }
 
         if (d.act === 'build' && wall) {
+          // stand still first (it may still be sliding from a sprint, on ice, or knocked back), then plan again from there
+          await settle(bot, signal)
+          const plan = coverWallFor(bot, agent, s.active.map(x => x.e))
+          if (!plan) { log.info('ranged: no wall fits where it stopped'); buildFailed = Date.now() + 3000; continue }
           const names = [...new Set(s.active.map(x => x.name))].join(' and ')
-          log.info(`ranged: building cover at ${fmtPos(bot.entity.position)}: ${wall.blocks.length - wall.pillar} ${wall.block}${wall.pillar ? ` on a ${wall.pillar}-block pillar` : ''} against the ${names}`)
-          const n = await buildWall(bot, wall, signal)
-          built += n
-          if (n < wall.blocks.length) { log.info(`ranged: placed ${n} of ${wall.blocks.length} blocks, giving up on building here`); buildFailed = Date.now() + 10_000; continue }
+          log.info(`ranged: building cover at ${fmtPos(bot.entity.position)}: ${plan.blocks.length - plan.pillar} ${plan.block}${plan.pillar ? ` on a ${plan.pillar}-block pillar` : ''} against the ${names}`)
+          const r = await buildWall(bot, agent, plan, signal)
+          built += r.placed
+          if (r.placed < plan.blocks.length) { log.info(`ranged: placed ${r.placed} of ${plan.blocks.length} blocks, giving up on building here (${r.why ?? 'unknown'})`); buildFailed = Date.now() + 10_000; continue }
           const f = bot.entity.position.floored()
-          const r = await holdCover(`${f.x},${f.y},${f.z}`)
-          if (r === 'exposed') buildFailed = Date.now() + 10_000
+          const held = await holdCover(`${f.x},${f.y},${f.z}`)
+          if (held === 'exposed') buildFailed = Date.now() + 10_000
+          continue
+        }
+
+        if (d.act === 'dig_in' && dig) {
+          await settle(bot, signal)
+          const now = digInFor(bot, agent, s.active.map(x => x.e))
+          if (!now) { digFailed = Date.now() + 3000; continue }
+          log.info(`ranged: digging in at ${fmtPos(bot.entity.position)}: ${now.floor.name} out from under it${now.wall ? `, then ${now.wall.blocks.length} ${now.wall.block}` : ''}`)
+          try {
+            await equipFor(bot, now.floor)
+            await digBlock(bot, now.floor, signal)
+          } catch (e) {
+            checkAborted(signal)
+            log.info(`ranged: could not dig in (${(e as Error).message})`)
+            digFailed = Date.now() + 10_000
+            continue
+          }
+          await sleep(150, signal) // let it start dropping into the hole
+          await settle(bot, signal)
+          dug++
+          // plan the blocks again from the bottom of the hole
+          const plan = now.wall ? coverWallFor(bot, agent, s.active.map(x => x.e), { maxPillar: 0, maxBlocks: 4 }) : null
+          if (plan && plan.blocks.length) {
+            const r = await buildWall(bot, agent, plan, signal)
+            built += r.placed
+            if (r.placed < plan.blocks.length) log.info(`ranged: placed ${r.placed} of ${plan.blocks.length} blocks around the hole (${r.why ?? 'unknown'})`)
+          }
+          const f = bot.entity.position.floored()
+          const held = await holdCover(`${f.x},${f.y},${f.z}`)
+          if (held === 'exposed') digFailed = Date.now() + 10_000
           continue
         }
 
         // back off: straight away from them, out of range, but not past the cap (with nothing to fight
         // or hide with, a few more blocks beyond it rather than standing in the open)
-        const run = away ?? cappedRetreat(origin, here, ents.map(e => e.position), 8, (heavy ? FLEE_CAP : RETREAT_CAP) + 16, safe)
+        const run = away ?? cappedRetreat(origin, here, shotAt, 8, (heavy ? FLEE_CAP : RETREAT_CAP) + 16, safe)
         if (!run) { await sleep(300, signal); continue }
         const goal = new goals.GoalNear(run.x, run.y, run.z, 3)
         const mv = (bot.pathfinder as any).movements
@@ -547,7 +703,7 @@ export const rangedDefense = defineAction({
       bot.pathfinder.setGoal(null)
       try { bot.deactivateItem() } catch {}
     }
-    const what = [kills ? `killed ${kills}` : '', ...done.map(a => a === 'shoot' ? 'shot back' : a === 'shield_close' ? 'closed in behind the shield' : a === 'charge' ? 'charged' : a === 'cover' ? 'took cover' : a === 'build' ? `built cover (${built} blocks)` : 'backed out of range'), blocked ? `blocked ${blocked}x with the shield` : '', ate ? `ate ${ate}x` : ''].filter(Boolean)
+    const what = [kills ? `killed ${kills}` : '', ...done.map(a => a === 'shoot' ? 'shot back' : a === 'shield_close' ? 'closed in behind the shield' : a === 'charge' ? 'charged' : a === 'cover' ? 'took cover' : a === 'build' ? `built cover (${built} blocks)` : a === 'dig_in' ? `dug in${dug > 1 ? ` ${dug}x` : ''}` : 'backed out of range'), blocked ? `blocked ${blocked}x with the shield` : '', ate ? `ate ${ate}x` : ''].filter(Boolean)
     if (!what.length) return ok('nothing shooting at me')
     return ok(what.join(', '))
   }
