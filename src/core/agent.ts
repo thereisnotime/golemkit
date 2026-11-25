@@ -21,6 +21,7 @@ import { TOGGLES, findToggle, parseToggleValue, getPath, expandPaths, deepMerge,
 import { resolveHumanize, typingDelayMs, styleLine, between, type HumanizeOptions } from './humanize.ts'
 import type { UsageSnapshot } from '../llm/usage.ts'
 import { Journal } from './journal/journal.ts'
+import { StatusTracker, statusAction } from './statusTracker.ts'
 import type { DeathReport } from './journal/deathReport.ts'
 import { supports, type GameAdapter, type GameClient, type AdapterEvents, type Capability } from './adapter.ts'
 // The default game until profiles pick one (game-adapters phase 4).
@@ -139,6 +140,8 @@ export class Agent extends TypedEmitter<AgentEvents> {
   readonly protectedAreas: ProtectedAreas
   /** Event journal (data/bots/<username>/journal/), see docs/guide/journal.md. */
   readonly journal: Journal
+  /** What it is doing, why, last progress; status.json and the stuck alert (docs/guide/status.md). */
+  readonly status: StatusTracker
   /** The game behind this agent (Minecraft Java unless InstanceOptions.adapter says otherwise). */
   readonly adapter: GameAdapter
   /** Actions left out because the adapter lacks a capability they need. */
@@ -188,6 +191,8 @@ export class Agent extends TypedEmitter<AgentEvents> {
     for (const skill of this.skills) {
       for (const action of skill.actions ?? []) this.registerAction(action, skill.capabilities)
     }
+    if (!this.actions.has(statusAction.name)) this.registerAction(statusAction)
+    this.status = new StatusTracker(this)
     if (this.unsupported.length) this.log.debug(`left out (the game lacks what they need): ${this.unsupported.map(u => `${u.name} (${u.missing.join(', ')})`).join(', ')}`)
   }
 
@@ -652,6 +657,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
   async start (): Promise<void> {
     this.adapter.start?.()
     for (const brain of this.brains) await brain.start?.(this)
+    this.status.start()
     this.log.info(`starting: ${this.skills.length} skills, ${this.actions.size} actions, brains: ${this.brains.map(b => b.name).join(', ') || 'none'}`)
     let learnRounds = 0
     let failures = 0
@@ -680,6 +686,7 @@ export class Agent extends TypedEmitter<AgentEvents> {
       try { await brain.stop?.(this) } catch (e) { this.log.warn(`brain ${brain.name} stop: ${(e as Error).message}`) }
     }
     void this.adapter.disconnect('stopped').catch(() => {})
+    this.status.stop()
     this.storage.flush()
     this.journal.stop()
     this.emit('stopped')

@@ -15,7 +15,6 @@ const hp = defineAction({
   description: 'Report health, food and what the bot is doing.',
   params: noParams,
   exclusive: false,
-  aliases: ['status'],
   run: ({ bot, agent }) => ok(`health ${Math.round(bot.health)}/20, food ${bot.food}/20, doing ${agent.currentAction?.name ?? 'nothing'}`)
 })
 

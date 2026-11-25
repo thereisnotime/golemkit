@@ -55,7 +55,8 @@
       "scene_walk (internal)",
       "scene_look (internal)",
       "scene_gesture (internal)",
-      "scene_hold (internal)"
+      "scene_hold (internal)",
+      "status"
     ],
     "catalog": [
       {
@@ -894,9 +895,20 @@
         },
         "exclusive": false,
         "longRunning": false
+      },
+      {
+        "name": "status",
+        "description": "Say what the bot is doing and why (or why it is idle or stuck), how long since it last made progress, health and food, and the last failure. Answers \"status\", \"what are you doing\", \"why are you idle\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !scene_start !scene_stop !scene_status !scene_list (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !scene_start !scene_stop !scene_status !scene_list !status (!help <command> for details)"
   },
   "variant:apprentice": {
     "actions": [
@@ -944,7 +956,8 @@
       "places",
       "goto_place",
       "flee",
-      "prepare_trip"
+      "prepare_trip",
+      "status"
     ],
     "catalog": [
       {
@@ -1688,9 +1701,20 @@
         },
         "exclusive": true,
         "longRunning": false
+      },
+      {
+        "name": "status",
+        "description": "Say what the bot is doing and why (or why it is idle or stuck), how long since it last made progress, health and food, and the last failure. Answers \"status\", \"what are you doing\", \"why are you idle\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !status (!help <command> for details)"
   },
   "variant:buddy": {
     "actions": [
@@ -1740,7 +1764,8 @@
       "history",
       "goto_death",
       "protect",
-      "feed_player"
+      "feed_player",
+      "status"
     ],
     "catalog": [
       {
@@ -2521,9 +2546,20 @@
         },
         "exclusive": true,
         "longRunning": false
+      },
+      {
+        "name": "status",
+        "description": "Say what the bot is doing and why (or why it is idle or stuck), how long since it last made progress, health and food, and the last failure. Answers \"status\", \"what are you doing\", \"why are you idle\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !status (!help <command> for details)"
   },
   "variant:companion": {
     "actions": [
@@ -2650,7 +2686,8 @@
       "recover_items",
       "mods",
       "mod_items",
-      "creative_get"
+      "creative_get",
+      "status"
     ],
     "catalog": [
       {
@@ -6386,9 +6423,20 @@
         },
         "exclusive": true,
         "longRunning": false
+      },
+      {
+        "name": "status",
+        "description": "Say what the bot is doing and why (or why it is idle or stuck), how long since it last made progress, health and food, and the last failure. Answers \"status\", \"what are you doing\", \"why are you idle\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get !status (!help <command> for details)"
   },
   "variant:villager": {
     "actions": [
@@ -6501,7 +6549,8 @@
       "set_spawn",
       "shear",
       "light_up",
-      "recover_items"
+      "recover_items",
+      "status"
     ],
     "catalog": [
       {
@@ -9903,9 +9952,20 @@
         },
         "exclusive": true,
         "longRunning": true
+      },
+      {
+        "name": "status",
+        "description": "Say what the bot is doing and why (or why it is idle or stuck), how long since it last made progress, health and food, and the last failure. Answers \"status\", \"what are you doing\", \"why are you idle\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !status (!help <command> for details)"
   },
   "profile:apprentice": {
     "actions": [
@@ -9953,7 +10013,8 @@
       "places",
       "goto_place",
       "flee",
-      "prepare_trip"
+      "prepare_trip",
+      "status"
     ],
     "catalog": [
       {
@@ -10697,9 +10758,20 @@
         },
         "exclusive": true,
         "longRunning": false
+      },
+      {
+        "name": "status",
+        "description": "Say what the bot is doing and why (or why it is idle or stuck), how long since it last made progress, health and food, and the last failure. Answers \"status\", \"what are you doing\", \"why are you idle\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !status (!help <command> for details)"
   },
   "profile:example": {
     "actions": [
@@ -10749,7 +10821,8 @@
       "history",
       "goto_death",
       "protect",
-      "feed_player"
+      "feed_player",
+      "status"
     ],
     "catalog": [
       {
@@ -11530,9 +11603,20 @@
         },
         "exclusive": true,
         "longRunning": false
+      },
+      {
+        "name": "status",
+        "description": "Say what the bot is doing and why (or why it is idle or stuck), how long since it last made progress, health and food, and the last failure. Answers \"status\", \"what are you doing\", \"why are you idle\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !status (!help <command> for details)"
   },
   "profile:pax": {
     "actions": [
@@ -11659,7 +11743,8 @@
       "recover_items",
       "mods",
       "mod_items",
-      "creative_get"
+      "creative_get",
+      "status"
     ],
     "catalog": [
       {
@@ -15395,8 +15480,19 @@
         },
         "exclusive": true,
         "longRunning": false
+      },
+      {
+        "name": "status",
+        "description": "Say what the bot is doing and why (or why it is idle or stuck), how long since it last made progress, health and food, and the last failure. Answers \"status\", \"what are you doing\", \"why are you idle\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get !status (!help <command> for details)"
   }
 }

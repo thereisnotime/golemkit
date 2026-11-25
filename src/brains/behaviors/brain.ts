@@ -136,6 +136,7 @@ export const behaviorsBrain = (opts: BehaviorsBrainOptions = {}) => {
         suspended: () => { const run = sceneRuntimeOf(agent)?.actingIn(); return run ? `acting in scene ${run}` : null }
       })
       rt.controller = c
+      const unlist = agent.status?.addSource(c.name, () => c.snapshot())
       const tick = () => { c.tick().catch(e => rt.log.warn(`tick: ${(e as Error).message}`)) }
       const first = setTimeout(tick, 3000) // let chunks and entities load first
       const timer = setInterval(tick, tickMs)
@@ -143,6 +144,7 @@ export const behaviorsBrain = (opts: BehaviorsBrainOptions = {}) => {
         clearTimeout(first)
         clearInterval(timer)
         c.stop('session ended')
+        unlist?.()
         if (rt.controller === c) rt.controller = null
       }
     },

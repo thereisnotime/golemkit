@@ -2,7 +2,7 @@
 // somebody else owns the body, score behaviours, and start/keep/switch the winner.
 import {
   PRIORITY, ActionAbortedError, checkAborted, sleep,
-  type Agent, type ActionResult, type Caller, type Logger, type GameClient
+  type Agent, type ActionResult, type Caller, type Logger, type GameClient, type DeciderSnapshot
 } from '../../core/index.ts'
 import { getHome, setHome } from '../../skills/navigation.ts'
 import { Blackboard, type BlackboardOptions } from './blackboard.ts'
@@ -493,6 +493,37 @@ export class NpcController {
       ...(this.suspendedBy ? { suspended: this.suspendedBy } : {}),
       ...(this.help.recent(now).length ? { askedForHelp: this.help.observeView(now) } : {}),
       ...this.bb.toJSON()
+    }
+  }
+
+  /**
+   * Read-only plain object for the bot's status (agent.status, status.json): what runs, who holds
+   * the body, the last scores, cooldowns, idle since, last failure and success. Loops that know
+   * their need, goal, reason or last progress fill the optional fields of DeciderSnapshot.
+   */
+  snapshot (): DeciderSnapshot {
+    const now = this.now()
+    const r = this.running
+    const h = this.foreign()
+    const runs = [...this.stats].filter(([, s]) => s.last && s.lastAt)
+    const latest = (kind: string) => runs.filter(([, s]) => s.last!.startsWith(kind + ': '))
+      .sort((a, b) => b[1].lastAt! - a[1].lastAt!)[0]
+    const fail = latest('fail')
+    const ok = latest('ok')
+    return {
+      name: this.name,
+      behavior: r?.behavior.name ?? null,
+      startedAt: r?.startedAt ?? null,
+      score: r ? Math.round(r.score) : null,
+      priority: r?.priority ?? null,
+      holder: h ? `${h.label}@${h.priority}` : null,
+      paused: now < this.pausedUntil ? { until: this.pausedUntil, by: this.yieldedTo } : null,
+      suspended: this.suspendedBy,
+      idleSince: r ? null : this.idleSince || null,
+      scores: [...this.lastScores].sort((a, b) => b.score - a.score).slice(0, 6).map(s => ({ name: s.name, score: Math.round(s.score) })),
+      cooling: [...this.stats].filter(([, s]) => s.cooldownUntil > now).map(([name, s]) => ({ name, until: s.cooldownUntil, failures: s.failures })),
+      lastFailure: fail ? { behavior: fail[0], message: fail[1].last!.slice(6), at: fail[1].lastAt! } : null,
+      lastSuccess: ok ? { behavior: ok[0], message: ok[1].last!.slice(4), at: ok[1].lastAt! } : null
     }
   }
 

@@ -93,6 +93,14 @@ export const ProfileSchema = z.object({
     quietHours: z.tuple([z.number().min(0).max(24), z.number().min(0).max(24)]).optional(),
     observeMinutes: z.number().min(1).max(1440).optional()
   }).strict()]).optional(),
+  /** Status snapshot, status.json and the stuck alert: true/false or options. Lands in settings.status. See docs/guide/status.md. */
+  status: z.union([z.boolean(), z.object({
+    file: z.boolean().optional().describe('write data/bots/<name>/status.json for `node src/cli.ts status` (default true)'),
+    intervalMs: z.number().int().min(1000).max(600_000).optional().describe('sample and file rewrite interval in ms (default 5000)'),
+    alert: z.boolean().optional().describe('whisper online owners when stuck, with back-off (default true)'),
+    stuckAlertMs: z.number().int().min(60_000).max(86_400_000).optional().describe('no progress for this long while it wants to do something = stuck, in ms (default 600000)'),
+    alertMaxMs: z.number().int().min(60_000).max(7 * 86_400_000).optional().describe('largest gap between repeat alerts in ms (default 7200000)')
+  }).strict()]).optional(),
   persona: z.string().optional(),
   server: z.object({
     host: z.string().optional(),
@@ -217,13 +225,13 @@ const HINTS: Record<string, string> = {
   bot: 'the key is variant:'
 }
 
-/** settings.combat / mining / trips / inventoryMemory keys the code reads (the combat.*, mining.*, trips.* and inventoryMemory.* feature toggles). */
+/** settings.combat / mining / trips / inventoryMemory / status keys the code reads (their feature toggles). */
 const toggleKeys = (group: string) => new Set(TOGGLES.filter(t => t.key.startsWith(`${group}.`)).map(t => t.key.slice(group.length + 1)))
-const CHECKED_SETTINGS: Record<string, Set<string>> = { combat: toggleKeys('combat'), mining: toggleKeys('mining'), trips: toggleKeys('trips'), inventoryMemory: toggleKeys('inventoryMemory') }
+const CHECKED_SETTINGS: Record<string, Set<string>> = { combat: toggleKeys('combat'), mining: toggleKeys('mining'), trips: toggleKeys('trips'), inventoryMemory: toggleKeys('inventoryMemory'), status: toggleKeys('status') }
 
 /**
  * Keys in `raw` that `schema` doesn't declare (zod strips them without a word), as dotted paths
- * (see unknownKeys); settings.combat, mining, trips and inventoryMemory are checked against their toggles.
+ * (see unknownKeys); settings.combat, mining, trips, inventoryMemory and status are checked against their toggles.
  */
 export function unknownProfileKeys (raw: unknown, schema: z.ZodType = ProfileSchema): string[] {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
@@ -252,6 +260,7 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (profile.respectBuilds !== undefined) settings.respectBuilds = profile.respectBuilds
   if (profile.selfAware !== undefined) settings.selfAware = profile.selfAware
   if (profile.npcMode !== undefined) settings.npcMode = profile.npcMode
+  if (profile.status !== undefined) settings.status = { ...(settings.status as object | undefined), ...(profile.status === true ? {} : profile.status === false ? { file: false, alert: false } : profile.status) }
   if (profile.askHelp !== undefined) settings.askHelp = { ...(settings.askHelp as object | undefined), ...(typeof profile.askHelp === 'boolean' ? { enabled: profile.askHelp } : profile.askHelp) }
   settings.profileName = name   // so the bot can tell which profile it is (observe: profile)
   if (profile.llm) settings.llm = { ...(settings.llm as object | undefined), ...profile.llm }

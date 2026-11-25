@@ -16,6 +16,11 @@ export {
   type Logger, type Level, type LogEntry, type LogConfig, type LogFields
 } from './log.ts'
 export { Storage } from './storage.ts'
+export {
+  STATUS_DEFAULTS, resolveStatusOptions, assess, idleReason, alertDue, alertText, chatLine as statusChatLine, formatStatus, staleAfter, fmtDuration,
+  type StatusOptions, type DeciderSnapshot, type BotStatus, type StatusState, type DoingView, type Assessment, type AssessInput, type AlertState
+} from './status.ts'
+export { StatusTracker, statusAction, PROGRESS_DISTANCE, type DeciderSource, type StatusAgent } from './statusTracker.ts'
 export { distance } from './format.ts'
 export { Fleet, Blackboard, type FleetMessage, type FleetEvents } from './fleet.ts'
 export { goals, Movements, goto, gotoTimed, travel, reachMovements, type ReachMoves, surfaceY, roofed, TravelUndergroundError, TravelUnderwaterError, swimUp, holdGoal, playerEntity, isHostile, FLYING, nearestHostile, itemName, fmtPos, needsSurvival, gameModeNote } from '../adapters/minecraft-java/helpers.ts'

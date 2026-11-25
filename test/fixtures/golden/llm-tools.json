@@ -3481,6 +3481,14 @@
           "item"
         ]
       }
+    },
+    {
+      "name": "status",
+      "description": "Say what the bot is doing and why (or why it is idle or stuck), how long since it last made progress, health and food, and the last failure. Answers \"status\", \"what are you doing\", \"why are you idle\".",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
     }
   ],
   "profile:pax": [
@@ -6964,6 +6972,14 @@
         "required": [
           "item"
         ]
+      }
+    },
+    {
+      "name": "status",
+      "description": "Say what the bot is doing and why (or why it is idle or stuck), how long since it last made progress, health and food, and the last failure. Answers \"status\", \"what are you doing\", \"why are you idle\".",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
       }
     }
   ]

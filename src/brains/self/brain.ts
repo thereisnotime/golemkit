@@ -163,6 +163,7 @@ export class SelfImprover {
     this.client = bot
     this.startController(bot)
     const game = (this.agent as Agent).adapter
+    const unlist = (this.agent as Agent).status?.addSource(CALLER, () => this.controller?.snapshot() ?? null)
     const spawnedAt = Date.now()
     let lastHurt = 0
     const onHurt = () => {
@@ -192,6 +193,7 @@ export class SelfImprover {
       clearInterval(npcTick)
       if (inbox) clearInterval(inbox)
       this.controller?.stop('session ended')
+      unlist?.()
       this.controller = null
       this.client = null
     }

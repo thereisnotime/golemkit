@@ -45,6 +45,7 @@ export const npcBrain = (opts: NpcOptions) => {
     session (agent, bot) {
       const c = new NpcController(agent, bot, opts)
       controller = c
+      const unlist = agent.status?.addSource(c.name, () => c.snapshot())
       const tick = () => { c.tick().catch(e => agent.log.warn(`npc tick: ${(e as Error).message}`)) }
       // Give the world a moment to load chunks and entities before the first decision.
       const first = setTimeout(tick, 3000)
@@ -53,6 +54,7 @@ export const npcBrain = (opts: NpcOptions) => {
         clearTimeout(first)
         clearInterval(timer)
         c.stop('session ended')
+        unlist?.()
         if (controller === c) controller = null
       }
     },
