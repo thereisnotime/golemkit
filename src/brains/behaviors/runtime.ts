@@ -131,6 +131,7 @@ export class BehaviorRuntime {
       runningFor: cs?.runningFor ?? 0,
       paused: cs?.paused ?? null,
       ...(cs?.askedForHelp ? { askedForHelp: cs.askedForHelp } : {}),
+      snapshot: c?.snapshot() ?? null,
       connected: !!c
     }
   }

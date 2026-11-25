@@ -8,7 +8,7 @@
 //
 // See docs/guide/behaviors.md.
 import { defineBrain, type Agent } from '../../core/index.ts'
-import { NpcController, INTERRUPT_ACTION, helpDesk, type SelectOptions, type BlackboardOptions } from '../npc/index.ts'
+import { NpcController, NeedsLayer, INTERRUPT_ACTION, helpDesk, type SelectOptions, type BlackboardOptions, type NeedsProvider } from '../npc/index.ts'
 import type { Caller } from '../../core/index.ts'
 import { defineAction, noParams, ok } from '../../core/index.ts'
 import { BehaviorRegistry } from './registry.ts'
@@ -16,6 +16,7 @@ import { BehaviorRuntime } from './runtime.ts'
 import { mergeConfigs, validateBehaviorConfig, type BehaviorConfig } from './config.ts'
 import { attachRuntime, behaviorActions, fmtOptions, runtimeFor } from './actions.ts'
 import { defaultBehaviors } from '../../adapters/minecraft-java/behaviors/index.ts'
+import { minecraftNeeds } from '../../adapters/minecraft-java/needs/index.ts'
 import { runtimeOf as sceneRuntimeOf } from '../scene/runtime.ts'
 
 export interface BehaviorsBrainOptions extends SelectOptions, BlackboardOptions {
@@ -31,6 +32,11 @@ export interface BehaviorsBrainOptions extends SelectOptions, BlackboardOptions 
   backoffMs?: Partial<Record<Caller['kind'], number>>
   /** Set home to the spawn point when none is set. Default false: return_home etc. use an explicit home. */
   autoHome?: boolean
+  /**
+   * The needs layer's provider (needs, idle chores, site checks), or false for none. Default: the
+   * Minecraft Java adapter's. settings.needs / idle / sites tune it (docs/guide/needs-and-idle.md).
+   */
+  needs?: NeedsProvider | false
 }
 
 let shared: BehaviorRegistry | null = null
@@ -130,6 +136,7 @@ export const behaviorsBrain = (opts: BehaviorsBrainOptions = {}) => {
         name,
         autoHome: opts.autoHome ?? false,
         behaviors: () => rt.behaviors(),
+        needs: opts.needs === false ? null : new NeedsLayer(agent, opts.needs ?? minecraftNeeds(agent), { log: rt.log }),
         hooks: () => rt.hooks(),
         // a scene holds the body at PRIORITY.scene (25), below armed behaviours (35): without this
         // keep_fed or bodyguard would walk the actor off mid-scene. Reflexes still cover emergencies.
@@ -153,7 +160,8 @@ export const behaviorsBrain = (opts: BehaviorsBrainOptions = {}) => {
       if (!rt) return {}
       // what it asked the owners for help with lately (settings.askHelp), so an LLM knows it is waiting
       const asked = helpDesk(agent).observeView(Date.now())
-      return { behaviors: { armed: rt.armed().map(a => a.name), running: rt.controller?.current ?? null }, ...(asked.length ? { askedForHelp: asked } : {}) }
+      const snap = rt.controller?.snapshot()
+      return { behaviors: { armed: rt.armed().map(a => a.name), running: rt.controller?.current ?? null, ...(snap?.idleMode ? { need: snap.need, needUrgency: snap.needUrgency, idleMode: snap.idleMode, ...(snap.reason && snap.behavior ? { why: snap.reason } : {}) } : {}) }, ...(asked.length ? { askedForHelp: asked } : {}) }
     },
     stop (agent) {
       runtimeFor(agent)?.controller?.stop('stopped')

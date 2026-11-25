@@ -110,6 +110,12 @@ behaviors:
   light_home: { radius: 24, farmRadius: 14, target: 8, maxTorches: 12 }
   check_storage: { max: 3 }   # with settings.inventoryMemory.indexOwn: looks into its chests near home now and then
   anti_afk: { afterSeconds: 45 }   # small look/swing/hop so idle-kick servers don't drop it
+# Needs and idle mode (docs/guide/needs-and-idle.md). Pax stood around for hours: its farm froze over
+# (0 cells of work, 35 seeds in the pantry) and it had no iron armour because it only used ore in sight.
+# Site health drops a flooded or frozen farm and starts a new one near home; the gear need goes looking
+# for exposed iron ore within 160 blocks by day (a trip, then home) when nothing in sight helps. When
+# nothing needs doing it does chores near home: tidy its chests, wood and seeds, the farm, torches, scouting.
+idle: active
 # Plain-language commands without the LLM (docs/guide/intents.md): "pax follow me", "pax chop some
 # wood". first = simple requests are handled directly (no tokens), everything else goes to the LLM.
 intents:

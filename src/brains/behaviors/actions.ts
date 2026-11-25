@@ -106,7 +106,9 @@ export const behaviorStatus = defineAction({
     const paused = s.paused ? `, backing off ${s.paused.seconds}s for ${s.paused.by ?? '?'}` : ''
     const asked = (s as { askedForHelp?: { behavior: string, reason: string, minutesAgo: number, sorted: boolean }[] }).askedForHelp ?? []
     const help = asked.length ? ` | asked for help: ${asked.map(a => `${a.behavior} (${a.reason}, ${a.minutesAgo}m ago${a.sorted ? ', sorted' : ''})`).join('; ')}` : ''
-    return ok(`armed: ${armed.join('; ')} | ${run}${paused}${help}`, s)
+    const snap = (s as { snapshot?: { need: string | null, needUrgency: number | null, urgent: string[], idleMode: string | null, reason: string | null } | null }).snapshot
+    const drives = snap && snap.idleMode ? ` | top need ${snap.need ? `${snap.need} ${snap.needUrgency}${snap.urgent.includes(snap.need) ? ' (urgent)' : ''}` : 'none'}, idle mode ${snap.idleMode}${s.running && snap.reason ? `, because ${snap.reason}` : ''}` : ''
+    return ok(`armed: ${armed.join('; ')} | ${run}${paused}${drives}${help}`, s)
   }
 })
 
