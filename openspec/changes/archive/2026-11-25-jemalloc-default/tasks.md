@@ -1,0 +1,3 @@
+- [x] justfile `GOLEM_MALLOC` (auto/system/path) for run, dev, fleet
+- [x] Containerfile installs and preloads jemalloc
+- [x] docs: deployment memory section, config reference

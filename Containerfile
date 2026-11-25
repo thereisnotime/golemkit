@@ -7,6 +7,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
+# jemalloc gives back the native memory a busy bot used; glibc keeps it (docs/guide/deployment.md#memory).
+# Run with -e LD_PRELOAD= to use glibc instead.
+RUN apt-get update && apt-get install -y --no-install-recommends libjemalloc2 && rm -rf /var/lib/apt/lists/* \
+  && ln -s "$(ls /usr/lib/*-linux-gnu/libjemalloc.so.2)" /usr/local/lib/libjemalloc.so.2
+ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so.2
 COPY src ./src
 COPY variants ./variants
 COPY profiles ./profiles

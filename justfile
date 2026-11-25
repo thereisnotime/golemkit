@@ -10,6 +10,13 @@ export NODE_COMPILE_CACHE := env("NODE_COMPILE_CACHE", justfile_directory() / "n
 # time (measured: docs/guide/deployment.md#memory). GOLEM_NODE_FLAGS="" uses V8's defaults.
 node_flags := env("GOLEM_NODE_FLAGS", "--max-semi-space-size=8")
 
+# Malloc for bot processes. glibc keeps the native memory a busy bot used (scouting, long paths);
+# jemalloc gives it back: Pax on mc02 went from 265 to about 210 MB. GOLEM_MALLOC=auto (default)
+# preloads jemalloc when it's installed, =system keeps glibc, or give a path to a .so.
+# docs/guide/deployment.md#memory
+malloc_preload := `m="${GOLEM_MALLOC:-auto}"; case "$m" in system|off|"") ;; auto) for p in /usr/lib64/libjemalloc.so.2 /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/lib/aarch64-linux-gnu/libjemalloc.so.2 /usr/lib/libjemalloc.so.2 /usr/local/lib/libjemalloc.so.2; do [ -f "$p" ] && { echo "$p"; break; }; done ;; *) [ -f "$m" ] && echo "$m" ;; esac; true`
+node := if malloc_preload == "" { "node" } else { "LD_PRELOAD=" + malloc_preload + " node" }
+
 # Show available recipes
 [group('help')]
 default:
@@ -27,19 +34,19 @@ setup:
 [group('run')]
 run name="buddy" *args:
     @echo "{{BOLD}}{{GREEN}}==> starting {{name}}{{NORMAL}}"
-    node {{node_flags}} --env-file-if-exists=.env src/cli.ts run {{name}} {{args}}
+    {{node}} {{node_flags}} --env-file-if-exists=.env src/cli.ts run {{name}} {{args}}
 
 # Same as run, restarting on file changes
 [group('run')]
 dev name="buddy" *args:
     @echo "{{BOLD}}{{GREEN}}==> starting {{name}} (watch mode){{NORMAL}}"
-    node {{node_flags}} --watch --env-file-if-exists=.env src/cli.ts run {{name}} {{args}}
+    {{node}} {{node_flags}} --watch --env-file-if-exists=.env src/cli.ts run {{name}} {{args}}
 
 # Run a fleet (fleets/<name>.yaml or a file path) in one process
 [group('run')]
 fleet name="example" *args:
     @echo "{{BOLD}}{{GREEN}}==> starting fleet {{name}}{{NORMAL}}"
-    node {{node_flags}} --env-file-if-exists=.env src/cli.ts fleet {{name}} {{args}}
+    {{node}} {{node_flags}} --env-file-if-exists=.env src/cli.ts fleet {{name}} {{args}}
 
 # List variants, profiles and fleets
 [group('bots')]

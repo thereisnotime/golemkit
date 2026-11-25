@@ -129,9 +129,12 @@ the process, and `--max-semi-space-size=8` caps V8's young generation. Where the
 - **Work peaks: up to 100+ MB, for a while.** Scouting and long paths keep 100+ MB of
   short-lived objects (heap used goes from about 65 to 110–140 MB) and glibc's malloc does not
   give the native part back afterwards: in the busy runs `other` stayed 30–80 MB higher after a
-  scout. With jemalloc (`LD_PRELOAD=/usr/lib64/libjemalloc.so.2 just run pax`, one busy run)
-  the process went back to 190–198 MB after the same kind of scout; it is not the default
-  because it depends on the system library.
+  scout. jemalloc gives it back: on mc02, Pax settled at 265 MB with glibc and at 210–220 MB
+  with jemalloc (`other` 135 → about 90 MB), and a busy local run went back to 190–198 MB after
+  the same kind of scout. `just run`, `just dev` and `just fleet` preload jemalloc when it is
+  installed (`GOLEM_MALLOC=auto`, the default; `=system` keeps glibc, or give a path to a
+  `.so`), and the image installs it and sets `LD_PRELOAD` (`-e LD_PRELOAD=` for glibc).
+  Install it with `dnf install jemalloc` or `apt install libjemalloc2`.
 - **A second bot costs about 40 to 50 MB in a fleet** (its own chunk store, about 30 MB, plus
   its brains and state) **and about 200 MB or more as a separate process**, so put bots that
   share a machine in one fleet.
