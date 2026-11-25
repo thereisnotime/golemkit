@@ -1,0 +1,3 @@
+- [x] `keepWhenPathing` / `protectFromPathing` in `noBreak.ts`, applied to the bot's Movements on spawn
+- [x] unit test: every 1.21.1 bed lands in `blocksCantBreak`, terrain stays diggable
+- [x] docs: stay-safe / world notes

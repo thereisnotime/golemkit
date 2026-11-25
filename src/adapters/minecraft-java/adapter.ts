@@ -23,6 +23,7 @@ import { watchDeaths } from './deaths.ts'
 import { waterStepExclusion, trackOwnAir } from './air.ts'
 import { LIQUID_COST } from '../../skills/airPlan.ts'
 import { resolveViewDistance, viewDistanceChunks } from './viewDistance.ts'
+import { protectFromPathing } from './noBreak.ts'
 import './types.ts'
 
 type EventName = keyof AdapterEvents
@@ -120,6 +121,8 @@ export class MinecraftJavaAdapter implements GameAdapter {
       // into a ravine pool. Normal max drop (4) still applies.
       ;(moves as { infiniteLiquidDropdownDistance?: boolean }).infiniteLiquidDropdownDistance = false
       moves.exclusionAreasBreak.push(agent.protectedAreas.breakCost)
+      // never tunnel through beds, storage, workstations, doors, torches or farmland (noBreak.ts)
+      protectFromPathing(bot, moves)
       // Keep out of water when a dry path exists, and out from under ice above all: Pax drowned
       // under the frozen lake by its home on the way to its pantry (skills/airPlan.ts).
       ;(moves as { liquidCost?: number }).liquidCost = LIQUID_COST

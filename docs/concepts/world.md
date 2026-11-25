@@ -729,6 +729,16 @@ or an owner passes `replace=true`. Spawn protection applies either way: the serv
 Other places still prefer natural sources whatever the setting: woodcutting fells real trees,
 strip mining digs natural stone, farm sites avoid builds.
 
+## Paths go around base blocks
+
+With digging allowed the pathfinder may tunnel, but never through beds, storage (chests,
+barrels, shulker boxes, hoppers), workstations, doors, trapdoors, fence gates, signs, banners,
+torches, lanterns, glass or farmland: the Minecraft adapter adds all of them to its never-break
+set (`src/adapters/minecraft-java/noBreak.ts`), so paths go around. Mineflayer-pathfinder only
+protects chests by itself, and Pax used to walk home through its own bed, pick it up, put it back
+and lose its respawn point every few minutes. Explicit digs (`dig`, `clear_area`, building) are
+not affected.
+
 ## Travel stays on the surface
 
 Long trips (`travel`, used by `goto`, scouting and going home) go in legs of about 64 blocks. Each
