@@ -277,7 +277,7 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
         for (const line of helpLines(agent.username)) reply(line)
         return
       }
-      case 'status': return reply(statusLine(agent))
+      case 'status': return reply(agent.status ? agent.status.chatLine() : statusLine(agent))
       case 'where': {
         const o = agent.observe() as { position?: string, dimension?: string, connected?: boolean }
         return reply(o.connected === false ? 'not connected' : `at ${o.position} in ${String(o.dimension ?? '?').replace('minecraft:', '')}`)

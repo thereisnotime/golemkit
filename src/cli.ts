@@ -3,6 +3,7 @@
 //   node src/cli.ts fleet <name|file.yaml>        (fleets/<name>.yaml)
 //   node src/cli.ts list
 //   node src/cli.ts actions <profile|variant>
+//   node src/cli.ts status [name] [--json] [--watch]   (reads data/bots/**/status.json)
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -11,6 +12,7 @@ import { Agent, Fleet, serverFromEnv, createLogger, configureLogging, installCra
 import { parseFleetFile, resolveUsername, fleetServerConfig, fleetAddresses } from './core/fleetFile.ts'
 import { loadProfile, mergeOptions, PROFILES_DIR, type LoadedProfile } from './core/profile.ts'
 import { validateBehaviorConfig, defaultBehaviorRegistry } from './brains/behaviors/index.ts'
+import { formatStatus, staleAfter, fmtDuration, type BotStatus } from './core/status.ts'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const VARIANTS_DIR = join(ROOT, 'variants')
@@ -71,6 +73,54 @@ function runFleet (fleet: Fleet, staggerMs: number | ((server: string) => number
   fleet.start(staggerMs)
 }
 
+/** Every status.json under data/bots/ (data/bots/<bot>/ and data/bots/<server>/<bot>/), relative to the working directory like the agents' data. */
+function findStatusFiles (root = join('data', 'bots')): string[] {
+  if (!existsSync(root)) return []
+  const out: string[] = []
+  for (const d of readdirSync(root, { withFileTypes: true })) {
+    if (!d.isDirectory()) continue
+    const dir = join(root, d.name)
+    if (existsSync(join(dir, 'status.json'))) out.push(join(dir, 'status.json'))
+    for (const sub of readdirSync(dir, { withFileTypes: true })) {
+      if (sub.isDirectory() && existsSync(join(dir, sub.name, 'status.json'))) out.push(join(dir, sub.name, 'status.json'))
+    }
+  }
+  return out.sort()
+}
+
+function readStatus (file: string): BotStatus | null {
+  try { return JSON.parse(readFileSync(file, 'utf8')) as BotStatus } catch { return null }
+}
+
+/** `status [name]`: one bot in detail (by username, profile or data dir name), or one line per bot. */
+function printStatus (name: string | undefined, json: boolean): boolean {
+  const all = findStatusFiles().map(f => ({ file: f, s: readStatus(f) })).filter((x): x is { file: string, s: BotStatus } => !!x.s)
+  const now = Date.now()
+  const want = name?.toLowerCase()
+  const hits = want ? all.filter(x => x.s.bot.toLowerCase() === want || x.s.profile?.toLowerCase() === want || x.file.split(/[\\/]/).at(-2)?.toLowerCase() === want) : all
+  if (!hits.length) {
+    console.error(want ? `no status for "${name}" (looked in data/bots/*/status.json; is the bot running with settings.status.file on?)` : 'no status files under data/bots/ (no bot has run with settings.status.file on)')
+    return false
+  }
+  if (json) {
+    console.log(JSON.stringify(want && hits.length === 1 ? hits[0]!.s : hits.map(x => x.s), null, 2))
+    return true
+  }
+  if (!want && hits.length > 1) {
+    for (const { s } of hits) {
+      const stale = now - s.updatedAt > staleAfter(s)
+      console.log(`${s.bot.padEnd(14)} ${(stale ? 'not running' : s.state).padEnd(11)} ${stale ? `last update ${fmtDuration(now - s.updatedAt)} ago` : s.summary}`)
+    }
+    return true
+  }
+  for (const [i, { s, file }] of hits.entries()) {
+    if (i) console.log('')
+    for (const line of formatStatus(s, now)) console.log(line)
+    console.log(`  file      ${file}`)
+  }
+  return true
+}
+
 async function main (): Promise<void> {
   const { positionals, values } = parseArgs({
     allowPositionals: true,
@@ -85,7 +135,9 @@ async function main (): Promise<void> {
       'log-file': { type: 'string' },
       'log-dir': { type: 'string' },
       verbose: { type: 'boolean', short: 'v' },
-      quiet: { type: 'boolean', short: 'q' }
+      quiet: { type: 'boolean', short: 'q' },
+      json: { type: 'boolean' },
+      watch: { type: 'boolean', short: 'w' }
     }
   })
   installCrashHandlers(log)
@@ -169,6 +221,16 @@ async function main (): Promise<void> {
       }
       break
     }
+    case 'status': {
+      if (values.watch) {
+        const draw = () => { process.stdout.write('\x1b[2J\x1b[H'); printStatus(arg, !!values.json) }
+        draw()
+        setInterval(draw, 2000)
+        await new Promise(() => {})
+      }
+      if (!printStatus(arg, !!values.json)) process.exitCode = 1
+      break
+    }
     default:
       console.log([
         'usage: cli.ts <command> [options]',
@@ -176,6 +238,7 @@ async function main (): Promise<void> {
         '  fleet <name|file>      run fleets/<name>.yaml or a file',
         '  list                   variants, profiles and fleets',
         '  actions <name>         a profile\'s or variant\'s actions',
+        '  status [name]          what a running bot is doing and why (data/bots/**/status.json) [--json] [-w|--watch]',
         'logging: [-l|--log-level SPEC] [--log-format pretty|plain|json] [--log-file F] [--log-dir D] [-v|--verbose] [-q|--quiet]'
       ].join('\n'))
       process.exitCode = cmd ? 1 : 0

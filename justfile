@@ -41,6 +41,11 @@ bots:
 actions name="buddy":
     @node src/cli.ts actions {{name}}
 
+# What a running bot is doing and why, from its status file (no name: every bot; --json, -w to watch)
+[group('bots')]
+status name="" *args:
+    @node src/cli.ts status {{name}} {{args}}
+
 # Connect once, report how far login gets, then quit
 [group('debug')]
 probe:
