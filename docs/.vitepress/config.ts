@@ -90,6 +90,7 @@ export default withMermaid(defineConfig({
         items: [
           { text: 'Behaviours and bodyguard', link: '/guide/behaviors' },
           { text: 'NPC brain', link: '/guide/npc-brain' },
+          { text: 'Needs and idle modes', link: '/guide/needs-and-idle' },
           { text: 'Self-improver', link: '/guide/self-improver' },
           { text: 'Scenes', link: '/guide/scenes' }
         ]

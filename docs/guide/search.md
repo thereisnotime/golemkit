@@ -19,7 +19,7 @@ actions. "Where's my X" is answered from [container memory](#container-memory) b
 
 | action | |
 |---|---|
-| `find_target` | `target` (a word), `radius` (160), `max_minutes` (8), `bring` + `count` (also fetch some), `go` (walk there and stay instead of coming back), `prospect` (strip mine for ores), `at_night`. |
+| `find_target` | `target` (a word), `radius` (160), `max_minutes` (8), `bring` + `count` (also fetch some), `go` (walk there and stay instead of coming back), `prospect` (strip mine for ores), `at_night`, `exposed` (ores: only ore with an open face, as the [gear search](/guide/needs-and-idle#going-looking) uses). |
 | `bring_item` | `item`, `count` (1), `player` (default the asker), `max_minutes` (10, for a search). |
 | `fetch_drops` | `player` (default the asker), `x y z` when the bot didn't see the death, `try_anyway`. |
 | `where_stored` | `item` (a name or a word of it): where it remembers seeing it in a chest, with the position and how long ago ([container memory](#container-memory)). Quick, not long-running. |

@@ -58,6 +58,11 @@ behind an adapter interface, so the core, brains and intents don't depend on Min
   daylight runs short, a bed at home as respawn point, torches around home and farms so mobs
   stop spawning there, going back for their own drops after a death, and one whisper to the
   owner when a behaviour keeps failing the same way instead of looping for hours.
+- **Never just stand there.** Needs (stay safe, fed, geared up, supplied, rested) push the
+  behaviours that serve them and go looking, within limits, when nothing in sight helps (no iron
+  ore near: a short scouting trip for some). Places it depends on are checked: a farm under a
+  frozen lake is dropped and a new one started near home. With nothing to do, an idle mode picks
+  chores near home (`idle: active`) or just looks around.
 - **Find and fetch.** Search for ores, mobs, water, villages or biomes, then bring items from
   their own chests, crafting, smelting or gathering, and recover an owner's drops after a death.
   Optionally remember what is in their chests across restarts ("where's my iron?") and notice
@@ -114,6 +119,7 @@ behind an adapter interface, so the core, brains and intents don't depend on Min
 | Trips (`settings.trips`, `prepare_trip`, turn back on food or daylight) | ✅ | seen in the survival benchmark; [trips](docs/guide/behaviors.md#trips) |
 | Asking the owners for help (`askHelp`) | ✅ | [asking for help](docs/guide/behaviors.md#asking-for-help) |
 | Going back for its own drops after a death (`recover_drops`, `recover_items`) | ✅ | live test in [behaviours](docs/guide/behaviors.md#death-drops-recover_drops) |
+| Needs, site health and idle modes (`needs`, `sites`, `idle`) | 🧪 | unit tested, survival bench `--bad-farm`; [needs and idle modes](docs/guide/needs-and-idle.md) |
 | Status snapshot (`just status`, `!status`, `status.json`) and stuck alerts (`settings.status`) | 🧪 | unit tested, no live run recorded yet; [status](docs/guide/status.md) |
 | Death cause reports for hooks and the LLM | ✅ | causes show up in the survival benchmark; [journal](docs/guide/journal.md#what-is-recorded) |
 | Container memory (`settings.inventoryMemory`, `check_storage`, `where_stored`) | ✅ | live run in [search](docs/guide/search.md#container-memory) |
@@ -202,7 +208,7 @@ Guides worth starting with:
 - [Goals and building](docs/guide/goals-and-building.md), [blueprints](docs/guide/blueprints.md), [roads](docs/guide/roads.md), [WorldEdit](docs/guide/worldedit.md)
 - [Tool progression](docs/guide/progression.md): tools, mining, what to do when digging gives nothing
 - [Live config](docs/guide/live-config.md) and [profiles](docs/guide/profiles.md)
-- [NPC brain](docs/guide/npc-brain.md), [self-improving NPCs](docs/guide/self-improver.md), [scenes](docs/guide/scenes.md)
+- [NPC brain](docs/guide/npc-brain.md), [needs, site health and idle modes](docs/guide/needs-and-idle.md), [self-improving NPCs](docs/guide/self-improver.md), [scenes](docs/guide/scenes.md)
 - [Context packs](docs/guide/context-pack.md), the [journal](docs/guide/journal.md) and [status and stuck alerts](docs/guide/status.md)
 - Concepts: [architecture](docs/concepts/architecture.md), [world, movement and combat](docs/concepts/world.md), [combat research](docs/concepts/combat-research.md)
 - [What is game-specific](docs/concepts/scope.md): which code is game-agnostic, Minecraft-specific or NeoForge-specific, and the [game adapters](docs/concepts/adapters.md) that keep them apart

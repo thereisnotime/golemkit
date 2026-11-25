@@ -745,7 +745,7 @@ What happened: recent journal events (deaths, damage, kills, items, chat, action
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help; or deaths, chat, items, blocks, players, actions, places, combat, llm, connections, food, finds, stuck, chests, containers, storage |
+| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help, site; or deaths, chat, items, blocks, players, actions, places, combat, llm, connections, food, finds, stuck, sites, chests, containers, storage |
 | `since` | string |  |  | how far back: 30m, 1h, 2d, today, yesterday, a date (YYYY-MM-DD); default 24h |
 | `player` | string |  |  | only events involving this player |
 | `near` | string |  |  | only events near "x y z" or "x z", optionally with a radius as 4th number (default 32) |
@@ -1163,6 +1163,7 @@ Find something and report where it is: blocks and families (iron, diamonds, coal
 | `go` | boolean |  | `false` | walk there and stay, instead of coming back to report |
 | `prospect` | boolean |  | `false` | ores: strip mine for it when none is in sight (always on with bring) |
 | `at_night` | boolean |  | `false` | also scout at night (dangerous) |
+| `exposed` | boolean |  | `false` | ores: only count ore with an open face (a cave wall, a cliff), not ore buried in rock |
 
 ### `bring_item`
 

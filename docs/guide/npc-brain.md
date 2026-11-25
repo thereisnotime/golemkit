@@ -7,7 +7,7 @@ scopeNote: "The utility-AI loop is game-agnostic; the stock behaviours (sleep, e
 
 `npcBrain()` (src/brains/npc/) makes a bot live on its own: wander near home, go back at
 night, sleep, eat, deal with mobs, notice players, do chores when it has the skills. It is a
-utility-AI loop you configure with behaviours. For behaviours that owners and LLMs switch on and tune at runtime, see [Behaviours](behaviors.md), which runs on the same controller. `variants/villager.ts` is the worked example. For brains in general see [Writing brains](writing-brains.md).
+utility-AI loop you configure with behaviours. For behaviours that owners and LLMs switch on and tune at runtime, see [Behaviours](behaviors.md), which runs on the same controller. `variants/villager.ts` is the worked example. For brains in general see [Writing brains](writing-brains.md). What it does when nothing scores (needs, going looking, idle modes) and how it notices that a farm or bed went bad is in [Needs, site health and idle modes](needs-and-idle.md).
 
 ```ts
 import { npcBrain, wander, goHome, sleepAtNight, fleeOrFight, greetPlayers, actionBehavior } from '../src/brains/npc/index.ts'

@@ -1990,6 +1990,9 @@ behaviorsBrain({ registry: new BehaviorRegistry([...defaultBehaviors(), fishAtDa
 - `!behavior_status`: armed set with non-default options, what runs, last outcome per
   behaviour, cooldowns and back-off. The result `data` has the full JSON.
 - `-l info,<bot>/behaviors=debug` logs every start, switch, stop, back-off and cooldown.
+- With nothing armed scoring, the controller doesn't just stand there: the [needs layer and idle
+  mode](./needs-and-idle) run a search (`need:gear`) or a chore (`idle:tidy_storage`), shown in
+  `!behavior_status` with the top need and why.
 
 ## NPC mode (when the LLM can't think)
 

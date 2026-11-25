@@ -109,6 +109,27 @@ can't change their own.
 | `inventoryMemory.grumble` | on/off | grumble once in chat when its own chest is raided, moved or broken (default off) |
 | `inventoryMemory.grumbleTo` | owners / say | whisper the owners online, or public chat (default owners) |
 | `inventoryMemory.grumbleHours` | 0–168 | at most one grumble per chest this often (default 3) |
+| `needs.enabled` | on/off | the [needs layer](./needs-and-idle): boosts for urgent needs and going looking (default on) |
+| `needs.boost` | 0–60 | score added to a behaviour serving an urgent need, at urgency 1 (default 15) |
+| `needs.search.enabled` | on/off | go looking when a need has no visible way to be met (default on) |
+| `needs.search.radius` | 16–512 | how far a search may go, in blocks (default 160) |
+| `needs.search.minutes` | 1–30 | give a search up after this long (default 6) |
+| `needs.search.cooldownMinutes` | 1–1440 | minutes between searches for one need (default 30) |
+| `needs.search.perDay` | 0–100 | searches per need a day at most (default 6) |
+| `needs.search.atNight` | on/off | also search at night (default off) |
+| `needs.<need>.enabled` | on/off | `safety`, `food`, `gear`, `supplies`, `rest`: on or off; reset = on when a behaviour serving it is armed |
+| `needs.<need>.threshold` | 0–1 | urgency from which the need boosts its behaviours and may search (default 0.5) |
+| `idle.mode` | off / passive / idle / active / explore | what it does when nothing else scores ([idle modes](./needs-and-idle#idle-modes); default idle) |
+| `idle.radius` | 4–256 | idle and active chores stay this close to home (default 24) |
+| `idle.exploreRadius` | 32–1024 | explore mode: how far a scouting trip goes (default 200) |
+| `idle.exploreMinutes` | 1–30 | explore mode: how long a scouting trip may take (default 8) |
+| `idle.chores.<chore>` | on/off | one idle chore on or off (`!config_set idle.chores.scout_nearby off`) |
+| `sites.enabled` | on/off | [site health](./needs-and-idle#site-health): check the farm, bed, chests and home and mark bad ones (default on) |
+| `sites.failures` | 1–20 | unreachable or no-work checks in a row before a site is bad (default 3) |
+| `sites.checkMinutes` | 0.5–240 | one site checked at most this often (default 5) |
+| `sites.recheckHours` | 0.1–720 | a bad site is looked at again after this long (default 6) |
+| `sites.replace` | on/off | replace a bad site when it can (a new farm near home; default on) |
+| `sites.tell` | on/off | whisper the owners when a site goes bad or is fine again (default on) |
 | `humanize.enabled` | on/off | player-like reaction and typing delays |
 | `humanize.typoRate` | 0–1 | chance of a typo per message |
 | `humanize.lowercase` | on/off | write chat in lower case |
@@ -143,7 +164,7 @@ can't change their own.
 | `retry.actions.<action>` | 0–10 | extra attempts after a failed action |
 
 In a profile, the `reflexes.*` values go under `reflexes:`, the `askHelp.*` values under the
-top-level `askHelp:` key, the `status.*` values under the top-level `status:` key (or `settings.status`), and the `combat.*`, `mining.*`, `trips.*` and `inventoryMemory.*`
+top-level `askHelp:` key, the `status.*` values under the top-level `status:` key (or `settings.status`), the `needs.*`, `idle.*` and `sites.*` values under the top-level `needs:`, `idle:` and `sites:` keys, and the `combat.*`, `mining.*`, `trips.*` and `inventoryMemory.*`
 values under `settings:` (`settings: { combat: { pvp: defend } }`). A top-level `combat:` key
 is ignored with a warning, and so is any key under `settings.combat`, `settings.mining`,
 `settings.trips` or `settings.inventoryMemory` that is not in the table above (see
