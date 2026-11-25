@@ -162,6 +162,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'build.creativeMethod', description: 'creative builds: hand (block by block like a player) | commands (/fill and /setblock when op; shown to other ops) | auto (= hand)', schema: z.enum(['auto', 'hand', 'commands']) },
   { key: 'build.handDelayMs', description: 'pause after each block in a creative hand build (ms, jittered)', schema: z.number().int().min(0).max(5000) },
   { key: 'world.spawnProtection', description: "the server's spawn-protection radius (server.properties, default 16): crafting tables and furnaces go outside it", schema: z.number().int().min(0).max(256) },
+  { key: 'world.viewDistance', description: 'chunks around the bot the client asks for: tiny (6) | short (8) | normal (10) | far (12, default) or 2-32; fewer = less memory, but blocks and mobs further out are not seen (the server caps it at its own view-distance)', schema: z.union([z.enum(['tiny', 'short', 'normal', 'far']), z.number().int().min(2).max(32)]) },
   { key: 'road.width', description: 'lanes of a new road (1, 3 or 5)', schema: z.number().int().min(1).max(5) },
   { key: 'road.palette', description: 'road look: stone_bricks | cobblestone | stone | oak | spruce', schema: z.enum(['stone_bricks', 'cobblestone', 'stone', 'oak', 'spruce']) },
   { key: 'road.maxCut', description: 'deepest a road may cut into the ground (blocks)', schema: z.number().int().min(0).max(16) },

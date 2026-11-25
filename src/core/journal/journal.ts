@@ -88,6 +88,11 @@ export class Journal {
     this.limiter = new RateLimiter(this.config.caps)
   }
 
+  /** Events waiting for the next flush. */
+  get buffered (): number {
+    return this.buffer.length
+  }
+
   get enabled (): boolean {
     return this.config.enabled
   }

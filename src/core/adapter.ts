@@ -197,6 +197,8 @@ export interface GameAdapter {
   playerPosition? (name: string): Pos | null
   /** Low health or food, night, or hostiles close (the LLM brain lets safety behaviours win then). */
   inDanger? (): boolean
+  /** Cheap counts of what the client holds (loaded chunks, entities, ...), for GOLEM_MEMLOG. */
+  memStats? (): Record<string, number>
 }
 
 /**

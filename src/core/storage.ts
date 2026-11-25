@@ -35,6 +35,11 @@ export class Storage {
     return Object.keys(this.data)
   }
 
+  /** Size of the stored JSON in bytes (serialises it: for diagnostics, not hot paths). */
+  approxBytes (): number {
+    return JSON.stringify(this.data).length
+  }
+
   /** Writes immediately (also called on shutdown). */
   flush (): void {
     if (this.timer) { clearTimeout(this.timer); this.timer = null }

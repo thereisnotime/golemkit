@@ -22,6 +22,7 @@ import { JournalCapture } from './journal-capture.ts'
 import { watchDeaths } from './deaths.ts'
 import { waterStepExclusion, trackOwnAir } from './air.ts'
 import { LIQUID_COST } from '../../skills/airPlan.ts'
+import { resolveViewDistance, viewDistanceChunks } from './viewDistance.ts'
 import './types.ts'
 
 type EventName = keyof AdapterEvents
@@ -80,7 +81,8 @@ export class MinecraftJavaAdapter implements GameAdapter {
       version: server.version,
       profilesFolder: '.auth',
       checkTimeoutInterval: 60_000,
-      hideErrors: true
+      hideErrors: true,
+      viewDistance: resolveViewDistance(getPath(agent.settings, 'world.viewDistance')) as any
     })
     for (const s of this.subs) { for (const off of s.offs) off(); s.offs = [] }
     this.bot = bot
@@ -295,6 +297,23 @@ export class MinecraftJavaAdapter implements GameAdapter {
     return !!this.bot && inDanger(this.bot)
   }
 
+  memStats (): Record<string, number> {
+    const bot = this.bot
+    if (!bot) return { session: 0 }
+    const listeners = (em: { eventNames (): (string | symbol)[], listenerCount (e: string | symbol): number } | undefined): number =>
+      em ? em.eventNames().reduce((n, e) => n + em.listenerCount(e), 0) : 0
+    const columns = (bot.world as unknown as { async?: { columns?: Record<string, unknown> } })?.async?.columns
+    return {
+      chunks: columns ? Object.keys(columns).length : -1,
+      viewDistance: viewDistanceChunks(bot.settings?.viewDistance) ?? -1,
+      serverViewDistance: (bot.game as { serverViewDistance?: number })?.serverViewDistance ?? -1,
+      entities: Object.keys(bot.entities ?? {}).length,
+      players: Object.keys(bot.players ?? {}).length,
+      botListeners: listeners(bot as unknown as Parameters<typeof listeners>[0]),
+      clientListeners: listeners(bot._client as unknown as Parameters<typeof listeners>[0])
+    }
+  }
+
   // ---------------------------------------------------------------- chat and primitives
 
   chat (text: string, to?: string): Promise<void> {
@@ -330,6 +349,10 @@ export class MinecraftJavaAdapter implements GameAdapter {
     const bot = this.bot as any
     if (bot?.pathfinder?.movements && (key === 'canDig' || key === '*')) bot.pathfinder.movements.canDig = this.agent.canDig
     if (bot?.pathfinder && (key.startsWith('pathfinder') || key === '*')) this.applyPathfinderSettings(bot)
+    if (this.spawned && bot?.setSettings && (key === 'world.viewDistance' || key === 'world' || key === '*')) {
+      const vd = resolveViewDistance(getPath(this.agent.settings, 'world.viewDistance'))
+      if (bot.settings?.viewDistance !== vd) { try { bot.setSettings({ viewDistance: vd }) } catch (e) { this.agent.log.warn(`viewDistance: ${(e as Error).message}`) } }
+    }
   }
 
   replan (): void {

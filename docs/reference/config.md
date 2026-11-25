@@ -56,6 +56,7 @@ copy it from `.env.example`. Profiles, context packs, fleet and [scene](/guide/s
 | `MC_LOG_MAX_SIZE_MB` | `20` | rotate files at this size (0 = never) |
 | `MC_LOG_MAX_FILES` | `5` | rotated files to keep |
 | `MC_LOG_BUFFER` | `1000` | entries kept in memory (`recentLogs()`) |
+| `GOLEM_MEMLOG` | | seconds between [memory log](../guide/deployment#memory) lines (RSS, heap, swap, child processes, chunks, entities, store sizes); off when unset |
 
 `MC_USERNAME` in `.env.example` is only read by `scripts/probe.ts` and `scripts/skill-test.ts`;
 bots take their name from the profile, `--username` or the variant. The LLM variables
@@ -122,6 +123,7 @@ table; the same keys work in the profile under `settings:` and live with `!confi
 | `settings.inventoryMemory` | [container memory](../guide/search#container-memory): `true`/`false` or `{ enabled, maxAgeHours, refreshMinutes, indexOwn, radius, lowFood, grumble, grumbleTo, grumbleHours }` | `enabled: false`, `maxAgeHours: 24`, `indexOwn: false` |
 | `settings.status` | the `status.*` toggles, same as the top-level `status:` key: [status file and stuck alert](../guide/status#settings) | `file: true`, `intervalMs: 5000`, `alert: true`, `stuckAlertMs: 600000`, `alertMaxMs: 7200000` |
 | `settings.pathfinder.thinkTimeoutMs` | planning time per path (ms) | 10000 |
+| `settings.world.viewDistance` | chunks around the bot the client asks the server for: `tiny` (6), `short` (8), `normal` (10), `far` (12) or 2–32; the server caps it at its own `view-distance`. Fewer chunks use less memory but the bot sees less far ([memory](../guide/deployment#memory)) | `far` |
 | `settings.road`, `settings.build`, `settings.world.spawnProtection` | [roads](../guide/roads), creative builds, spawn-protection radius | see the toggles |
 
 Unknown keys under `settings.combat`, `settings.mining`, `settings.trips`,

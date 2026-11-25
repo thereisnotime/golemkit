@@ -11,6 +11,7 @@ import { parseArgs } from 'node:util'
 import { Agent, Fleet, serverFromEnv, createLogger, configureLogging, installCrashHandlers, type BotDefinition, type InstanceOptions, type ServerConfig } from './core/index.ts'
 import { parseFleetFile, resolveUsername, fleetServerConfig, fleetAddresses } from './core/fleetFile.ts'
 import { loadProfile, mergeOptions, PROFILES_DIR, type LoadedProfile } from './core/profile.ts'
+import { memlogInterval, startMemLog } from './core/memlog.ts'
 import { validateBehaviorConfig, defaultBehaviorRegistry } from './brains/behaviors/index.ts'
 import { formatStatus, staleAfter, fmtDuration, type BotStatus } from './core/status.ts'
 
@@ -70,6 +71,11 @@ function runFleet (fleet: Fleet, staggerMs: number | ((server: string) => number
   }
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
+  const memEvery = memlogInterval(process.env.GOLEM_MEMLOG)
+  if (memEvery) {
+    log.info(`memlog every ${memEvery}s (pid ${process.pid})`)
+    startMemLog({ intervalS: memEvery, log: createLogger('memlog'), sources: () => fleet.agents.map(a => ({ name: a.username, counts: () => a.memStats() })) })
+  }
   fleet.start(staggerMs)
 }
 

@@ -203,6 +203,18 @@ export class Agent extends TypedEmitter<AgentEvents> {
    * variant, profile, brains, LLM model and modes, the key toggles and which ones were changed in game.
    * Armed behaviours come from the behaviours brain's own observe field.
    */
+  /** Cheap counts for GOLEM_MEMLOG (src/core/memlog.ts): the adapter's own, then the agent's stores. */
+  memStats (): Record<string, number> {
+    return {
+      ...(this.adapter.memStats?.() ?? {}),
+      storeKeys: this.storage.keys().length,
+      storeKB: Math.round(this.storage.approxBytes() / 1024),
+      journalBuf: this.journal.buffered,
+      chatQueue: this.chatQueue.length,
+      suspended: this.suspended.length
+    }
+  }
+
   selfSummary (): Record<string, unknown> {
     const s = this.settings as Record<string, any>
     const llm = s.llm ?? {}
