@@ -13,8 +13,10 @@ COPY profiles ./profiles
 COPY fleets ./fleets
 COPY blueprints ./blueprints
 COPY scenes ./scenes
-# Writable state: bot data, LLM logins, log files.
-RUN mkdir -p data .auth logs && chown node:node data .auth logs
+# Writable state: bot data, LLM logins, log files, the compile cache.
+RUN mkdir -p data .auth logs .cache && chown node:node data .auth logs .cache
+# Type-stripped source cached between starts (docs/guide/deployment.md#memory)
+ENV NODE_COMPILE_CACHE=/app/.cache/node-compile
 USER node
 ENTRYPOINT ["node", "src/cli.ts"]
 CMD ["run", "buddy"]

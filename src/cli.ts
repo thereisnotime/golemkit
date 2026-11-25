@@ -7,6 +7,7 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { flushCompileCache } from 'node:module'
 import { parseArgs } from 'node:util'
 import { Agent, Fleet, serverFromEnv, createLogger, configureLogging, installCrashHandlers, type BotDefinition, type InstanceOptions, type ServerConfig } from './core/index.ts'
 import { parseFleetFile, resolveUsername, fleetServerConfig, fleetAddresses } from './core/fleetFile.ts'
@@ -77,6 +78,9 @@ function runFleet (fleet: Fleet, staggerMs: number | ((server: string) => number
     startMemLog({ intervalS: memEvery, log: createLogger('memlog'), sources: () => fleet.agents.map(a => ({ name: a.username, counts: () => a.memStats() })) })
   }
   fleet.start(staggerMs)
+  // With NODE_COMPILE_CACHE set (the justfile does), write the cache once the bots are up, so the
+  // next start skips the TypeScript stripper even when this process is killed instead of stopped.
+  if (process.env.NODE_COMPILE_CACHE) setTimeout(() => { try { flushCompileCache() } catch {} }, 60_000).unref()
 }
 
 /** Every status.json under data/bots/ (data/bots/<bot>/ and data/bots/<server>/<bot>/), relative to the working directory like the agents' data. */
