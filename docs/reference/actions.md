@@ -1253,7 +1253,7 @@ No parameters.
 
 Report health, food and what the bot is doing.
 
-*non-exclusive · aliases: `status`*
+*non-exclusive*
 
 No parameters.
 

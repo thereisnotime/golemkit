@@ -17,6 +17,7 @@ scopeNote: "run, fleet and list are game-agnostic; probes, live tests and benchm
 | run | `just fleet [name]` | run a [fleet file](/guide/running#a-fleet): `fleets/<name>.yaml` or a path (default `example`) |
 | bots | `just bots` | list variants, profiles and [fleets](/concepts/architecture#fleets-and-multiple-servers) |
 | bots | `just actions [name]` | list a profile's or variant's actions |
+| bots | `just status [name] [--json] [-w]` | what a running bot is doing and why, from its [status file](/guide/status) (no name: one line per bot) |
 | debug | `just probe` | connect once with no brains, print a world snapshot (or how far login got), quit |
 | debug | `just chat-test "!help,!pos"` | join as a second player and send commands |
 | debug | `just guard-bench [args]` | [bodyguard benchmark](/guide/behaviors#benchmark-just-guard-bench): mob waves against guard, follow_owner and no bot; also duels and water-bucket clutches ([options](#benchmarks)) |
@@ -126,6 +127,7 @@ node src/cli.ts run <name> [-u|--username X] [--owners a,b] [--dig] [--host H] [
 node src/cli.ts fleet <name|file.yaml>
 node src/cli.ts list
 node src/cli.ts actions <name>
+node src/cli.ts status [name] [--json] [-w|--watch]
 
 logging flags (any command):
   -l, --log-level SPEC     e.g. 'info,McBuddy=debug'
@@ -142,6 +144,12 @@ that, a variant (`variants/<name>.ts`, `variants/<name>/index.ts` or a path to a
 `--host` and `--port` override `.env`, a profile's `server:` and, for `fleet`, the fleet's own
 server entries (see [Running](/guide/running#a-fleet)). `--username`, `--owners` and `--dig` only apply to
 `run`. `list` and `actions` don't connect.
+
+`status` reads `data/bots/*/status.json` and `data/bots/*/*/status.json` under the working
+directory (see [Status and stuck alerts](/guide/status)): with a name (username, profile or data
+directory) the bot in detail, without one a line per bot. A file older than 3 intervals reads
+`NOT RUNNING`. `--json` prints the raw file, `-w` redraws every 2 s. Exit code 1 when nothing
+matches.
 
 ## .env
 

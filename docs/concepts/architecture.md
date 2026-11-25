@@ -92,6 +92,8 @@ get the bot as `ctx.bot`. The agent owns:
   (`AgentEvents` in agent.ts). `askHelp` and `helpSorted` come from the help desk
   (`src/brains/npc/help.ts`, one per agent) when a behaviour keeps failing the same way and when it
   works again, see [Asking for help](../guide/behaviors#asking-for-help)
+- `status`: the [status tracker](../guide/status) (what it does and why, last progress,
+  `data/bots/<username>/status.json`, the stuck alert); every agent also gets the `status` action
 - `lastDeathReport`: the cause of the last death, from the adapter's `deathCause` event (the
   server's death message, recent damage, hostiles close by, what it was doing); `observe()` shows it
   as `lastDeath` for 10 minutes. See the [journal](../guide/journal#what-is-recorded)

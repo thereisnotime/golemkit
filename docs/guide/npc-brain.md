@@ -175,6 +175,9 @@ All are exported from `src/brains/npc/index.ts`. `wander`, `goHome`, `sleepAtNig
 
 ## Debugging
 
+- `!status` / `just status <bot>`: the bot's [status](./status): what runs and the score that
+  picked it, or why nothing runs, time since the last progress, and the stuck alert. It reads
+  `NpcController.snapshot()`.
 - `!npc_status`: current behaviour, top scores, needs, back-off. Its `data` has the full
   JSON (cooldowns, last outcome per behaviour).
 - `MC_LOG_LEVEL=debug` logs every start, switch, stop, back-off and failure cooldown under

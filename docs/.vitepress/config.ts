@@ -119,6 +119,7 @@ export default withMermaid(defineConfig({
         text: 'Observing',
         collapsed: true,
         items: [
+          { text: 'Status and stuck alerts', link: '/guide/status' },
           { text: 'Event journal', link: '/guide/journal' },
           { text: 'Logging', link: '/guide/logging' }
         ]

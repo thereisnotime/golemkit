@@ -90,6 +90,7 @@ All optional except `variant`; see [Profiles](../guide/profiles).
 | `respectBuilds`, `selfAware` | leave player-made blocks alone (default off); show the bot its own setup each turn (default on) | [Feature toggles](../guide/live-config) |
 | `npcMode` | behaviours to arm while the LLM is paused, or `false` | [NPC mode](../guide/behaviors#npc-mode-when-the-llm-can-t-think) |
 | `askHelp` | `true`/`false` or `{ enabled, failures, minutes, forgetMinutes, perReasonMinutes, maxPerHour, tell, llm, thanks, quietHours, observeMinutes }`; lands in `settings.askHelp`. Default off; an options map turns it on unless it says `enabled: false` | [Asking for help](../guide/behaviors#asking-for-help) |
+| `status` | `true`/`false` or `{ file, intervalMs, alert, stuckAlertMs, alertMaxMs }`; lands in `settings.status`. Default on: `status.json` every 5 s, stuck alert after 10 min without progress, repeats back off up to 2 h; `false` turns off file and alert | [Status and stuck alerts](../guide/status) |
 | `behaviors` | [armed behaviours](/guide/behaviors) and their options | [Behaviours](../guide/behaviors) |
 | `intents` | [plain-language commands](/guide/intents) without the LLM: mode, layers, strategy | [Plain-language commands](../guide/intents) |
 | `worldedit` | `true`/`false` or `{ enabled, maxBlocks, ownersOnly, replyMs }` | [WorldEdit](../guide/worldedit) |
@@ -116,11 +117,12 @@ table; the same keys work in the profile under `settings:` and live with `!confi
 | `settings.trips` | the `trips.*` toggles: [trips](../guide/behaviors#trips) top-up and turn-back rules | `enabled: true`, `food: 8`, `minFood: 4`, `minHealth: 12`, `turnBackAt: 0.5` |
 | `settings.storage.chests` | chests the bot may take from as its own, as `[x, y, z]`, `{ x, y, z }`, `"x y z"` or `{ at: [x, y, z], role: pantry \| storage \| gear }`; without roles the first is the pantry (food only) and the others storage ([chest roles](/guide/search#chest-roles)) | none |
 | `settings.inventoryMemory` | [container memory](../guide/search#container-memory): `true`/`false` or `{ enabled, maxAgeHours, refreshMinutes, indexOwn, radius, lowFood, grumble, grumbleTo, grumbleHours }` | `enabled: false`, `maxAgeHours: 24`, `indexOwn: false` |
+| `settings.status` | the `status.*` toggles, same as the top-level `status:` key: [status file and stuck alert](../guide/status#settings) | `file: true`, `intervalMs: 5000`, `alert: true`, `stuckAlertMs: 600000`, `alertMaxMs: 7200000` |
 | `settings.pathfinder.thinkTimeoutMs` | planning time per path (ms) | 10000 |
 | `settings.road`, `settings.build`, `settings.world.spawnProtection` | [roads](../guide/roads), creative builds, spawn-protection radius | see the toggles |
 
-Unknown keys under `settings.combat`, `settings.mining`, `settings.trips` and
-`settings.inventoryMemory` are ignored with a warning (`profiles/pax.yaml: unknown key
+Unknown keys under `settings.combat`, `settings.mining`, `settings.trips`,
+`settings.inventoryMemory` and `settings.status` are ignored with a warning (`profiles/pax.yaml: unknown key
 settings.mining.depth (ignored)`), as are unknown top-level keys and unknown keys in the other
 declared blocks; see [Profiles](../guide/profiles#format). Other `settings` maps are not checked.
 
@@ -135,6 +137,7 @@ declared blocks; see [Profiles](../guide/profiles#format). Other `settings` maps
 | `data/protected-<host>-<port>.json` | learned [protected areas](/concepts/world#protected-areas) (spawn, claims) per server |
 | `data/registries-<host>-<port>.json` | the server's item / entity / block registries (from the NeoForge [registry sync](/concepts/neoforge#_4-modded-item-and-entity-names)) |
 | `data/bots/<username>/store.json` | per-bot storage (`agent.storage`: own chests under `search.ownChests`, container memory under `containers.memory`, in-game toggle changes under `settings.overrides`) |
+| `data/bots/<username>/status.json` | the bot's [status](../guide/status) (what it does, why, last progress), rewritten every `status.intervalMs` while it runs; read by `just status` |
 | `data/bots/<username>/journal/` | journal: daily JSONL files and `rollups/` |
 | `data/bots/<server>/<username>/` | the same per-bot data, when a fleet runs on several servers |
 | `data/models/` | cached model for the [intents embeddings layer](../guide/intents) |

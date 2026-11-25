@@ -8,6 +8,9 @@ Every bot, brain, skill and the [fleet](/concepts/architecture#fleets-and-multip
 bot and per subsystem, write files per bot, switch to JSON for tooling, and subscribe to the
 log stream from code.
 
+To see at a glance whether a bot is working and, if not, why, you don't need the logs:
+`just status <bot>` and `!status` show the [status snapshot](./status).
+
 ```mermaid
 flowchart TD
   SRC["log.info(msg, fields)<br/>McBuddy/action/goto"] --> LVL{"level rule<br/>most specific match"}

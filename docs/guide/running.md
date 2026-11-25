@@ -115,6 +115,13 @@ Each bot logs with its username as a coloured prefix. `-v` shows every action ca
 `-l 'info,*/neoforge=trace'` the NeoForge internals. Per-bot files, JSON output and
 everything else: see [Logging](./logging).
 
+## Is it working?
+
+`just status` lists every bot with its state (`working`, `busy`, `idle`, `stuck`, `offline`) and
+one line on what it does and why; `just status Pax` shows one in detail. In game, `!status` or
+"what are you doing" / "why are you idle" answers in chat, and a bot that is stuck for 10 minutes
+whispers its owners. See [Status and stuck alerts](./status).
+
 ## Stopping
 
 Ctrl-C stops all bots cleanly (storage is flushed). A second Ctrl-C exits immediately.

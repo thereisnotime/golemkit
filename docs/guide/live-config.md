@@ -84,6 +84,11 @@ can't change their own.
 | `askHelp.tell` | owners / say | whisper the owners who are online, or public chat (default owners) |
 | `askHelp.thanks` | on/off | say "sorted, thanks" once when something it asked about works again (default off) |
 | `askHelp.llm` | on/off | let the LLM brain know it asked (no extra turn unless `triggers.events.stuck`; default on) |
+| `status.file` | on/off | write `data/bots/<name>/status.json` for `just status` ([status](./status); default on) |
+| `status.intervalMs` | 1000–600000 | status sample and file interval in ms (default 5000) |
+| `status.alert` | on/off | whisper the online owners when stuck: it wants to do something and made no progress for `status.stuckAlertMs` (default on) |
+| `status.stuckAlertMs` | 60000–86400000 | no progress for this long counts as stuck, ms (default 600000 = 10 min) |
+| `status.alertMaxMs` | 60000–604800000 | repeat alerts double their gap up to this, ms (default 7200000 = 2 h) |
 | `trips.enabled` | on/off | [trips](./behaviors#trips) that behaviours start: prepare (food from own chests, weapon, health) and turn back when food or daylight runs short (default on) |
 | `trips.food` | 0–64 | food items to top up to from the pantry (own and configured chests near home) before a trip (default 8) |
 | `trips.minFood` | 0–64 | fewest food items to leave with; food trips are exempt (default 4) |
@@ -138,7 +143,7 @@ can't change their own.
 | `retry.actions.<action>` | 0–10 | extra attempts after a failed action |
 
 In a profile, the `reflexes.*` values go under `reflexes:`, the `askHelp.*` values under the
-top-level `askHelp:` key, and the `combat.*`, `mining.*`, `trips.*` and `inventoryMemory.*`
+top-level `askHelp:` key, the `status.*` values under the top-level `status:` key (or `settings.status`), and the `combat.*`, `mining.*`, `trips.*` and `inventoryMemory.*`
 values under `settings:` (`settings: { combat: { pvp: defend } }`). A top-level `combat:` key
 is ignored with a warning, and so is any key under `settings.combat`, `settings.mining`,
 `settings.trips` or `settings.inventoryMemory` that is not in the table above (see
