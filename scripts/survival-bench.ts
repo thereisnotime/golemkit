@@ -552,7 +552,8 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
   const journalDeaths = inRun.filter(e => e.type === 'death')
   // help asks (npc askHelp, keep_fed when starving): recorded whether or not an owner was online to get them
   // needs-and-idle: sites marked bad or fine again, need searches and the idle chores that ran
-  const sites = inRun.filter(e => e.type === 'site').map(e => `${e.data.kind} ${e.data.id} ${e.data.status}${e.data.reason ? `: ${e.data.reason}` : ''}`.slice(0, 160))
+  // from the journal over the whole session: the first site checks run before the measuring starts
+  const sites = events.filter(e => e.type === 'site').map(e => `${e.data.kind} ${e.data.id} ${e.data.status}${e.data.reason ? `: ${e.data.reason}` : ''}`.slice(0, 160))
   const searches = agent.storage.get<{ need: string, at: number, ok: boolean, message: string }[]>('needs.searches', []).filter(x => x.at >= runStart).map(x => `${x.need} ${x.ok ? 'ok' : 'failed'}: ${x.message}`.slice(0, 200))
   const choresRun = Object.keys(agent.storage.get<Record<string, number>>('needs.choresRun', {}))
   const farmsAtEnd = agent.storage.get<{ name: string, x: number, z: number }[]>('farms', []).map(f => `${f.name} ${f.x} ${f.z}`)
