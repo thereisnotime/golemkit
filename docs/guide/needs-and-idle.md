@@ -91,7 +91,12 @@ scores above 15, it is day, the bot has a stone pickaxe or better and digging is
 
 What it found stays remembered as `found:iron` and is checked first next time. Each need searches
 at most once every `cooldownMinutes` (30) and `perDay` (6) times a day; the searches are kept in
-storage (`needs.searches`).
+storage (`needs.searches`). A search that other work takes over in its first minute (farm work, a
+bed, a reflex), or that a restart left unfinished, is cut short: it doesn't count towards either
+limit and the search may run again after `retryMinutes` (5). Pax lost whole days of gear searches
+before that rule: six 160-block searches were taken over after 3 to 17 seconds, used up the day's
+six, and the only thing left looking for iron was the `scout_nearby` chore, which looks within
+twice `idle.radius` (48 blocks).
 
 ## Site health
 
@@ -240,7 +245,7 @@ settings:
 needs:
   enabled: true
   boost: 15                       # added at urgency 1
-  search: { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, perDay: 6, atNight: false }
+  search: { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, retryMinutes: 5, perDay: 6, atNight: false }
   gear: { threshold: 0.5 }        # enabled (unset = automatic), threshold, boost, search, radius, minutes
   rest: false                     # a need switched off
 idle:

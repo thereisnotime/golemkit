@@ -134,6 +134,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'needs.search.radius', description: 'how far a need search may go, in blocks (default 160)', schema: z.number().int().min(16).max(512) },
   { key: 'needs.search.minutes', description: 'give a need search up after this many minutes (default 6)', schema: z.number().min(1).max(30) },
   { key: 'needs.search.cooldownMinutes', description: 'minutes between searches for the same need (default 30)', schema: z.number().min(1).max(1440) },
+  { key: 'needs.search.retryMinutes', description: 'a need search taken over by other work in its first minute does not count; minutes before it may run again (default 5)', schema: z.number().min(0).max(1440) },
   { key: 'needs.search.perDay', description: 'searches per need per day at most (default 6, 0 = never)', schema: z.number().int().min(0).max(100) },
   { key: 'needs.search.atNight', description: 'also search at night (default off)', schema: bool },
   { key: 'needs.safety.enabled', description: 'the safety need (stay safe (hostiles close, low health)): on, off; reset = on when a behaviour serving it is armed', schema: bool },

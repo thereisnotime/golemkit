@@ -17,6 +17,7 @@ export const SearchSettingsSchema = z.object({
   radius: z.number().int().min(16).max(512).optional().describe('how far a search may go from where it starts, in blocks (default 160)'),
   minutes: z.number().min(1).max(30).optional().describe('give a search up after this many minutes (default 6)'),
   cooldownMinutes: z.number().min(1).max(1440).optional().describe('wait this long before searching for the same need again (default 30)'),
+  retryMinutes: z.number().min(0).max(1440).optional().describe('a search taken over by other work in its first minute is not counted; it may run again after this many minutes (default 5)'),
   perDay: z.number().int().min(0).max(100).optional().describe('searches per need per real day at most (default 6, 0 = never)'),
   atNight: z.boolean().optional().describe('also search at night (default off: mobs)')
 }).strict()
@@ -69,7 +70,7 @@ export const SitesSettingsSchema = z.object({
   tell: z.boolean().optional().describe('whisper the owners online when a site goes bad or is fine again (default on)')
 }).strict()
 
-export interface SearchSettings { enabled: boolean, radius: number, minutes: number, cooldownMinutes: number, perDay: number, atNight: boolean }
+export interface SearchSettings { enabled: boolean, radius: number, minutes: number, cooldownMinutes: number, retryMinutes: number, perDay: number, atNight: boolean }
 
 export interface NeedSetting {
   /** true/false when set; null = automatic (on when a serving behaviour is in the set). */
@@ -89,7 +90,7 @@ export interface NeedsSettings {
   need (name: string): NeedSetting
 }
 
-export const SEARCH_DEFAULTS: SearchSettings = { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, perDay: 6, atNight: false }
+export const SEARCH_DEFAULTS: SearchSettings = { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, retryMinutes: 5, perDay: 6, atNight: false }
 export const NEED_THRESHOLD = 0.5
 export const NEED_BOOST = 15
 
@@ -106,6 +107,7 @@ export function needsSettings (raw: unknown): NeedsSettings {
     radius: num(s.radius, SEARCH_DEFAULTS.radius, 16, 512),
     minutes: num(s.minutes, SEARCH_DEFAULTS.minutes, 1, 30),
     cooldownMinutes: num(s.cooldownMinutes, SEARCH_DEFAULTS.cooldownMinutes, 1, 1440),
+    retryMinutes: num(s.retryMinutes, SEARCH_DEFAULTS.retryMinutes, 0, 1440),
     perDay: num(s.perDay, SEARCH_DEFAULTS.perDay, 0, 100),
     atNight: bool(s.atNight, SEARCH_DEFAULTS.atNight)
   }

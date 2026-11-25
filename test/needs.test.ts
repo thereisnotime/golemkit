@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { minecraftView } from './fake-attach.ts'
 import { NpcController } from '../src/brains/npc/controller.ts'
-import { NeedsLayer, planNeeds, searchDue, pickChore, inHours, windowOk, type Behavior, type NeedsProvider, type NeedInput } from '../src/brains/npc/index.ts'
+import { NeedsLayer, planNeeds, searchDue, cutShort, pickChore, inHours, windowOk, type Behavior, type NeedsProvider, type NeedInput } from '../src/brains/npc/index.ts'
 import { needsSettings, idleSettings, sitesSettings, noteSiteCheck, recheckDue, SiteBook, ok, createLogger, type ActionResult, type SiteRecord } from '../src/core/index.ts'
 import { parseProfile } from '../src/core/profile.ts'
 import { findToggle, parseToggleValue } from '../src/core/toggles.ts'
@@ -13,7 +13,7 @@ import { findToggle, parseToggleValue } from '../src/core/toggles.ts'
 test('needs settings: defaults, per-need overrides, booleans and off', () => {
   const d = needsSettings(undefined)
   assert.equal(d.enabled, true)
-  assert.deepEqual(d.search, { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, perDay: 6, atNight: false })
+  assert.deepEqual(d.search, { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, retryMinutes: 5, perDay: 6, atNight: false })
   assert.deepEqual(d.need('gear'), { enabled: null, threshold: 0.5, boost: 15, search: true, radius: 160, minutes: 6 })
   const s = needsSettings({ boost: 20, search: { radius: 96 }, gear: { threshold: 0.3, minutes: 3 }, rest: false })
   assert.equal(s.need('gear').threshold, 0.3)
@@ -85,6 +85,31 @@ test('searchDue: cooldown per need and a daily cap', () => {
   assert.equal(searchDue([{ need: 'food', at: now - 10 * 60_000 }], 'gear', now, o), true)
   assert.equal(searchDue([{ need: 'gear', at: now - 5 * 3_600_000 }, { need: 'gear', at: now - 3_600_000 }], 'gear', now, o), false)
   assert.equal(searchDue([{ need: 'gear', at: now - 3_600_000 }], 'gear', now, { cooldownMinutes: 30, perDay: 0 }), false)
+})
+
+test('searchDue: a search cut short only waits retryMinutes and does not use up the day', () => {
+  const now = 10 * 86_400_000
+  const o = { cooldownMinutes: 30, perDay: 6, retryMinutes: 5 }
+  // Pax: six gear searches taken over after 3 to 17 s, then a whole day of nothing but the idle scout
+  const cut = [6, 5, 4, 3, 2, 1].map(h => ({ need: 'gear', at: now - h * 3_600_000, cut: true, message: 'replaced' }))
+  assert.equal(searchDue(cut, 'gear', now, o), true)
+  assert.equal(searchDue([...cut, { need: 'gear', at: now - 2 * 60_000, cut: true, message: 'replaced' }], 'gear', now, o), false, 'retry gap')
+  assert.equal(searchDue([...cut, { need: 'gear', at: now - 6 * 60_000, cut: true, message: 'replaced' }], 'gear', now, o), true)
+  // a 'started' left behind by a restart is cut short once it is old
+  assert.equal(searchDue([{ need: 'gear', at: now - 2 * 3_600_000, message: 'started' }], 'gear', now, o), true)
+  assert.equal(searchDue([{ need: 'gear', at: now - 10 * 60_000, message: 'started' }], 'gear', now, o), false)
+  // real searches still count
+  const real = [6, 5, 4, 3, 2, 1].map(h => ({ need: 'gear', at: now - h * 3_600_000, message: 'nothing found' }))
+  assert.equal(searchDue(real, 'gear', now, o), false)
+})
+
+test('cutShort: taken over or thrown in the first minute', () => {
+  assert.equal(cutShort(null, 3000), true)
+  assert.equal(cutShort({ ok: false, message: 'replaced' }, 3600), true)
+  assert.equal(cutShort({ ok: false, message: 'preempted by reflex' }, 17_000), true)
+  assert.equal(cutShort({ ok: false, message: 'nothing in sight within 160 blocks' }, 3000), false)
+  assert.equal(cutShort({ ok: false, message: 'replaced' }, 5 * 60_000), false)
+  assert.equal(cutShort(null, 5 * 60_000), false)
 })
 
 // ------------------------------------------------------------------ pickChore
@@ -233,6 +258,41 @@ test('controller: an urgent need with nothing in sight runs its search, then it 
   await c.tick()
   await flush(); await flush()
   assert.equal(f.calls.at(-1)?.name, 'wander')
+  c.stop()
+})
+
+test('controller: a gear search taken over in its first seconds keeps its full radius and runs again after the retry gap', async () => {
+  const f = fake(['wander', 'deposit', 'find_target'])
+  const score = { v: 0 }
+  const tools: Behavior = { name: 'tools', score: () => 0, run: async () => 'ok' }
+  const chores: Behavior = { name: 'farm', score: () => score.v, run: async (ctx) => { await ctx.act('deposit', {}); return 'ok' } }
+  let release: (() => void) | null = null
+  const radii: number[] = []
+  const prov = provider({ urgency: { v: 0.7 } })
+  prov.needs[0]!.search!.run = async (ctx, o) => {
+    radii.push(o.radius)
+    await new Promise<void>(res => { release = res; ctx.signal.addEventListener('abort', () => res()) })
+    ctx.signal.throwIfAborted()
+    return ok('found')
+  }
+  const layer = new NeedsLayer(f.agent, prov, { now: () => f.clock.t })
+  const c = new NpcController(f.agent, f.bot as any, { behaviors: [tools, chores], needs: layer, now: () => f.clock.t, autoHome: false })
+  f.settings.needs = { gear: { enabled: true } }
+  await c.tick(); await flush()
+  assert.deepEqual(radii, [160])
+  // farm work takes over 4 s in
+  f.clock.t += 4000
+  score.v = 40
+  await c.tick(); await flush(); await flush()
+  const last = layer.searchHistory().at(-1)
+  assert.equal(last?.cut, true, JSON.stringify(last))
+  score.v = 0
+  await c.tick(); await flush()
+  assert.equal(radii.length, 1, 'waits the retry gap')
+  f.clock.t += 6 * 60_000
+  await c.tick(); await flush()
+  assert.deepEqual(radii, [160, 160])
+  ;(release as (() => void) | null)?.()
   c.stop()
 })
 

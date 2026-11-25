@@ -115,6 +115,7 @@ can't change their own.
 | `needs.search.radius` | 16–512 | how far a search may go, in blocks (default 160) |
 | `needs.search.minutes` | 1–30 | give a search up after this long (default 6) |
 | `needs.search.cooldownMinutes` | 1–1440 | minutes between searches for one need (default 30) |
+| `needs.search.retryMinutes` | 0–1440 | a search taken over in its first minute doesn't count; minutes before it may run again (default 5) |
 | `needs.search.perDay` | 0–100 | searches per need a day at most (default 6) |
 | `needs.search.atNight` | on/off | also search at night (default off) |
 | `needs.<need>.enabled` | on/off | `safety`, `food`, `gear`, `supplies`, `rest`: on or off; reset = on when a behaviour serving it is armed |

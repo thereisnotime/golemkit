@@ -141,17 +141,51 @@ export function planNeeds (needs: readonly NeedInput[], scores: readonly Scored[
   return { scores: out, boosted, top: active[0] ? { name: active[0].name, urgency: active[0].urgency } : null, urgent: urgent.map(n => n.name), quiet, search }
 }
 
-/** Searches in the last day and the time of the last one, for one need. */
-export function searchDue (history: readonly { need: string, at: number }[], need: string, now: number, o: { cooldownMinutes: number, perDay: number }): boolean {
+/** One search as the layer remembers it (storage `needs.searches`). */
+export interface SearchRecord {
+  need: string
+  /** When it started. */
+  at: number
+  ok: boolean
+  message: string
+  /** How long it ran. */
+  ms?: number
+  /** Cut short before it got going (taken over, aborted): not a real try, see searchDue. */
+  cut?: boolean
+}
+
+/** A search taken over within this long is cut short, not a real try. */
+export const CUT_SHORT_MS = 60_000
+/** A 'started' record this old belongs to a run that never finished (a restart): cut short. */
+const STALE_START_MS = 45 * 60_000
+const ABORTED = /^(replaced|preempted|aborted|interrupted|cancelled|suspended)\b/i
+
+/** Whether a finished run was cut short: it threw or was taken over, in its first minute. */
+export function cutShort (r: { ok: boolean, message: string } | null, ms: number): boolean {
+  if (ms >= CUT_SHORT_MS) return false
+  return !r || (!r.ok && ABORTED.test(r.message))
+}
+
+/**
+ * Whether a need may search now. Pure. Real searches count: one in the last cooldownMinutes
+ * blocks, perDay of them in the last day stop it for the day. A search cut short (taken over by
+ * other work in its first minute, or a run a restart left at 'started') only blocks for
+ * retryMinutes and doesn't count. Pax lost its whole day of gear searches that way: six searches
+ * taken over by farm and bed work after 3 to 17 s, then only the 48-block idle scout ran.
+ */
+export function searchDue (history: readonly { need: string, at: number, cut?: boolean, message?: string }[], need: string, now: number, o: { cooldownMinutes: number, perDay: number, retryMinutes?: number }): boolean {
   const mine = history.filter(h => h.need === need)
-  const last = mine.reduce((m, h) => Math.max(m, h.at), 0)
-  if (last && now - last < o.cooldownMinutes * 60_000) return false
-  return mine.filter(h => now - h.at < 86_400_000).length < o.perDay
+  const isCut = (h: typeof mine[number]) => !!h.cut || (h.message === 'started' && now - h.at > STALE_START_MS)
+  const real = mine.filter(h => !isCut(h))
+  const lastReal = real.reduce((m, h) => Math.max(m, h.at), 0)
+  if (lastReal && now - lastReal < o.cooldownMinutes * 60_000) return false
+  const lastCut = mine.filter(isCut).reduce((m, h) => Math.max(m, h.at), 0)
+  if (lastCut && now - lastCut < (o.retryMinutes ?? 5) * 60_000) return false
+  return real.filter(h => now - h.at < 86_400_000).length < o.perDay
 }
 
 // ------------------------------------------------------------------ the layer
 
-interface SearchRecord { need: string, at: number, ok: boolean, message: string }
 const SEARCHES_KEY = 'needs.searches'
 const CHORES_KEY = 'needs.choresRun'
 const QUIET_KEY = 'needs.choresQuiet'
@@ -209,11 +243,19 @@ export class NeedsLayer {
         run: async (ctx) => {
           const st = this.needsSettings()
           const ns = st.need(n.name)
-          // counted when it starts, so a search cut short still waits out the cooldown
-          this.recordSearch({ need: n.name, at: this.now(), ok: false, message: 'started' })
-          const r = await s.run(ctx, { radius: ns.radius, minutes: ns.minutes, atNight: st.search.atNight })
-          this.recordSearch({ need: n.name, at: this.now(), ok: r.ok, message: r.message }, true)
-          return r
+          // recorded when it starts (a running search blocks the next), finished whatever happens:
+          // taken over in its first minute it is cut short and doesn't use up the day's searches
+          const at = this.now()
+          this.recordSearch({ need: n.name, at, ok: false, message: 'started' })
+          let r: ActionResult | null = null
+          try {
+            r = await s.run(ctx, { radius: ns.radius, minutes: ns.minutes, atNight: st.search.atNight })
+            return r
+          } finally {
+            const ms = this.now() - at
+            const cut = cutShort(r, ms)
+            this.recordSearch({ need: n.name, at, ok: !!r?.ok, message: r?.message ?? 'cut short', ms, ...(cut ? { cut } : {}) }, true)
+          }
         }
       })
     }
