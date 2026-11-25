@@ -5,6 +5,11 @@ set dotenv-load := false
 # or NODE_DISABLE_COMPILE_CACHE=1 turns it off. docs/guide/deployment.md#memory
 export NODE_COMPILE_CACHE := env("NODE_COMPILE_CACHE", justfile_directory() / "node_modules/.cache/node-compile")
 
+# V8 flags for bot processes (run, dev, fleet). V8 lets the young generation grow to 2 x 32 MB,
+# which a busy bot keeps full; 8 MB semi-spaces keep about 45 MB less heap for a little more GC
+# time (measured: docs/guide/deployment.md#memory). GOLEM_NODE_FLAGS="" uses V8's defaults.
+node_flags := env("GOLEM_NODE_FLAGS", "--max-semi-space-size=8")
+
 # Show available recipes
 [group('help')]
 default:
@@ -22,19 +27,19 @@ setup:
 [group('run')]
 run name="buddy" *args:
     @echo "{{BOLD}}{{GREEN}}==> starting {{name}}{{NORMAL}}"
-    node --env-file-if-exists=.env src/cli.ts run {{name}} {{args}}
+    node {{node_flags}} --env-file-if-exists=.env src/cli.ts run {{name}} {{args}}
 
 # Same as run, restarting on file changes
 [group('run')]
 dev name="buddy" *args:
     @echo "{{BOLD}}{{GREEN}}==> starting {{name}} (watch mode){{NORMAL}}"
-    node --watch --env-file-if-exists=.env src/cli.ts run {{name}} {{args}}
+    node {{node_flags}} --watch --env-file-if-exists=.env src/cli.ts run {{name}} {{args}}
 
 # Run a fleet (fleets/<name>.yaml or a file path) in one process
 [group('run')]
 fleet name="example" *args:
     @echo "{{BOLD}}{{GREEN}}==> starting fleet {{name}}{{NORMAL}}"
-    node --env-file-if-exists=.env src/cli.ts fleet {{name}} {{args}}
+    node {{node_flags}} --env-file-if-exists=.env src/cli.ts fleet {{name}} {{args}}
 
 # List variants, profiles and fleets
 [group('bots')]

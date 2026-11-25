@@ -18,5 +18,5 @@ RUN mkdir -p data .auth logs .cache && chown node:node data .auth logs .cache
 # Type-stripped source cached between starts (docs/guide/deployment.md#memory)
 ENV NODE_COMPILE_CACHE=/app/.cache/node-compile
 USER node
-ENTRYPOINT ["node", "src/cli.ts"]
+ENTRYPOINT ["node", "--max-semi-space-size=8", "src/cli.ts"]
 CMD ["run", "buddy"]
