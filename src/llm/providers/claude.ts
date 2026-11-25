@@ -18,9 +18,9 @@
 // profile 'user' uses your normal login instead (settings are still ignored).
 // API keys are never passed unless allowApiKey is set, and the turn is aborted if Claude Code
 // still reports an API key as its credential source.
-import { query, type Options, type SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+// The Agent SDK and the MCP SDK are loaded on the first SDK-mode turn, not at startup.
+import type { Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { join } from 'node:path'
-import { buildMcpServer } from '../mcp.ts'
 import { ProviderError, type LlmProvider, type TurnInput, type TurnResult, type Usage } from '../types.ts'
 import { isolatedEnv, readEnvFileVar, resolveProfile, resolveProxy, runProcess, scratchDir, tail, which, type Profile } from './proc.ts'
 
@@ -130,9 +130,10 @@ export class ClaudeSubscriptionProvider implements LlmProvider {
     const onAbort = () => abort.abort()
     turn.signal.addEventListener('abort', onAbort, { once: true })
     const timer = setTimeout(() => abort.abort(), turn.timeoutMs)
+    const { query } = await import('@anthropic-ai/claude-agent-sdk')
     const mcpServers: Options['mcpServers'] = this.opts.transport === 'http'
       ? { [SERVER]: { type: 'http', url: need(turn).url, headers: { Authorization: `Bearer ${need(turn).token}` } } }
-      : { [SERVER]: { type: 'sdk', name: SERVER, instance: buildMcpServer(turn.tools, SERVER) as any } }
+      : { [SERVER]: { type: 'sdk', name: SERVER, instance: (await import('../mcp.ts')).buildMcpServer(turn.tools, SERVER) as any } }
     const options: Options = {
       systemPrompt: turn.system,
       tools: [],

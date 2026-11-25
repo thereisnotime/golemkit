@@ -2,7 +2,8 @@
 // Auth: ANTHROPIC_API_KEY (or whatever the SDK resolves: ANTHROPIC_AUTH_TOKEN, an
 // `ant auth login` profile). Tools + system prompt are static per bot and cached.
 import { resolveProxy } from './proc.ts'
-import Anthropic from '@anthropic-ai/sdk'
+// The SDK is loaded on the first turn, not at startup: a bot that never calls the API doesn't pay its memory.
+import type Anthropic from '@anthropic-ai/sdk'
 import { ProviderError, type LlmProvider, type TurnInput, type TurnResult, type Usage } from '../types.ts'
 
 export interface AnthropicProviderOptions {
@@ -30,6 +31,7 @@ export class AnthropicProvider implements LlmProvider {
   readonly model: string
   private readonly opts: AnthropicProviderOptions
   private client: Anthropic | null = null
+  private sdk: typeof Anthropic | null = null
 
   constructor (opts: AnthropicProviderOptions = {}) {
     this.opts = opts
@@ -42,8 +44,9 @@ export class AnthropicProvider implements LlmProvider {
     this.opts.baseURL = (await resolveProxy(this.opts.proxy))?.baseUrl
   }
 
-  private getClient (): Anthropic {
-    this.client ??= new Anthropic({ apiKey: this.opts.apiKey, baseURL: this.opts.baseURL, maxRetries: 2 })
+  private async getClient (): Promise<Anthropic> {
+    this.sdk ??= (await import('@anthropic-ai/sdk')).default
+    this.client ??= new this.sdk({ apiKey: this.opts.apiKey, baseURL: this.opts.baseURL, maxRetries: 2 })
     return this.client
   }
 
@@ -56,7 +59,8 @@ export class AnthropicProvider implements LlmProvider {
 
   async run (turn: TurnInput): Promise<TurnResult> {
     await this.ensureBase()
-    const client = this.getClient()
+    const client = await this.getClient()
+    const Sdk = this.sdk!
     const specs = turn.tools.list()
     const tools: Anthropic.Beta.BetaTool[] = specs.map((t, i) => ({
       name: t.name,
@@ -88,9 +92,9 @@ export class AnthropicProvider implements LlmProvider {
           ...(useFallbacks ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {})
         }, { signal: turn.signal, timeout: remaining })
       } catch (e) {
-        if (e instanceof Anthropic.AuthenticationError) throw new ProviderError(this.name, 'authentication failed, check ANTHROPIC_API_KEY')
-        if (e instanceof Anthropic.RateLimitError) throw new ProviderError(this.name, 'rate limited, try again later')
-        if (e instanceof Anthropic.APIError) throw new ProviderError(this.name, `API error ${e.status ?? ''}: ${e.message}`)
+        if (e instanceof Sdk.AuthenticationError) throw new ProviderError(this.name, 'authentication failed, check ANTHROPIC_API_KEY')
+        if (e instanceof Sdk.RateLimitError) throw new ProviderError(this.name, 'rate limited, try again later')
+        if (e instanceof Sdk.APIError) throw new ProviderError(this.name, `API error ${e.status ?? ''}: ${e.message}`)
         throw e
       }
       addUsage(usage, res.usage, res.model)

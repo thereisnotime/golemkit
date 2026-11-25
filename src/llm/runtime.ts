@@ -3,7 +3,7 @@
 // tests drive it directly with a fake agent and a fake provider.
 import type { Agent, ActionInfo, ActionResult, ChatMessage, Logger } from '../core/index.ts'
 import { Budget, type BudgetOptions } from './budget.ts'
-import { startMcpHttp, type McpHttpBridge } from './mcp.ts'
+import type { McpHttpBridge } from './mcp.ts'
 import { Memory, type MemoryOptions } from './memory.ts'
 import { backoffMs, isTransientLlmError } from '../core/retry.ts'
 import { buildSystemPrompt, buildUserMessage, chatTrigger, type ChatTriggerOptions, type PromptContext, type Trigger } from './prompt.ts'
@@ -200,6 +200,8 @@ export class LlmRuntime {
     if (this.unavailable) this.log.warn(`provider ${this.provider.name} unavailable: ${this.unavailable}`, { provider: this.provider.name })
     if (this.provider.needsMcp || this.opts.mcp?.expose) {
       const port = this.opts.mcp?.port ?? 0
+      // loaded here so bots whose provider needs no MCP bridge never load the MCP SDK
+      const { startMcpHttp } = await import('./mcp.ts')
       this.bridge = await startMcpHttp(this.tools, { port, token: this.opts.mcp?.token, name: `golemkit-${this.agent.username}` })
       // The token is a local secret; print it only when the user asked to expose the bridge.
       if (this.opts.mcp?.expose) this.log.info(`MCP bridge on ${this.bridge.url} (Authorization: Bearer ${this.bridge.token})`, { url: this.bridge.url })
