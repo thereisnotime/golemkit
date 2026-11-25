@@ -9,6 +9,7 @@ import { Blackboard, type BlackboardOptions } from './blackboard.ts'
 import { decide, failureCooldown, flipCooldown, isFlip, type Scored, type SelectOptions } from './select.ts'
 import { helpDesk, type HelpDesk } from './help.ts'
 import { NpcYield, type Behavior, type BehaviorContext, type NpcContext, type NpcHook } from './types.ts'
+import type { NeedsLayer } from './needs.ts'
 
 /** Internal no-op action the brain runs to cut its own in-flight action short. */
 export const INTERRUPT_ACTION = 'npc_interrupt'
@@ -39,6 +40,30 @@ export interface NpcOptions extends SelectOptions, BlackboardOptions {
    * whatever its priority. The behaviours brain uses it to stay out of a scene the bot acts in.
    */
   suspended?: () => string | null
+  /**
+   * The needs layer (src/brains/npc/needs.ts): boosts behaviours serving an urgent need and,
+   * when nothing scores above the idle band, runs a need's search or the idle mode's chore.
+   */
+  needs?: NeedsLayer | null
+}
+
+/**
+ * The status snapshot (DeciderSnapshot, src/core/status.ts) with what the needs layer knows:
+ * need/goal/reason/lastProgressAt filled in, plus the need's urgency, the urgent needs, the idle
+ * mode and the idle chore running.
+ */
+export interface NpcSnapshot extends DeciderSnapshot {
+  need: string | null
+  goal: string | null
+  reason: string | null
+  lastProgressAt: number | null
+  /** Urgency (0..1) of `need`. */
+  needUrgency: number | null
+  /** Needs at or above their threshold. */
+  urgent: string[]
+  idleMode: string | null
+  /** The idle chore running, if any. */
+  chore: string | null
 }
 
 const DEFAULT_BACKOFF: Record<Caller['kind'], number> = { player: 20000, brain: 20000, reflex: 3000, system: 10000 }
@@ -113,6 +138,8 @@ export class NpcController {
   private lastScores: Scored[] = []
   private ticking = false
   private stopped = false
+  private reason: string | null = null
+  private lastProgressAt: number | null = null
 
   constructor (agent: Agent, client: GameClient, opts: NpcOptions) {
     this.agent = agent
@@ -126,7 +153,7 @@ export class NpcController {
     this.backoff = { ...DEFAULT_BACKOFF, ...opts.backoffMs }
     this.bb = new Blackboard(agent, opts)
     this.help = opts.help ?? helpDesk(agent)
-    if (Array.isArray(opts.behaviors)) this.checkNames(opts.behaviors)
+    if (Array.isArray(opts.behaviors)) this.checkNames(opts.needs ? [...opts.behaviors, ...opts.needs.behaviors()] : opts.behaviors)
     this.behaviors()
     const self = agent.adapter.self()
     if ((opts.autoHome ?? true) && self && !getHome(agent)) {
@@ -144,9 +171,15 @@ export class NpcController {
     }
   }
 
-  /** The current behaviour set (static, or re-read from the options function). */
+  /** The behaviours configured on the brain (without the needs layer's). */
+  regularBehaviors (): Behavior[] {
+    return typeof this.opts.behaviors === 'function' ? this.opts.behaviors() : this.opts.behaviors
+  }
+
+  /** The current behaviour set: the configured ones, then the needs layer's (need:*, idle:*). */
   behaviors (): Behavior[] {
-    const list = typeof this.opts.behaviors === 'function' ? this.opts.behaviors() : this.opts.behaviors
+    const regular = this.regularBehaviors()
+    const list = this.opts.needs ? [...regular, ...this.opts.needs.behaviors()] : regular
     for (const b of list) if (!this.stats.has(b.name)) this.stats.set(b.name, { runs: 0, failures: 0, cooldownUntil: 0, flips: 0, flipUntil: 0 })
     return list
   }
@@ -253,7 +286,11 @@ export class NpcController {
   }
 
   scoreAll (ctx: NpcContext, isBlocked: (priority: number) => boolean = () => false): Scored[] {
-    return this.behaviors().map(b => {
+    return this.scoreList(this.behaviors(), ctx, isBlocked)
+  }
+
+  private scoreList (list: Behavior[], ctx: NpcContext, isBlocked: (priority: number) => boolean): Scored[] {
+    return list.map(b => {
       const st = this.stats.get(b.name)!
       if (ctx.now < st.cooldownUntil && st.failures > 0 && b.retryKey && st.failKey !== undefined && ctx.now - (st.lastAt ?? 0) >= RETRY_MIN_MS) {
         // what made it fail changed (wood arrived for the tools, say): retry now, not in 15 minutes
@@ -306,6 +343,8 @@ export class NpcController {
       for (const hook of this.hooks()) {
         try { hook(ctx) } catch (e) { this.log.debug(`hook: ${(e as Error).message}`) }
       }
+      const layer = this.opts.needs
+      try { layer?.tick(ctx) } catch (e) { this.log.debug(`needs: ${(e as Error).message}`) }
 
       const list = this.behaviors()
       const lowest = list.reduce((m, b) => Math.min(m, this.prio(b)), this.priority)
@@ -336,19 +375,29 @@ export class NpcController {
         this.yieldedTo = null
       }
 
-      this.lastScores = this.scoreAll(ctx, isBlocked)
+      this.behaviors() // stats for every behaviour, the layer's included
+      if (layer) {
+        const regular = this.scoreList(this.regularBehaviors(), ctx, isBlocked)
+        let boosted = regular
+        try { boosted = layer.plan(ctx, regular, this.current, this.opts) } catch (e) { this.log.debug(`needs plan: ${(e as Error).message}`) }
+        this.lastScores = [...boosted, ...this.scoreList(layer.behaviors(), ctx, isBlocked)]
+      } else {
+        this.lastScores = this.scoreAll(ctx, isBlocked)
+      }
       if (report) this.idleReport(now, holder, this.lastScores)
       const running = this.running ? { name: this.running.behavior.name, startedAt: this.running.startedAt } : null
       const d = decide(this.lastScores, running, now, this.opts)
       switch (d.kind) {
         case 'start':
           this.log.debug(`start ${d.name} (${Math.round(d.score)})`)
+          this.reason = layer?.reasonFor(d.name) ?? `${d.name} ${Math.round(d.score)}`
           this.start(d.name, d.score, now)
           break
         case 'switch':
           this.log.debug(`switch ${d.from} -> ${d.name}: ${d.reason}`)
           if (!((this.lastScores.find(s => s.name === d.from)?.score ?? 0) > 0)) this.noteDropOut(now)
           this.abortRunning('switch', true)
+          this.reason = layer?.reasonFor(d.name) ?? d.reason
           this.start(d.name, d.score, now)
           break
         case 'stop':
@@ -387,7 +436,8 @@ export class NpcController {
       holder: holder ? `${holder.label}@${holder.priority}` : 'none',
       paused: now < this.pausedUntil ? `${Math.round((this.pausedUntil - now) / 1000)}s` : 'no',
       scores: scored.join(' ') || 'none',
-      cooling: cooling.join(', ') || 'none'
+      cooling: cooling.join(', ') || 'none',
+      ...(this.opts.needs ? { need: this.opts.needs.lastView().need ? `${this.opts.needs.lastView().need!.name} ${this.opts.needs.lastView().need!.urgency}` : 'none', idleMode: this.opts.needs.lastView().idleMode } : {})
     })
   }
 
@@ -411,6 +461,7 @@ export class NpcController {
         // priority for a moment after a switch; wait for it instead of backing off from ourselves
         for (let i = 0; i < 20 && this.ownAbove(priority); i++) await sleep(50, signal)
         const res = await this.agent.act(action, params, { caller: this.caller, priority })
+        if (res.ok) this.lastProgressAt = this.now()
         if (signal.aborted) throw new ActionAbortedError(String(signal.reason ?? 'aborted'))
         if (!res.ok) {
           const h = this.foreignHolder(priority)
@@ -450,7 +501,9 @@ export class NpcController {
         }
       }
       const end = this.now()
+      try { this.opts.needs?.outcome(name, outcome, detail, this.context(end)) } catch (e) { this.log.debug(`needs: ${(e as Error).message}`) }
       if (outcome === 'ok') {
+        this.lastProgressAt = end
         st.failures = 0
         st.failKey = undefined
         if (!signal.aborted) st.flips = 0 // a run that finished by itself, not one cut short
@@ -481,6 +534,7 @@ export class NpcController {
   status (): Record<string, unknown> {
     const now = this.now()
     const r = this.running
+    const v = this.opts.needs?.lastView()
     return {
       behavior: r?.behavior.name ?? null,
       runningFor: r ? Math.round((now - r.startedAt) / 1000) : 0,
@@ -491,6 +545,8 @@ export class NpcController {
         .map(([n, s]) => [n, Math.ceil((s.cooldownUntil - now) / 1000)])),
       last: Object.fromEntries([...this.stats].filter(([, s]) => s.last).map(([n, s]) => [n, s.last])),
       ...(this.suspendedBy ? { suspended: this.suspendedBy } : {}),
+      ...(r && this.reason ? { reason: this.reason } : {}),
+      ...(v ? { drives: { top: v.need, urgent: v.urgent, idleMode: v.idleMode, ...(Object.keys(v.boosted).length ? { boosted: Object.fromEntries(Object.entries(v.boosted).map(([k, b]) => [k, `${b.need} +${Math.round(b.by)}`])) } : {}) } } : {}),
       ...(this.help.recent(now).length ? { askedForHelp: this.help.observeView(now) } : {}),
       ...this.bb.toJSON()
     }
@@ -501,7 +557,7 @@ export class NpcController {
    * the body, the last scores, cooldowns, idle since, last failure and success. Loops that know
    * their need, goal, reason or last progress fill the optional fields of DeciderSnapshot.
    */
-  snapshot (): DeciderSnapshot {
+  snapshot (): NpcSnapshot {
     const now = this.now()
     const r = this.running
     const h = this.foreign()
@@ -510,6 +566,7 @@ export class NpcController {
       .sort((a, b) => b[1].lastAt! - a[1].lastAt!)[0]
     const fail = latest('fail')
     const ok = latest('ok')
+    const v = this.opts.needs?.lastView()
     return {
       name: this.name,
       behavior: r?.behavior.name ?? null,
@@ -523,7 +580,15 @@ export class NpcController {
       scores: [...this.lastScores].sort((a, b) => b.score - a.score).slice(0, 6).map(s => ({ name: s.name, score: Math.round(s.score) })),
       cooling: [...this.stats].filter(([, s]) => s.cooldownUntil > now).map(([name, s]) => ({ name, until: s.cooldownUntil, failures: s.failures })),
       lastFailure: fail ? { behavior: fail[0], message: fail[1].last!.slice(6), at: fail[1].lastAt! } : null,
-      lastSuccess: ok ? { behavior: ok[0], message: ok[1].last!.slice(4), at: ok[1].lastAt! } : null
+      lastSuccess: ok ? { behavior: ok[0], message: ok[1].last!.slice(4), at: ok[1].lastAt! } : null,
+      need: v?.need?.name ?? null,
+      needUrgency: v?.need?.urgency ?? null,
+      urgent: v?.urgent ?? [],
+      goal: r ? r.behavior.goal ?? r.behavior.name : null,
+      reason: r ? this.reason : null,
+      lastProgressAt: this.lastProgressAt,
+      idleMode: v?.idleMode ?? null,
+      chore: r?.behavior.name.startsWith('idle:') ? r.behavior.name.slice(5) : null
     }
   }
 
@@ -541,10 +606,16 @@ export class NpcController {
       paused ? `backing off ${paused.seconds}s for ${paused.by ?? '?'}` : '',
       `scores: ${scores || 'none'}`,
       `needs: ${needs || 'none'}`,
+      s.drives ? drivesLine(s.drives as { top: { name: string, urgency: number } | null, urgent: string[], idleMode: string }) : '',
       asked.length ? `asked for help: ${asked.map(a => `${a.behavior} (${a.reason}, ${a.minutesAgo}m ago${a.sorted ? ', sorted' : ''})`).join('; ')}` : '',
       s.isNight ? 'night' : 'day'
     ].filter(Boolean).join(' | ')
   }
+}
+
+function drivesLine (d: { top: { name: string, urgency: number } | null, urgent: string[], idleMode: string }): string {
+  const top = d.top ? `${d.top.name} ${d.top.urgency}${d.urgent.includes(d.top.name) ? ' (urgent)' : ''}` : 'none'
+  return `top need: ${top}, idle mode ${d.idleMode}`
 }
 
 function isResult (r: unknown): r is ActionResult {
