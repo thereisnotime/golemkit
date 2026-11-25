@@ -100,9 +100,23 @@ function isStandable (block: any): boolean {
   return !!block && block.boundingBox === 'block' && !/lava|magma|cactus|campfire/.test(block.name)
 }
 
-/** Finds a block to stand on at x/z near height y (solid below, two free blocks above). */
-export function findStandable (bot: Bot, x: number, y: number, z: number, span = 6): Place | null {
-  for (let dy = span; dy >= -span; dy--) {
+/** Height offsets to try, top down (0 = y itself), or nearest to y first: 0, -1, 1, -2, 2... */
+export function standOffsets (span: number, nearest = false): number[] {
+  const out: number[] = []
+  if (!nearest) { for (let dy = span; dy >= -span; dy--) out.push(dy); return out }
+  out.push(0)
+  for (let d = 1; d <= span; d++) out.push(-d, d)
+  return out
+}
+
+/**
+ * Finds a block to stand on at x/z near height y (solid below, two free blocks above). Top down
+ * by default; `nearest` tries the heights closest to y first, so a walk near a building ends on
+ * the ground next to it and not on its roof or wall top (seen live: Pax's strolls by the fortress
+ * all picked roofs it could not get to, "found nowhere to wander to").
+ */
+export function findStandable (bot: Bot, x: number, y: number, z: number, span = 6, nearest = false): Place | null {
+  for (const dy of standOffsets(span, nearest)) {
     const ground = bot.blockAt(at(bot, x, y + dy - 1, z))
     if (!ground || !isStandable(ground)) continue
     const feet = bot.blockAt(ground.position.offset(0, 1, 0))
@@ -162,18 +176,25 @@ const wander = defineAction({
     const center = x !== undefined && cz !== undefined
       ? { x, y: pos.y, z: cz }
       : useHome ? home! : { x: pos.x, y: pos.y, z: pos.z }
-    for (let attempt = 0; attempt < 10; attempt++) {
+    // the later tries stay closer (a small yard inside walls), and every try takes the ground
+    // nearest the bot's height, not a roof or wall top above it
+    let tries = 0
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const r = attempt < 6 ? radius : Math.max(2, radius / 2)
       const angle = Math.random() * Math.PI * 2
-      const dist = radius * Math.sqrt(Math.random())
+      const dist = Math.max(1.5, r * Math.sqrt(Math.random()))
       const tx = Math.floor(center.x + Math.cos(angle) * dist)
       const tz = Math.floor(center.z + Math.sin(angle) * dist)
-      const spot = findStandable(bot, tx, Math.floor(pos.y), tz)
+      const spot = findStandable(bot, tx, Math.floor(pos.y), tz, 6, true)
       if (!spot) continue
-      const arrived = await gotoWithin(bot, new goals.GoalNear(spot.x, spot.y, spot.z, 1), signal, 20000)
-        .catch(() => false)
+      // water, or a spot well above or below it: a lake or a cliff, not a stroll
+      if (Math.abs(spot.y - pos.y) > 4) continue
+      if (++tries > 6) break
+      const arrived = await gotoWithin(bot, new goals.GoalNear(spot.x, spot.y, spot.z, 1), signal, 12000)
+        .catch(() => { checkAborted(signal); return false })
       if (arrived) return ok(`wandered to ${fmtPos(bot.entity.position)}`)
     }
-    return fail('found nowhere to wander to')
+    return fail(tries ? 'found nowhere to wander to: no path to the spots I picked' : 'found nowhere to wander to: no ground to stand on within reach')
   }
 })
 
