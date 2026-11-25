@@ -56,7 +56,9 @@ copy it from `.env.example`. Profiles, context packs, fleet and [scene](/guide/s
 | `MC_LOG_MAX_SIZE_MB` | `20` | rotate files at this size (0 = never) |
 | `MC_LOG_MAX_FILES` | `5` | rotated files to keep |
 | `MC_LOG_BUFFER` | `1000` | entries kept in memory (`recentLogs()`) |
-| `GOLEM_MEMLOG` | | seconds between [memory log](../guide/deployment#memory) lines (RSS, heap, swap, child processes, chunks, entities, store sizes); off when unset |
+| `GOLEM_MEMLOG` | | seconds between [memory log](../guide/deployment#memory) lines (RSS, heap, swap, child processes, chunks, entities, store sizes, GC count and time); off when unset |
+| `GOLEM_NODE_FLAGS` | `--max-semi-space-size=8` | Node/V8 flags `just run`, `just dev` and `just fleet` start the bot process with; empty for V8's defaults ([memory](../guide/deployment#memory)) |
+| `NODE_COMPILE_CACHE` | `node_modules/.cache/node-compile` (justfile), `/app/.cache/node-compile` (image) | Node's compile cache: type-stripped source kept between starts, so a start skips the TypeScript stripper; empty or `NODE_DISABLE_COMPILE_CACHE=1` turns it off |
 
 `MC_USERNAME` in `.env.example` is only read by `scripts/probe.ts` and `scripts/skill-test.ts`;
 bots take their name from the profile, `--username` or the variant. The LLM variables
