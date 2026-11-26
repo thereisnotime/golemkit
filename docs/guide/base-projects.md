@@ -176,5 +176,20 @@ the chore off); it runs when nothing else scores, like the other chores. See
 LLM) with a small kit in an empty spot far from everything and lets the chore build an outpost
 from scratch; BuildBoss, its owner for the run, approves the walls when asked, reads `projects` and
 `plan fortress`, pauses and resumes once. Every block that changed near the bot is put back
-afterwards. Unit tests: `test/projects.test.ts` (queue), `test/base-plan.test.ts` (stages,
+afterwards.
+
+What the live runs showed (2026-11-26, NeoForge server, outpost, `askAbove: 60`): the walls were
+proposed, approved by whisper and built in one session (83 blocks, about 40 s with the kit),
+pause and resume worked, the farm plot was kept, the floor, lighting (4 to 5 torches, 0 dark
+spots inside), the chest row and the workshop were built in later sessions; in the best run six
+of seven projects were done in an hour, the corner posts not reached (two nights in between, when
+only finished, lit insides are worked on). Each clean-up put back every changed block. Found and
+fixed on the way: collect_drops and the eat reflex ended sessions (now a sticky chore and a
+long-running action), the bot tunnelled out through its new wall on every trip and was then
+locked out by a hard ban (now a high dig cost), and a proposal sent before the owner listened was
+never answered (re-asked after `reaskHours`; "pax projects" shows it). Still open: leaving a
+closed base costs one to four wall blocks a trip, repaired by the next session; the gate walk
+did not trigger reliably (the build reached the inside cells anyway); a bot that dug a mining pit
+under its home got stuck in it for a whole run (gathering, not the projects); the gate door went
+missing twice and was put back by the next walls session. Unit tests: `test/projects.test.ts` (queue), `test/base-plan.test.ts` (stages,
 survey, fitting, materials), `test/base-projects.test.ts` (Pax's fortress on a fake world).
