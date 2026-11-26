@@ -3474,6 +3474,77 @@
       }
     },
     {
+      "name": "projects",
+      "description": "List the base projects (fortress walls, stone floor, lighting, storage chests, workshop, walkway, towers, a farm plot) in working order: what is done, ready, waiting for an owner's ok, skipped or blocked, the policy and what comes next. Answers \"pax projects\".",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "project",
+      "description": "Owners: decide about a base project. approve (ok to build), veto (never), skip (not now), unskip, next (build it next, implies ok), pause / resume (all base work), reset (forget what was said about one, or all). Names: walls, floor, walkway, towers, lighting, storage, workshop, farm_plot.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "op": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "veto",
+              "skip",
+              "unskip",
+              "next",
+              "pause",
+              "resume",
+              "reset"
+            ],
+            "description": "approve | veto | skip | unskip | next | pause | resume | reset"
+          },
+          "name": {
+            "description": "the project (not for pause/resume); words like \"chests\" or \"the towers\" work",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op"
+        ]
+      }
+    },
+    {
+      "name": "plan_base",
+      "description": "Dry run of the base projects: finds the base (fits the fortress blueprint to what is built), surveys every project (blocks done and left, spots left alone because they hold someone else's blocks), the materials each still needs against what it carries and what its chests hold, where new things would go, and what it would do next. Builds nothing. Answers \"pax plan fortress\".",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "detail": {
+            "default": true,
+            "description": "add the materials and notes per project",
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "name": "work_on_base",
+      "description": "One work session on the base projects (at most `minutes`): the next one in the queue, or the one named. Takes materials from its chests, gathers what is still missing (bounded), then builds only what is not there yet; never digs blocks it did not place itself except natural ones. Resumes where the last session stopped. Big projects need an owner's ok first (policy).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "description": "work on this one (it must be ready, or an owner asks); default the next in the queue",
+            "type": "string"
+          },
+          "minutes": {
+            "description": "session length (default settings projects.sessionMinutes, 10)",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 60
+          }
+        }
+      }
+    },
+    {
       "name": "mods",
       "description": "List the mods this server runs (with versions when known) and how many items/blocks/mobs each adds. Use it before explaining or teaching a mod, so you talk about what is actually installed.",
       "inputSchema": {
@@ -7017,6 +7088,77 @@
             "type": "number",
             "minimum": 16,
             "maximum": 2000
+          }
+        }
+      }
+    },
+    {
+      "name": "projects",
+      "description": "List the base projects (fortress walls, stone floor, lighting, storage chests, workshop, walkway, towers, a farm plot) in working order: what is done, ready, waiting for an owner's ok, skipped or blocked, the policy and what comes next. Answers \"pax projects\".",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "project",
+      "description": "Owners: decide about a base project. approve (ok to build), veto (never), skip (not now), unskip, next (build it next, implies ok), pause / resume (all base work), reset (forget what was said about one, or all). Names: walls, floor, walkway, towers, lighting, storage, workshop, farm_plot.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "op": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "veto",
+              "skip",
+              "unskip",
+              "next",
+              "pause",
+              "resume",
+              "reset"
+            ],
+            "description": "approve | veto | skip | unskip | next | pause | resume | reset"
+          },
+          "name": {
+            "description": "the project (not for pause/resume); words like \"chests\" or \"the towers\" work",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op"
+        ]
+      }
+    },
+    {
+      "name": "plan_base",
+      "description": "Dry run of the base projects: finds the base (fits the fortress blueprint to what is built), surveys every project (blocks done and left, spots left alone because they hold someone else's blocks), the materials each still needs against what it carries and what its chests hold, where new things would go, and what it would do next. Builds nothing. Answers \"pax plan fortress\".",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "detail": {
+            "default": true,
+            "description": "add the materials and notes per project",
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "name": "work_on_base",
+      "description": "One work session on the base projects (at most `minutes`): the next one in the queue, or the one named. Takes materials from its chests, gathers what is still missing (bounded), then builds only what is not there yet; never digs blocks it did not place itself except natural ones. Resumes where the last session stopped. Big projects need an owner's ok first (policy).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "description": "work on this one (it must be ready, or an owner asks); default the next in the queue",
+            "type": "string"
+          },
+          "minutes": {
+            "description": "session length (default settings projects.sessionMinutes, 10)",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 60
           }
         }
       }
