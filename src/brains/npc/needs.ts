@@ -27,6 +27,8 @@ export interface NeedSearch {
   requires?: string[]
   /** Whether a search could help right now (a pickaxe to mine what it finds, say). Default true. */
   ready? (ctx: NpcContext): boolean
+  /** Whether it may run at night now although needs.search.atNight is off (a lit mine near home, say). Default false. */
+  night? (ctx: NpcContext): boolean
   run (ctx: BehaviorContext, o: { radius: number, minutes: number, atNight: boolean }): Promise<ActionResult>
 }
 
@@ -334,7 +336,8 @@ export class NeedsLayer {
       if (active) { try { urgency = Math.max(0, Math.min(1, Number(n.urgency(ctx)) || 0)) } catch (e) { this.log?.debug(`need ${n.name}: ${(e as Error).message}`) } }
       const ns = st.need(n.name)
       let canSearch = false
-      if (active && n.search && ns.search && urgency >= ns.threshold && (st.search.atNight || !ctx.bb.facts.isNight) &&
+      const nightOk = (): boolean => { try { return !!n.search?.night?.(ctx) } catch { return false } }
+      if (active && n.search && ns.search && urgency >= ns.threshold && (st.search.atNight || !ctx.bb.facts.isNight || nightOk()) &&
           searchDue(history, n.name, now, st.search) && (n.search.requires ?? []).every(a => this.agent.getAction(a))) {
         try { canSearch = n.search.ready?.(ctx) ?? true } catch { canSearch = false }
       }

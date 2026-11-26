@@ -2,7 +2,7 @@
 // needs provider (src/adapters/minecraft-java/needs/). No mineflayer here: unit-tested in
 // test/need-plan.test.ts.
 import type { SiteVerdict } from '../core/sites.ts'
-import { heldTier, ARMOUR } from './progression.ts'
+import { heldTier, ironChain, chainIngots } from './progression.ts'
 import type { ToolKind } from './toolkit.ts'
 
 const TIER: Record<string, number> = { none: 0, wooden: 1, golden: 1, stone: 2, iron: 3, diamond: 4, netherite: 5 }
@@ -14,6 +14,11 @@ export interface GearState {
   upTo: 'stone' | 'iron' | 'diamond'
   /** Iron armour is part of the target. */
   armour: boolean
+  /** A bucket and a shield are part of the target (keep_tools_upgraded's bucket and shield). Default false. */
+  bucket?: boolean
+  shield?: boolean
+  /** Something needs a bucket now (the blackboard need `bucket`). */
+  bucketNeeded?: boolean
 }
 
 /** Any helmet/chestplate/leggings/boots of iron or better counts for its slot. */
@@ -23,7 +28,8 @@ const GOOD_ARMOUR = /^(iron|diamond|netherite)_(helmet|chestplate|leggings|boots
 /**
  * Gear urgency, 0..1, and what is missing. No weapon (sword or axe) or no pickaxe 0.8; a pickaxe
  * below the target tier 0.5, other tools below it 0.35; armour: 0.3 plus 0.075 per missing slot
- * (no armour at all: 0.6). The largest applies.
+ * (no armour at all: 0.6); a bucket 0.35 (0.6 while something needs one now), a shield 0.3.
+ * The largest applies.
  */
 export function gearUrgency (s: GearState): { urgency: number, missing: string[] } {
   const target = TIER[s.upTo]!
@@ -40,18 +46,17 @@ export function gearUrgency (s: GearState): { urgency: number, missing: string[]
     const gone = SLOTS.filter(x => !have.has(x))
     if (gone.length) { missing.push(`iron ${gone.join(', ')}`); u = Math.max(u, 0.3 + 0.075 * gone.length) }
   }
+  const has = (...names: string[]) => names.some(n => (s.held[n] ?? 0) > 0)
+  if ((s.bucket || s.bucketNeeded) && target >= 3 && !has('bucket', 'water_bucket', 'lava_bucket', 'powder_snow_bucket')) { missing.push('a bucket'); u = Math.max(u, s.bucketNeeded ? 0.6 : 0.35) }
+  if (s.shield && target >= 3 && !has('shield')) { missing.push('a shield'); u = Math.max(u, 0.3) }
   return { urgency: Math.min(1, u), missing }
 }
 
-/** Iron ingots the missing iron gear still needs (for the search's count). */
+/** Iron ingots the missing iron gear still needs (the iron chain, src/skills/progression.ts), less the iron it carries. */
 export function ironWanted (s: GearState): number {
-  let n = 0
-  if (TIER[s.upTo]! >= 3) {
-    const heads: Record<string, number> = { pickaxe: 3, sword: 2, axe: 3, shovel: 1 }
-    for (const [k, c] of Object.entries(heads)) if ((TIER[heldTier(s.held, k as ToolKind)] ?? 0) < 3) n += c
-  }
-  if (s.armour) for (const [a, c] of Object.entries(ARMOUR)) if (!Object.keys(s.held).some(h => (s.held[h] ?? 0) > 0 && GOOD_ARMOUR.test(h) && h.endsWith(a.split('_')[1]!))) n += c
-  return n
+  if (TIER[s.upTo]! < 3) return 0
+  const chain = ironChain(s.held, undefined, { armour: s.armour, bucket: s.bucket, shield: s.shield, bucketFirst: s.bucketNeeded })
+  return Math.max(0, chainIngots(chain) - (s.held.iron_ingot ?? 0) - (s.held.raw_iron ?? 0))
 }
 
 export interface SuppliesState {

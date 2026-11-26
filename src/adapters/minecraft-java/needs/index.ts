@@ -7,7 +7,10 @@ import type { Agent } from '../../../core/index.ts'
 import { needsSurvival } from '../../../core/index.ts'
 import type { NeedsProvider, NeedDef, NpcContext } from '../../../brains/npc/index.ts'
 import { runtimeFor } from '../../../brains/behaviors/actions.ts'
-import { gearUrgency, suppliesUrgency, type GearState } from '../../../skills/needPlan.ts'
+import { gearUrgency, suppliesUrgency, ironWanted, type GearState } from '../../../skills/needPlan.ts'
+import { stairMineConfig, knownMine, knownLitMine, lastMineTrip } from '../../../skills/stairMine.ts'
+import { mineTripDue } from '../../../skills/stairMinePlan.ts'
+import { BUCKET_NEED } from '../behaviors/tools.ts'
 import { heldTier } from '../../../skills/progression.ts'
 import { seedCount } from '../../../skills/foodPlan.ts'
 import { getFarms } from '../../../skills/food.ts'
@@ -30,15 +33,15 @@ export function heldItems (bot: Bot): Record<string, number> {
 }
 
 /** What "geared up" means for this bot: keep_tools_upgraded's options when it is armed, else iron tools without armour. */
-export function gearTarget (agent: Agent): Pick<GearState, 'upTo' | 'armour'> {
+export function gearTarget (agent: Agent): Pick<GearState, 'upTo' | 'armour' | 'bucket' | 'shield'> {
   try {
     const rt = runtimeFor(agent)
     if (rt?.store.isArmed('keep_tools_upgraded')) {
-      const o = rt.store.options('keep_tools_upgraded') as { upTo?: GearState['upTo'], armour?: boolean }
-      return { upTo: o.upTo ?? 'iron', armour: !!o.armour }
+      const o = rt.store.options('keep_tools_upgraded') as { upTo?: GearState['upTo'], armour?: boolean, bucket?: boolean, shield?: boolean }
+      return { upTo: o.upTo ?? 'iron', armour: !!o.armour, bucket: o.bucket !== false, shield: o.shield !== false }
     }
   } catch {}
-  return { upTo: 'iron', armour: false }
+  return { upTo: 'iron', armour: false, bucket: false, shield: false }
 }
 
 /** Caches a costly reading for a few seconds. */
@@ -57,7 +60,7 @@ export function minecraftNeeds (agent: Agent): NeedsProvider {
   const gear = cached(10_000, (ctx) => {
     const b = bot(ctx)
     if (!b.entity || !needsSurvival(b)) return { urgency: 0, missing: [] as string[] }
-    return gearUrgency({ held: heldItems(b), ...gearTarget(agent) })
+    return gearUrgency({ held: heldItems(b), ...gearTarget(agent), bucketNeeded: ctx.bb.need(BUCKET_NEED) > 0 })
   })
   const supplies = cached(15_000, (ctx) => {
     const b = bot(ctx)
@@ -103,7 +106,7 @@ export function minecraftNeeds (agent: Agent): NeedsProvider {
       servedBy: ['keep_tools_upgraded'],
       urgency: (ctx) => gear(ctx).urgency,
       search: {
-        what: 'iron ore with an open face',
+        what: 'iron ore with an open face, else its staircase mine',
         requires: ['find_target', 'upgrade_tools'],
         // only when iron is what is missing and it could mine it (a stone pickaxe, digging allowed)
         ready: (ctx) => {
@@ -112,19 +115,50 @@ export function minecraftNeeds (agent: Agent): NeedsProvider {
           if (!agent.canDig || t.upTo === 'stone') return false
           const tier = heldTier(heldItems(b), 'pickaxe')
           if (tier === 'none' || tier === 'wooden') return false
-          return gear(ctx).missing.some(m => /iron/.test(m))
+          return gear(ctx).missing.some(m => /iron|bucket|shield/.test(m))
+        },
+        // at night only down a lit mine near home (the walk to it is short)
+        night: (ctx) => {
+          const s = stairMineConfig(agent)
+          return s.enabled && s.atNight && !!agent.getAction('dig_mine') && !!knownLitMine(agent, bot(ctx)) && mineTripDue(lastMineTrip(agent), ctx.now, s)
         },
         async run (ctx, o) {
           const t = gearTarget(agent)
-          const r = await tripRun(ctx, { purpose: 'a search for iron ore', kind: 'ore', distance: o.radius }, async () => {
-            const f = await ctx.act('find_target', { target: 'iron', radius: o.radius, max_minutes: o.minutes, go: true, exposed: true, at_night: o.atNight })
-            if (!f.ok) return f
-            // upgrade_tools mines what it sees (safe mining: not deeper than mining.safeDepth unless ready)
-            const u = await ctx.act('upgrade_tools', { up_to: t.upTo, armour: t.armour, safe: true })
-            return { ok: u.ok, message: `${f.message}; ${u.message}` }
-          })
-          if (ctx.agent.getAction('go_home')) await ctx.act('go_home', { range: 4 })
-          return r
+          const b = bot(ctx)
+          const s = stairMineConfig(agent)
+          const upgrade = () => ctx.act('upgrade_tools', { up_to: t.upTo, armour: t.armour, bucket: !!t.bucket || ctx.bb.need(BUCKET_NEED) > 0, shield: !!t.shield, safe: true })
+          const home = async () => { if (ctx.agent.getAction('go_home')) await ctx.act('go_home', { range: 4 }) }
+          const night = ctx.bb.facts.isNight
+          const mineOk = s.enabled && !!agent.getAction('dig_mine') && mineTripDue(lastMineTrip(agent), ctx.now, s)
+          const mine = knownMine(agent, b)
+          const parts: string[] = []
+          // 1. ore with an open face within the search radius, by day; skipped once its mine is down at depth
+          if (!night && !(mineOk && mine?.bottom)) {
+            const r = await tripRun(ctx, { purpose: 'a search for iron ore', kind: 'ore', distance: o.radius }, async () => {
+              const f = await ctx.act('find_target', { target: 'iron', radius: o.radius, max_minutes: o.minutes, go: true, exposed: true, at_night: o.atNight })
+              if (!f.ok) return f
+              // upgrade_tools mines what it sees (safe mining: not deeper than mining.safeDepth unless ready)
+              const u = await upgrade()
+              return { ok: u.ok, message: `${f.message}; ${u.message}` }
+            })
+            if (r.ok || (r.data as { turnedBack?: unknown } | undefined)?.turnedBack || !mineOk) { await home(); return r }
+            parts.push(r.message)
+          }
+          if (!mineOk) { await home(); return { ok: false, message: parts.join('; ') || 'no mine trip due' } }
+          // 2. its staircase mine near home: food from the pantry and a weapon first, then down for the iron the chain still needs
+          await home()
+          if (agent.getAction('prepare_trip')) {
+            const p = await ctx.act('prepare_trip', { purpose: 'a trip down the mine', kind: 'ore', waive: [] })
+            if (!p.ok) return { ok: false, message: [...parts, p.message].join('; '), ...(p.data ? { data: p.data } : {}) }
+          }
+          const want = Math.min(32, Math.max(3, ironWanted({ held: heldItems(b), ...t, bucketNeeded: ctx.bb.need(BUCKET_NEED) > 0 })))
+          const m = await ctx.act('dig_mine', { ore: 'iron', count: want })
+          parts.push(m.message)
+          // 3. smelt and craft at home
+          await home()
+          const u = await upgrade()
+          parts.push(u.message)
+          return { ok: m.ok || u.ok, message: parts.join('; ') }
         }
       }
     },

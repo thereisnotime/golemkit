@@ -96,13 +96,27 @@ test('farmCells reads water and ice over the field, farmland and dirt', () => {
   assert.equal(farmCells(bot as any, { x: 50, y: 63, z: 0, size: 3 }), null, 'not loaded')
 })
 
-test('the Minecraft provider: five needs, unique chores for every mode, four site kinds', async () => {
+test('the Minecraft provider: five needs, unique chores for every mode, five site kinds', async () => {
   const { minecraftNeeds } = await import('../src/adapters/minecraft-java/needs/index.ts')
   const p = minecraftNeeds({ settings: {}, storage: { get: (_k: string, fb: unknown) => fb, set () {} }, getAction: () => undefined } as any)
   assert.deepEqual(p.needs.map(n => n.name), ['safety', 'food', 'gear', 'supplies', 'rest'])
   const names = p.chores.map(c => c.name)
   assert.equal(new Set(names).size, names.length)
   for (const m of ['passive', 'idle', 'active', 'explore']) assert.ok(p.chores.some(c => c.mode === m), m)
-  assert.deepEqual(p.sites!.map(s => s.kind), ['farm', 'bed', 'chest', 'home'])
+  assert.deepEqual(p.sites!.map(s => s.kind), ['farm', 'bed', 'chest', 'home', 'mine'])
   assert.equal(p.siteFromFailure!('farm_setup', "couldn't get to farm:1: no path", { agent: { storage: { get: () => [{ name: 'farm:1', x: 1, y: 2, z: 3, size: 9 }] } } } as any)?.verdict.ok, false)
+})
+
+test('gearUrgency and ironWanted: a bucket and a shield in the target, urgent while something needs a bucket', () => {
+  const ironTools = { iron_pickaxe: 1, iron_sword: 1, iron_axe: 1, iron_shovel: 1 }
+  assert.deepEqual(gearUrgency({ held: ironTools, upTo: 'iron', armour: false }), { urgency: 0, missing: [] })
+  const b = gearUrgency({ held: ironTools, upTo: 'iron', armour: false, bucket: true, shield: true })
+  assert.deepEqual(b.missing, ['a bucket', 'a shield'])
+  assert.equal(b.urgency, 0.35)
+  assert.equal(gearUrgency({ held: ironTools, upTo: 'iron', armour: false, bucketNeeded: true }).urgency, 0.6)
+  assert.deepEqual(gearUrgency({ held: { ...ironTools, water_bucket: 1 }, upTo: 'iron', armour: false, bucketNeeded: true }).missing, [])
+  assert.equal(gearUrgency({ held: { stone_pickaxe: 1, stone_sword: 1 }, upTo: 'stone', armour: false, bucket: true }).missing.length, 0, 'stone target: no bucket')
+  // Pax: stone tools, 2 raw iron in the bag, bucket and shield on, armour on
+  const stone = { stone_pickaxe: 1, stone_sword: 1, stone_axe: 1, stone_shovel: 1, raw_iron: 2 }
+  assert.equal(ironWanted({ held: stone, upTo: 'iron', armour: true, bucket: true, shield: true }), 3 + 3 + 1 + 24 + 2 + 3 + 1 - 2)
 })

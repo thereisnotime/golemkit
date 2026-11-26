@@ -11,6 +11,7 @@ import { getSpawn, spawnBedState } from '../../../skills/bed.ts'
 import { ownChests, configuredChests } from '../../../skills/containers.ts'
 import { vec } from '../../../skills/world.ts'
 import { farmSiteVerdict, type FarmSiteCell } from '../../../skills/needPlan.ts'
+import { mineSiteProbe } from './mine.ts'
 
 const bot = (ctx: NpcContext) => ctx.bot as Bot
 const ICE = /^(ice|packed_ice|blue_ice|frosted_ice)$/
@@ -128,7 +129,7 @@ export function minecraftSites (agent: Agent): SiteProbe[] {
     onBad: () => 'set_home somewhere else if it should move'
   }
 
-  return [farm, bed, chest, home]
+  return [farm, bed, chest, home, mineSiteProbe(agent)]
 }
 
 /** Failures that say a site can't be reached: "couldn't get to farm:1" (farm_setup), tend_farm on a missing farm. */

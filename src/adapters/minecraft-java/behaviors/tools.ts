@@ -7,9 +7,17 @@ import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import { nextToolUpgrade, senseNearby, heldTier, miningGate, chestWants, type Nearby } from '../../../skills/progression.ts'
 import { miningState } from '../../../skills/mining.ts'
 import { inventoryCounts, toolTier, usablePlankUnits, type ToolKind } from '../../../skills/toolkit.ts'
+import { heldCounts } from '../../../skills/gear.ts'
 
 /** Blackboard need set while upgrade_tools is stuck for wood; chop_wood_loop scores higher for it. */
 export const WOOD_NEED = 'wood'
+/**
+ * Blackboard need for a bucket (water for a farm where the water near home froze, say): any
+ * behaviour sets it (`ctx.bb.setNeed(BUCKET_NEED, 1)`), keep_tools_upgraded then makes the bucket
+ * before anything else iron and the gear need treats it as urgent. A bucket (empty, water or
+ * lava) held means the need is met; the setter clears it when it is done with it.
+ */
+export const BUCKET_NEED = 'bucket'
 
 const KINDS: ToolKind[] = ['pickaxe', 'sword', 'axe', 'shovel']
 
@@ -43,7 +51,9 @@ export const keepToolsUpgraded = defineBehavior({
   options: z.object({
     upTo: z.enum(['stone', 'iron', 'diamond']).default('iron').describe('highest tier to work towards'),
     minDurability: z.number().min(0).max(0.9).default(0.1).describe('replace a tool when less than this share of its durability is left'),
-    armour: z.boolean().default(false).describe('also make iron armour once iron tools are done'),
+    armour: z.boolean().default(false).describe('also make iron armour (chestplate, leggings, helmet, boots) after the iron pickaxe, bucket and shield'),
+    bucket: z.boolean().default(true).describe('make a bucket right after the iron pickaxe (first of all while the blackboard need `bucket` is set)'),
+    shield: z.boolean().default(true).describe('make a shield after the bucket'),
     senseSeconds: z.number().min(5).max(600).default(30).describe('how often to look around for stone and ore (the scan costs CPU)'),
     safeMining: z.boolean().default(true).describe('safe mining (settings.mining): ore deeper than mining.safeDepth only with a weapon, food and the gear mining.gear asks for; no caves, torches, climb out when losing underground')
   }),
@@ -70,18 +80,20 @@ export const keepToolsUpgraded = defineBehavior({
         let want = false
         try {
           const ctx = { bot, agent, signal: new AbortController().signal, log: agent.log }
-          want = Object.keys(chestWants(ctx, { upTo: o.upTo, armour: o.armour, mining: miningGate(miningState(bot, agent.settings), o.safeMining) }).want).length > 0
+          want = Object.keys(chestWants(ctx, { upTo: o.upTo, armour: o.armour, bucket: o.bucket, shield: o.shield, mining: miningGate(miningState(bot, agent.settings), o.safeMining) }).want).length > 0
         } catch {}
         chestSensed = { at: now, key, want }
       }
       return chestSensed.want
     }
+    let bucketFirst = false
     const want = (bot: Bot, now: number) => {
       if (!bot.entity || !needsSurvival(bot)) return null
       const worn = wornTools(bot, o.minDurability)
       if (worn.length) return { worn: worn[0]! }
-      const inv = inventoryCounts(bot)
-      const step = nextToolUpgrade(inv, nearby(bot, now), bot.game?.gameMode, { upTo: o.upTo, armour: o.armour, mining: miningGate(miningState(bot, agent.settings), o.safeMining) })
+      // worn armour and the offhand shield count (they are not in inventory.items())
+      const inv = heldCounts(bot)
+      const step = nextToolUpgrade(inv, nearby(bot, now), bot.game?.gameMode, { upTo: o.upTo, armour: o.armour, bucket: o.bucket, shield: o.shield, bucketFirst, mining: miningGate(miningState(bot, agent.settings), o.safeMining) })
       // nothing it can do from here, or only gathering: its chests may have what the step needs
       if ((!step || step.do === 'gather') && bot.game?.gameMode !== 'creative' && fromChests(bot, now, inv)) return { step: step ?? null, chest: true }
       if (!step || (step.do === 'gather' && !agent.canDig)) {
@@ -98,7 +110,10 @@ export const keepToolsUpgraded = defineBehavior({
       cooldownMs: 20_000,
       failureCooldownMs: 60_000,
       maxFailureCooldownMs: 900_000,
-      score: ({ bot, now, current }) => current === 'keep_tools_upgraded' || want(bot, now) ? 28 : 0,
+      score: ({ bot, bb, now, current }) => {
+        bucketFirst = bb.need(BUCKET_NEED) > 0
+        return current === 'keep_tools_upgraded' || want(bot, now) ? 28 : 0
+      },
       // stuck for wood: the back-off ends as soon as the usable wood changes (chopped, or put in its inventory)
       // not ready to mine: the back-off ends when the kit (weapon, food, gear) changes
       retryKey: ({ bot }) => {
@@ -112,7 +127,7 @@ export const keepToolsUpgraded = defineBehavior({
         if (!w) return { ok: true, message: 'tools are fine' }
         if ('worn' in w) return ctx.act('craft', { item: w.worn, count: 1 })
         sensed = null // look again after the work
-        const r = await ctx.act('upgrade_tools', { up_to: o.upTo, armour: o.armour, safe: o.safeMining })
+        const r = await ctx.act('upgrade_tools', { up_to: o.upTo, armour: o.armour, bucket: o.bucket || bucketFirst, shield: o.shield, safe: o.safeMining })
         lastNeed = (r.data as { need?: string } | undefined)?.need
         notReady = !!(r.data as { notReady?: boolean } | undefined)?.notReady
         ctx.bb.setNeed(WOOD_NEED, lastNeed === 'wood' ? 1 : 0)
