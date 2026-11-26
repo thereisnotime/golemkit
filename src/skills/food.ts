@@ -1074,6 +1074,7 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
   const coldOk = fs.protectWater !== 'off' && canPlace(agent)
   let source: 'natural' | 'ice' | 'bucket' = 'natural'
   let iceKept: 'cover' | 'torch' | undefined
+  let iceNote: string | null = null
   const pick = (from: { x: number, y: number, z: number }) => {
     // within the radius first, then as far as the loaded chunks go
     for (const r of [...new Set([p.radius, Math.max(p.radius, 96)])]) {
@@ -1112,12 +1113,12 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
       })
       const best = chooseFarmSite(cands)
       if (!best) {
-        if (r === Math.max(p.radius, 96)) steps.push(!raw.length ? 'no ice next to tillable ground' : ice.length ? `${ice.length} shore ice blocks, none usable (${siteProblems(cands)})` : `${raw.length} shore ice blocks, none open above with water or ground under, away from the bad farm`)
+        if (r === Math.max(p.radius, 96)) iceNote = (!raw.length ? 'no ice next to tillable ground' : ice.length ? `${ice.length} shore ice blocks, none usable (${siteProblems(cands)})` : `${raw.length} shore ice blocks, none open above with water or ground under, away from the bad farm`)
         continue
       }
       const r2 = await keepWaterOpen(ctx, best, 'ice', fs)
       if (r2.ok) { site = best; source = 'ice'; if (r2.how !== 'none') iceKept = r2.how; steps.push(r2.message); break }
-      steps.push(r2.message)
+      iceNote = `at ${fmtPos(best.water)}, ${r2.message}`
       break
     }
   }
@@ -1149,7 +1150,7 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
       }
     }
   }
-  if (!site) return fail(`no flat grass next to water within ${Math.max(p.radius, 96)} blocks of ${centerName} that isn't protected or somebody's build, no frozen shore to open${fs.iceWater ? '' : ' (farming.iceWater is off)'}, and no water bucket${steps.length ? ` (${steps.join(', ')})` : ''}`)
+  if (!site) return fail(`no flat grass next to water within ${Math.max(p.radius, 96)} blocks of ${centerName} that isn't protected or somebody's build, and no water bucket; ${fs.iceWater ? `frozen shore: ${iceNote ?? 'none found'}` : 'farming.iceWater is off'}${steps.length ? ` (${steps.join(', ')})` : ''}`)
   // open water (a lake or a poured hole) in a cold biome: keep it from freezing too
   let keptOpen: 'cover' | 'torch' | undefined
   if (source === 'ice') keptOpen = iceKept
