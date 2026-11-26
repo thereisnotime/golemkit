@@ -2685,6 +2685,10 @@
       "shear",
       "light_up",
       "recover_items",
+      "projects",
+      "project",
+      "plan_base",
+      "work_on_base",
       "mods",
       "mod_items",
       "creative_get",
@@ -6411,6 +6415,89 @@
         "longRunning": true
       },
       {
+        "name": "projects",
+        "description": "List the base projects (fortress walls, stone floor, lighting, storage chests, workshop, walkway, towers, a farm plot) in working order: what is done, ready, waiting for an owner's ok, skipped or blocked, the policy and what comes next. Answers \"pax projects\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "project",
+        "description": "Owners: decide about a base project. approve (ok to build), veto (never), skip (not now), unskip, next (build it next, implies ok), pause / resume (all base work), reset (forget what was said about one, or all). Names: walls, floor, walkway, towers, lighting, storage, workshop, farm_plot.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "approve",
+                "veto",
+                "skip",
+                "unskip",
+                "next",
+                "pause",
+                "resume",
+                "reset"
+              ],
+              "description": "approve | veto | skip | unskip | next | pause | resume | reset"
+            },
+            "name": {
+              "description": "the project (not for pause/resume); words like \"chests\" or \"the towers\" work",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "plan_base",
+        "description": "Dry run of the base projects: finds the base (fits the fortress blueprint to what is built), surveys every project (blocks done and left, spots left alone because they hold someone else's blocks), the materials each still needs against what it carries and what its chests hold, where new things would go, and what it would do next. Builds nothing. Answers \"pax plan fortress\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "detail": {
+              "default": true,
+              "description": "add the materials and notes per project",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "work_on_base",
+        "description": "One work session on the base projects (at most `minutes`): the next one in the queue, or the one named. Takes materials from its chests, gathers what is still missing (bounded), then builds only what is not there yet; never digs blocks it did not place itself except natural ones. Resumes where the last session stopped. Big projects need an owner's ok first (policy).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "project": {
+              "description": "work on this one (it must be ready, or an owner asks); default the next in the queue",
+              "type": "string"
+            },
+            "minutes": {
+              "description": "session length (default settings projects.sessionMinutes, 10)",
+              "type": "number",
+              "minimum": 1,
+              "maximum": 60
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
         "name": "mods",
         "description": "List the mods this server runs (with versions when known) and how many items/blocks/mobs each adds. Use it before explaining or teaching a mod, so you talk about what is actually installed.",
         "inputSchema": {
@@ -6496,7 +6583,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get !status (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !projects !project !plan_base !work_on_base !mods !mod_items !creative_get !status (!help <command> for details)"
   },
   "variant:villager": {
     "actions": [
@@ -6611,6 +6698,10 @@
       "shear",
       "light_up",
       "recover_items",
+      "projects",
+      "project",
+      "plan_base",
+      "work_on_base",
       "status"
     ],
     "catalog": [
@@ -10074,6 +10165,89 @@
         "longRunning": true
       },
       {
+        "name": "projects",
+        "description": "List the base projects (fortress walls, stone floor, lighting, storage chests, workshop, walkway, towers, a farm plot) in working order: what is done, ready, waiting for an owner's ok, skipped or blocked, the policy and what comes next. Answers \"pax projects\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "project",
+        "description": "Owners: decide about a base project. approve (ok to build), veto (never), skip (not now), unskip, next (build it next, implies ok), pause / resume (all base work), reset (forget what was said about one, or all). Names: walls, floor, walkway, towers, lighting, storage, workshop, farm_plot.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "approve",
+                "veto",
+                "skip",
+                "unskip",
+                "next",
+                "pause",
+                "resume",
+                "reset"
+              ],
+              "description": "approve | veto | skip | unskip | next | pause | resume | reset"
+            },
+            "name": {
+              "description": "the project (not for pause/resume); words like \"chests\" or \"the towers\" work",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "plan_base",
+        "description": "Dry run of the base projects: finds the base (fits the fortress blueprint to what is built), surveys every project (blocks done and left, spots left alone because they hold someone else's blocks), the materials each still needs against what it carries and what its chests hold, where new things would go, and what it would do next. Builds nothing. Answers \"pax plan fortress\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "detail": {
+              "default": true,
+              "description": "add the materials and notes per project",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "work_on_base",
+        "description": "One work session on the base projects (at most `minutes`): the next one in the queue, or the one named. Takes materials from its chests, gathers what is still missing (bounded), then builds only what is not there yet; never digs blocks it did not place itself except natural ones. Resumes where the last session stopped. Big projects need an owner's ok first (policy).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "project": {
+              "description": "work on this one (it must be ready, or an owner asks); default the next in the queue",
+              "type": "string"
+            },
+            "minutes": {
+              "description": "session length (default settings projects.sessionMinutes, 10)",
+              "type": "number",
+              "minimum": 1,
+              "maximum": 60
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
         "name": "status",
         "description": "Say what the bot is doing and why (or why it is idle or stuck), how long since it last made progress, health and food, and the last failure. Answers \"status\", \"what are you doing\", \"why are you idle\".",
         "inputSchema": {
@@ -10085,7 +10259,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !status (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !projects !project !plan_base !work_on_base !status (!help <command> for details)"
   },
   "profile:apprentice": {
     "actions": [
@@ -11862,6 +12036,10 @@
       "shear",
       "light_up",
       "recover_items",
+      "projects",
+      "project",
+      "plan_base",
+      "work_on_base",
       "mods",
       "mod_items",
       "creative_get",
@@ -15588,6 +15766,89 @@
         "longRunning": true
       },
       {
+        "name": "projects",
+        "description": "List the base projects (fortress walls, stone floor, lighting, storage chests, workshop, walkway, towers, a farm plot) in working order: what is done, ready, waiting for an owner's ok, skipped or blocked, the policy and what comes next. Answers \"pax projects\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "project",
+        "description": "Owners: decide about a base project. approve (ok to build), veto (never), skip (not now), unskip, next (build it next, implies ok), pause / resume (all base work), reset (forget what was said about one, or all). Names: walls, floor, walkway, towers, lighting, storage, workshop, farm_plot.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "approve",
+                "veto",
+                "skip",
+                "unskip",
+                "next",
+                "pause",
+                "resume",
+                "reset"
+              ],
+              "description": "approve | veto | skip | unskip | next | pause | resume | reset"
+            },
+            "name": {
+              "description": "the project (not for pause/resume); words like \"chests\" or \"the towers\" work",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op"
+          ]
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "plan_base",
+        "description": "Dry run of the base projects: finds the base (fits the fortress blueprint to what is built), surveys every project (blocks done and left, spots left alone because they hold someone else's blocks), the materials each still needs against what it carries and what its chests hold, where new things would go, and what it would do next. Builds nothing. Answers \"pax plan fortress\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "detail": {
+              "default": true,
+              "description": "add the materials and notes per project",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "work_on_base",
+        "description": "One work session on the base projects (at most `minutes`): the next one in the queue, or the one named. Takes materials from its chests, gathers what is still missing (bounded), then builds only what is not there yet; never digs blocks it did not place itself except natural ones. Resumes where the last session stopped. Big projects need an owner's ok first (policy).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "project": {
+              "description": "work on this one (it must be ready, or an owner asks); default the next in the queue",
+              "type": "string"
+            },
+            "minutes": {
+              "description": "session length (default settings projects.sessionMinutes, 10)",
+              "type": "number",
+              "minimum": 1,
+              "maximum": 60
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
         "name": "mods",
         "description": "List the mods this server runs (with versions when known) and how many items/blocks/mobs each adds. Use it before explaining or teaching a mod, so you talk about what is actually installed.",
         "inputSchema": {
@@ -15673,6 +15934,6 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get !status (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !projects !project !plan_base !work_on_base !mods !mod_items !creative_get !status (!help <command> for details)"
   }
 }
