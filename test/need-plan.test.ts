@@ -120,3 +120,38 @@ test('gearUrgency and ironWanted: a bucket and a shield in the target, urgent wh
   const stone = { stone_pickaxe: 1, stone_sword: 1, stone_axe: 1, stone_shovel: 1, raw_iron: 2 }
   assert.equal(ironWanted({ held: stone, upTo: 'iron', armour: true, bucket: true, shield: true }), 3 + 3 + 1 + 24 + 2 + 3 + 1 - 2)
 })
+
+test('the gear search: exposed ore first, then its staircase mine for the iron, then upgrade_tools at home', async () => {
+  const { minecraftNeeds } = await import('../src/adapters/minecraft-java/needs/index.ts')
+  const store = new Map<string, unknown>([['home', { x: 0, y: 64, z: 0 }]])
+  const calls: { name: string, params: any }[] = []
+  const agent: any = {
+    settings: {},
+    canDig: true,
+    storage: { get: (k: string, fb: unknown) => store.has(k) ? store.get(k) : fb, set: (k: string, v: unknown) => store.set(k, v) },
+    getAction: (n: string) => ['find_target', 'upgrade_tools', 'dig_mine', 'go_home', 'prepare_trip'].includes(n) ? { name: n } : undefined
+  }
+  const p = minecraftNeeds(agent)
+  const gear = p.needs.find(n => n.name === 'gear')!
+  const bot = { entity: { position: { x: 0, y: 64, z: 0 } }, registry: { foodsByName: {} }, food: 20, health: 20, time: { timeOfDay: 1000 }, game: { dimension: 'overworld', gameMode: 'survival' }, inventory: { items: () => [{ name: 'stone_pickaxe', count: 1 }], slots: [] } }
+  let committedSeen = false
+  const ctx: any = {
+    agent, bot, now: 1_000_000,
+    bb: { facts: { isNight: false }, need: () => 0 },
+    act: async (name: string, params: any) => {
+      calls.push({ name, params })
+      if (name === 'dig_mine') committedSeen = gear.search!.committed!(ctx)
+      if (name === 'find_target') return { ok: false, message: "didn't find iron ore" }
+      return { ok: true, message: `${name} done` }
+    }
+  }
+  const r = await gear.search!.run(ctx, { radius: 160, minutes: 6, atNight: false })
+  assert.deepEqual(calls.map(c => c.name), ['prepare_trip', 'find_target', 'go_home', 'prepare_trip', 'dig_mine', 'go_home', 'upgrade_tools'])
+  assert.equal(calls.find(c => c.name === 'find_target')!.params.radius, 160)
+  assert.ok(calls.find(c => c.name === 'dig_mine')!.params.count >= 3)
+  assert.equal(committedSeen, true)
+  assert.equal(gear.search!.committed!(ctx), false, 'not committed after the run')
+  assert.equal(r.ok, true)
+  // at night there is no lit mine: the search may not run
+  assert.equal(gear.search!.night!({ ...ctx, bb: { facts: { isNight: true }, need: () => 0 } }), false)
+})
