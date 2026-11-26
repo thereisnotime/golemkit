@@ -1,0 +1,8 @@
+- [x] coldFarmPlan.ts: ice to water, freezing, protection, steps (tests)
+- [x] start_farm: frozen-shore sites, keep cold water open, seeds and blocks from its chests
+- [x] farm land cells and the shore-aware site verdict
+- [x] choreIdle rules, seeds without a farm, quiet pause, idle explanation in the status
+- [x] wander nearest ground, thin snow takes a torch
+- [x] settings and toggles farming.iceWater, farming.protectWater; idle.chores.<name>.quietMinutes
+- [x] docs: needs-and-idle, behaviors, config
+- [x] survival bench on the ice scenario
