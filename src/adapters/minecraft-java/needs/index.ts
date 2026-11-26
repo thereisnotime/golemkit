@@ -19,6 +19,7 @@ import { woodStock } from '../behaviors/work.ts'
 import { chestSeedCount } from '../behaviors/keepFed.ts'
 import { tripRun } from '../behaviors/trip.ts'
 import { minecraftChores } from './chores.ts'
+import { projectChores } from './projects.ts'
 import { minecraftSites, siteFromFailure } from './sites.ts'
 
 /** Items carried, worn and in the offhand, by name. */
@@ -193,7 +194,7 @@ export function minecraftNeeds (agent: Agent): NeedsProvider {
 
   return {
     needs,
-    chores: minecraftChores(agent),
+    chores: [...minecraftChores(agent), ...projectChores(agent)],
     sites: minecraftSites(agent),
     siteFromFailure,
     // Minecraft: timeOfDay 0 is 06:00
