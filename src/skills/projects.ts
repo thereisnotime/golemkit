@@ -648,6 +648,8 @@ const workOnBase = defineAction({
     project: z.string().optional().describe('work on this one (it must be ready, or an owner asks); default the next in the queue'),
     minutes: z.number().min(1).max(60).optional().describe('session length (default settings projects.sessionMinutes, 10)')
   }),
+  // a reflex (eating, a fight) suspends the session and it picks up again afterwards, instead of ending it
+  longRunning: true,
   async run (ctx, { project, minutes }) {
     const bot = ctx.bot as Bot
     if (!bot?.entity) return fail('not in the game')
