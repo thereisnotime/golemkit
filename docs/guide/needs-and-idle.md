@@ -223,6 +223,11 @@ cooldown and only runs when it would do something.
 | `light_dark_spots` | active | day | 30 min (quiet 4 h) | `light_up` around home, 8 torches at most |
 | `scout_nearby` | active | day | 30 min | `find_target` iron, then coal, within twice the radius, while it doesn't know where they are |
 | `explore` | explore | day | 20 min | a trip to `idle.exploreRadius` for iron, coal, a village, diamonds it doesn't know of yet |
+| `base_project` | active | any | 1 min | one [base projects](./base-projects) session (or a proposal to the owners); sticky; at night only inside finished, lit walls |
+
+A chore marked sticky (`base_project`) keeps the body once it runs when another behaviour climbs
+just above the idle band (drops to pick up, scoring 22): only one that beats it by the switch
+margin takes over. Plain chores give way as soon as anything scores.
 
 Every chore takes `true`/`false` or `{ enabled, radius, when: day | night | any, hours: [from, to],
 cooldownMinutes, quietMinutes }`. Hours are the game clock: 0 is midnight, 6 sunrise, 18 sunset;

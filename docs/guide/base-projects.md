@@ -84,6 +84,10 @@ A session (`work_on_base`, at most `sessionMinutes`) works the first ready proje
    session (the rest is for the next session);
 4. builds only the stage's cells, then surveys again and records progress.
 
+Once the base is settled, the pathfinder never digs through its blocks (walls, floor, towers, the
+rows): in the first live run the bot tunnelled out through its new wall on every trip and rebuilt
+it the next session. The chore is sticky, so picking up a few drops doesn't cut a session short.
+
 Progress is the world itself plus `projects.state` in agent storage, so a session cut short by a
 reflex, a death, a disconnect or a restart picks up where it was. A project that got nothing done
 three sessions in a row rests for two hours. When one finishes, the owners online are told.
