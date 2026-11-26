@@ -378,6 +378,7 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
         if (mainSinceBranch >= branchEvery(s)) {
           // a branch on each side, back to the main tunnel after each
           const junction = feet
+          const brokenBefore = broken
           for (const side of sides(mainDir)) {
             let len = 0
             for (; len < s.branchLength; len++) {
@@ -393,11 +394,12 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
             await gotoWithin(bot, new goals.GoalBlock(junction.x, junction.y, junction.z), signal, 20_000).catch(e => { checkAborted(signal) })
             feet = floorP(bot.entity.position)
           }
-          branchesThisTrip++
-          mine.branches++
+          // a branch that was already there (an old tunnel) doesn't count towards this trip's branches
+          if (broken > brokenBefore) { branchesThisTrip++; mine.branches++ }
           mainSinceBranch = 0
           continue
         }
+        const brokenBefore = broken
         const why = await step(mainDir, false)
         if (why) {
           // the main tunnel turns once; twice blocked ends the trip
@@ -408,7 +410,8 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
           continue
         }
         mine.mainSteps++
-        mainSinceBranch++
+        // walking an old tunnel: on to its end before the next branch
+        if (broken > brokenBefore) mainSinceBranch++
         mine.face = feet
       }
     }
