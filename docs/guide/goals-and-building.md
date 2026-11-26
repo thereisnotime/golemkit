@@ -118,6 +118,13 @@ that waited for a fully idle body would never get a turn. The rule:
 - **What it already did:** the last finished goals (2 days) and saved places with coordinates are
   in every prompt, so "did you build the fortress?" gets a true answer.
 
+### Goals and base projects
+
+A bot with the `base_projects` skill improves its base on its own when nothing else needs doing
+([base projects](./base-projects)). An active LLM goal about building holds that work back; a
+paused or stale one doesn't, and the projects it names (floor, towers, walkway...) count as asked
+for by its owner, so a half-built fortress gets finished without the model.
+
 ### Guardrails
 
 | setting (`llm.goals`) | default | |
@@ -382,7 +389,10 @@ blueprint as text.
 | `cottage` | 9x9x8 | 239 | ~85 + 40 cobblestone | cobblestone foundation and porch with fence posts, log frame and beams, glass windows on every side, gabled stair roof overhanging all round, four torches, bed, chest, crafting table, furnace |
 | `cabin` | 7x7x7 | 160 | ~95 | log cabin: logs laid along each wall, upright corners, log gables, stair roof, windows with open trapdoor shutters, torch, bed, chest, crafting table |
 | `watchtower` | 5x5x8 | 89 | ~40 + 9 cobblestone | 3x3 shaft with a ladder inside, side windows, fenced 5x5 platform six up, torches on the corner posts |
-| `fortress` | 15x15x5 | 201 | stone | walled compound with battlements, a gated door and corner torches, to put a house and farm inside |
+| `fortress` | 17x17x7 | 648 | stone | fortress v2: stone foundation and floor, walls with battlements, a walkway with a ladder, four 3x3 corner towers with torches, a gate with a door and torches; built in stages by [base projects](./base-projects) |
+| `outpost` | 9x9x5 | 152 | stone | small walled base: stone floor, walls 2 high, a door, torch-topped corner posts (a starter base for [base projects](./base-projects)) |
+| `storage_row` | 4x1x1 | 4 | ~8 | four chests against a wall (base projects' storage) |
+| `workshop_row` | 3x1x1 | 3 | ~1 + 16 cobblestone | crafting table and two furnaces against a wall (base projects' workshop) |
 | `hut` | 5x5x4 | 82 | ~25 | plain plank box with a flat roof (quick) |
 | `shelter` | 3x3x3 | 25 | | emergency box around the bot, no door |
 | `wall_segment` | 7x1x3 | 21 | | straight wall |

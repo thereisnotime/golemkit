@@ -148,6 +148,14 @@ can't change their own.
 | `sites.recheckHours` | 0.1–720 | a bad site is looked at again after this long (default 6) |
 | `sites.replace` | on/off | replace a bad site when it can (a new farm near home; default on) |
 | `sites.tell` | on/off | whisper the owners when a site goes bad or is fine again (default on) |
+| `projects.enabled` | on/off | [base projects](./base-projects): improve and extend the base on its own (default on) |
+| `projects.policy` | auto / ask / off | auto builds, asking first for big projects; ask proposes every one; off only plans (default auto) |
+| `projects.askAbove` | 0–100000 | auto: projects with more blocks than this need an owner's ok (default 150) |
+| `projects.askTimeoutMinutes` | 1–10080 | how long to wait for an answer to a proposal (default 30) |
+| `projects.onTimeout` | wait / build / skip | no answer in time: ask again later, go ahead or skip it (default wait) |
+| `projects.paused` | on/off | no base work for now; planning still works (owners: "pax pause building") |
+| `projects.sessionMinutes` | 1–60 | one work session at most (default 10) |
+| `projects.night` | on/off | also work at night on projects inside finished, lit walls (default on) |
 | `humanize.enabled` | on/off | player-like reaction and typing delays |
 | `humanize.typoRate` | 0–1 | chance of a typo per message |
 | `humanize.lowercase` | on/off | write chat in lower case |

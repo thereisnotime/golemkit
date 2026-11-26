@@ -63,6 +63,12 @@ behind an adapter interface, so the core, brains and intents don't depend on Min
   ore near: a short scouting trip for some). Places it depends on are checked: a farm under a
   frozen lake is dropped and a new one started near home. With nothing to do, an idle mode picks
   chores near home (`idle: active`) or just looks around.
+- **Improve the base by itself.** Base projects: a queue of upgrades to its fortress (walls and
+  gate, a stone floor, torches so nothing spawns inside, more chests, a workshop, a walkway,
+  corner towers, a plot kept free for a farm) worked through in short sessions when nothing else
+  needs doing: chests first, then gathering, then building only what is missing, never touching
+  other people's blocks. Owners see and steer the queue from chat ("pax projects", "pax build
+  towers next", "pax skip walkway", "pax pause building"); big ones wait for an ok.
 - **Find and fetch.** Search for ores, mobs, water, villages or biomes, then bring items from
   their own chests, crafting, smelting or gathering, and recover an owner's drops after a death.
   Optionally remember what is in their chests across restarts ("where's my iron?") and notice
@@ -120,6 +126,7 @@ behind an adapter interface, so the core, brains and intents don't depend on Min
 | Asking the owners for help (`askHelp`) | ✅ | [asking for help](docs/guide/behaviors.md#asking-for-help) |
 | Going back for its own drops after a death (`recover_drops`, `recover_items`) | ✅ | live test in [behaviours](docs/guide/behaviors.md#death-drops-recover_drops) |
 | Needs, site health and idle modes (`needs`, `sites`, `idle`) | 🧪 | unit tested, survival bench `--bad-farm`; [needs and idle modes](docs/guide/needs-and-idle.md) |
+| Base projects (`projects`): fortress stages, lighting, storage, workshop, owner approvals | 🧪 | unit tested, live `scripts/projects-test.ts`; [base projects](docs/guide/base-projects.md) |
 | Status snapshot (`just status`, `!status`, `status.json`) and stuck alerts (`settings.status`) | 🧪 | unit tested, no live run recorded yet; [status](docs/guide/status.md) |
 | Death cause reports for hooks and the LLM | ✅ | causes show up in the survival benchmark; [journal](docs/guide/journal.md#what-is-recorded) |
 | Container memory (`settings.inventoryMemory`, `check_storage`, `where_stored`) | ✅ | live run in [search](docs/guide/search.md#container-memory) |
@@ -208,7 +215,7 @@ Guides worth starting with:
 - [Goals and building](docs/guide/goals-and-building.md), [blueprints](docs/guide/blueprints.md), [roads](docs/guide/roads.md), [WorldEdit](docs/guide/worldedit.md)
 - [Tool progression](docs/guide/progression.md): tools, mining, what to do when digging gives nothing
 - [Live config](docs/guide/live-config.md) and [profiles](docs/guide/profiles.md)
-- [NPC brain](docs/guide/npc-brain.md), [needs, site health and idle modes](docs/guide/needs-and-idle.md), [self-improving NPCs](docs/guide/self-improver.md), [scenes](docs/guide/scenes.md)
+- [NPC brain](docs/guide/npc-brain.md), [needs, site health and idle modes](docs/guide/needs-and-idle.md), [base projects](docs/guide/base-projects.md), [self-improving NPCs](docs/guide/self-improver.md), [scenes](docs/guide/scenes.md)
 - [Context packs](docs/guide/context-pack.md), the [journal](docs/guide/journal.md) and [status and stuck alerts](docs/guide/status.md)
 - Concepts: [architecture](docs/concepts/architecture.md), [world, movement and combat](docs/concepts/world.md), [combat research](docs/concepts/combat-research.md)
 - [What is game-specific](docs/concepts/scope.md): which code is game-agnostic, Minecraft-specific or NeoForge-specific, and the [game adapters](docs/concepts/adapters.md) that keep them apart
