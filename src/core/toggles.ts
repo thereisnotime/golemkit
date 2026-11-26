@@ -151,6 +151,8 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'idle.exploreRadius', description: 'explore mode: how far a scouting trip may go (default 200)', schema: z.number().int().min(32).max(1024) },
   { key: 'idle.exploreMinutes', description: 'explore mode: give a scouting trip up after this many minutes (default 8)', schema: z.number().min(1).max(30) },
   { key: 'idle.chores.*', description: 'switch one idle chore on or off, e.g. idle.chores.scout_nearby off', schema: bool },
+  { key: 'farming.iceWater', description: 'cold ground: break ice on a frozen shore or pond for a new farm\'s water when there is no open water or bucket (default on)', schema: bool },
+  { key: 'farming.protectWater', description: 'keep a farm\'s water from freezing in a cold biome: auto (a cheap block over it, else a torch next to it) | cover | torch | off', schema: z.enum(['auto', 'cover', 'torch', 'off']) },
   { key: 'sites.enabled', description: 'site health: check the farm, bed, chests and home it depends on and mark bad ones', schema: bool },
   { key: 'sites.failures', description: 'unreachable or no-work checks in a row before a site is bad (default 3)', schema: z.number().int().min(1).max(20) },
   { key: 'sites.checkMinutes', description: 'check one site at most this often, in minutes (default 5)', schema: z.number().min(0.5).max(240) },

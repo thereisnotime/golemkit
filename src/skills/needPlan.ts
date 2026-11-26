@@ -134,3 +134,79 @@ export function spareCraft (inv: Record<string, number>): { item: string, count:
   }
   return null
 }
+
+/**
+ * What the Minecraft idle chores need to know (src/adapters/minecraft-java/needs/chores.ts reads
+ * it lazily: a field is only looked at when the chore asks for it).
+ */
+export interface ChoreState {
+  /** Distance to home, null without a home in this dimension. */
+  homeDistance: number | null
+  /** The chore's radius (idle.radius or its own). */
+  radius: number
+  canDig: boolean
+  canPlace: boolean
+  sleeping: boolean
+  /** Logs carried (4 planks count as one). */
+  wood: number
+  /** Seeds carried plus seeds in its chests near home. */
+  seeds: number
+  /** Its nearest farm: distance from home and the cells of work there; null without one. */
+  farm: { fromHome: number, work: number } | null
+  /** start_farm is there. */
+  startFarm: boolean
+  /** Something spare to craft from what it carries (spareCraft). */
+  spare: boolean
+  /** Torches, coal or charcoal carried. */
+  lightFuel: boolean
+  /** The next ore to scout for that it doesn't know of, or null. */
+  scoutTarget: string | null
+  /** deposit_when_full (at half full) would store something. */
+  tidy: boolean
+}
+
+/** Seeds a farm wants on hand; start_farm needs 8. */
+export const SEED_STOCK = 16
+export const LOG_STOCK = 16
+
+/**
+ * Why a chore has nothing to do now ("35 seeds, enough"), or null when it would do something.
+ * Pure; the selection tests run it with Pax's real conditions.
+ */
+export function choreIdle (name: string, s: ChoreState): string | null {
+  const near = (r: number) => s.homeDistance !== null && s.homeDistance <= r
+  switch (name) {
+    case 'look_around': return null
+    case 'go_home': return s.homeDistance === null ? 'no home' : s.homeDistance > s.radius ? null : 'at home'
+    case 'stroll': return near(s.radius) ? null : 'away from home'
+    case 'rest_by_bed': return s.sleeping ? 'asleep' : s.homeDistance === null ? 'no home' : null
+    case 'tidy_storage': return !near(s.radius) ? 'away from home' : s.tidy ? null : 'nothing to store yet'
+    case 'top_up_wood':
+      if (!s.canDig) return 'no digging'
+      if (!near(s.radius)) return 'away from home'
+      return s.wood < LOG_STOCK ? null : `${s.wood} logs, enough`
+    case 'top_up_seeds':
+      // with no farm too: the farm it is to start needs them (it used to wait for a farm)
+      if (!s.canDig) return 'no digging'
+      if (!near(s.radius)) return 'away from home'
+      return s.seeds < SEED_STOCK ? null : `${s.seeds} seeds, enough`
+    case 'extend_farm': {
+      if (!s.canDig) return 'no digging'
+      const f = s.farm
+      if (!f) {
+        if (!s.startFarm) return 'no farm and no start_farm'
+        if (s.seeds < 8) return `no farm, ${s.seeds} seeds (8 to start one)`
+        return near(s.radius * 2) ? null : 'away from home'
+      }
+      if (f.fromHome > s.radius * 2) return 'its farm is far from home'
+      return f.work > 0 ? null : 'farm needs nothing'
+    }
+    case 'craft_spares': return s.spare ? null : 'nothing spare to craft from what it carries'
+    case 'light_dark_spots':
+      if (!near(s.radius)) return 'away from home'
+      if (!s.canPlace) return 'no placing'
+      return s.lightFuel ? null : 'no torches, coal or charcoal'
+    case 'scout_nearby': return !near(s.radius) ? 'away from home' : s.scoutTarget ? null : 'knows where iron and coal are'
+    default: return null
+  }
+}
