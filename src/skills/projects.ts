@@ -622,11 +622,62 @@ const workOnBase = defineAction({
   }
 })
 
+/**
+ * The base's own blocks (walls, floor, towers, the rows), so the pathfinder never tunnels through
+ * them: a bot leaving its outpost dug a wall block every time and rebuilt it the next session.
+ * Only once the base is settled (settings.projects.base or remembered when work started).
+ */
+function baseBlockKeys (agent: Agent): Set<string> {
+  const out = new Set<string>()
+  const s = settingsOf(agent)
+  const spots = spotsOf(agent)
+  const at = s.base ? { origin: { x: Math.floor(s.base.x), y: Math.floor(s.base.y), z: Math.floor(s.base.z) }, facing: s.base.facing } : spots.anchor
+  if (!at) return out
+  const bp = blueprintNamed(agent, s.template)
+  if (!bp) return out
+  for (const c of solidCells(placeCells(rotate(bp, at.facing ?? bp.facing), at.origin))) out.add(key(c))
+  const lib = loadLibrary(libraryDirs(agent)).blueprints
+  for (const [fit, name] of [[spots.storage, 'storage_row'], [spots.workshop, 'workshop_row']] as const) {
+    const rb = fit ? lib.get(name) : undefined
+    if (!fit || !rb) continue
+    const y = at.origin.y + 1
+    for (const c of placeCells(rotate(rb, fit.facing), { x: fit.x, y, z: fit.z })) out.add(key(c))
+  }
+  return out
+}
+
+function guardBase (agent: Agent, bot: Bot): () => void {
+  let keys = new Set<string>()
+  let at = 0
+  const cost = (b: { position: Pos }) => {
+    const now = Date.now()
+    if (now - at > 30_000) { at = now; try { keys = baseBlockKeys(agent) } catch { keys = new Set() } }
+    return keys.has(key(b.position)) ? Infinity : 0
+  }
+  let attached: { exclusionAreasBreak: unknown[] } | null = null
+  const attach = () => {
+    const m = bot.pathfinder?.movements as unknown as { exclusionAreasBreak?: unknown[] } | undefined
+    if (!m?.exclusionAreasBreak || m === attached) return
+    m.exclusionAreasBreak.push(cost)
+    attached = m as { exclusionAreasBreak: unknown[] }
+  }
+  attach()
+  bot.once('spawn', attach)
+  const timer = setInterval(attach, 10_000)
+  timer.unref?.()
+  return () => {
+    clearInterval(timer)
+    bot.removeListener('spawn', attach)
+    if (attached) attached.exclusionAreasBreak = attached.exclusionAreasBreak.filter(f => f !== cost)
+  }
+}
+
 export const baseProjects = () => defineSkill({
   name: 'base_projects',
   capabilities: ['move', 'place'],
   description: 'Long-term base projects: improving and extending the fortress by itself.',
   actions: [projectsAction, projectAction, planBaseAction, workOnBase],
+  setup (agent, bot) { return guardBase(agent, bot as Bot) },
   observe (agent) {
     const st = loadState(agent)
     const last = Object.entries(st.progress).sort((a, b) => b[1].lastAt - a[1].lastAt)[0]
