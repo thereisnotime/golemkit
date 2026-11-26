@@ -235,6 +235,9 @@ function ironStep (inv: Record<string, number>, nearby: Nearby, chain: IronWant[
   if (raw > 0) {
     // smelt what we have (all of it: one furnace trip), needs a furnace and fuel
     if (!nearby.furnace && !inv.furnace) {
+      // a furnace is crafted at a crafting table: one near, one carried, or 4 planks' worth of wood for one
+      const table = !!inv.crafting_table || !!nearby.craftingTable || usablePlankUnits(inv) >= 4
+      if (count(inv, STONE_HEADS) >= 8 && !table) return trees ? { do: 'gather', item: 'logs', count: 1, why: 'a crafting table for the furnace' } : null
       if (count(inv, STONE_HEADS) >= 8) return { do: 'craft_furnace', why: 'a furnace to smelt iron' }
       if (stoneNear) return { do: 'gather', item: 'cobblestone', count: 8 - count(inv, STONE_HEADS), why: 'a furnace' }
       return null

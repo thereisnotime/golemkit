@@ -243,3 +243,11 @@ test('nextToolUpgrade: the iron chain in order, ingots kept for the next item wh
   const s = step({ ...stone, raw_iron: 6, oak_planks: 4 }, { furnace: true })
   assert.deepEqual([s.do, s.fuel], ['smelt', 'planks'])
 })
+
+test('nextToolUpgrade: no crafting table and no wood for the furnace: logs first (the live mine trip came up with raw iron and no planks)', () => {
+  const stone = { stone_pickaxe: 1, stone_axe: 1, stone_shovel: 1, stone_sword: 1, raw_iron: 6, cobblestone: 40, coal: 4 }
+  const s = nextToolUpgrade(stone, {}, S) as any
+  assert.deepEqual([s.do, s.item], ['gather', 'logs'])
+  assert.equal((nextToolUpgrade({ ...stone, birch_planks: 4 }, {}, S) as any).do, 'craft_furnace')
+  assert.equal((nextToolUpgrade(stone, { craftingTable: true }, S) as any).do, 'craft_furnace')
+})
