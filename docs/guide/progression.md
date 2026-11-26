@@ -239,6 +239,20 @@ flowchart TD
 
 `!dig_mine ore=iron count=9` runs it by hand; `fresh=true` starts a new mine.
 
+### Live runs
+
+`just survival-bench --kit stone` with `SURVIVAL_BOT=ProgTest`, 2026-11-26. Both the ice scenario and
+Pax's full profile spend their days on other work (the frozen lake kept the test bot in the air reflex
+for 7 minutes; in a forest keep_fed, seeds and the farm took the day), so the chain was measured
+with a bench profile that has only keep_tools_upgraded, keep_fed, stay_safe and collect_drops, and a
+16-block surface search so the mine gets used:
+
+| run | what happened | ended with |
+|---|---|---|
+| forest 1300 1650, first trip | stairs from y 65 to y 22 in 281 s, 139 blocks; its only stone pickaxe wore out (no wood for a spare) | 7 coal, 5 raw iron; smelted to 5 ingots at home, then the shield failed for planks (fixed: logs to planks first) |
+| forest 1300 1650 | down to y 16, 6 branches; taken over at dusk by stay_safe going home (fixed: not while in its mine) | 16 raw iron, 28 raw copper; no furnace: no crafting table and no wood (fixed: logs first) |
+| windswept forest 2350 1750 | a tree for wood, stairs to y 16 in about 8 minutes, branches, taken over by a silverfish fight; smelted 13 raw iron in a furnace it put down by the mine; a second trip down a new mine (the site check had called the first one filled in before it was dug, fixed) until a creeper fight at night | iron axe, iron shovel, a bucket, a shield, 8 iron ingots, 7 coal, 74 raw copper; the iron pickaxe it made wore out on the second trip and it went on with the spare stone one; no armour yet (the 8 ingots were waiting for the chestplate when the run ended); no deaths |
+
 ### Ore trips
 
 When `keep_tools_upgraded` (or anything else that isn't an owner) runs `upgrade_tools` and the
