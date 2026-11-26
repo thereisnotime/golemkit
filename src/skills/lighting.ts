@@ -296,7 +296,7 @@ function centreFor (agent: Agent, bot: Bot, p: { place?: string, x?: number, y?:
   return { x: p.x !== undefined ? Math.floor(p.x) : me.x, y: p.y !== undefined ? Math.floor(p.y) : me.y, z: p.z !== undefined ? Math.floor(p.z) : me.z }
 }
 
-const lightUp = defineAction({
+export const lightUp = defineAction({
   name: 'light_up',
   capabilities: ['place', 'craft'],
   description: 'Spawn-proofs an area: finds the spots around a place (home, farm:1, coordinates, or here) where hostile mobs could spawn ' +

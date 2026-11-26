@@ -311,7 +311,28 @@ export function remainingWants (ctx: Pick<ActionContext, 'bot' | 'agent' | 'play
   return { ...wantsForRoles(bp.cells, resolveRoles(bp, inventoryCounts(ctx.bot), material, theme)), note: '' }
 }
 
-export interface BuildParams extends PlanInput { gather: boolean, path?: boolean, replace?: boolean, method?: BuildMethod }
+export interface BuildParams extends PlanInput {
+  gather: boolean
+  path?: boolean
+  replace?: boolean
+  method?: BuildMethod
+  /** Only these cells of the blueprint (one stage of a base project). Not in the action schema. */
+  only?: (c: WorldCell) => boolean
+  /**
+   * Working on its own (base projects): only natural blocks and its own may be dug, whatever
+   * settings.respectBuilds says, and spots holding anything else are left out instead of failing the build.
+   */
+  autonomous?: boolean
+}
+
+/**
+ * Where a new structure would go near the bot (or the player): the spot and door side build
+ * picks without coordinates. A message when there is none.
+ */
+export function planSite (ctx: Pick<ActionContext, 'bot' | 'agent' | 'player'>, template: string): { origin: Pos, facing: Facing } | string {
+  const p = planBuild(ctx, { template })
+  return typeof p === 'string' ? p : { origin: p.origin, facing: p.facing }
+}
 
 type BuildCtx = Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log' | 'player'>
 
@@ -418,6 +439,13 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
   const planned = planBuild(ctx, params)
   if (typeof planned === 'string') return fail(planned)
   let { bp, origin, facing, cells, roles, theme } = planned
+  if (params.only) {
+    cells = cells.filter(params.only)
+    const cols = new Set(cells.map(c => `${c.x},${c.z}`))
+    planned.cells = cells
+    planned.fills = planned.fills.filter(f => cols.has(`${f.x},${f.z}`))
+    if (!solidCells(cells).length) return ok(`nothing of the ${bp.name} to build there`)
+  }
   const at = (p: Pos) => blockName(bot, p)
   const own = ownBlocks(agent)
   // replace=true (only for an owner): blocks in the footprint that don't fit may be dug and replaced,
@@ -427,8 +455,17 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
   const respect = respectsBuilds(agent)
   const ownerAsked = !!params.replace && !!ctx.player && agent.isOwner(ctx.player)
   if (respect && params.replace && !ownerAsked) return fail('replace=true is only for my owners: I don\'t dig up blocks I can\'t tell are mine otherwise')
-  const mine = (p: Pos) => own.has(p) || ((!respect || ownerAsked) && !agent.protectedAreas.isProtected(p))
+  const mine = params.autonomous ? (p: Pos) => own.has(p) : (p: Pos) => own.has(p) || ((!respect || ownerAsked) && !agent.protectedAreas.isProtected(p))
   let diff = diffCells(cells, at, roles, agent.canDig, mine)
+  let leftOut = ''
+  if (diff.blocked.length && params.autonomous) {
+    // on its own: someone else's blocks stay, the rest of the stage goes ahead
+    const skip = new Set(diff.blocked.map(c => `${c.x},${c.y},${c.z}`))
+    leftOut = `left ${diff.blocked.length} spot${diff.blocked.length === 1 ? '' : 's'} alone (blocks I didn't place, e.g. ${at(diff.blocked[0]!)} at ${fmtPos(diff.blocked[0]!)}); `
+    cells = cells.filter(c => !skip.has(`${c.x},${c.y},${c.z}`))
+    planned.cells = cells
+    diff = diffCells(cells, at, roles, agent.canDig, mine)
+  }
   if (diff.blocked.length) {
     const b = diff.blocked[0]!
     if (planned.resumed) agent.storage.delete(ACTIVE_KEY)
@@ -440,8 +477,8 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
   const save = (placed: number) => { own.save(); agent.storage.set(ACTIVE_KEY, { template: bp.name, origin, facing, material: params.material, theme, startedAt: Date.now(), placed, total } satisfies ActiveBuild) }
   if (already === total && !diff.clear.length) {
     agent.storage.delete(ACTIVE_KEY)
-    recordPlacement(agent, planned)
-    return ok(`the ${bp.name} at ${fmtPos(origin)} is already complete`)
+    if (!params.only) recordPlacement(agent, planned)
+    return ok(`${leftOut}the ${bp.name}${params.only ? ' part' : ''} at ${fmtPos(origin)} is already complete`)
   }
 
   // Creative: by hand (default) or with /fill and /setblock when op (falls back to hand without op)
@@ -457,12 +494,12 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
 
   // Materials for what is still to place; gather first if asked.
   let rows = materials([...diff.place, ...diff.dig], roles, inventoryCounts(bot))
-  let gatherNote = methodNote
+  let gatherNote = leftOut + methodNote
   if ((params.gather || isCreative(bot)) && rows.some(r => r.missing)) {
     const want = wantsForRoles([...diff.place, ...diff.dig], roles)
     log.info('gathering materials before building', { need: fmtMaterials(rows) })
     const g = await gatherMaterials(ctx, want.required, { optional: want.optional, fallbacks: want.fallbacks, theme })
-    gatherNote = methodNote + (isCreative(bot) ? `${g.message}; ` : `gathered first (${g.message}); `)
+    gatherNote = leftOut + methodNote + (isCreative(bot) ? `${g.message}; ` : `gathered first (${g.message}); `)
     log.info('materials gathered', { ok: g.ok, result: g.message })
     checkAborted(signal)
     await travel(bot, { x: origin.x, y: origin.y, z: origin.z }, signal, { range: 3 }).catch(e => { checkAborted(signal); log.debug('travel back to site', { error: (e as Error).message }) })
@@ -732,13 +769,13 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
   const missingKeys = solidCells(cells).filter((c, i) => !roles[c.role]!.optional && rowsQ[i]!.check.status !== 'ok' && rowsQ[i]!.check.status !== 'soft').map(key)
   if (sum.missingRequired > 0 && finishDespiteUnreachable(missingKeys, unreachable, total, outOf.size > 0)) {
     agent.storage.delete(ACTIVE_KEY)
-    recordPlacement(agent, { ...planned, bp, roles })
+    if (!params.only) recordPlacement(agent, { ...planned, bp, roles })
     const at = missingKeys.map(k => k.replace(/,/g, ' ')).join(', ')
     return ok(`${gatherNote}built a ${bp.name} ${where}: ${sum.built}/${total} blocks${counts}; ${missingKeys.length} block${missingKeys.length === 1 ? '' : 's'} unreachable at ${at}, skipped${tail}`, { ...data, unreachable: missingKeys })
   }
   if (sum.missingRequired === 0) {
     agent.storage.delete(ACTIVE_KEY)
-    recordPlacement(agent, { ...planned, bp, roles })
+    if (!params.only) recordPlacement(agent, { ...planned, bp, roles })
     return ok(`${gatherNote}built a ${bp.name} ${where}: ${sum.built}/${total} blocks${counts}${tail}${pathNote}`, data)
   }
   const why = outOf.size ? `out of ${[...outOf].join(', ')}` : errors.slice(0, 2).join('; ') || 'stopped'
