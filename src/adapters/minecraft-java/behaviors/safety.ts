@@ -160,7 +160,9 @@ export function assessDanger (ctx: Pick<NpcContext, 'agent' | 'bot' | 'bb'> & { 
   // an armed bodyguard with its player online stays with them at night (the dangers above still apply)
   if (escorting(agent)) return null
   const home = getHome(agent)
-  if (o.homeAtNight && bb.facts.isNight && !bb.facts.sleeping && home && sameDimension(bot, home)) {
+  // down its own mine (dig_mine) night doesn't matter: the trip has its own retreat rules and comes back up on its own
+  const mining = agent.currentAction?.name === 'dig_mine'
+  if (o.homeAtNight && bb.facts.isNight && !bb.facts.sleeping && home && sameDimension(bot, home) && !mining) {
     const now = ctx.now ?? Date.now()
     if (needsHome(homeOffset(pos, home), { homeRange: o.homeRange, arriveRange: arriveRange(o), running, sinceArrivedMs: now - trips.arrivedAt })) {
       // go_home just failed: don't try again every few seconds, stand guard where it is meanwhile

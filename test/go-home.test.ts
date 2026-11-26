@@ -195,3 +195,10 @@ test('go_home: stopping right at the edge of the range counts as home', async ()
   const r = await goHomeAction().run({ agent, bot, signal: new AbortController().signal } as any, { range: 4 }) as ActionResult
   assert.equal(r.ok, true, r.message)
 })
+
+test('stay_safe: night does not pull it out of its own mine (dig_mine has its own retreat)', () => {
+  const c = nightCtx({ x: 600, y: 16, z: -60 })
+  c.agent.currentAction = { name: 'dig_mine' }
+  assert.equal(assessDanger(c, O), null)
+  assert.equal(assessDanger(nightCtx({ x: 600, y: 16, z: -60 }), O), 'night')
+})
