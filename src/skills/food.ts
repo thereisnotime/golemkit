@@ -25,7 +25,7 @@ import { planColdWater, waterFreezes, coverItem, sideCell, iceSourceOk, farmingS
 import { siteBook } from '../core/sites.ts'
 import {
   seedStopReason, seedLimits, scoutWaypoints, scoutStopReason, nextWaypoint, sectorsText, compass, sectorOf, mergeSpot, markSpotEmpty, rankSpots, dryWaypoint,
-  chooseFarmSite, plotLayout, pickFarmSeed, seedCount, breedPlan, BREED_FOOD, DEFAULT_SCOUT_LIMITS,
+  chooseFarmSite, siteProblems, plotLayout, pickFarmSeed, seedCount, breedPlan, BREED_FOOD, DEFAULT_SCOUT_LIMITS,
   type FoodSpot, type FoodSpotKind, type CellKind, type SiteCandidate, type Pos, type Waypoint
 } from './foodPlan.ts'
 
@@ -864,6 +864,23 @@ export function shoreIce (bot: Bot, center: Vec3, radius: number, count = 96): I
   return out
 }
 
+/**
+ * A read-only look at the farm water around a point, for the survival bench's --survey: open
+ * shore water (and how much of it freezes), shore ice, and what rules the best candidates out.
+ */
+export function farmWaterSurvey (agent: Agent, bot: Bot, center: Pos, radius = 96, size = 9): string {
+  const c = vec(bot, center.x, center.y, center.z)
+  const waters = surfaceWater(bot, c, radius, 160, true)
+  const cold = waters.filter(w => freezes(bot, w)).length
+  const wc = waters.map(w => siteAt(agent, bot, w, size, center, 48, { iceAsWater: freezes(bot, w) }))
+  const raw = shoreIce(bot, c, radius)
+  const ice = raw.filter(i => iceSourceOk(i, {}))
+  const ic = ice.map(i => { const cand = siteAt(agent, bot, vec(bot, i.x, i.y, i.z), size, center, 48, { iceAsWater: true }); cand.cells['0,0'] = 'water'; return cand })
+  const best = chooseFarmSite(ic)
+  return `open shore water ${waters.length} (${cold} freezing; ${chooseFarmSite(wc) ? 'a usable site' : siteProblems(wc) || 'none'}), ` +
+    `shore ice ${raw.length} (${ice.length} open with water or ground under; ${best ? `usable site at ${fmtPos(best.water)}` : siteProblems(ic) || 'none'})`
+}
+
 /** The cold-water settings (settings.farming). */
 export function farmingOptions (agent: Agent): FarmingSettings {
   return farmingSettings((agent.settings as { farming?: unknown } | undefined)?.farming)
@@ -1048,7 +1065,8 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
     for (const r of [...new Set([p.radius, Math.max(p.radius, 96)])]) {
       const waters = surfaceWater(bot, vec(bot, from.x, from.y, from.z), r, 160, true)
         .filter(w => !nearBadSite(w, badFarms) && (coldOk || !freezes(bot, w)))
-      const best = chooseFarmSite(waters.map(w => siteAt(agent, bot, w, size, center!, p.spawnClearance)))
+      // water it keeps open may have ice around it (that is the lake freezing, not a hazard)
+      const best = chooseFarmSite(waters.map(w => siteAt(agent, bot, w, size, center!, p.spawnClearance, { iceAsWater: coldOk && freezes(bot, w) })))
       if (best) return best
     }
     return null
@@ -1070,7 +1088,8 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
     // a frozen shore or pond: break the ice over water (or ground) for a source, keep it open
     const nether = !!dim && /nether/.test(dim)
     for (const r of [...new Set([p.radius, Math.max(p.radius, 96)])]) {
-      const ice = shoreIce(bot, vec(bot, center.x, center.y, center.z), r)
+      const raw = shoreIce(bot, vec(bot, center.x, center.y, center.z), r)
+      const ice = raw
         .filter(c => iceSourceOk(c, { nether }) && !nearBadSite(c, badFarms) && !offLimits(agent, bot, c, p.spawnClearance))
       const cands = ice.map(c => {
         const cand = siteAt(agent, bot, vec(bot, c.x, c.y, c.z), size, center!, p.spawnClearance, { iceAsWater: true })
@@ -1078,7 +1097,10 @@ export async function startFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sig
         return cand
       })
       const best = chooseFarmSite(cands)
-      if (!best) continue
+      if (!best) {
+        if (r === Math.max(p.radius, 96)) steps.push(!raw.length ? 'no ice next to tillable ground' : ice.length ? `${ice.length} shore ice blocks, none usable (${siteProblems(cands)})` : `${raw.length} shore ice blocks, none open above with water or ground under, away from the bad farm`)
+        continue
+      }
       const r2 = await keepWaterOpen(ctx, best, 'ice', fs)
       if (r2.ok) { site = best; source = 'ice'; if (r2.how !== 'none') iceKept = r2.how; steps.push(r2.message); break }
       steps.push(r2.message)

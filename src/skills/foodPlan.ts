@@ -236,6 +236,31 @@ export function scoreSite (c: SiteCandidate, rules: Partial<SiteRules> = {}): nu
   return till - water * 0.5 - c.distance / 8
 }
 
+/** Why a site can't be used ("4 tillable cells, 8 needed"), or null when it can. Same rules as scoreSite. */
+export function siteProblem (c: SiteCandidate, rules: Partial<SiteRules> = {}): string | null {
+  const r: SiteRules = { minTillable: 8, allowFarmland: false, ...rules }
+  const kinds = Object.values(c.cells)
+  if (kinds.includes('protected') || c.around.includes('protected')) return 'protected'
+  if (kinds.includes('build') || c.around.includes('build')) return 'somebody\'s build'
+  if (kinds.includes('hazard') || c.around.includes('hazard')) return 'lava, powder snow or ice close'
+  if (!r.allowFarmland && (kinds.includes('farmland') || c.around.includes('farmland'))) return 'a field there'
+  const till = Object.entries(c.cells).filter(([k, v]) => k !== '0,0' && v === 'tillable').length
+  if (till < r.minTillable) return `${till} tillable cells, ${r.minTillable} needed`
+  return null
+}
+
+/** What ruled the candidates out, most common first: "12 x 3 tillable cells, 8 needed; 4 x protected". */
+export function siteProblems (cands: readonly SiteCandidate[], rules: Partial<SiteRules> = {}, top = 3): string {
+  const n = new Map<string, number>()
+  for (const c of cands) {
+    let why = siteProblem(c, rules)
+    if (!why) continue
+    if (/tillable cells/.test(why)) why = `under ${rules.minTillable ?? 8} tillable cells`
+    n.set(why, (n.get(why) ?? 0) + 1)
+  }
+  return [...n].sort((a, b) => b[1] - a[1]).slice(0, top).map(([w, k]) => `${k} ${w}`).join(', ')
+}
+
 /** The best usable site, or null. */
 export function chooseFarmSite<T extends SiteCandidate> (cands: readonly T[], rules: Partial<SiteRules> = {}): T | null {
   let best: T | null = null

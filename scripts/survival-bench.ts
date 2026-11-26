@@ -34,6 +34,7 @@ import { Agent, defineVariant, serverFromEnv, fmtPos, type ActionResult, type Bo
 import { loadProfile } from '../src/core/profile.ts'
 import { standardSkills, extendedSkills, navigation, modsSkill, setHome } from '../src/skills/index.ts'
 import { isNaturalLeaves } from '../src/skills/woodcutting.ts'
+import { farmWaterSurvey } from '../src/skills/food.ts'
 import { reflexes, behaviorsBrain, commandBrain } from '../src/brains/index.ts'
 import {
   KEEP_AWAY, SCENARIOS, TEST_AREAS, aliveSeconds, countTrees, terrainNote, type Terrain, compareTable, gathered, isFoodName, parseResults, pathLength, startFor, stuckLoops, summaryTable,
@@ -271,7 +272,8 @@ async function survey (spots: [number, number][]): Promise<void> {
     log(`players online: ${players.map(p => `${p.name} at ${Math.round(p.x)} ${Math.round(p.z)}`).join(', ') || 'none in the overworld'}`)
     await d.cmd(`/gamemode spectator ${DIRECTOR}`)
     for (const [x, z] of spots) {
-      const near = [...tooClose(x, z, [...KEEP_AWAY, ...TEST_AREAS]), ...tooClose(x, z, players.map(p => [p.name, p.x, p.z] as [string, number, number]))]
+      // a read-only look: the bench's own test areas are fine to look at, the rest is kept away from
+      const near = [...tooClose(x, z, KEEP_AWAY), ...tooClose(x, z, players.map(p => [p.name, p.x, p.z] as [string, number, number]))]
       if (near.length) { log(`${x} ${z}: skipped, ${near.map(n => `${n.distance} from ${n.name}`).join(', ')}`); continue }
       await d.cmd(`/tp ${DIRECTOR} ${x + 0.5} 180 ${z + 0.5}`)
       await pause(8000)
@@ -279,6 +281,7 @@ async function survey (spots: [number, number][]): Promise<void> {
       if (!s) { log(`${x} ${z}: no dry open surface within 24`); continue }
       await pause(2000)
       log(`${x} ${z}: surface ${fmtPos(s)}: ${terrainNote(measureTerrain(d, s), TREE_RADIUS)}`)
+      log(`${x} ${z}: farm water within 96: ${farmWaterSurvey(d.agent, d.agent.bot, s)}`)
     }
   } finally {
     await d.cmd(`/tp ${DIRECTOR} ${from.x} ${from.y} ${from.z}`).catch(() => {})
