@@ -88,6 +88,7 @@ can't change their own.
 | `mine.minFreeSlots` | 1–30 | head back up with fewer free slots than this (default 3) |
 | `mine.cooldownMinutes` | 0–1440 | minutes between two trips down (default 20) |
 | `mine.atNight` | on/off | go down a lit mine at night too (default on) |
+| `mine.startAtNight` | on/off | at night, with no mine yet, start one near home when it has torches or can make them (default on) |
 | `mine.gear` | none / shield_or_armour / armour | gear needed for its own mine (default none; `mining.gear` is for caves) |
 | `mine.minHealth` | 0–20 | health needed to go down (default 14) |
 | `mine.keepCobble` | 0–2304 | cobblestone kept on a trip; more is dropped at the end of a branch (default 64) |

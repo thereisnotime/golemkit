@@ -9,7 +9,9 @@ import type { NeedsProvider, NeedDef, NpcContext } from '../../../brains/npc/ind
 import { runtimeFor } from '../../../brains/behaviors/actions.ts'
 import { gearUrgency, suppliesUrgency, ironWanted, type GearState } from '../../../skills/needPlan.ts'
 import { stairMineConfig, knownMine, knownLitMine, lastMineTrip } from '../../../skills/stairMine.ts'
-import { mineTripDue } from '../../../skills/stairMinePlan.ts'
+import { mineTripDue, nightMineOk, turnedBackForLight } from '../../../skills/stairMinePlan.ts'
+import { torchCrafts } from '../../../skills/minePlan.ts'
+import { inventoryCounts } from '../../../skills/toolkit.ts'
 import { BUCKET_NEED } from '../behaviors/tools.ts'
 import { heldTier } from '../../../skills/progression.ts'
 import { seedCount } from '../../../skills/foodPlan.ts'
@@ -58,6 +60,13 @@ function cached<T> (ms: number, read: (ctx: NpcContext) => T): (ctx: NpcContext)
 const bot = (ctx: NpcContext) => ctx.bot as Bot
 
 export function minecraftNeeds (agent: Agent): NeedsProvider {
+  // night trips: a lit known mine, or none yet and torches for a first one (mine.startAtNight)
+  const mineAtNight = (b: Bot): boolean => {
+    const s = stairMineConfig(agent)
+    const known = knownMine(agent, b)
+    const inv = inventoryCounts(b)
+    return nightMineOk({ known: !!known, lit: !!knownLitMine(agent, b), torches: (inv.torch ?? 0) + 4 * torchCrafts(inv), startAtNight: s.startAtNight })
+  }
   const gear = cached(10_000, (ctx) => {
     const b = bot(ctx)
     if (!b.entity || !needsSurvival(b)) return { urgency: 0, missing: [] as string[] }
@@ -119,10 +128,11 @@ export function minecraftNeeds (agent: Agent): NeedsProvider {
           if (tier === 'none' || tier === 'wooden') return false
           return gear(ctx).missing.some(m => /iron|bucket|shield/.test(m))
         },
-        // at night only down a lit mine near home (the walk to it is short)
+        // at night only down a lit mine near home (the walk to it is short), or a first mine it lights as it digs
         night: (ctx) => {
           const s = stairMineConfig(agent)
-          return s.enabled && s.atNight && !!agent.getAction('dig_mine') && !!knownLitMine(agent, bot(ctx)) && mineTripDue(lastMineTrip(agent), ctx.now, s)
+          if (!s.enabled || !s.atNight || !agent.getAction('dig_mine') || !mineTripDue(lastMineTrip(agent), ctx.now, s)) return false
+          return mineAtNight(bot(ctx))
         },
         // down the mine and smelting after it: chopping wood or tending the farm doesn't pull it out
         committed: () => mineLeg,
@@ -147,7 +157,9 @@ export function minecraftNeeds (agent: Agent): NeedsProvider {
             })
             // not fit for a trip yet (health, food): no mine either, and it doesn't count as a search
             if (!r.ok && /^not ready for a trip/.test(r.message)) return { ok: false, message: r.message, data: { retry: true } }
-            if (r.ok || (r.data as { turnedBack?: unknown } | undefined)?.turnedBack || !mineOk) { await home(); return r }
+            // turned back at sunset: the mine near home doesn't need daylight, so on to it when night mining may go
+            const back = (r.data as { turnedBack?: unknown } | undefined)?.turnedBack
+            if (r.ok || !mineOk || (back && !(turnedBackForLight(back) && s.atNight && mineAtNight(b)))) { await home(); return r }
             parts.push(r.message)
           }
           if (!mineOk) { await home(); return { ok: false, message: parts.join('; ') || 'no mine trip due' } }

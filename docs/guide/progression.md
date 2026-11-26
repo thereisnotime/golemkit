@@ -236,6 +236,12 @@ flowchart TD
   first steps), unsafe (lava) or gone (filled in), and unreachable when the walk down fails 3 times.
 - A mine with a torch every ~8 stair steps counts as **lit**: with `mine.atNight` (on) the gear need
   may go down it at night.
+- With no mine yet, `mine.startAtNight` (on) lets a night trip start the first one when the bot
+  carries 8 torches or can make them (coal or charcoal and sticks, 4 torches each). It lights the
+  stairs as it digs, so the next night it is a lit mine. A known mine that isn't lit still waits for
+  the day.
+- A surface search for iron that turns back at sunset goes on to the mine (when night trips may go)
+  instead of home: the mine is near home and underground, so the light doesn't matter there.
 
 `!dig_mine ore=iron count=9` runs it by hand; `fresh=true` starts a new mine.
 

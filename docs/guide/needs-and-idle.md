@@ -102,16 +102,17 @@ keep_tools_upgraded 28, which also leaves a running gear search alone so the fir
 doesn't pull it out), while danger and real hunger still take over. Before, any tree to fell ended
 the search on its walk home.
 
-At night the search may still run when it knows a lit mine near home and `mine.atNight` is on
+At night the search may still run when it knows a lit mine near home and `mine.atNight` is on, or
+knows no mine yet and has torches for a first one (`mine.startAtNight`)
 (`NeedSearch.night`); then it skips the surface leg and goes down the mine.
 
 ```mermaid
 flowchart TD
   G(["gear need urgent,<br/>nothing in sight"]) --> N{"day?"}
   N -->|yes| F["find_target iron<br/>exposed, 160 blocks"]
-  N -->|"night, lit mine"| M
+  N -->|"night, lit mine or torches for a first"| M
   F -->|found| U
-  F -->|nothing| M["dig_mine: its staircase mine<br/>(raw iron the chain needs)"]
+  F -->|"nothing, or turned back at sunset"| M["dig_mine: its staircase mine<br/>(raw iron the chain needs)"]
   M --> U["home: smelt, craft<br/>pickaxe, bucket, shield,<br/>armour, tools"]
 ```
 

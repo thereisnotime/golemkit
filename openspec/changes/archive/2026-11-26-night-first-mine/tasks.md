@@ -1,0 +1,3 @@
+- [x] nightMineOk and turnedBackForLight with tests
+- [x] wire into the gear search (night gate, turned-back fallthrough)
+- [x] mine.startAtNight setting, toggle, docs

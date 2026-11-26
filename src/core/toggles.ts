@@ -81,6 +81,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'mine.minFreeSlots', description: 'head back up with fewer free inventory slots than this, after dropping junk (default 3)', schema: z.number().int().min(1).max(30) },
   { key: 'mine.cooldownMinutes', description: 'minutes between two trips down the mine (default 20)', schema: z.number().min(0).max(1440) },
   { key: 'mine.atNight', description: 'go down a lit mine at night too (default on)', schema: bool },
+  { key: 'mine.startAtNight', description: 'at night, with no mine yet, start one near home when it has torches or can make them (default on)', schema: bool },
   { key: 'mine.gear', description: 'gear needed to go down its own mine: none | shield_or_armour | armour (default none; mining.gear is for caves)', schema: z.enum(['none', 'shield_or_armour', 'armour']) },
   { key: 'mine.minHealth', description: 'health needed to go down the mine (default 14)', schema: health },
   { key: 'mine.keepCobble', description: 'cobblestone kept on a mine trip; more is dropped at the end of a branch (default 64)', schema: z.number().int().min(0).max(2304) },

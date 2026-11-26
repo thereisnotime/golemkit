@@ -34,6 +34,9 @@ export interface StairMineSettings {
   cooldownMinutes: number
   /** Go down a lit mine at night too (the walk to the entrance is short). Default true. */
   atNight: boolean
+  /** At night, with no mine yet, start one near home when it carries torches or makes them (it lights
+   * the stairs as it digs, so the next night it is a lit mine). Default true. */
+  startAtNight: boolean
   /** Gear for its own mine (mining.gear is for caves and ore it walks to). Default none. */
   gear: MiningGear
   /** Health needed to go down. Default 14. */
@@ -56,6 +59,7 @@ export const STAIR_MINE_DEFAULTS: StairMineSettings = {
   minFreeSlots: 3,
   cooldownMinutes: 20,
   atNight: true,
+  startAtNight: true,
   gear: 'none',
   minHealth: 14,
   keepCobble: 64,
@@ -339,6 +343,25 @@ export interface MineSite {
   lastAt: number
   /** What it got out of it, over all trips. */
   got: Record<string, number>
+}
+
+/** Torches (carried, or 4 per coal and stick it could craft) it needs before it starts a mine at night. */
+export const NIGHT_START_TORCHES = 8
+
+/**
+ * Whether a night trip down its own mine may go: down a known mine only when it is lit; with no
+ * mine yet, a new one when mine.startAtNight is on and it has torches for the stairs (it lights
+ * them as it digs, so from then on it is a lit mine). Without this a bot whose first mine never
+ * got dug by day could never mine at night either.
+ */
+export function nightMineOk (o: { known: boolean, lit: boolean, torches: number, startAtNight: boolean }): boolean {
+  if (o.known) return o.lit
+  return o.startAtNight && o.torches >= NIGHT_START_TORCHES
+}
+
+/** A surface search that turned back for the light (sunset): the mine near home doesn't need it. */
+export function turnedBackForLight (reason: unknown): boolean {
+  return typeof reason === 'string' && /daylight|dark|night/i.test(reason)
 }
 
 /** A mine counts as lit when the stairs have a torch about every mining.torchEvery steps. */
