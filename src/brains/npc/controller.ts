@@ -585,7 +585,8 @@ export class NpcController {
       needUrgency: v?.need?.urgency ?? null,
       urgent: v?.urgent ?? [],
       goal: r ? r.behavior.goal ?? r.behavior.name : null,
-      reason: r ? this.reason : null,
+      // nothing runs: why no idle chore did either ("idle (active): tidy_storage not needed, ...")
+      reason: r ? this.reason : v?.idleWhy ? `idle (${v.idleMode}): ${v.idleWhy}` : null,
       lastProgressAt: this.lastProgressAt,
       idleMode: v?.idleMode ?? null,
       chore: r?.behavior.name.startsWith('idle:') ? r.behavior.name.slice(5) : null

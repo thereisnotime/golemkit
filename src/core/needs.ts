@@ -48,7 +48,8 @@ export const ChoreSettingSchema = z.union([z.boolean(), z.object({
   radius: z.number().int().min(2).max(512).optional().describe('how far from home the chore may go (default idle.radius, explore: idle.exploreRadius)'),
   when: z.enum(['day', 'night', 'any']).optional().describe('time of day it may run (default: the chore\'s own)'),
   hours: z.tuple([Hour, Hour]).optional().describe('game clock window [from, to] in hours (Minecraft: 0 midnight, 6 sunrise); wraps past midnight when from > to'),
-  cooldownMinutes: z.number().min(0).max(1440).optional().describe('pause after it ran before it may run again')
+  cooldownMinutes: z.number().min(0).max(1440).optional().describe('pause after it ran before it may run again'),
+  quietMinutes: z.number().min(0).max(1440).optional().describe('pause after a run that found nothing to do (default three cooldowns, at least 30)')
 }).strict()])
 
 export const IdleSettingsSchema = z.object({
@@ -56,7 +57,7 @@ export const IdleSettingsSchema = z.object({
   radius: z.number().int().min(4).max(256).optional().describe('idle and active chores stay within this many blocks of home (default 24)'),
   exploreRadius: z.number().int().min(32).max(1024).optional().describe('explore mode: how far a scouting trip may go (default 200)'),
   exploreMinutes: z.number().min(1).max(30).optional().describe('explore mode: give a scouting trip up after this many minutes (default 8)'),
-  chores: z.record(z.string(), ChoreSettingSchema).optional().describe('per chore: true/false or { enabled, radius, when, hours, cooldownMinutes }')
+  chores: z.record(z.string(), ChoreSettingSchema).optional().describe('per chore: true/false or { enabled, radius, when, hours, cooldownMinutes, quietMinutes }')
 }).strict()
 
 export const SitesSettingsSchema = z.object({
@@ -135,6 +136,7 @@ export interface ChoreSetting {
   when: 'day' | 'night' | 'any' | null
   hours: [number, number] | null
   cooldownMinutes: number | null
+  quietMinutes: number | null
 }
 
 export interface IdleSettings {
@@ -169,7 +171,8 @@ export function idleSettings (raw: unknown): IdleSettings {
         radius: typeof c.radius === 'number' && c.radius > 0 ? c.radius : null,
         when: c.when === 'day' || c.when === 'night' || c.when === 'any' ? c.when : null,
         hours: h,
-        cooldownMinutes: typeof c.cooldownMinutes === 'number' && c.cooldownMinutes >= 0 ? c.cooldownMinutes : null
+        cooldownMinutes: typeof c.cooldownMinutes === 'number' && c.cooldownMinutes >= 0 ? c.cooldownMinutes : null,
+        quietMinutes: typeof c.quietMinutes === 'number' && c.quietMinutes >= 0 ? c.quietMinutes : null
       }
     }
   }

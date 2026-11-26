@@ -11,7 +11,7 @@
 import type { Agent, ActionResult, Logger } from '../../core/index.ts'
 import { needsSettings, idleSettings, sitesSettings, type IdleMode, type NeedsSettings, type IdleSettings, type SitesSettings } from '../../core/needs.ts'
 import { siteBook, siteText, checkDue, recheckDue, type SiteRef, type SiteVerdict, type SiteRecord } from '../../core/sites.ts'
-import { pickChore, MODE_RANK, type ChoreSpec } from './idle.ts'
+import { explainChores, choreSummary, MODE_RANK, effective, type ChoreSpec } from './idle.ts'
 import type { Behavior, BehaviorContext, NpcContext } from './types.ts'
 import type { Scored } from './select.ts'
 
@@ -45,9 +45,15 @@ export interface ChoreDef extends ChoreSpec {
   /** What it does, for docs and status. */
   description: string
   requires?: string[]
-  /** Whether it would do something useful now. `radius` is the chore's (settings or default). */
+  /**
+   * Whether it would do something useful now. `radius` is the chore's (settings or default).
+   * A run that turns out to have nothing to do returns `{ ok: true, data: { nothingDone: true } }`:
+   * the chore then waits its quietMinutes instead of its cooldown.
+   */
   applicable (ctx: NpcContext, o: { radius: number }): boolean
   run (ctx: BehaviorContext, o: { radius: number, minutes: number }): Promise<ActionResult | string | void | boolean>
+  /** Why it has nothing to do now, for the status ("35 seeds, enough"); optional. */
+  whyIdle? (ctx: NpcContext, o: { radius: number }): string | null
   goal?: string
 }
 
@@ -148,6 +154,7 @@ export function searchDue (history: readonly { need: string, at: number }[], nee
 interface SearchRecord { need: string, at: number, ok: boolean, message: string }
 const SEARCHES_KEY = 'needs.searches'
 const CHORES_KEY = 'needs.choresRun'
+const QUIET_KEY = 'needs.choresQuiet'
 const SITE_TICK_MS = 15_000
 
 type LayerAgent = Pick<Agent, 'storage' | 'settings' | 'getAction'> & Partial<Agent>
@@ -159,6 +166,8 @@ export interface LayerView {
   idleMode: IdleMode
   /** The fallback it picked this tick, if any. */
   fallback: { behavior: string, reason: string } | null
+  /** Quiet and no chore picked: why each chore was passed over ("tidy_storage not needed, ..."). */
+  idleWhy: string | null
 }
 
 export class NeedsLayer {
@@ -168,7 +177,7 @@ export class NeedsLayer {
   private readonly now: () => number
   private list: Behavior[] | null = null
   private fallback: { behavior: string, reason: string, score: number } | null = null
-  private view: LayerView = { need: null, urgent: [], boosted: {}, idleMode: 'idle', fallback: null }
+  private view: LayerView = { need: null, urgent: [], boosted: {}, idleMode: 'idle', fallback: null, idleWhy: null }
   private siteTickAt = 0
 
   constructor (agent: LayerAgent, provider: NeedsProvider, opts: { log?: Logger, now?: () => number } = {}) {
@@ -220,7 +229,9 @@ export class NeedsLayer {
         run: async (ctx) => {
           const o = this.choreOptions(c)
           try {
-            return await c.run(ctx, o)
+            const r = await c.run(ctx, o)
+            if (r && typeof r === 'object' && r.ok && (r.data as { nothingDone?: boolean } | undefined)?.nothingDone) this.markQuiet(c)
+            return r
           } finally {
             this.markChore(c.name)
           }
@@ -251,6 +262,11 @@ export class NeedsLayer {
   searchHistory (): SearchRecord[] { return this.searches() }
 
   private choresRun (): Record<string, number> { return this.agent.storage.get<Record<string, number>>(CHORES_KEY, {}) }
+  private choresQuiet (): Record<string, number> { return this.agent.storage.get<Record<string, number>>(QUIET_KEY, {}) }
+  private markQuiet (c: ChoreDef): void {
+    const e = effective(c, this.idleSettings().chore(c.name))
+    this.agent.storage.set(QUIET_KEY, { ...this.choresQuiet(), [c.name]: this.now() + e.quietMs })
+  }
   private markChore (name: string): void { this.agent.storage.set(CHORES_KEY, { ...this.choresRun(), [name]: this.now() }) }
 
   /** Whether a need is active: on explicitly, or automatic with a serving behaviour in the set. */
@@ -285,6 +301,7 @@ export class NeedsLayer {
     const p = planNeeds(inputs, regular, o)
     const idle = this.idleSettings()
     this.fallback = null
+    let idleWhy: string | null = null
     if (p.quiet) {
       if (running && (running.startsWith('need:') || running.startsWith('idle:'))) {
         // finish what it started
@@ -299,15 +316,18 @@ export class NeedsLayer {
         const chores = this.provider.chores.filter(c => (c.requires ?? []).every(a => this.agent.getAction(a)))
         let hour: number | null = null
         try { hour = this.provider.clock?.(ctx) ?? null } catch {}
-        const pick = pickChore(chores, {
+        const { pick, why } = explainChores(chores, {
           mode: idle.mode,
           isNight: ctx.bb.facts.isNight,
           hour,
           now,
           last: this.choresRun(),
+          quietUntil: this.choresQuiet(),
           setting: (name) => idle.chore(name),
-          applicable: (name) => { const c = chores.find(x => x.name === name)!; return c.applicable(ctx, this.choreOptions(c)) }
+          applicable: (name) => { const c = chores.find(x => x.name === name)!; return c.applicable(ctx, this.choreOptions(c)) },
+          whyNot: (name) => { const c = chores.find(x => x.name === name)!; return c.whyIdle?.(ctx, this.choreOptions(c)) ?? null }
         })
+        if (!pick) idleWhy = MODE_RANK[idle.mode] > 0 ? choreSummary(why) || 'no chores' : null
         if (pick) {
           const c = chores.find(x => x.name === pick.name)!
           this.fallback = { behavior: `idle:${c.name}`, reason: pick.reason, score: CHORE_SCORES[c.mode] }
@@ -319,7 +339,8 @@ export class NeedsLayer {
       urgent: p.urgent,
       boosted: p.boosted,
       idleMode: idle.mode,
-      fallback: this.fallback ? { behavior: this.fallback.behavior, reason: this.fallback.reason } : null
+      fallback: this.fallback ? { behavior: this.fallback.behavior, reason: this.fallback.reason } : null,
+      idleWhy
     }
     return p.scores
   }
