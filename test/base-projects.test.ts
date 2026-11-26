@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { Vec3 } from 'vec3'
 import { Agent, defineVariant } from '../src/core/index.ts'
 import { standardSkills, extendedSkills } from '../src/skills/index.ts'
-import { planBase, planLines } from '../src/skills/projects.ts'
+import { planBase, planLines, gateOf } from '../src/skills/projects.ts'
 import { loadBlueprints, rotate, placeCells } from '../src/skills/blueprint.ts'
 import { fakeBot, WORLDS } from './fake-world.ts'
 import { attachFakeBot } from './fake-attach.ts'
@@ -76,6 +76,11 @@ test('Pax\'s fortress: found one block below the place, the old walls count, the
   assert.equal(by.walls!.status, 'ready')
   assert.equal(p.step.kind, 'work')
   assert.equal(p.step.kind === 'work' && p.step.entry.info.name, 'walls')
+  // the gate on the north wall: outside to the north, inside to the south
+  const gate = gateOf(p.survey.base)!
+  assert.ok(gate)
+  assert.equal(gate.outside.z, gate.door.z - 1)
+  assert.equal(gate.inside.z, gate.door.z + 1)
   const lines = planLines(agent, bot, p, true)
   assert.match(lines[0]!, /fortress at 560 67 -43, gate north/)
   assert.ok(lines.some(l => /^ {2}floor: .*cobblestone/.test(l)))

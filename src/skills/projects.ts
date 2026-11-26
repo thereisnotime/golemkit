@@ -10,12 +10,12 @@
 import type { Bot } from 'mineflayer'
 import type { ActionContext, ActionResult, Agent } from '../core/index.ts'
 import {
-  defineSkill, defineAction, z, ok, fail, checkAborted, fmtPos, needsSurvival,
+  defineSkill, defineAction, z, ok, fail, checkAborted, fmtPos, needsSurvival, sleep, goals,
   projectsSettings, normalizeState, projectQueue, nextStep, applyOp, noteSession, restingReason, fmtQueue, goalMentions,
   PROJECT_OPS, type ProjectInfo, type ProjectState, type ProjectsSettings, type QueueEntry, type NextStep, type ProjectOp
 } from '../core/index.ts'
 import { GoalStore, type Goal } from '../llm/goals.ts'
-import { vec } from './world.ts'
+import { vec, gotoWithin } from './world.ts'
 import { inventoryCounts } from './toolkit.ts'
 import { rotate, placeCells, bounds, resolveRoles, solidCells, isReplaceableName, FACINGS, type Blueprint, type Facing, type Pos, type WorldCell, type ResolvedRole } from './blueprint.ts'
 import {
@@ -437,6 +437,52 @@ async function supply (ctx: Ctx, sv: Surveyed, s: ProjectsSettings, notes: strin
   notes.push(g.timedOut ? `gathered for ${s.gatherMinutes} min` : `gathered: ${g.value?.message.slice(0, 160)}`)
 }
 
+/** The gate: the door's lower half, the spot in front of it outside and the first spot inside. */
+export function gateOf (base: Pick<Base, 'cells' | 'roles' | 'interior'>): { door: Pos, outside: Pos, inside: Pos } | null {
+  if (!base.interior) return null
+  const inside = new Set(base.interior.cols.map(c => `${c.x},${c.z}`))
+  const door = base.cells.filter(c => base.roles[c.role]?.kind === 'door' && !c.passive).sort((a, b) => a.y - b.y)[0]
+  if (!door) return null
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+    if (inside.has(`${door.x + dx},${door.z + dz}`) && !inside.has(`${door.x - dx},${door.z - dz}`)) {
+      return { door: { x: door.x, y: door.y, z: door.z }, outside: { x: door.x - dx, y: door.y, z: door.z - dz }, inside: { x: door.x + dx, y: door.y, z: door.z + dz } }
+    }
+  }
+  return null
+}
+
+/**
+ * Walks in through the gate when the bot is outside a walled base: the pathfinder can't use a
+ * door (it would dig through a wall instead), so: to the spot in front of the gate, open the
+ * door, step through, shut it behind. False when it couldn't (no door, not reached).
+ */
+async function enterBase (ctx: Ctx, base: Base): Promise<boolean> {
+  const bot = ctx.bot as Bot
+  const gate = gateOf(base)
+  if (!gate || !base.interior) return false
+  const inside = new Set(base.interior.cols.map(c => `${c.x},${c.z}`))
+  const here = () => { const p = bot.entity.position; return inside.has(`${Math.floor(p.x)},${Math.floor(p.z)}`) }
+  if (here()) return true
+  await gotoWithin(bot, new goals.GoalBlock(gate.outside.x, gate.outside.y, gate.outside.z), ctx.signal, 45_000).catch(() => { checkAborted(ctx.signal) })
+  const p0 = bot.entity.position
+  if (Math.hypot(p0.x - (gate.outside.x + 0.5), p0.z - (gate.outside.z + 0.5)) > 1.5) return false
+  const door = bot.blockAt(vec(bot, gate.door.x, gate.door.y, gate.door.z))
+  if (!door || !/_door$/.test(door.name)) return false
+  const isOpen = () => (bot.blockAt(vec(bot, gate.door.x, gate.door.y, gate.door.z))?.getProperties() as { open?: boolean } | undefined)?.open === true
+  if (!isOpen()) { await bot.activateBlock(door).catch(() => {}); await sleep(300, ctx.signal) }
+  await bot.lookAt(vec(bot, gate.inside.x + 0.5, gate.inside.y + 1.6, gate.inside.z + 0.5), true)
+  bot.setControlState('forward', true)
+  try {
+    for (let i = 0; i < 30 && !here(); i++) await sleep(100, ctx.signal)
+    await sleep(250, ctx.signal)
+  } finally {
+    bot.setControlState('forward', false)
+  }
+  const shut = bot.blockAt(vec(bot, gate.door.x, gate.door.y, gate.door.z))
+  if (shut && isOpen()) await bot.activateBlock(shut).catch(() => {})
+  return here()
+}
+
 /** One work session on a project: at most sessionMinutes. */
 export async function workOn (ctx: Ctx, p: BasePlan, entry: QueueEntry, minutes: number): Promise<ActionResult> {
   const { agent } = ctx
@@ -460,6 +506,7 @@ export async function workOn (ctx: Ctx, p: BasePlan, entry: QueueEntry, minutes:
     setPlace(agent, 'farm_plot', { ...c, ...(bot.game?.dimension ? { dimension: String(bot.game.dimension).replace('minecraft:', '') } : {}) })
     result = ok(`kept a ${f.size}x${f.size} plot inside the walls free for a farm (place farm_plot, ${fmtPos(c)}); the floor goes around it`)
   } else if (kind === 'light') {
+    await enterBase(ctx, base)
     const y = (base.interior?.y ?? base.origin.y) + 1
     const radius = Math.ceil(Math.max(base.bp.width, base.bp.depth) / 2) + 1
     const params = lightUp.params.parse({ x: base.origin.x, y, z: base.origin.z, radius: Math.min(48, radius), y_range: 4, max_torches: 16 })
@@ -473,6 +520,9 @@ export async function workOn (ctx: Ctx, p: BasePlan, entry: QueueEntry, minutes:
   } else {
     await supply(ctx, sv, s, notes)
     checkAborted(ctx.signal)
+    // the floor and the rows are inside: in through the gate (the walls and towers are reached from either side)
+    const indoorWork = kind === 'row' || ('stage' in sv.def && sv.def.stage.name === 'floor')
+    if (indoorWork && !(await enterBase(ctx, base))) notes.push('could not get in through the gate')
     if (kind === 'row') {
       const fit = sv.fit as Fit
       if (sv.def.kind === 'row' && sv.def.def.name === 'storage') spots.storage = fit
