@@ -109,7 +109,7 @@ export function iceSourceOk (c: IceCandidate, o: { nether?: boolean } = {}): boo
   return iceMakesWater({ below: c.below, belowSolid: c.belowSolid, nether: o.nether })
 }
 
-export type ColdStep = 'take_blocks' | 'break_ice' | 'cover' | 'torch'
+export type ColdStep = 'take_blocks' | 'dig_blocks' | 'break_ice' | 'cover' | 'torch'
 
 export interface ColdWaterPlan {
   ok: boolean
@@ -133,6 +133,8 @@ export function planColdWater (o: {
   torches: number
   side: boolean
   iceWater: boolean
+  /** It may dig two ground blocks outside the plot for a cover when it has none anywhere. */
+  canDigBlocks?: boolean
 }): ColdWaterPlan {
   if (o.centre === 'ice' && !o.iceWater) return { ok: false, steps: [], protection: { how: 'none', ok: false, reason: '' }, reason: 'the water is frozen and farming.iceWater is off' }
   let cover = coverItem(o.inv)
@@ -141,10 +143,16 @@ export function planColdWater (o: {
     cover = coverItem(o.stored)
     take = !!cover
   }
+  let dig = false
+  if (!cover && (o.mode === 'auto' || o.mode === 'cover') && !(o.mode === 'auto' && o.torches > 0) && o.canDigBlocks) {
+    cover = 'dirt'
+    dig = true
+  }
   const protection = protectionFor({ freezes: o.freezes, mode: o.mode, cover, torches: o.torches, side: o.side })
   if (!protection.ok) return { ok: false, steps: [], protection, reason: protection.reason }
   const steps: ColdStep[] = []
   if (take && protection.how === 'cover') steps.push('take_blocks')
+  if (dig && protection.how === 'cover') steps.push('dig_blocks')
   if (o.centre === 'ice') steps.push('break_ice')
   if (protection.how === 'cover') steps.push('cover')
   if (protection.how === 'torch') steps.push('torch')

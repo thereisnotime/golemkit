@@ -907,7 +907,8 @@ export async function keepWaterOpen (ctx: Pick<ActionContext, 'bot' | 'agent' | 
     stored,
     torches: canPlace(agent) ? torchesAvailable(bot) : 0,
     side: !!side,
-    iceWater: fs.iceWater
+    iceWater: fs.iceWater,
+    canDigBlocks: !!agent.canDig
   })
   if (!plan.ok) return { ok: false, how: 'none', message: plan.reason }
   const done: string[] = []
@@ -919,6 +920,23 @@ export async function keepWaterOpen (ctx: Pick<ActionContext, 'bot' | 'agent' | 
       if (!item) continue
       const r = await takeItemsFromOwnChests(ctx, { [item]: 2 }, 128, {}, chestView(agent, bot)).catch(e => { checkAborted(signal); return { took: {} as Record<string, number> } })
       if ((r.took[item] ?? 0) >= 2) done.push(`took 2 ${item} from my chests`)
+    } else if (step === 'dig_blocks') {
+      // two ground blocks from just outside the plot (grass drops dirt), never protected or built
+      const h = (Math.sqrt(Object.keys(site.cells).length) - 1) / 2
+      let got = 0
+      for (let r = h + 2; r <= h + 4 && got < 2; r++) {
+        for (const [dx, dz] of [[r, 0], [-r, 0], [0, r], [0, -r], [r, 1], [-r, 1], [1, r], [1, -r]] as const) {
+          if (got >= 2 || coverItem(inventory(bot))) break
+          const g = bot.blockAt(vec(bot, w.x + dx, w.y, w.z + dz))
+          const up = bot.blockAt(vec(bot, w.x + dx, w.y + 1, w.z + dz))
+          if (!g || !/^(grass_block|dirt|coarse_dirt)$/.test(g.name) || !up || !/^(air|snow|short_grass)$/.test(up.name)) continue
+          if (offLimits(agent, bot, g.position, 0)) continue
+          try { await reachBlock(bot, g.position, signal, 3, 15_000); await digBlock(bot, g, signal); got++ } catch (e) { checkAborted(signal) }
+        }
+      }
+      await pickupNearby(bot, signal, { radius: 6, maxMs: 6000 }).catch(() => 0)
+      if (!coverItem(inventory(bot))) return { ok: false, how: 'none', message: 'could not dig two blocks of dirt to cover the water' }
+      done.push('dug 2 dirt beside the plot')
     } else if (step === 'break_ice') {
       // from the shore cell, never standing on the ice it breaks
       if (sidePos) { try { await gotoWithin(bot, new goals.GoalBlock(sidePos.x, sidePos.y, sidePos.z), signal, 30_000) } catch (e) { checkAborted(signal) } }

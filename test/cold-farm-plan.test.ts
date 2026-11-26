@@ -68,6 +68,7 @@ test("Pax's frozen shore: no bucket, no torches, dirt in its chests: take two, b
   const open = planColdWater({ centre: 'water', freezes: true, mode: 'auto', inv: { dirt: 2 }, torches: 0, side: true, iceWater: true })
   assert.deepEqual(open.steps, ['cover'], 'open water in the cold: just keep it open')
   assert.equal(planColdWater({ centre: 'ice', freezes: true, mode: 'auto', inv: {}, stored: {}, torches: 0, side: true, iceWater: true }).ok, false)
+  assert.deepEqual(planColdWater({ centre: 'ice', freezes: true, mode: 'auto', inv: {}, stored: {}, torches: 0, side: true, iceWater: true, canDigBlocks: true }).steps, ['dig_blocks', 'break_ice', 'cover'], 'nothing anywhere: dig two dirt beside the plot')
   assert.match(planColdWater({ centre: 'ice', freezes: true, mode: 'auto', inv: { dirt: 2 }, torches: 0, side: true, iceWater: false }).reason, /iceWater is off/)
 })
 

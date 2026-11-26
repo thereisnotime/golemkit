@@ -150,6 +150,8 @@ What `start_farm` tries, in order:
      against, so it first puts a helper block on the shore cell next to it and digs that back
      afterwards.
    - Without blocks, a torch on that shore cell. That cell is then not tilled.
+   - With neither, it digs two dirt from just outside the plot (when digging is allowed) and
+     covers the water with one.
    - `cover` or `torch` uses only that one. `off` never uses water that would freeze.
 5. With a bucket (or once one exists): a poured water hole in flat grass, kept open the same way
    in the cold.

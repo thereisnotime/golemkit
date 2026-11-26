@@ -11,7 +11,7 @@ afterwards. Water in a cold biome (temperature below 0.15), whether open, poured
 from broken ice, SHALL be kept from freezing as farming.protectWater says. In auto, that is a cheap
 block over the water, placed against a helper block on the shore cell next to it that it takes back;
 it carries two cheap blocks or takes them from its chests. Without the blocks it uses a torch on that
-shore cell, which gives the water light 12. In cover or torch mode it uses only that one. With off,
+shore cell, which gives the water light 12, and without either, two dirt dug from just outside the plot. In cover or torch mode it uses only that one. With off,
 or with neither, it SHALL not use the site and SHALL say why. Protected areas, spawn clearance,
 builds nearby, bad farm sites and lava stay ruled out.
 
