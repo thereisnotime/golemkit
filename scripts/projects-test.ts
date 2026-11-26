@@ -269,10 +269,12 @@ async function run (): Promise<void> {
       owner.whisper(BOT, 'resume building')
     }
     if (['walls', 'floor', 'towers', 'lighting', 'storage', 'workshop'].every(done)) { log('all projects done'); break }
-    const tod = bot.bot?.time?.timeOfDay
-    if (tod !== undefined && Math.random() < 0.1) log(`time ${tod}, health ${bot.bot.health}, food ${bot.bot.food}, at ${JSON.stringify(bot.observe().position)}`)
+    try {
+      const tod = bot.bot?.time?.timeOfDay
+      if (tod !== undefined && Math.random() < 0.1) log(`time ${tod}, health ${bot.bot.health}, food ${bot.bot.food}, at ${JSON.stringify(bot.observe().position)}`)
+    } catch { log('bot not connected') }
   }
-  const plan = await bot.act('plan_base', {}, { caller: { kind: 'system', name: 'projects-test' }, priority: 0 })
+  const plan = await bot.act('plan_base', {}, { caller: { kind: 'system', name: 'projects-test' }, priority: 0 }).catch(e => ({ ok: false, message: (e as Error).message }))
   log(`final plan:\n${plan.message}`)
   log(`journal-ish: ${JSON.stringify(bot.storage.get('projects.state'))}`)
   bot.storage.flush()
