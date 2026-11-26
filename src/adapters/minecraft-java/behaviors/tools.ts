@@ -112,6 +112,8 @@ export const keepToolsUpgraded = defineBehavior({
       maxFailureCooldownMs: 900_000,
       score: ({ bot, bb, now, current }) => {
         bucketFirst = bb.need(BUCKET_NEED) > 0
+        // the gear search (down its mine) ends with upgrade_tools itself: the first raw iron must not pull it out early
+        if (current === 'need:gear') return 0
         return current === 'keep_tools_upgraded' || want(bot, now) ? 28 : 0
       },
       // stuck for wood: the back-off ends as soon as the usable wood changes (chopped, or put in its inventory)
