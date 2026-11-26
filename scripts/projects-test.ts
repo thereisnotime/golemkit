@@ -199,7 +199,8 @@ async function run (): Promise<void> {
     projects: { template: TEMPLATE, policy: 'auto', askAbove: ASK_ABOVE, askTimeoutMinutes: 5, onTimeout: 'wait', sessionMinutes: 8, gatherMinutes: 6 },
     intents: { mode: 'fallback' },
     inventoryMemory: { enabled: true, indexOwn: true },
-    behaviors: { collect_drops: { radius: 12 } }
+    // keep_fed's farm start (seed trips) is left out so the run measures the projects; Pax has it on
+    behaviors: { collect_drops: { radius: 12 }, keep_fed: { startFarm: false } }
   }
   await d.cmd(`/gamemode survival ${BOT}`)
   await d.cmd(`/clear ${BOT}`)
