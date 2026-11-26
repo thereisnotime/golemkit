@@ -8,11 +8,11 @@ export type IntentName =
   | 'follow' | 'unfollow' | 'come' | 'go_home' | 'goto' | 'guard' | 'unguard' | 'farm' | 'chop' | 'collect'
   | 'find' | 'bring' | 'give' | 'drop' | 'eat' | 'sleep' | 'stop' | 'status' | 'where' | 'inventory'
   | 'set_home' | 'remember_place' | 'build' | 'behavior_on' | 'behavior_off' | 'help'
-  | 'pvp_attack' | 'pvp_spare' | 'pvp_mode' | 'hunt'
+  | 'pvp_attack' | 'pvp_spare' | 'pvp_mode' | 'hunt' | 'projects'
 
 /**
  * Every intent the brain can act on (the label set for classifiers and the local LLM prompt).
- * The PvP intents (pvp_attack, pvp_spare, pvp_mode) and hunt are left out on purpose: only the
+ * The PvP intents (pvp_attack, pvp_spare, pvp_mode), hunt and projects are left out on purpose: only the
  * anchored patterns produce them, never a guess from the embeddings or a local model.
  */
 export const INTENT_NAMES: readonly IntentName[] = [
@@ -381,6 +381,9 @@ function huntsPlayer (verb: string, word: string, ctx: ParseContext): boolean {
   return verb !== 'track down' // no list: only the kill verbs guess at a player; "track down iron" is a search
 }
 
+/** Base project names and words for them (src/skills/basePlan.ts projectWords). */
+const PROJECT_WORD = '(walls?|gate|floor|stone floor|towers?|corner towers|walkway|battlements|lighting|lights|torches|storage|chests|storage room|workshop|furnaces?|farm plot|farm_plot|plot)'
+
 export const NOT_PLAYERS = new Set(['it', 'that', 'this', 'them', 'there', 'here', 'around', 'everyone', 'everybody', 'someone', 'home', 'the', 'a', 'my', 'your'])
 
 const RULES: Rule[] = [
@@ -398,6 +401,16 @@ const RULES: Rule[] = [
   { re: /^(stand down|at ease|you can stop guarding|off duty|dismissed)$/, build: () => ({ intent: 'unguard' }) },
   { re: /^(stay|stay here|stay there|wait here|wait there|stay put|hold position|hold your position|do not move|stand here|stand still|remain here)$/, build: () => ({ intent: 'stop', args: { stay: true } }) },
   { re: /^(stop|halt|cancel|abort|freeze|enough|nevermind|never mind|forget it|quit it|cut it out|hold on|hold up|stop it|stop that|stop everything|cancel that|cancel it|cancel everything|stop what you are doing|stop whatever you are doing|stop doing that|stop moving|that is enough|thats enough|wait|stop now|stop stop)$/, build: () => ({ intent: 'stop' }) },
+
+  // ---- base projects ("pax projects", "pax build towers next", "pax skip walkway", "pax pause building")
+  { re: /^(projects|base projects|your projects|our projects|the projects|list projects|show projects|show me the projects|project list|build queue|building queue|base queue|what is next to build|what will you build next|what are you building next)$/, build: () => ({ intent: 'projects', args: { op: 'list' } }) },
+  { re: /^(plan|survey|check|inspect) (the |our |your |my )?(fortress|base|projects|base projects|upgrades|fort)$/, build: () => ({ intent: 'projects', args: { op: 'plan' } }) },
+  { re: new RegExp(`^(build|do|make|start|work on) (the |our )?${PROJECT_WORD} (next|first|now|after this)$`), build: m => ({ intent: 'projects', args: { op: 'next', name: m[3] } }) },
+  { re: new RegExp(`^(ok|okay|yes|approve|approved|go ahead with|go ahead and build|you can build|fine build|sure build) (the |our )?${PROJECT_WORD}$`), build: m => ({ intent: 'projects', args: { op: 'approve', name: m[3] } }) },
+  { re: new RegExp(`^(skip|veto|leave out|forget|no|never build|do not build|dont build) (the |our )?${PROJECT_WORD}( for now)?$`), build: m => ({ intent: 'projects', args: { op: /^(veto|never build|do not build|dont build)$/.test(m[1]!) ? 'veto' : 'skip', name: m[3] } }) },
+  { re: new RegExp(`^(unskip|bring back|restore) (the |our )?${PROJECT_WORD}$`), build: m => ({ intent: 'projects', args: { op: 'unskip', name: m[3] } }) },
+  { re: /^(pause|stop|hold|halt|quit) (building|the building|construction|the projects|projects|base projects|base work|upgrading|the upgrades)( for now| now)?$/, build: () => ({ intent: 'projects', args: { op: 'pause' } }) },
+  { re: /^(resume|continue|carry on|restart|unpause|go on) (building|with the building|construction|the projects|projects|base projects|base work|upgrading|the upgrades)$/, build: () => ({ intent: 'projects', args: { op: 'resume' } }) },
 
   // ---- behaviours on/off by name ("turn on keep_fed", "disarm farm_loop")
   { re: /^(arm|enable|turn on|switch on|activate) ([a-z]+_[a-z_]+)$/, build: m => ({ intent: 'behavior_on', args: { behavior: m[2] } }) },
@@ -564,7 +577,7 @@ export function lineShape (text: string): LineShape {
  * intents ("did you follow him?"), except searches phrased as questions ("where is the village?").
  */
 export function shapeConfidence (intent: IntentName, confidence: number, shape: LineShape, args?: Record<string, unknown>): number | null {
-  if (shape.negated && intent !== 'unfollow' && intent !== 'unguard' && intent !== 'pvp_spare' && !(intent === 'pvp_mode' && args?.mode === 'off')) return null
+  if (shape.negated && intent !== 'unfollow' && intent !== 'unguard' && intent !== 'pvp_spare' && !(intent === 'pvp_mode' && args?.mode === 'off') && !(intent === 'projects' && (args?.op === 'veto' || args?.op === 'skip'))) return null
   let c = confidence
   if (shape.asksQuestion && !INFO.has(intent)) {
     if (!(intent === 'find' && /^(where|is there|are there|any)\b/.test(shape.t))) c *= 0.5
@@ -606,6 +619,7 @@ export function helpLines (name: string): string[] {
     `say "${name} <request>": follow me, stop following, come here, go home, go to <place>, guard me / guard here / stop guarding, stay, stop`,
     'farm (at <place>), make a farm, chop some wood, get 64 cobblestone, mine 10 iron, find <thing>, bring me bread 5, give me your <item>, drop <item>',
     'eat, sleep, status / what are you doing / where are you, inventory, set home, remember this place as <name>, build a house (here), start/stop farming|chopping|following|guarding',
+    'base projects: projects, plan fortress, ok <project>, build <project> next, skip <project>, pause building / resume building',
     'PvP (owners): pvp off|defend|revenge|targets|all, attack <player>, hunt <player> (or hunt player <name>), stop attacking <player>; hunt rabbits|cows|... for food; "stop" ends every fight'
   ]
 }

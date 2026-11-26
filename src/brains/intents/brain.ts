@@ -496,6 +496,21 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
         await run('build', { template: String(a.template), ...(p ? { x: p.x, z: p.z } : {}) }, `building ${a.template}`)
         return
       }
+      case 'projects': {
+        const op = String(a.op)
+        if (op === 'list' || op === 'plan') {
+          const name = op === 'list' ? 'projects' : 'plan_base'
+          if (!has(name)) return reply("can't: I have no base projects")
+          const r = await act(name, op === 'plan' ? { detail: true } : {})
+          if (!r.ok) return reply(`can't: ${r.message}`)
+          const lines = ((r.data as { lines?: string[] } | undefined)?.lines ?? r.message.split('\n')).slice(0, op === 'plan' ? 14 : 10)
+          for (const line of lines) reply(line)
+          return
+        }
+        if (!has('project')) return reply("can't: I have no base projects")
+        const r = await act('project', { op, ...(a.name ? { name: String(a.name) } : {}) })
+        return reply(r.ok ? r.message : `can't: ${r.message}`)
+      }
       case 'behavior_on':
       case 'behavior_off': {
         const name = a.behavior ? String(a.behavior) : ACTIVITIES[String(a.activity)] ?? ''
