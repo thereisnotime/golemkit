@@ -453,8 +453,8 @@ export function gateOf (base: Pick<Base, 'cells' | 'roles' | 'interior'>): { doo
 
 /**
  * Walks in through the gate when the bot is outside a walled base: the pathfinder can't use a
- * door (it would dig through a wall instead), so: to the spot in front of the gate, open the
- * door, step through, shut it behind. False when it couldn't (no door, not reached).
+ * door (it would dig through a wall instead), so: to the column in front of the gate, open the
+ * door, step (and hop) through, shut it behind. False when it couldn't (no door, not reached).
  */
 async function enterBase (ctx: Ctx, base: Base): Promise<boolean> {
   const bot = ctx.bot as Bot
@@ -463,7 +463,7 @@ async function enterBase (ctx: Ctx, base: Base): Promise<boolean> {
   const inside = new Set(base.interior.cols.map(c => `${c.x},${c.z}`))
   const here = () => { const p = bot.entity.position; return inside.has(`${Math.floor(p.x)},${Math.floor(p.z)}`) }
   if (here()) return true
-  await gotoWithin(bot, new goals.GoalBlock(gate.outside.x, gate.outside.y, gate.outside.z), ctx.signal, 45_000).catch(() => { checkAborted(ctx.signal) })
+  await gotoWithin(bot, new goals.GoalXZ(gate.outside.x, gate.outside.z), ctx.signal, 45_000).catch(() => { checkAborted(ctx.signal) })
   const p0 = bot.entity.position
   if (Math.hypot(p0.x - (gate.outside.x + 0.5), p0.z - (gate.outside.z + 0.5)) > 1.5) return false
   const door = bot.blockAt(vec(bot, gate.door.x, gate.door.y, gate.door.z))
@@ -471,12 +471,16 @@ async function enterBase (ctx: Ctx, base: Base): Promise<boolean> {
   const isOpen = () => (bot.blockAt(vec(bot, gate.door.x, gate.door.y, gate.door.z))?.getProperties() as { open?: boolean } | undefined)?.open === true
   if (!isOpen()) { await bot.activateBlock(door).catch(() => {}); await sleep(300, ctx.signal) }
   await bot.lookAt(vec(bot, gate.inside.x + 0.5, gate.inside.y + 1.6, gate.inside.z + 0.5), true)
+  // the floor inside can be a block above the ground outside: jump while walking in
   bot.setControlState('forward', true)
+  bot.setControlState('jump', true)
   try {
     for (let i = 0; i < 30 && !here(); i++) await sleep(100, ctx.signal)
+    bot.setControlState('jump', false)
     await sleep(250, ctx.signal)
   } finally {
     bot.setControlState('forward', false)
+    bot.setControlState('jump', false)
   }
   const shut = bot.blockAt(vec(bot, gate.door.x, gate.door.y, gate.door.z))
   if (shut && isOpen()) await bot.activateBlock(shut).catch(() => {})
