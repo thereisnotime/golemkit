@@ -88,8 +88,10 @@ Once the base is settled, its blocks (walls, floor, towers, the rows) cost the p
 dig through, so it takes any other way first: in the first live run the bot tunnelled out through
 its new wall on every trip and rebuilt it the next session. They aren't forbidden outright, because
 mineflayer-pathfinder can't walk through a door: with the gate shut and digging forbidden, the bot
-stood locked out for seven minutes. A closed base still costs a block when there is no other way
-out; the next survey puts it back. The chore is sticky, so picking up a few drops doesn't cut a session short.
+stood locked out for seven minutes. For work inside (the floor, the rows,
+lighting) the session walks in through the gate itself: to the spot in front of it, opens the
+door, steps through and shuts it. Leaving, a closed base still costs a block when there is no
+other way out; the next survey puts it back. The chore is sticky, so picking up a few drops doesn't cut a session short.
 
 Progress is the world itself plus `projects.state` in agent storage, so a session cut short by a
 reflex, a death, a disconnect or a restart picks up where it was. A project that got nothing done
