@@ -15,7 +15,7 @@ import { pickupNearby } from './pickup.ts'
 import { craftItem, spawnProtectionOf } from './crafting.ts'
 import { inSpawnProtection } from './stationPlan.ts'
 import { planStep, digHazard, kitOf, lookFor, placeTorch, undergroundNow, DIRS } from './mining.ts'
-import { miningSettings, undergroundRetreat, torchDue, caveHazard } from './minePlan.ts'
+import { miningSettings, undergroundRetreat, torchDue, caveHazard, torchCrafts } from './minePlan.ts'
 import { getHome, sameDimension } from './navigation.ts'
 import { getFarms } from './food.ts'
 import { bestFood } from './survival.ts'
@@ -248,7 +248,8 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
   const trail: P[] = [feet] // stands on this trip, for the walk back when the path fails
   let broken = 0
   let sinceTorch = 0
-  let noTorches = false
+  // torches: carried, or coal (mined on the way) and sticks to make them; checked each time, not latched
+  const canTorch = () => bot.inventory.items().some(i => i.name === 'torch') || torchCrafts(inventoryCounts(bot)) >= 1
   let branchesThisTrip = 0
   let mainSinceBranch = 0
   let stopped = ''
@@ -331,8 +332,8 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
     tunnel.add(key(feet)); tunnel.add(key(add(feet, 0, 1, 0)))
     trail.push(feet)
     sinceTorch++
-    if (ms.torches && !noTorches && torchDue(sinceTorch, ms, (bot.blockAt(vec(bot, feet.x, feet.y, feet.z)) as { light?: number } | null)?.light)) {
-      if (await placeTorch(bot, signal, prev)) { sinceTorch = 0; mine.torches++ } else noTorches = !bot.inventory.items().some(i => i.name === 'torch')
+    if (ms.torches && canTorch() && torchDue(sinceTorch, ms, (bot.blockAt(vec(bot, feet.x, feet.y, feet.z)) as { light?: number } | null)?.light)) {
+      if (await placeTorch(bot, signal, prev)) { sinceTorch = 0; mine.torches++ }
     }
     await mineOre()
     return null
