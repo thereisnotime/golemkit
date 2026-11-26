@@ -1,0 +1,13 @@
+# Four chests in a row against a wall (two double chests), fronts facing the room. Base projects
+# put one inside the walls when the chests at home are full.
+name: storage_row
+description: Four chests in a row against a wall
+facing: south
+site: near
+meta: { tags: [storage, utility, interior], author: golemkit }
+roles:
+  chest: { default: chest, accept: "^(chest|trapped_chest|barrel)$", kind: furnish }
+palette:
+  C: "chest[facing=south]"
+layers:
+  - ["CCCC"]

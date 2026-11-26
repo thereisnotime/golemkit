@@ -1,0 +1,76 @@
+# A small walled outpost, 9x9: cobblestone foundation and floor, walls 2 high with a door on the
+# gate side, and four corner posts a block taller with a torch on each. The starter base for a
+# bot with no fortress yet (settings projects.template: outpost); base projects build it in
+# stages like the fortress.
+name: outpost
+description: Small 9x9 walled outpost with a stone floor, a door and torch-topped corner posts
+facing: south            # the gate side, as drawn
+site: near
+meta:
+  tags: [defence, fort, walls, stone, small]
+  style: rustic
+  author: golemkit
+  stages:
+    - { name: walls, title: walls and gate, roles: [foundation, wall, door] }
+    - { name: floor, title: stone floor, roles: [floor], after: [walls], skipCovered: true }
+    - { name: towers, title: corner posts, roles: [stone], glyphs: [T] }
+roles:
+  stone: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_stone_bricks|andesite|polished_andesite)$" }
+  foundation: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_stone_bricks|andesite|polished_andesite)$" }
+  floor: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_stone_bricks|andesite|polished_andesite|smooth_stone)$" }
+  wall: { default: cobblestone, accept: "^(cobblestone|mossy_cobblestone|cobbled_deepslate|stone|stone_bricks|mossy_stone_bricks|[a-z_]+_planks)$", material: true }
+  door: { default: oak_door, accept: "_door$", kind: door, wood: true }
+  light: { default: torch, accept: "^(wall_)?torch$|^lantern$", kind: attachment, optional: true }
+palette:
+  S: stone
+  c: foundation
+  "=": floor
+  "#": wall
+  D: "door[facing=north,hinge=left]"
+  T: light
+layers:
+  - ["ScccccccS",
+     "c=======c",
+     "c=======c",
+     "c=======c",
+     "c=======c",
+     "c=======c",
+     "c=======c",
+     "c=======c",
+     "ScccccccS"]
+  - ["S#######S",
+     "#       #",
+     "#       #",
+     "#       #",
+     "#       #",
+     "#       #",
+     "#       #",
+     "#       #",
+     "S###D###S"]
+  - ["S#######S",
+     "#       #",
+     "#       #",
+     "#       #",
+     "#       #",
+     "#       #",
+     "#       #",
+     "#       #",
+     "S### ###S"]
+  - ["S       S",
+     "         ",
+     "         ",
+     "         ",
+     "         ",
+     "         ",
+     "         ",
+     "         ",
+     "S       S"]
+  - ["T       T",
+     "         ",
+     "         ",
+     "         ",
+     "         ",
+     "         ",
+     "         ",
+     "         ",
+     "T       T"]
