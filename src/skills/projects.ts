@@ -549,7 +549,7 @@ export async function workOn (ctx: Ctx, p: BasePlan, entry: QueueEntry, minutes:
   const msg = `${entry.info.name}: ${notes.length ? `${notes.join('; ')}; ` : ''}${result.message}`.slice(0, 400)
   saveState(agent, noteSession(loadState(agent), entry.info.name, { now: Date.now(), message: msg, progressed, done }))
   if (done) {
-    tellOwnersIf(agent, `finished the ${entry.info.title} at the ${base.bp.name}`)
+    tellOwnersIf(agent, `base project done: ${entry.info.name} (${entry.info.title}) at the ${base.bp.name}`)
     noteGoal(agent, entry.info.name, entry.info.title)
   }
   const tail = done ? ' (done)' : ` (${left} left)`
@@ -567,7 +567,7 @@ function noteGoal (agent: Agent, project: string, title: string): void {
   const spots = spotsOf(agent)
   if (spots.noted?.includes(`${goal.id}:${project}`)) return
   try {
-    new GoalStore(agent.storage as never).update({ note: `base projects finished the ${title} (${project}) on their own; check what is left before building it again` })
+    new GoalStore(agent.storage as never).update({ note: `base projects finished ${project} (${title}) on their own; check what is left before building it again` })
     spots.noted = [...(spots.noted ?? []), `${goal.id}:${project}`].slice(-20)
     saveSpots(agent, spots)
   } catch {}
