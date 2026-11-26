@@ -941,6 +941,14 @@ export async function keepWaterOpen (ctx: Pick<ActionContext, 'bot' | 'agent' | 
       if ((r.took[item] ?? 0) >= 2) done.push(`took 2 ${item} from my chests`)
     } else if (step === 'dig_blocks') {
       // two ground blocks from just outside the plot (grass drops dirt, stone cobblestone), never protected or built
+      // logs it carries make planks (one log, four planks) faster and more surely than digging:
+      // on a snowy stony shore no ground block at the water's height was diggable (bench: dug 0)
+      const log = Object.keys(inventory(bot)).find(k => /_(log|stem)$/.test(k) && !k.startsWith('stripped_'))
+      if (log) {
+        const planks = log.replace(/_(log|stem)$/, '_planks')
+        const r = await craftItem(bot, signal, planks, 2).catch(e => { checkAborted(signal); return null })
+        if (r?.ok && coverItem(inventory(bot))) { done.push(`made ${planks} for a cover`); continue }
+      }
       const h = (Math.sqrt(Object.keys(site.cells).length) - 1) / 2
       let got = 0
       for (let r = h + 2; r <= h + 4 && got < 2; r++) {
