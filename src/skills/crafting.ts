@@ -153,7 +153,15 @@ async function getTable (bot: Bot, signal: AbortSignal): Promise<{ table: Block,
   const near = bot.findBlock({ matching: tableId, maxDistance: TABLE_SEARCH })
   if (near) return { table: near, placed: false }
   if (!findItem(bot, 'crafting_table')) {
-    const r = bot.recipesFor(bot.registry.itemsByName.crafting_table.id, null, 1, null)[0]
+    let r = bot.recipesFor(bot.registry.itemsByName.crafting_table.id, null, 1, null)[0]
+    if (!r) {
+      // logs but too few planks: one log makes the 4 planks a table takes (the mine trip came up with 6 logs and 2 planks and stopped here)
+      const log = bot.inventory.items().find(i => /_(log|stem)$/.test(i.name) && !i.name.startsWith('stripped_'))
+      const planks = log && bot.registry.itemsByName[log.name.replace(/_(log|stem)$/, '_planks')]
+      const pr = planks ? bot.recipesFor(planks.id, null, 1, null)[0] : undefined
+      if (pr) { await bot.craft(pr, 1).catch(() => {}); await sleep(SETTLE_MS, signal) }
+      r = bot.recipesFor(bot.registry.itemsByName.crafting_table.id, null, 1, null)[0]
+    }
     if (!r) return 'needs a crafting table and there is none nearby (and no planks to make one)'
     await bot.craft(r, 1)
     await sleep(SETTLE_MS, signal)
