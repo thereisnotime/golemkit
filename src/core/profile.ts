@@ -20,6 +20,7 @@ import { createLogger } from './log.ts'
 import { TOGGLES } from './toggles.ts'
 import { unknownKeys } from './schemaKeys.ts'
 import { NeedsSettingsSchema, IdleSettingsSchema, SitesSettingsSchema, IDLE_MODES } from './needs.ts'
+import { ProjectsSettingsSchema } from './projects.ts'
 
 export const LlmProfileSchema = z.object({
   provider: z.string().optional().describe('claude-subscription | codex | anthropic | opencode | openai'),
@@ -112,6 +113,8 @@ export const ProfileSchema = z.object({
   idle: z.union([z.enum(IDLE_MODES), IdleSettingsSchema]).optional().describe('idle mode: off | passive | idle | active | explore, or options'),
   /** Site health: check the farm, bed, chests and home it depends on; mark, replace or report bad ones. false turns it off. Lands in settings.sites. */
   sites: z.union([z.literal(false), SitesSettingsSchema]).optional().describe('site health checks; false = off'),
+  /** Base projects (docs/guide/base-projects.md): the queue of base improvements it works through on its own. false turns it off. Lands in settings.projects. */
+  projects: z.union([z.literal(false), ProjectsSettingsSchema]).optional().describe('base projects: improve and extend the base on its own (policy auto | ask | off); false = off'),
   persona: z.string().optional(),
   server: z.object({
     host: z.string().optional(),
@@ -293,6 +296,7 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (profile.needs !== undefined) settings.needs = profile.needs === false ? { enabled: false } : { ...(settings.needs as object | undefined), ...profile.needs }
   if (profile.idle !== undefined) settings.idle = typeof profile.idle === 'string' ? { ...(settings.idle as object | undefined), mode: profile.idle } : { ...(settings.idle as object | undefined), ...profile.idle }
   if (profile.sites !== undefined) settings.sites = profile.sites === false ? { enabled: false } : { ...(settings.sites as object | undefined), ...profile.sites }
+  if (profile.projects !== undefined) settings.projects = profile.projects === false ? { enabled: false } : { ...(settings.projects as object | undefined), ...profile.projects }
   if (profile.building) settings.building = profile.building
   if (profile.worldedit !== undefined) settings.worldedit = { ...(settings.worldedit as object | undefined), ...(typeof profile.worldedit === 'boolean' ? { enabled: profile.worldedit } : profile.worldedit) }
   if (profile.blueprints) {

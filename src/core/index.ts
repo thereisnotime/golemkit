@@ -61,3 +61,9 @@ export {
   SiteBook, siteBook, noteSiteCheck, recheckDue, checkDue, siteText, siteLabel, HARD_FAULTS,
   type SiteFault, type SitePos, type SiteRef, type SiteVerdict, type SiteRecord, type SiteChange
 } from './sites.ts'
+export {
+  PROJECT_POLICIES, TIMEOUT_POLICIES, PROJECT_OPS, PROJECTS_DEFAULTS, MAX_FAILS, FAIL_BACKOFF_MS, ProjectsSettingsSchema, projectsSettings, emptyProjectState, normalizeState,
+  orderProjects, needsOk, projectQueue, nextStep, applyOp, noteSession, restingReason, fmtQueue, goalMentions,
+  type ProjectPolicy, type TimeoutPolicy, type ProjectsSettings, type ProjectInfo, type ProjectState, type ProjectProgress, type Decision,
+  type QueueStatus, type QueueEntry, type StepContext, type NextStep, type ProjectOp
+} from './projects.ts'
