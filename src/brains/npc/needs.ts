@@ -64,6 +64,12 @@ export interface ChoreDef extends ChoreSpec {
   /** Why it has nothing to do now, for the status ("35 seeds, enough"); optional. */
   whyIdle? (ctx: NpcContext, o: { radius: number }): string | null
   goal?: string
+  /**
+   * Long work (a base-project session): once running it keeps its score when something else
+   * scores above the idle band, so only a challenger beating it by the switch margin (a real need,
+   * danger) takes over, not a passing chore-like behaviour (drops to pick up). Default false.
+   */
+  sticky?: boolean
 }
 
 export interface SiteProbe {
@@ -363,6 +369,10 @@ export class NeedsLayer {
     try { committed = !!runningNeed?.search?.committed?.(ctx) } catch {}
     if (committed && running && !p.scores.some(x => x.score >= COMMITTED_SCORE)) {
       this.fallback = { behavior: running, reason: `finishing ${running} (committed: ${runningNeed!.search!.what})`, score: COMMITTED_SCORE }
+    } else if (!p.quiet && running?.startsWith('idle:') && this.provider.chores.some(c => `idle:${c.name}` === running && c.sticky && MODE_RANK[idle.mode] >= MODE_RANK[c.mode])) {
+      // a sticky chore (a base-project session) keeps the body for a passing behaviour
+      const sticky = this.provider.chores.find(c => `idle:${c.name}` === running)!
+      this.fallback = { behavior: running, reason: this.view.fallback?.behavior === running ? this.view.fallback.reason : `finishing ${running}`, score: CHORE_SCORES[sticky.mode] }
     } else if (p.quiet) {
       if (running && (running.startsWith('need:') || running.startsWith('idle:'))) {
         // finish what it started

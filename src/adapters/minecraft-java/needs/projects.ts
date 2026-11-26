@@ -31,6 +31,7 @@ export function projectChores (agent: Agent): ChoreDef[] {
     mode: 'active',
     when: 'any',
     cooldownMinutes: 1,
+    sticky: true,
     description: 'one work session on the base projects (fortress walls, stone floor, lighting, storage, workshop, walkway, towers), or propose the next big one to the owners',
     requires: ['work_on_base'],
     applicable: (ctx) => {

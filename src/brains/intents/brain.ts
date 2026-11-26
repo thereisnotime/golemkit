@@ -503,8 +503,15 @@ export const intentsBrain = (opts: IntentsBrainOptions = {}) => {
           if (!has(name)) return reply("can't: I have no base projects")
           const r = await act(name, op === 'plan' ? { detail: true } : {})
           if (!r.ok) return reply(`can't: ${r.message}`)
-          const lines = ((r.data as { lines?: string[] } | undefined)?.lines ?? r.message.split('\n')).slice(0, op === 'plan' ? 14 : 10)
-          for (const line of lines) reply(line)
+          // packed into a few chat lines: the chat queue drops the rest of a long list
+          const lines = (r.data as { lines?: string[] } | undefined)?.lines ?? r.message.split('\n')
+          const packed: string[] = []
+          for (const line of lines.map(l => l.trim())) {
+            const last = packed[packed.length - 1]
+            if (last !== undefined && last.length + line.length + 3 <= 240) packed[packed.length - 1] = `${last} | ${line}`
+            else packed.push(line.slice(0, 240))
+          }
+          for (const line of packed.slice(0, op === 'plan' ? 6 : 4)) reply(line)
           return
         }
         if (!has('project')) return reply("can't: I have no base projects")

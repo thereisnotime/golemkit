@@ -161,3 +161,18 @@ test('intents: base project commands', () => {
   assert.equal(p('build a tower')?.intent, 'build')
   assert.equal(p('stop chopping')?.intent, 'behavior_off')
 })
+
+test('needs layer: a sticky chore keeps the body against a passing behaviour, a plain one does not', async () => {
+  const { NeedsLayer } = await import('../src/brains/npc/index.ts')
+  const mem = new Map<string, unknown>()
+  const agent = { storage: { get: (k: string, d?: unknown) => mem.has(k) ? mem.get(k) : d, set: (k: string, v: unknown) => { mem.set(k, v) } }, settings: { idle: { mode: 'active' } }, getAction: () => ({}) }
+  const chore = (name: string, sticky: boolean) => ({ name, mode: 'active' as const, when: 'any' as const, cooldownMinutes: 1, description: name, applicable: () => true, run: async () => 'ok', sticky })
+  const layer = new NeedsLayer(agent as never, { needs: [], chores: [chore('base_project', true), chore('tidy', false)] })
+  const ctx = { bb: { facts: { isNight: false }, needs: { danger: 0 } }, now: NOW } as never
+  const regular = [{ name: 'collect_drops', score: 22 }]
+  const sticky = layer.plan(ctx, regular, 'idle:base_project')
+  assert.equal(layer.lastView().fallback?.behavior, 'idle:base_project')
+  assert.equal(sticky.length, 1)
+  layer.plan(ctx, regular, 'idle:tidy')
+  assert.equal(layer.lastView().fallback, null)
+})
