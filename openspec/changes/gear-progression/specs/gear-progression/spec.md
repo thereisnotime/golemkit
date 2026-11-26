@@ -38,3 +38,10 @@ The gear need's search SHALL run when iron (tools, armour, a bucket or a shield)
 #### Scenario: Pax on the frozen lake
 - **WHEN** the gear need is urgent, it is day and no iron ore with an open face is within 160 blocks
 - **THEN** the bot digs its staircase mine near home, comes back up with raw iron, smelts it by home and crafts an iron pickaxe
+
+### Requirement: Committed search
+A need search MAY say it is committed while it runs (`NeedSearch.committed`). While it is, the needs layer SHALL keep it running with score 45 unless another behaviour scores 45 or more. The gear search SHALL be committed from the walk home before its mine trip to the end of the upgrade after it, and keep_tools_upgraded SHALL score 0 while the gear search runs.
+
+#### Scenario: A tree to fell
+- **WHEN** the gear search is walking home for its mine trip and chop_wood_loop scores 38
+- **THEN** the gear search goes on

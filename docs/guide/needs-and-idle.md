@@ -95,6 +95,12 @@ better, digging is on and iron (tools, armour, a bucket, a shield) is what is mi
 3. home, and `upgrade_tools` with keep_tools_upgraded's target: smelt (furnace by home) and craft
    pickaxe, bucket, shield, armour, tools.
 
+From the walk home before the mine to the crafting after it the search is **committed**
+(`NeedSearch.committed`): it keeps a score of 45 against ordinary work (chop_wood_loop 30 to 38,
+keep_tools_upgraded 28, which also leaves a running gear search alone so the first raw iron
+doesn't pull it out), while danger and real hunger still take over. Before, any tree to fell ended
+the search on its walk home.
+
 At night the search may still run when it knows a lit mine near home and `mine.atNight` is on
 (`NeedSearch.night`); then it skips the surface leg and goes down the mine.
 
