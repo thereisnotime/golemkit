@@ -412,6 +412,15 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
       }
     }
   } catch (e) {
+    if (signal.aborted) {
+      // taken over down there (night, a fight): what it dug and got is still the mine's
+      const after = inventoryCounts(bot)
+      for (const f of Object.values(ORE_FAMILIES)) { const d = (after[f.drop] ?? 0) - (before[f.drop] ?? 0); if (d > 0) mine.got[f.drop] = (mine.got[f.drop] ?? 0) + d }
+      mine.trips++
+      mine.lastAt = Date.now()
+      saveMine(agent, mine)
+      agent.storage.set(LAST_TRIP_KEY, Date.now())
+    }
     checkAborted(signal)
     stopped = (e as Error).message
   }
