@@ -16,6 +16,7 @@ import { craftItem, spawnProtectionOf } from './crafting.ts'
 import { inSpawnProtection } from './stationPlan.ts'
 import { planStep, digHazard, kitOf, lookFor, placeTorch, undergroundNow, DIRS } from './mining.ts'
 import { miningSettings, undergroundRetreat, torchDue, caveHazard, torchCrafts } from './minePlan.ts'
+import { supplyTorches } from './lighting.ts'
 import { getHome, sameDimension } from './navigation.ts'
 import { getFarms } from './food.ts'
 import { bestFood } from './survival.ts'
@@ -51,6 +52,9 @@ export function knownMine (agent: Agent, bot: Bot): MineSite | null {
   const book = siteBook(agent)
   return pickMine(getMines(agent), home && sameDimension(bot, home) ? home : null, s.radius, bot.game?.dimension, id => book.isBad('mine', id))
 }
+
+/** Torches it makes for a trip down before it leaves home (fewer when it can't make more). */
+const MINE_TORCHES = 16
 
 /** A known mine that is lit (night trips go only down a lit mine). */
 export function knownLitMine (agent: Agent, bot: Bot): MineSite | null {
@@ -208,6 +212,12 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
     if (r.ok) notes.push('made a spare stone pickaxe')
   }
   if (!bot.inventory.items().some(i => i.name === 'stick')) await ensureSticks(bot, signal, 4).catch(() => false)
+  // torches for the stairs before going down, at home where the furnace is: charcoal from logs
+  // when there is no coal (a dark first mine is what kept night trips from ever qualifying)
+  if (ms.torches && (inventoryCounts(bot).torch ?? 0) < MINE_TORCHES) {
+    const t = await supplyTorches(bot, signal, log, MINE_TORCHES).catch(e => { checkAborted(signal); return fail((e as Error).message) })
+    if (typeof t === 'number') { if (t > 0) notes.push(`${t} torches for the stairs`) } else log.debug('mine: no torches made', { why: t.message })
+  }
 
   // walk to the entrance, then down to where it left off
   const goTo = async (p: P, range: number, ms = 45_000) => {

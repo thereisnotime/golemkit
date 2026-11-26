@@ -237,8 +237,10 @@ flowchart TD
 - A mine with a torch every ~8 stair steps counts as **lit**: with `mine.atNight` (on) the gear need
   may go down it at night.
 - With no mine yet, `mine.startAtNight` (on) lets a night trip start the first one when the bot
-  carries 8 torches or can make them (coal or charcoal and sticks, 4 torches each). It lights the
-  stairs as it digs, so the next night it is a lit mine. A known mine that isn't lit still waits for
+  carries 8 torches or can make them (coal, or charcoal smelted from logs it carries, and sticks;
+  4 torches each). It lights the stairs as it digs, so the next night it is a lit mine.
+- Before every trip down, at home, `dig_mine` makes torches up to 16 the way `light_up` does
+  (coal, else charcoal from logs in the furnace), so a first mine doesn't start dark. A known mine that isn't lit still waits for
   the day.
 - A surface search for iron that turns back at sunset goes on to the mine (when night trips may go)
   instead of home: the mine is near home and underground, so the light doesn't matter there.

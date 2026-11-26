@@ -252,7 +252,7 @@ function blockNear (bot: Bot, name: string, range: number): boolean {
 }
 
 /** Craft and smelt until it has `want` torches or can't make more. Returns the torches in hand, or a failure. */
-async function supplyTorches (bot: Bot, signal: AbortSignal, log: { debug: (m: string, f?: Record<string, unknown>) => void }, want: number): Promise<number | ActionResult> {
+export async function supplyTorches (bot: Bot, signal: AbortSignal, log: { debug: (m: string, f?: Record<string, unknown>) => void }, want: number): Promise<number | ActionResult> {
   let last = ''
   for (let i = 0; i < 12; i++) {
     checkAborted(signal)

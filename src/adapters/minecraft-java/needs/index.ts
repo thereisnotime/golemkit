@@ -9,7 +9,8 @@ import type { NeedsProvider, NeedDef, NpcContext } from '../../../brains/npc/ind
 import { runtimeFor } from '../../../brains/behaviors/actions.ts'
 import { gearUrgency, suppliesUrgency, ironWanted, type GearState } from '../../../skills/needPlan.ts'
 import { stairMineConfig, knownMine, knownLitMine, lastMineTrip } from '../../../skills/stairMine.ts'
-import { mineTripDue, nightMineOk, turnedBackForLight } from '../../../skills/stairMinePlan.ts'
+import { mineTripDue, nightMineOk, turnedBackForLight, NIGHT_START_TORCHES } from '../../../skills/stairMinePlan.ts'
+import { torchSupplyStep } from '../../../skills/lightPlan.ts'
 import { torchCrafts } from '../../../skills/minePlan.ts'
 import { inventoryCounts } from '../../../skills/toolkit.ts'
 import { BUCKET_NEED } from '../behaviors/tools.ts'
@@ -65,7 +66,10 @@ export function minecraftNeeds (agent: Agent): NeedsProvider {
     const s = stairMineConfig(agent)
     const known = knownMine(agent, b)
     const inv = inventoryCounts(b)
-    return nightMineOk({ known: !!known, lit: !!knownLitMine(agent, b), torches: (inv.torch ?? 0) + 4 * torchCrafts(inv), startAtNight: s.startAtNight })
+    // torches carried, or the ones dig_mine makes before going down (coal or charcoal from logs)
+    const step = torchSupplyStep(inv, NIGHT_START_TORCHES, { furnaceNear: true, tableNear: true })
+    const torches = step.do === 'ready' ? step.torches : step.do === 'stuck' ? (inv.torch ?? 0) : Math.max(NIGHT_START_TORCHES, (inv.torch ?? 0) + 4 * torchCrafts(inv))
+    return nightMineOk({ known: !!known, lit: !!knownLitMine(agent, b), torches, startAtNight: s.startAtNight })
   }
   const gear = cached(10_000, (ctx) => {
     const b = bot(ctx)
