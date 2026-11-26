@@ -61,12 +61,12 @@ hostile), the chore or search drops out and that behaviour takes over.
 |---|---|---|---|
 | `safety` | the blackboard's danger, or low health (8 or less) | stay_safe, avoid_mobs, bodyguard, guard_owner | - |
 | `food` | the hunger need (food bar) | keep_fed, farm_setup, farm_loop | - (keep_fed has its own food ladder) |
-| `gear` | no weapon or pickaxe 0.8, a pickaxe below the target tier 0.5, other tools 0.35, armour 0.3 + 0.075 per missing slot | keep_tools_upgraded | iron ore with an open face |
+| `gear` | no weapon or pickaxe 0.8, a pickaxe below the target tier 0.5, other tools 0.35, armour 0.3 + 0.075 per missing slot, a bucket 0.35 (0.6 while the blackboard need `bucket` is set), a shield 0.3 | keep_tools_upgraded | iron ore with an open face, else its staircase mine |
 | `supplies` | wood under half of chop_wood_loop's `keep` 0.4 (none 0.6), stored food under `inventoryMemory.lowFood` 0.5, a farm with under 4 seeds 0.3 | chop_wood_loop, deposit_when_full, check_storage, farm_setup | - |
 | `rest` | night: 0.8 away from home, 0.5 at home; dusk: half the tiredness | sleep_at_night, keep_spawn_bed, return_home | - |
 
-"Geared up" is keep_tools_upgraded's target when it is armed (Pax: iron tools and iron armour),
-otherwise iron tools. A need is **active** when one of its serving behaviours is in the set, or
+"Geared up" is keep_tools_upgraded's target when it is armed (Pax: iron tools, a bucket, a shield
+and iron armour), otherwise iron tools. A need is **active** when one of its serving behaviours is in the set, or
 when the profile switches it on (`needs: { gear: true }`); `false` switches it off.
 
 While an active need's urgency is at or above its `threshold` (0.5), every serving behaviour that
@@ -77,17 +77,36 @@ needs on one behaviour: the larger boost counts.
 
 The gear search runs when the gear need is urgent, keep_tools_upgraded scores 0 (nothing it can
 do from here: no ore in sight, or safe mining said not ready for the deep ore), nothing else
-scores above 15, it is day, the bot has a stone pickaxe or better and digging is on:
+scores above 15, it is day (or night with a lit mine, below), the bot has a stone pickaxe or
+better, digging is on and iron (tools, armour, a bucket, a shield) is what is missing:
 
-1. a [trip](./behaviors#trips): food from the pantry, a weapon, enough health; turned back when
-   food or daylight runs short;
-2. `find_target iron exposed=true go=true` within `needs.search.radius` (160) blocks and
-   `minutes` (6): what it sees, then `found:iron` from memory, then a spiral scout on the surface
-   that skips protected areas, danger zones and water. Only ore with an open face within
-   `mining.safeDepth` (8) of the surface counts (a cliff, a shallow cave), so it is ore it may mine;
-3. `upgrade_tools` at the find, under the [safe-mining](./progression#safe-mining) rules (deeper
-   than `mining.safeDepth` only when ready), with the air reflex and climb-out as always;
-4. `go_home`.
+1. by day, a [trip](./behaviors#trips): food from the pantry, a weapon, enough health; turned back when
+   food or daylight runs short, and `find_target iron exposed=true go=true` within
+   `needs.search.radius` (160) blocks and `minutes` (6): what it sees, then `found:iron` from
+   memory, then a spiral scout on the surface that skips protected areas, danger zones and water.
+   Only ore with an open face within `mining.safeDepth` (8) of the surface counts (a cliff, a
+   shallow cave), so it is ore it may mine. Found: `upgrade_tools` there under the
+   [safe-mining](./progression#safe-mining) rules, then home. Skipped once its mine reached depth;
+2. nothing found (or skipped), and a mine trip is due (`mine.enabled`, `mine.cooldownMinutes` since the
+   last one): home, `prepare_trip` (pantry food, a weapon), then
+   [`dig_mine`](./progression#the-staircase-mine) for the raw iron the [iron chain](./progression#the-iron-chain)
+   still needs (3 to 32): its staircase mine near home, down to y 16, branches, the ore in the walls,
+   back up;
+3. home, and `upgrade_tools` with keep_tools_upgraded's target: smelt (furnace by home) and craft
+   pickaxe, bucket, shield, armour, tools.
+
+At night the search may still run when it knows a lit mine near home and `mine.atNight` is on
+(`NeedSearch.night`); then it skips the surface leg and goes down the mine.
+
+```mermaid
+flowchart TD
+  G(["gear need urgent,<br/>nothing in sight"]) --> N{"day?"}
+  N -->|yes| F["find_target iron<br/>exposed, 160 blocks"]
+  N -->|"night, lit mine"| M
+  F -->|found| U
+  F -->|nothing| M["dig_mine: its staircase mine<br/>(raw iron the chain needs)"]
+  M --> U["home: smelt, craft<br/>pickaxe, bucket, shield,<br/>armour, tools"]
+```
 
 What it found stays remembered as `found:iron` and is checked first next time. Each need searches
 at most once every `cooldownMinutes` (30) and `perDay` (6) times a day; the searches are kept in
@@ -106,6 +125,7 @@ twice `idle.radius` (48 blocks).
 | spawn bed | within 64 blocks | the bed is gone | keep_spawn_bed puts a new one down |
 | own and configured chests | within 64 blocks | no chest, barrel or shulker box there | deposit_when_full places a new one when needed; configured ones are left to the owner |
 | home | within 64 blocks | lava (unsafe), under water (flooded), buried | the owner is told; home stays where they set it |
+| mine (`mine:N`) | within 48 blocks | water in the first stair steps (flooded), lava (unsafe), the stairs filled in (gone); the walk down failed 3 times (unreachable) | skipped; the next trip digs a new one |
 
 Flooded, gone and unsafe mark a site bad at once; unreachable and no work after `sites.failures`
 (3) checks in a row, each site checked at most every `sites.checkMinutes` (5). A bad site is kept

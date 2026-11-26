@@ -22,17 +22,24 @@ flowchart TD
   WP --> COB
   SW --> COB["mine cobblestone<br/>3 per pickaxe/axe,<br/>1 shovel, 2 sword"]
   COB --> STONE["stone tools"]
-  STONE --> FURN["furnace<br/>8 cobblestone"]
-  STONE --> ORE{"iron ore seen?<br/>(deep only when ready,<br/>see safe mining)"}
-  ORE -->|no| STOPS(["stays on stone"])
+  STONE --> FURN["furnace<br/>8 cobblestone,<br/>put down by home"]
+  STONE --> ORE{"iron ore with an<br/>open face in sight?"}
   ORE -->|yes| RAW["mine raw iron<br/>(stone pickaxe)"]
+  ORE -->|no| SEARCH["gear need: find_target<br/>iron within 160 blocks<br/>(by day)"]
+  SEARCH -->|found| RAW
+  SEARCH -->|nothing| MINE["staircase mine near home<br/>down to y 16, branches,<br/>ore in the walls, back up"]
+  MINE --> RAW
   RAW --> FUEL{"coal?"}
   FUEL -->|yes| SMELT["smelt iron"]
   FUEL -->|"no, ≤ 3<br/>raw iron"| PLANKS["burn planks"] --> SMELT
-  FUEL -->|"no, more"| CHAR["logs →<br/>charcoal"] --> SMELT
+  FUEL -->|"no, more"| CHAR["logs →<br/>charcoal<br/>(planks last)"] --> SMELT
   FURN --> SMELT
-  SMELT --> IRON["iron tools<br/>pickaxe first,<br/>armour optional"]
-  IRON --> DIA{"diamonds?"}
+  SMELT --> PICK["iron pickaxe"]
+  PICK --> BUCKET["bucket<br/>(first while something<br/>needs water)"]
+  BUCKET --> SHIELD["shield"]
+  SHIELD --> ARM["iron chestplate, leggings,<br/>helmet, boots<br/>(armour: true)"]
+  ARM --> TOOLS["iron sword, axe, shovel"]
+  TOOLS --> DIA{"diamonds?<br/>(seen from the mine<br/>with an iron pickaxe)"}
   DIA -->|yes| DT["diamond tools"]
   DIA -->|no| STOPI(["stays on iron"])
 
@@ -40,10 +47,10 @@ flowchart TD
   classDef prof fill:#dcfce7,stroke:#16a34a,color:#14532d
   classDef vari fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
   classDef inst fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-  class START,STOPS,STOPI cmd
+  class START,STOPI cmd
   class LOGS,WP,COB,STONE,CHEST,SW prof
-  class NEED inst
-  class FURN,RAW,SMELT,PLANKS,CHAR,IRON vari
+  class NEED,SEARCH,MINE inst
+  class FURN,RAW,SMELT,PLANKS,CHAR,PICK,BUCKET,SHIELD,ARM,TOOLS vari
   class ORE,FUEL,DIA,DT inst
 ```
 
@@ -52,6 +59,33 @@ in `src/skills/progression.ts`. It returns one step (`craft`, `gather`, `craft_f
 `smelt`, `creative_get`) or nothing, and is unit tested. A step it can't do (no iron ore seen)
 ends the plan, so the bot stops at the best tier it can reach and says so. In creative mode it
 takes the tools with `creative_get` and never gathers.
+
+### The iron chain
+
+Iron goes, in order (`ironChain` in `src/skills/progression.ts`, unit tested):
+
+1. the iron pickaxe (3 ingots): it mines diamonds and it is the tool a mine wears out;
+2. a bucket (3) with `bucket` (keep_tools_upgraded: on by default): water for a farm where the water
+   near home froze, and the water clutch. While the blackboard need `bucket` is set (any behaviour
+   can set it: `ctx.bb.setNeed('bucket', 1)`, exported as `BUCKET_NEED` from
+   `behaviors/tools.ts`) the bucket comes before the pickaxe and the [gear need](./needs-and-idle#needs)
+   is urgent (0.6). A water or lava bucket counts;
+3. a shield (1 ingot, 6 planks of one kind) with `shield` (on by default);
+4. with `armour`: chestplate (8), leggings (7), helmet (5), boots (4), the most protection per
+   ingot first. Any iron, diamond or netherite piece, carried or worn, covers its slot;
+5. the other tools below iron: sword (2), axe (3), shovel (1).
+
+Ingots wait for the next item in line while more iron is to be had (raw iron to smelt, ore in sight,
+prospecting); with no more iron to be had they go to the first item further down they pay for, so 2
+ingots and no ore become a shield, not a sword. Worn armour and the shield in the offhand count as
+held (they are not in `inventory.items()`, which made the planner want a second helmet before).
+Safe mining's shield-first rule (below) still turns the very first ingot into a shield when
+`mining.gear` asks for one.
+
+**Smelting.** Coal, then charcoal from logs (burnt with planks), then planks as the last resort for
+any batch. The furnace it puts down is remembered as the place `furnace`; with no furnace within 32
+blocks it walks to that one (within 128 blocks, forgotten when it is gone), else home first, so the
+furnace goes by home and not at the bottom of a mine.
 
 Tool kinds go pickaxe, sword, axe, shovel at every tier: combat (the techniques, `defend`,
 bodyguard) assumes a sword, so the stone sword comes right after the stone pickaxe, and a bot
@@ -146,6 +180,65 @@ settings:
   mining: { gear: shield_or_armour, minFood: 4, retreatBelow: 12, retreatHostiles: 2 }
 ```
 
+## The staircase mine
+
+Pax lives on a frozen lake: no iron ore with an open face within 160 blocks of its fortress, and
+safe mining keeps it out of caves without armour. A player there digs their own mine, and so does
+the bot (`dig_mine`, `src/skills/stairMine.ts`; the decisions are the pure `src/skills/stairMinePlan.ts`,
+`test/stair-mine.test.ts`).
+
+```mermaid
+flowchart TD
+  R{"ready for its own mine?<br/>weapon, mining.minFood food,<br/>mine.minHealth health,<br/>mine.gear (none)"} -->|no| NR(["not ready: food 2/4<br/>(data.need)"])
+  R -->|yes| K{"a mine it knows<br/>near home, not bad?"}
+  K -->|no| E["entrance: within mine.radius (32)<br/>of home, 8+ out, dry (no water, ice,<br/>lava), no roof, no farm, not protected,<br/>4 safe steps down"]
+  K -->|yes| W["walk to the entrance,<br/>down the stairs to the face"]
+  E --> D
+  W --> M
+  D["stairs: 1 wide, 2 high, 45°<br/>(planStep: never straight down,<br/>no lava/water/caves next to it)"] -->|"y > mine.depthY"| D
+  D -->|"at y 16"| M["main tunnel, a branch pair<br/>every 4 blocks, 12 long"]
+  M --> O["ore in the walls and its vein:<br/>iron, coal, copper,<br/>diamonds with an iron pickaxe"]
+  O --> M
+  D & M --> L{"limit?<br/>got what it came for, 15 min,<br/>inventory, food, pickaxe,<br/>hurt or hostiles"}
+  L -->|yes| UP["back up the stairs<br/>(waypoints if the path fails),<br/>mine saved"]
+```
+
+- **Readiness** is its own: a weapon (`mining.needWeapon`), `mining.minFood` food, `mine.minHealth`
+  (14) health and the gear `mine.gear` asks for, `none` by default. A tunnel it digs never opens
+  into a cave, which is what `mining.gear` guards against, so Pax (`mining.gear: shield_or_armour`)
+  may go down its own mine with stone tools and no armour, but still not into a cave.
+- **Where:** the nearest spot to home that passes every check: within `mine.radius` (32) and at
+  least `mine.minFromHome` (8) from home, no water, ice or lava within 3 blocks, nothing solid
+  overhead, not on a farm, not in a protected area or spawn protection, and the first 4 steps down
+  plan safely. On Pax's frozen lake that rules out the shore and picks dry snow ground.
+- **Down:** the staircase step of the strip miner (`planStep`), checked the same way: never under
+  its own feet, nothing next to lava or water, no gravel or sand overhead, a solid floor, no cave
+  next to a dug block; an unsafe step tries a flat step, then the other directions. The stairs go
+  to `mine.depthY` (16; deepslate starts below 0), at least 6 above the world floor.
+- **At depth:** a main tunnel in the stairs' direction with a branch on each side every
+  `mine.branchSpacing + 1` (4) blocks, `mine.branchLength` (12) long, at most `mine.maxBranches`
+  (6) pairs a trip. After every step it mines the wanted ore touching the tunnel and the rest of
+  each vein (`mine.ores`: iron, coal, copper, diamond; each needs its pickaxe tier), unless the ore
+  touches lava or water or would open a cave.
+- **On the way:** a torch every `mining.torchEvery` (8) steps where it is dark (crafted from the coal
+  it mines), eating at food 15 (so the eat reflex doesn't take the body), a broken pickaxe re-made
+  from cobblestone, a spare stone pickaxe made before it goes down. Junk (dirt, granite, diorite,
+  andesite, tuff, gravel, cobblestone over `mine.keepCobble`) is dropped at the end of a branch,
+  where the walk back doesn't pick it up again.
+- **Back up** when it has the raw iron it came for, after `mine.minutes` (15), with fewer than
+  `mine.minFreeSlots` (3) free slots, out of food or pickaxes, or when safe mining's underground
+  retreat says so (`mining.retreatBelow` health, `mining.retreatHostiles` hostiles, air). It walks
+  up the stairs in one path, else stand by stand the way it came.
+- **Remembered** in storage (`mines`): entrance, direction, the foot of the stairs, the face, every
+  4th stair step, branches, torches, what it got. The next trip (`mine.cooldownMinutes`, 20, after
+  the last) walks down to the face and carries on; a new mine only when none is known or the known
+  one went bad. The [site check](./needs-and-idle#site-health) `mine` marks it flooded (water in the
+  first steps), unsafe (lava) or gone (filled in), and unreachable when the walk down fails 3 times.
+- A mine with a torch every ~8 stair steps counts as **lit**: with `mine.atNight` (on) the gear need
+  may go down it at night.
+
+`!dig_mine ore=iron count=9` runs it by hand; `fresh=true` starts a new mine.
+
 ### Ore trips
 
 When `keep_tools_upgraded` (or anything else that isn't an owner) runs `upgrade_tools` and the
@@ -183,7 +276,8 @@ until the iron tools and armour are done.
 |---|---|---|
 | `upgrade_tools` action | asked for (`!upgrade_tools up_to=iron`, or the LLM) | everything it can do now, up to `up_to` |
 | automatic cheap upgrades | before `gather_materials`, `collect` of stone and every `chop_tree` | stone tools (3 cobblestone + 2 sticks each) once a pickaxe exists; iron only when the iron is already in hand |
-| `keep_tools_upgraded` behaviour | idle, armed in the [profile](/guide/profiles) | re-crafts a worn tool (`minDurability`), then upgrades up to `upTo`, and makes iron armour after the iron tools with `armour: true` |
+| `keep_tools_upgraded` behaviour | idle, armed in the [profile](/guide/profiles) | re-crafts a worn tool (`minDurability`), then upgrades up to `upTo` along [the iron chain](#the-iron-chain): pickaxe, bucket (`bucket`, default on), shield (`shield`, default on), iron armour with `armour: true`, then the other tools |
+| gear need search | nothing scores, gear urgent, no ore in sight | exposed ore within `needs.search.radius` by day, else [its staircase mine](#the-staircase-mine), then smelts and crafts at home ([needs](./needs-and-idle#going-looking)) |
 
 Pax arms it in `profiles/pax.yaml`:
 

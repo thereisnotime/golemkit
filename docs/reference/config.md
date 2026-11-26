@@ -121,6 +121,7 @@ table; the same keys work in the profile under `settings:` and live with `!confi
 |---|---|---|
 | `settings.combat` | the `combat.*` toggles: mob fight techniques (all on, `maxChase` 16) and [PvP](../concepts/world#pvp) (`pvp: off`, `friends`, `targets`, `revengeMinutes`, `pvpEngage`, ...) | PvP `off` |
 | `settings.mining` | the `mining.*` toggles: [safe mining](../guide/progression#safe-mining) readiness depth, weapon, food, gear, climb-out thresholds, torches | `safe: true`, `safeDepth: 8`, `minFood: 3`, `gear: none`, `retreatBelow: 10`, `retreatHostiles: 2` |
+| `settings.mine` | the `mine.*` toggles: [the staircase mine](../guide/progression#the-staircase-mine) near home: depth, where the entrance goes, trip length, branches, cooldown, night trips, gear, ores | `enabled: true`, `depthY: 16`, `radius: 32`, `minFromHome: 8`, `minutes: 15`, `branchLength: 12`, `branchSpacing: 3`, `maxBranches: 6`, `minFreeSlots: 3`, `cooldownMinutes: 20`, `atNight: true`, `gear: none`, `minHealth: 14`, `keepCobble: 64`, `ores: [iron, coal, copper, diamond]` |
 | `settings.trips` | the `trips.*` toggles: [trips](../guide/behaviors#trips) top-up and turn-back rules | `enabled: true`, `food: 8`, `minFood: 4`, `minHealth: 12`, `turnBackAt: 0.5` |
 | `settings.storage.chests` | chests the bot may take from as its own, as `[x, y, z]`, `{ x, y, z }`, `"x y z"` or `{ at: [x, y, z], role: pantry \| storage \| gear }`; without roles the first is the pantry (food only) and the others storage ([chest roles](/guide/search#chest-roles)) | none |
 | `settings.inventoryMemory` | [container memory](../guide/search#container-memory): `true`/`false` or `{ enabled, maxAgeHours, refreshMinutes, indexOwn, radius, lowFood, grumble, grumbleTo, grumbleHours }` | `enabled: false`, `maxAgeHours: 24`, `indexOwn: false` |
@@ -130,7 +131,7 @@ table; the same keys work in the profile under `settings:` and live with `!confi
 | `settings.world.viewDistance` | chunks around the bot the client asks the server for: `tiny` (6), `short` (8), `normal` (10), `far` (12) or 2–32; the server caps it at its own `view-distance`. Fewer chunks use less memory but the bot sees less far ([memory](../guide/deployment#memory)) | `far` |
 | `settings.road`, `settings.build`, `settings.world.spawnProtection` | [roads](../guide/roads), creative builds, spawn-protection radius | see the toggles |
 
-Unknown keys under `settings.combat`, `settings.mining`, `settings.trips`,
+Unknown keys under `settings.combat`, `settings.mining`, `settings.mine`, `settings.trips`,
 `settings.inventoryMemory`, `settings.status` and `settings.farming` are ignored with a warning (`profiles/pax.yaml: unknown key
 settings.mining.depth (ignored)`), as are unknown top-level keys and unknown keys in the other
 declared blocks; see [Profiles](../guide/profiles#format). Other `settings` maps are not checked.

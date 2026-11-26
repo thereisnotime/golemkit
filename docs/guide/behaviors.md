@@ -1881,7 +1881,9 @@ Keeps tools usable and moving up the tiers when the bot is idle: re-crafts a wor
 |---|---|---|---|
 | `upTo` | `stone` \| `iron` \| `diamond` | `"iron"` | highest tier to work towards |
 | `minDurability` | number (0..0.9) | `0.1` | replace a tool when less than this share of its durability is left |
-| `armour` | boolean | `false` | also make iron armour once iron tools are done |
+| `armour` | boolean | `false` | also make iron armour (chestplate, leggings, helmet, boots) after the iron pickaxe, bucket and shield |
+| `bucket` | boolean | `true` | make a bucket right after the iron pickaxe (first of all while the blackboard need `bucket` is set) |
+| `shield` | boolean | `true` | make a shield after the bucket |
 | `senseSeconds` | number (5..600) | `30` | how often to look around for stone and ore (the scan costs CPU) |
 | `safeMining` | boolean | `true` | safe mining (settings.mining): ore deeper than mining.safeDepth only with a weapon, food and the gear mining.gear asks for; no caves, torches, climb out when losing underground |
 

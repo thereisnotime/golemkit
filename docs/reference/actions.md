@@ -10,7 +10,7 @@ scopeNote: "Generated from the skills: most are Minecraft; the journal and confi
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-28 skills, 124 actions.
+28 skills, 125 actions.
 
 ## blueprint-library
 
@@ -1051,10 +1051,25 @@ Upgrade tools as far as possible right now: wooden pickaxe -> stone tools (mines
 | param | type | required | default | description |
 |---|---|---|---|---|
 | `up_to` | `stone` \| `iron` \| `diamond` |  | `"iron"` | highest tier to aim for |
-| `armour` | boolean |  | `false` | also make iron armour once iron tools are done |
+| `armour` | boolean |  | `false` | also make iron armour (chestplate, leggings, helmet, boots) after the iron pickaxe |
+| `bucket` | boolean |  | `false` | also make a bucket right after the iron pickaxe |
+| `shield` | boolean |  | `false` | also make a shield (1 iron ingot, 6 planks) after the bucket |
 | `kinds` | array |  |  | tool kinds to upgrade; default pickaxe, sword, axe, shovel |
 | `prospect` | boolean |  | `true` | when no iron ore is in sight, dig a staircase and strip mine to look for some |
 | `safe` | boolean |  | `true` | safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground |
+
+### `dig_mine`
+
+Go mining in its own staircase mine near home: a 1-wide, 2-high staircase at 45 degrees from a dry, unprotected spot near home (never straight down, never next to lava or water, never into a cave) down to settings.mine.depthY (16: iron depth), then a main tunnel with side branches, mining the iron, coal, copper (and diamonds with an iron pickaxe) it sees in the walls, torches on the way, and back up the stairs when it has what it came for, the time is up, the inventory is full, food or the pickaxe run out, or it gets hurt. The mine is remembered: the next trip carries on where this one stopped.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `ore` | `iron` \| `coal` \| `copper` \| `diamond` \| `gold` \| `redstone` \| `lapis` |  | `"iron"` | what it goes for (it stops once it has `count` of it) |
+| `count` | integer (0..256) |  | `0` | how many of that ore to bring (raw iron, coal...); 0 = until the time, inventory or tools run out |
+| `max_minutes` | number (1..60) |  |  | time down there at most (default settings.mine.minutes, 15) |
+| `fresh` | boolean |  | `false` | start a new mine even when it knows one |
 
 ## recovery
 

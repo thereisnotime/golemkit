@@ -77,6 +77,21 @@ can't change their own.
 | `mining.hostileRadius` | 2–32 | underground: how close a hostile counts for `mining.retreatHostiles`, in blocks (default 8) |
 | `mining.torches` | on/off | light tunnels, crafting torches from coal or charcoal and sticks (default on) |
 | `mining.torchEvery` | 1–64 | a torch every this many tunnel steps (default 8) |
+| `mine.enabled` | on/off | [the staircase mine](./progression#the-staircase-mine): dig one near home when the gear need finds no iron ore with an open face (default on) |
+| `mine.depthY` | -58–120 | the stairs go down to this y (default 16, iron depth) |
+| `mine.radius` | 4–128 | the entrance is within this many blocks of home (default 32) |
+| `mine.minFromHome` | 0–64 | ...and at least this far from home (default 8) |
+| `mine.minutes` | 1–60 | one trip down lasts at most this long (default 15) |
+| `mine.branchLength` | 1–64 | side branches off the main tunnel (default 12) |
+| `mine.branchSpacing` | 1–16 | solid blocks between two branches (default 3) |
+| `mine.maxBranches` | 0–64 | branch pairs per trip (default 6) |
+| `mine.minFreeSlots` | 1–30 | head back up with fewer free slots than this (default 3) |
+| `mine.cooldownMinutes` | 0–1440 | minutes between two trips down (default 20) |
+| `mine.atNight` | on/off | go down a lit mine at night too (default on) |
+| `mine.gear` | none / shield_or_armour / armour | gear needed for its own mine (default none; `mining.gear` is for caves) |
+| `mine.minHealth` | 0–20 | health needed to go down (default 14) |
+| `mine.keepCobble` | 0–2304 | cobblestone kept on a trip; more is dropped at the end of a branch (default 64) |
+| `mine.ores` | list | ores mined in the walls (default iron, coal, copper, diamond; also gold, redstone, lapis, emerald) |
 | `askHelp.enabled` | on/off | when a behaviour keeps failing the same way, tell the owners once what it was trying, why it fails and what would help ([asking for help](./behaviors#asking-for-help); default off) |
 | `askHelp.failures` | 1–100 | failures of the same kind before it asks (default 3) |
 | `askHelp.minutes` | 0–1440 | ...spread over at least this many minutes (default 10) |
