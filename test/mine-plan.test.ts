@@ -140,7 +140,7 @@ test('nextToolUpgrade with safe mining: no prospecting or deep ore when not read
   assert.deepEqual([g.do, (g as any).item], ['gather', 'raw_iron'])
   // shield_or_armour: the first ingot becomes a shield before the iron pickaxe
   const sh = nextToolUpgrade({ ...stone, iron_ingot: 1 }, {}, S, { mining: { ready: false, shieldFirst: true } })!
-  assert.deepEqual([sh.do, (sh as any).item, (sh as any).kind], ['craft', 'shield', 'armour'])
+  assert.deepEqual([sh.do, (sh as any).item, (sh as any).kind], ['craft', 'shield', 'item'])
   const pick = nextToolUpgrade({ ...stone, iron_ingot: 3, shield: 1 }, {}, S, { mining: { ready: true, shieldFirst: false } })!
   assert.equal((pick as any).item, 'iron_pickaxe')
   // no planks for the shield: on to the tools

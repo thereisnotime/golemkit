@@ -2659,6 +2659,7 @@
       "blueprint_rename",
       "gather_materials",
       "upgrade_tools",
+      "dig_mine",
       "pickup_items",
       "we_status",
       "we_select",
@@ -5533,7 +5534,17 @@
             },
             "armour": {
               "default": false,
-              "description": "also make iron armour once iron tools are done",
+              "description": "also make iron armour (chestplate, leggings, helmet, boots) after the iron pickaxe",
+              "type": "boolean"
+            },
+            "bucket": {
+              "default": false,
+              "description": "also make a bucket right after the iron pickaxe",
+              "type": "boolean"
+            },
+            "shield": {
+              "default": false,
+              "description": "also make a shield (1 iron ingot, 6 planks) after the bucket",
               "type": "boolean"
             },
             "kinds": {
@@ -5558,6 +5569,50 @@
             "safe": {
               "default": true,
               "description": "safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
+        "name": "dig_mine",
+        "description": "Go mining in its own staircase mine near home: a 1-wide, 2-high staircase at 45 degrees from a dry, unprotected spot near home (never straight down, never next to lava or water, never into a cave) down to settings.mine.depthY (16: iron depth), then a main tunnel with side branches, mining the iron, coal, copper (and diamonds with an iron pickaxe) it sees in the walls, torches on the way, and back up the stairs when it has what it came for, the time is up, the inventory is full, food or the pickaxe run out, or it gets hurt. The mine is remembered: the next trip carries on where this one stopped.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "ore": {
+              "default": "iron",
+              "description": "what it goes for (it stops once it has `count` of it)",
+              "type": "string",
+              "enum": [
+                "iron",
+                "coal",
+                "copper",
+                "diamond",
+                "gold",
+                "redstone",
+                "lapis"
+              ]
+            },
+            "count": {
+              "default": 0,
+              "description": "how many of that ore to bring (raw iron, coal...); 0 = until the time, inventory or tools run out",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 256
+            },
+            "max_minutes": {
+              "description": "time down there at most (default settings.mine.minutes, 15)",
+              "type": "number",
+              "minimum": 1,
+              "maximum": 60
+            },
+            "fresh": {
+              "default": false,
+              "description": "start a new mine even when it knows one",
               "type": "boolean"
             }
           }
@@ -6441,7 +6496,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get !status (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get !status (!help <command> for details)"
   },
   "variant:villager": {
     "actions": [
@@ -6530,6 +6585,7 @@
       "blueprint_rename",
       "gather_materials",
       "upgrade_tools",
+      "dig_mine",
       "pickup_items",
       "we_status",
       "we_select",
@@ -9141,7 +9197,17 @@
             },
             "armour": {
               "default": false,
-              "description": "also make iron armour once iron tools are done",
+              "description": "also make iron armour (chestplate, leggings, helmet, boots) after the iron pickaxe",
+              "type": "boolean"
+            },
+            "bucket": {
+              "default": false,
+              "description": "also make a bucket right after the iron pickaxe",
+              "type": "boolean"
+            },
+            "shield": {
+              "default": false,
+              "description": "also make a shield (1 iron ingot, 6 planks) after the bucket",
               "type": "boolean"
             },
             "kinds": {
@@ -9166,6 +9232,50 @@
             "safe": {
               "default": true,
               "description": "safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
+        "name": "dig_mine",
+        "description": "Go mining in its own staircase mine near home: a 1-wide, 2-high staircase at 45 degrees from a dry, unprotected spot near home (never straight down, never next to lava or water, never into a cave) down to settings.mine.depthY (16: iron depth), then a main tunnel with side branches, mining the iron, coal, copper (and diamonds with an iron pickaxe) it sees in the walls, torches on the way, and back up the stairs when it has what it came for, the time is up, the inventory is full, food or the pickaxe run out, or it gets hurt. The mine is remembered: the next trip carries on where this one stopped.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "ore": {
+              "default": "iron",
+              "description": "what it goes for (it stops once it has `count` of it)",
+              "type": "string",
+              "enum": [
+                "iron",
+                "coal",
+                "copper",
+                "diamond",
+                "gold",
+                "redstone",
+                "lapis"
+              ]
+            },
+            "count": {
+              "default": 0,
+              "description": "how many of that ore to bring (raw iron, coal...); 0 = until the time, inventory or tools run out",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 256
+            },
+            "max_minutes": {
+              "description": "time down there at most (default settings.mine.minutes, 15)",
+              "type": "number",
+              "minimum": 1,
+              "maximum": 60
+            },
+            "fresh": {
+              "default": false,
+              "description": "start a new mine even when it knows one",
               "type": "boolean"
             }
           }
@@ -9975,7 +10085,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !status (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !status (!help <command> for details)"
   },
   "profile:apprentice": {
     "actions": [
@@ -11726,6 +11836,7 @@
       "blueprint_rename",
       "gather_materials",
       "upgrade_tools",
+      "dig_mine",
       "pickup_items",
       "we_status",
       "we_select",
@@ -14600,7 +14711,17 @@
             },
             "armour": {
               "default": false,
-              "description": "also make iron armour once iron tools are done",
+              "description": "also make iron armour (chestplate, leggings, helmet, boots) after the iron pickaxe",
+              "type": "boolean"
+            },
+            "bucket": {
+              "default": false,
+              "description": "also make a bucket right after the iron pickaxe",
+              "type": "boolean"
+            },
+            "shield": {
+              "default": false,
+              "description": "also make a shield (1 iron ingot, 6 planks) after the bucket",
               "type": "boolean"
             },
             "kinds": {
@@ -14625,6 +14746,50 @@
             "safe": {
               "default": true,
               "description": "safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground",
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
+        "name": "dig_mine",
+        "description": "Go mining in its own staircase mine near home: a 1-wide, 2-high staircase at 45 degrees from a dry, unprotected spot near home (never straight down, never next to lava or water, never into a cave) down to settings.mine.depthY (16: iron depth), then a main tunnel with side branches, mining the iron, coal, copper (and diamonds with an iron pickaxe) it sees in the walls, torches on the way, and back up the stairs when it has what it came for, the time is up, the inventory is full, food or the pickaxe run out, or it gets hurt. The mine is remembered: the next trip carries on where this one stopped.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "ore": {
+              "default": "iron",
+              "description": "what it goes for (it stops once it has `count` of it)",
+              "type": "string",
+              "enum": [
+                "iron",
+                "coal",
+                "copper",
+                "diamond",
+                "gold",
+                "redstone",
+                "lapis"
+              ]
+            },
+            "count": {
+              "default": 0,
+              "description": "how many of that ore to bring (raw iron, coal...); 0 = until the time, inventory or tools run out",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 256
+            },
+            "max_minutes": {
+              "description": "time down there at most (default settings.mine.minutes, 15)",
+              "type": "number",
+              "minimum": 1,
+              "maximum": 60
+            },
+            "fresh": {
+              "default": false,
+              "description": "start a new mine even when it knows one",
               "type": "boolean"
             }
           }
@@ -15508,6 +15673,6 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get !status (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !mods !mod_items !creative_get !status (!help <command> for details)"
   }
 }

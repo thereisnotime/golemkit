@@ -213,3 +213,33 @@ test('drop watch: notices digging that yields nothing and says why', async () =>
   bot.heldItem = { name: 'stone_pickaxe' }
   assert.equal(harvestProblem(bot, stone), null)
 })
+
+test('ironChain: pickaxe, bucket, shield, chestplate, leggings, helmet, boots, then sword, axe, shovel', async () => {
+  const { ironChain } = await import('../src/skills/progression.ts')
+  const stone = { stone_pickaxe: 1, stone_axe: 1, stone_shovel: 1, stone_sword: 1 }
+  assert.deepEqual(ironChain(stone, undefined, { armour: true, bucket: true, shield: true }).map(w => w.item),
+    ['iron_pickaxe', 'bucket', 'shield', 'iron_chestplate', 'iron_leggings', 'iron_helmet', 'iron_boots', 'iron_sword', 'iron_axe', 'iron_shovel'])
+  // a water bucket counts, worn armour counts (heldCounts), a diamond chestplate covers its slot
+  assert.deepEqual(ironChain({ ...stone, iron_pickaxe: 1, water_bucket: 1, shield: 1, iron_helmet: 1, diamond_chestplate: 1 }, undefined, { armour: true, bucket: true, shield: true }).map(w => w.item),
+    ['iron_leggings', 'iron_boots', 'iron_sword', 'iron_axe', 'iron_shovel'])
+  // the farm needs water now: the bucket goes first
+  assert.deepEqual(ironChain(stone, undefined, { bucket: true, bucketFirst: true }).map(w => w.item).slice(0, 2), ['bucket', 'iron_pickaxe'])
+  assert.deepEqual(ironChain(stone).map(w => w.item), ['iron_pickaxe', 'iron_sword', 'iron_axe', 'iron_shovel'], 'defaults: tools only')
+})
+
+test('nextToolUpgrade: the iron chain in order, ingots kept for the next item while more iron is to be had', () => {
+  const stone = { stone_pickaxe: 1, stone_axe: 1, stone_shovel: 1, stone_sword: 1, oak_planks: 8 }
+  const o = { armour: true, bucket: true, shield: true }
+  const step = (inv: Record<string, number>, nearby = {}) => nextToolUpgrade(inv, nearby, S, o) as any
+  assert.equal(step({ ...stone, iron_ingot: 3 }).item, 'iron_pickaxe')
+  assert.equal(step({ ...stone, iron_pickaxe: 1, iron_ingot: 3 }).item, 'bucket')
+  assert.equal(step({ ...stone, iron_pickaxe: 1, bucket: 1, iron_ingot: 1 }).item, 'shield')
+  assert.equal(step({ ...stone, iron_pickaxe: 1, bucket: 1, shield: 1, iron_ingot: 8 }).item, 'iron_chestplate')
+  // 2 ingots and ore in sight: mine for the bucket rather than spend them on a sword
+  assert.deepEqual([step({ ...stone, iron_pickaxe: 1, iron_ingot: 2 }, { ironOre: true }).do, step({ ...stone, iron_pickaxe: 1, iron_ingot: 2 }, { ironOre: true }).item], ['gather', 'raw_iron'])
+  // ...but with no more iron to be had they go to the first thing they pay for (the shield)
+  assert.equal(step({ ...stone, iron_pickaxe: 1, iron_ingot: 2 }).item, 'shield')
+  // raw iron, a furnace, no coal and no logs: planks burn as the last resort
+  const s = step({ ...stone, raw_iron: 6, oak_planks: 4 }, { furnace: true })
+  assert.deepEqual([s.do, s.fuel], ['smelt', 'planks'])
+})

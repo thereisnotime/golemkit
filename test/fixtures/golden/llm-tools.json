@@ -2677,7 +2677,17 @@
           },
           "armour": {
             "default": false,
-            "description": "also make iron armour once iron tools are done",
+            "description": "also make iron armour (chestplate, leggings, helmet, boots) after the iron pickaxe",
+            "type": "boolean"
+          },
+          "bucket": {
+            "default": false,
+            "description": "also make a bucket right after the iron pickaxe",
+            "type": "boolean"
+          },
+          "shield": {
+            "default": false,
+            "description": "also make a shield (1 iron ingot, 6 planks) after the bucket",
             "type": "boolean"
           },
           "kinds": {
@@ -2702,6 +2712,47 @@
           "safe": {
             "default": true,
             "description": "safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground",
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "name": "dig_mine",
+      "description": "Go mining in its own staircase mine near home: a 1-wide, 2-high staircase at 45 degrees from a dry, unprotected spot near home (never straight down, never next to lava or water, never into a cave) down to settings.mine.depthY (16: iron depth), then a main tunnel with side branches, mining the iron, coal, copper (and diamonds with an iron pickaxe) it sees in the walls, torches on the way, and back up the stairs when it has what it came for, the time is up, the inventory is full, food or the pickaxe run out, or it gets hurt. The mine is remembered: the next trip carries on where this one stopped. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ore": {
+            "default": "iron",
+            "description": "what it goes for (it stops once it has `count` of it)",
+            "type": "string",
+            "enum": [
+              "iron",
+              "coal",
+              "copper",
+              "diamond",
+              "gold",
+              "redstone",
+              "lapis"
+            ]
+          },
+          "count": {
+            "default": 0,
+            "description": "how many of that ore to bring (raw iron, coal...); 0 = until the time, inventory or tools run out",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 256
+          },
+          "max_minutes": {
+            "description": "time down there at most (default settings.mine.minutes, 15)",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "fresh": {
+            "default": false,
+            "description": "start a new mine even when it knows one",
             "type": "boolean"
           }
         }
@@ -6174,7 +6225,17 @@
           },
           "armour": {
             "default": false,
-            "description": "also make iron armour once iron tools are done",
+            "description": "also make iron armour (chestplate, leggings, helmet, boots) after the iron pickaxe",
+            "type": "boolean"
+          },
+          "bucket": {
+            "default": false,
+            "description": "also make a bucket right after the iron pickaxe",
+            "type": "boolean"
+          },
+          "shield": {
+            "default": false,
+            "description": "also make a shield (1 iron ingot, 6 planks) after the bucket",
             "type": "boolean"
           },
           "kinds": {
@@ -6199,6 +6260,47 @@
           "safe": {
             "default": true,
             "description": "safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground",
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "name": "dig_mine",
+      "description": "Go mining in its own staircase mine near home: a 1-wide, 2-high staircase at 45 degrees from a dry, unprotected spot near home (never straight down, never next to lava or water, never into a cave) down to settings.mine.depthY (16: iron depth), then a main tunnel with side branches, mining the iron, coal, copper (and diamonds with an iron pickaxe) it sees in the walls, torches on the way, and back up the stairs when it has what it came for, the time is up, the inventory is full, food or the pickaxe run out, or it gets hurt. The mine is remembered: the next trip carries on where this one stopped. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ore": {
+            "default": "iron",
+            "description": "what it goes for (it stops once it has `count` of it)",
+            "type": "string",
+            "enum": [
+              "iron",
+              "coal",
+              "copper",
+              "diamond",
+              "gold",
+              "redstone",
+              "lapis"
+            ]
+          },
+          "count": {
+            "default": 0,
+            "description": "how many of that ore to bring (raw iron, coal...); 0 = until the time, inventory or tools run out",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 256
+          },
+          "max_minutes": {
+            "description": "time down there at most (default settings.mine.minutes, 15)",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "fresh": {
+            "default": false,
+            "description": "start a new mine even when it knows one",
             "type": "boolean"
           }
         }

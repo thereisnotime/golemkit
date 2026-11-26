@@ -135,7 +135,7 @@ export function inStoneLayer (at: BlockLook, feet: P, dir: { x: number, z: numbe
 
 type Ctx = Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>
 
-function lookFor (bot: Bot): BlockLook {
+export function lookFor (bot: Bot): BlockLook {
   return (p) => {
     const b = bot.blockAt(vec(bot, p.x, p.y, p.z))
     return b ? { name: b.name, solid: b.boundingBox === 'block', ...(typeof (b as any).skyLight === 'number' ? { sky: (b as any).skyLight } : {}) } : null
@@ -203,7 +203,7 @@ export function undergroundNow (bot: Bot, radius: number): { underground: boolea
 }
 
 /** Has (or crafts) a torch and puts it on the tunnel floor at `spot` (an air block with a solid floor). */
-async function placeTorch (bot: Bot, signal: AbortSignal, spot: P): Promise<boolean> {
+export async function placeTorch (bot: Bot, signal: AbortSignal, spot: P): Promise<boolean> {
   let torch = bot.inventory.items().find(i => i.name === 'torch')
   if (!torch) {
     if (torchCrafts(inventoryCounts(bot)) < 1) return false

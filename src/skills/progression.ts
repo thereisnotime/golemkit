@@ -5,7 +5,7 @@
 // gather_materials, collect and big chops call autoUpgrade() first, which only does the
 // cheap steps (stone tools cost 3 cobblestone and 2 sticks once a wooden pickaxe exists).
 import type { ActionContext, ActionResult } from '../core/index.ts'
-import { defineSkill, defineAction, z, ok, fail, checkAborted, needsSurvival } from '../core/index.ts'
+import { defineSkill, defineAction, z, ok, fail, checkAborted, needsSurvival, goals } from '../core/index.ts'
 import { TOOL_SHAPE, toolTier, inventoryCounts, plankUnits, usablePlankUnits, ensureTool, ensurePlanks, type ToolKind, type Tier } from './toolkit.ts'
 import { craftItem, smeltItem } from './crafting.ts'
 import { collectBlocks } from './gather.ts'
@@ -20,12 +20,18 @@ import { plankFuel } from './materials.ts'
 import { loadBlueprints } from './blueprint.ts'
 import { chooseWallMaterial, PLANKS_PER_TREE } from './efficiency.ts'
 import { actionTrip, isTurnBack } from './trip.ts'
+import { digMineAction } from './stairMine.ts'
+import { getPlaces, setPlace, getHome, sameDimension } from './navigation.ts'
+import { gotoWithin, vec } from './world.ts'
 
 export type UpTo = 'stone' | 'iron' | 'diamond'
 const TIER_RANK: Record<string, number> = { none: 0, wooden: 1, stone: 2, iron: 3, diamond: 4, netherite: 5 }
 const HEAD_ITEM: Record<'stone' | 'iron' | 'diamond', string> = { stone: 'cobblestone', iron: 'iron_ingot', diamond: 'diamond' }
 const STONE_HEADS = ['cobblestone', 'cobbled_deepslate', 'blackstone']
 export const ARMOUR: Record<string, number> = { iron_helmet: 5, iron_chestplate: 8, iron_leggings: 7, iron_boots: 4 }
+/** The order iron armour is made in: the most protection per ingot first. */
+export const ARMOUR_ORDER = ['iron_chestplate', 'iron_leggings', 'iron_helmet', 'iron_boots'] as const
+const GOOD_ARMOUR = /^(iron|diamond|netherite)_(helmet|chestplate|leggings|boots)$/
 
 /** What the bot knows about its surroundings (cheap to sense, see senseNearby). */
 export interface Nearby {
@@ -48,7 +54,7 @@ export interface Nearby {
 }
 
 export type UpgradeStep =
-  | { do: 'craft', item: string, kind: ToolKind | 'armour', tier: Tier, why: string }
+  | { do: 'craft', item: string, kind: ToolKind | 'armour' | 'item', tier: Tier, why: string }
   | { do: 'gather', item: 'logs' | 'cobblestone' | 'raw_iron' | 'coal' | 'diamond', count: number, why: string }
   | { do: 'craft_furnace', why: string }
   | { do: 'smelt', input: string, count: number, fuel: string, why: string }
@@ -59,8 +65,14 @@ export interface UpgradeOptions {
   upTo?: UpTo
   /** Tool kinds to keep upgraded, in order. Default pickaxe, sword, axe, shovel. */
   kinds?: ToolKind[]
-  /** Also make iron armour once iron tools are done. Default false. */
+  /** Also make iron armour (chestplate, leggings, helmet, boots). Default false. */
   armour?: boolean
+  /** A bucket right after the iron pickaxe (water for a farm, the water clutch). Default false. */
+  bucket?: boolean
+  /** Something wants the bucket now (the blackboard need `bucket`): it goes first. Default false. */
+  bucketFirst?: boolean
+  /** A shield after the bucket. Default false. */
+  shield?: boolean
   /** No iron ore in sight: dig a staircase and strip to look for some. Default false. */
   prospect?: boolean
   /** Safe mining readiness (settings.mining): not ready means no prospecting and no deep ore; shieldFirst turns the first iron ingot into a shield. */
@@ -146,11 +158,10 @@ export function nextToolUpgrade (inv: Record<string, number>, nearby: Nearby, ga
   }
   if (upTo === 'stone') return null
 
-  // 2. iron: pickaxe first (it unlocks diamonds), then the rest, then armour
-  const wantIron = kinds.filter(k => TIER_RANK[heldTier(inv, k)]! < 3)
-  const armour = opts.armour ? Object.keys(ARMOUR).filter(a => !inv[a]) : []
-  if ((wantIron.length || armour.length) && TIER_RANK[heldTier(inv, 'pickaxe')]! >= 2) {
-    const step = ironStep(inv, nearby, wantIron, armour, trees, stoneNear, !!opts.prospect && opts.mining?.ready !== false, !!opts.mining?.shieldFirst)
+  // 2. iron, in the order ironChain gives: pickaxe, bucket, shield, armour, the other tools
+  const chain = ironChain(inv, kinds, opts)
+  if (chain.length && TIER_RANK[heldTier(inv, 'pickaxe')]! >= 2) {
+    const step = ironStep(inv, nearby, chain, trees, stoneNear, !!opts.prospect && opts.mining?.ready !== false, !!opts.mining?.shieldFirst)
     if (step) return step
   }
   if (upTo === 'iron') return null
@@ -166,22 +177,60 @@ export function nextToolUpgrade (inv: Record<string, number>, nearby: Nearby, ga
   return null
 }
 
-function ironStep (inv: Record<string, number>, nearby: Nearby, kinds: ToolKind[], armour: string[], trees: boolean, stoneNear: boolean, prospect: boolean, shieldFirst: boolean): UpgradeStep | null {
+/** One thing the iron chain still wants: what, the ingots it takes, and how it is crafted. */
+export interface IronWant { item: string, ingots: number, kind: ToolKind | 'armour' | 'item' }
+
+/** Whether an armour slot is covered by an iron-or-better piece held or worn. */
+function slotCovered (inv: Record<string, number>, piece: string): boolean {
+  const slot = piece.split('_')[1]!
+  return Object.keys(inv).some(k => (inv[k] ?? 0) > 0 && GOOD_ARMOUR.test(k) && k.endsWith(`_${slot}`))
+}
+
+/**
+ * What the iron tier still wants, in the order it is made. Pure. The iron pickaxe first (it
+ * mines diamonds and is the tool the mine wears out), then a bucket (water for a farm where the
+ * water froze, the water clutch), a shield, armour by protection per ingot (chestplate, leggings,
+ * helmet, boots), then the other tool kinds (sword, axe, shovel). With `bucketFirst` (something
+ * needs water now) the bucket goes before the pickaxe. Items held or worn are left out; a water
+ * or lava bucket counts as a bucket, any iron-or-better piece counts for its slot.
+ */
+export function ironChain (inv: Record<string, number>, kinds: readonly ToolKind[] = DEFAULT_KINDS, opts: Pick<UpgradeOptions, 'armour' | 'bucket' | 'bucketFirst' | 'shield'> = {}): IronWant[] {
+  const below = kinds.filter(k => TIER_RANK[heldTier(inv, k)]! < 3)
+  const out: IronWant[] = []
+  const tool = (k: ToolKind): IronWant => ({ item: `iron_${k}`, ingots: TOOL_SHAPE[k].head, kind: k })
+  const hasBucket = (inv.bucket ?? 0) + (inv.water_bucket ?? 0) + (inv.lava_bucket ?? 0) + (inv.powder_snow_bucket ?? 0) > 0
+  const bucket: IronWant | null = (opts.bucket || opts.bucketFirst) && !hasBucket ? { item: 'bucket', ingots: 3, kind: 'item' } : null
+  if (bucket && opts.bucketFirst) out.push(bucket)
+  if (below.includes('pickaxe')) out.push(tool('pickaxe'))
+  if (bucket && !opts.bucketFirst) out.push(bucket)
+  if (opts.shield && !inv.shield) out.push({ item: 'shield', ingots: 1, kind: 'item' })
+  if (opts.armour) for (const a of ARMOUR_ORDER) if (!slotCovered(inv, a)) out.push({ item: a, ingots: ARMOUR[a]!, kind: 'armour' })
+  for (const k of below) if (k !== 'pickaxe') out.push(tool(k))
+  return out
+}
+
+/** Iron ingots the rest of the chain takes. */
+export function chainIngots (chain: readonly IronWant[]): number {
+  return chain.reduce((n, w) => n + w.ingots, 0)
+}
+
+function ironStep (inv: Record<string, number>, nearby: Nearby, chain: IronWant[], trees: boolean, stoneNear: boolean, prospect: boolean, shieldFirst: boolean): UpgradeStep | null {
   const ingots = inv.iron_ingot ?? 0
+  const planks = usablePlankUnits(inv)
   // safe mining wants a shield or armour before going deep: the first ingot (and 6 planks) is a shield
-  if (shieldFirst && ingots >= 1 && !inv.shield && usablePlankUnits(inv) >= 6) return { do: 'craft', item: 'shield', kind: 'armour', tier: 'iron', why: 'a shield before mining deep' }
-  const k = kinds.find(k => TOOL_SHAPE[k].head <= ingots)
-  if (k) return { do: 'craft', item: `iron_${k}`, kind: k, tier: 'iron', why: 'iron ingots' }
-  if (!kinds.length) {
-    const a = armour.find(a => ARMOUR[a]! <= ingots)
-    if (a) return { do: 'craft', item: a, kind: 'armour', tier: 'iron', why: 'iron ingots' }
-  }
+  if (shieldFirst && ingots >= 1 && !inv.shield && planks >= 6) return { do: 'craft', item: 'shield', kind: 'item', tier: 'iron', why: 'a shield before mining deep' }
+  const affordable = (w: IronWant) => ingots >= w.ingots && (w.item !== 'shield' || planks >= 6)
+  const craft = (w: IronWant, why: string): UpgradeStep => ({ do: 'craft', item: w.item, kind: w.kind, tier: 'iron', why })
+  const first = chain[0]!
+  if (affordable(first)) return craft(first, 'iron ingots')
+  // the shield is next but there are no planks for it: logs, else on to the next thing
+  if (first.item === 'shield' && ingots >= 1 && planks < 6 && trees) return { do: 'gather', item: 'logs', count: 2, why: 'planks for a shield' }
   // ingots for the next thing in line
-  const nextNeed = kinds.length ? TOOL_SHAPE[kinds[0]!].head : ARMOUR[armour[0]!]!
+  const nextNeed = first.ingots
   const raw = count(inv, ['raw_iron'])
   const missing = nextNeed - ingots
-  const what = kinds.length ? `an iron ${kinds[0]}` : `an ${armour[0]}`
-  // not enough raw iron for the next tool yet and more to be had: mine first, smelt once
+  const what = first.kind === 'item' || first.kind === 'armour' ? `a ${first.item.replace(/_/g, ' ')}` : `an iron ${first.kind}`
+  // not enough raw iron for the next item yet and more to be had: mine first, smelt once
   if (raw > 0 && raw < missing && (nearby.ironOre || (prospect && stoneNear))) return { do: 'gather', item: 'raw_iron', count: missing - raw, why: `${what} (have ${raw} raw iron)` }
   if (raw > 0) {
     // smelt what we have (all of it: one furnace trip), needs a furnace and fuel
@@ -203,11 +252,16 @@ function ironStep (inv: Record<string, number>, nearby: Nearby, kinds: ToolKind[
     const want = fuelNeed - fuelItems(inv)
     if (log && (spare >= 1 || logs >= 2)) return { do: 'smelt', input: log, count: Math.min(spare >= 1 ? logs : logs - 1, want), fuel: 'planks', why: 'charcoal to smelt iron' }
     if (nearby.coalOre) return { do: 'gather', item: 'coal', count: want, why: 'fuel to smelt iron' }
+    // last resort: planks for the whole batch
+    if (plankUnits(inv) >= plankFuel) return { do: 'smelt', input: 'raw_iron', count: n, fuel: 'planks', why: 'iron ingots (planks as fuel, no coal or logs)' }
     if (trees) return { do: 'gather', item: 'logs', count: want + 1, why: 'logs for charcoal' }
     return null
   }
   if (nearby.ironOre && missing > 0) return { do: 'gather', item: 'raw_iron', count: missing, why: what }
   if (prospect && stoneNear && missing > 0) return { do: 'gather', item: 'raw_iron', count: missing, why: `${what} (no ore in sight: digging for some)` }
+  // no more iron to be had from here: the ingots go to the first thing further down the line they pay for
+  const later = chain.find(affordable)
+  if (later) return craft(later, 'iron ingots')
   return null
 }
 
@@ -226,10 +280,9 @@ export function upgradeTakes (inv: Record<string, number>, chest: Record<string,
   const belowStone = kinds.filter(k => TIER_RANK[heldTier(inv, k)]! < 2)
   if (belowStone.length) take('cobblestone', belowStone.reduce((n, k) => n + TOOL_SHAPE[k].head, 0) - count(inv, STONE_HEADS))
   if (upTo === 'stone') return out
-  const wantIron = kinds.filter(k => TIER_RANK[heldTier(inv, k)]! < 3)
-  const armour = opts.armour ? Object.keys(ARMOUR).filter(a => !inv[a]) : []
-  const shield = opts.mining?.shieldFirst && !inv.shield ? 1 : 0
-  const ingotNeed = wantIron.reduce((n, k) => n + TOOL_SHAPE[k].head, 0) + armour.reduce((n, a) => n + ARMOUR[a]!, 0) + shield
+  const chain = ironChain(inv, kinds, opts)
+  const shield = opts.mining?.shieldFirst && !inv.shield && !chain.some(w => w.item === 'shield') ? 1 : 0
+  const ingotNeed = chainIngots(chain) + shield
   let missing = ingotNeed - (inv.iron_ingot ?? 0) - (inv.raw_iron ?? 0)
   if (missing > 0) missing -= take('iron_ingot', missing)
   if (missing > 0) take('raw_iron', missing)
@@ -309,7 +362,7 @@ export async function runUpgradeStep (ctx: Ctx, s: UpgradeStep, safe = true): Pr
       return typeof r === 'object' && r ? r : fail(`could not take a ${s.item}`)
     }
     case 'craft': {
-      if (s.kind === 'armour') return craftItem(bot, signal, s.item, 1)
+      if (s.kind === 'armour' || s.kind === 'item') return craftItem(bot, signal, s.item, 1)
       const r = await ensureTool(bot, signal, s.kind, { minTier: s.tier })
       return r.ok ? ok(r.message) : r
     }
@@ -317,7 +370,12 @@ export async function runUpgradeStep (ctx: Ctx, s: UpgradeStep, safe = true): Pr
     case 'smelt': {
       if (s.fuel === 'planks') await ensurePlanks(bot, signal, Math.ceil(s.count / 1.5))
       const fuel = s.fuel === 'planks' ? plankFuel(bot) : s.fuel
-      return smeltItem(bot, signal, ctx.log, s.input, s.count, fuel)
+      await toFurnace(ctx)
+      const r = await smeltItem(bot, signal, ctx.log, s.input, s.count, fuel)
+      // the furnace it put down (by home) is remembered and walked to next time
+      const placed = (r.data as { placed?: { x: number, y: number, z: number } } | undefined)?.placed
+      if (placed) setPlace(ctx.agent, FURNACE_PLACE, { ...placed, ...(bot.game?.dimension ? { dimension: bot.game.dimension } : {}) })
+      return r
     }
     case 'gather': {
       if (s.item === 'logs') return getWood(ctx, s.count)
@@ -326,6 +384,34 @@ export async function runUpgradeStep (ctx: Ctx, s: UpgradeStep, safe = true): Pr
       if (s.item === 'coal') return collectOre(ctx, ['coal_ore', 'deepslate_coal_ore'], s.count, 'coal', safe)
       return collectOre(ctx, ['diamond_ore', 'deepslate_diamond_ore'], s.count, 'diamond', safe)
     }
+  }
+}
+
+/** The place name of the furnace it put down (navigation places), used again for smelting. */
+export const FURNACE_PLACE = 'furnace'
+const FURNACE_NEAR = 32
+const FURNACE_WALK = 128
+
+/**
+ * Before smelting with no furnace within 32 blocks: walk to the furnace it remembers (within 128
+ * blocks, and still there when loaded), else home when it is within 128, so a new furnace goes
+ * down by home instead of at the bottom of a mine. Quiet on failure: smelting then works with
+ * what is here.
+ */
+async function toFurnace (ctx: Ctx): Promise<void> {
+  const { bot, agent, signal } = ctx
+  const id = bot.registry.blocksByName.furnace?.id
+  if (id === undefined || bot.findBlock({ matching: id, maxDistance: FURNACE_NEAR })) return
+  const pos = bot.entity.position
+  const near = (p: { x: number, y: number, z: number, dimension?: string }) => sameDimension(bot, p) && Math.hypot(p.x - pos.x, p.y - pos.y, p.z - pos.z) <= FURNACE_WALK
+  const known = getPlaces(agent)[FURNACE_PLACE]
+  const home = getHome(agent)
+  const target = known && near(known) ? known : home && near(home) && Math.hypot(home.x - pos.x, home.z - pos.z) > 8 ? home : null
+  if (!target) return
+  await gotoWithin(bot, new goals.GoalNear(target.x, target.y, target.z, 3), signal, 60_000).catch(e => { checkAborted(signal); ctx.log.debug('smelt: could not walk to the furnace', { error: (e as Error).message }) })
+  if (known && target === known) {
+    const b = bot.blockAt(vec(bot, known.x, known.y, known.z))
+    if (b && b.name !== 'furnace' && b.name !== 'lit_furnace') setPlace(agent, FURNACE_PLACE, null)
   }
 }
 
@@ -388,7 +474,7 @@ export function chestWants (ctx: Ctx, opts: UpgradeOptions = {}): { want: Record
   const view = chestView(agent, bot)
   if (!view.length) return { want: {}, unknown: 0 }
   const t = chestTotals(view)
-  const inv = inventoryCounts(bot)
+  const inv = heldCounts(bot)
   const mining = opts.mining ?? miningGate(miningState(bot, agent.settings), true)
   const want = { ...upgradeTakes(inv, t.has, { ...opts, mining }), ...gearWant(heldCounts(bot), t.has) }
   return { want, unknown: t.unknown }
@@ -426,7 +512,8 @@ export async function upgradeTools (ctx: Ctx, opts: UpgradeRun = {}): Promise<Ac
   }
   for (let i = 0; i < (opts.maxSteps ?? 12); i++) {
     checkAborted(ctx.signal)
-    const inv = inventoryCounts(bot)
+    // worn armour and the shield in the offhand count: they are not in inventory.items()
+    const inv = heldCounts(bot)
     const m = miningState(bot, agent.settings)
     const nearby = senseNearby(ctx, m)
     const planOpts: UpgradeOptions = { ...opts, mining: miningGate(m, opts.safe !== false) }
@@ -501,17 +588,19 @@ const upgradeAction = defineAction({
     'it only takes ore near the surface and says "not ready to mine: ..." instead of going into caves. In creative it just takes the tools.',
   params: z.object({
     up_to: z.enum(['stone', 'iron', 'diamond']).default('iron').describe('highest tier to aim for'),
-    armour: z.boolean().default(false).describe('also make iron armour once iron tools are done'),
+    armour: z.boolean().default(false).describe('also make iron armour (chestplate, leggings, helmet, boots) after the iron pickaxe'),
+    bucket: z.boolean().default(false).describe('also make a bucket right after the iron pickaxe'),
+    shield: z.boolean().default(false).describe('also make a shield (1 iron ingot, 6 planks) after the bucket'),
     kinds: z.array(z.enum(['pickaxe', 'axe', 'shovel', 'sword', 'hoe'])).optional().describe('tool kinds to upgrade; default pickaxe, sword, axe, shovel'),
     prospect: z.boolean().default(true).describe('when no iron ore is in sight, dig a staircase and strip mine to look for some'),
     safe: z.boolean().default(true).describe('safe mining (settings.mining): only go deeper than mining.safeDepth with a weapon, food and the gear it asks for; avoid caves, light tunnels, climb out when losing underground')
   }),
   longRunning: true,
-  async run (ctx, { up_to, armour, kinds, prospect, safe }) {
+  async run (ctx, { up_to, armour, bucket, shield, kinds, prospect, safe }) {
     // going for ore is a trip: pantry food, a weapon and health first, home when food or daylight runs short
     const trip = actionTrip(ctx, { purpose: 'an ore trip', kind: 'ore' })
     try {
-      return await trip.finish(await upgradeTools(ctx, { upTo: up_to, armour, kinds, prospect, safe, maxSteps: 30, beginTrip: () => trip.begin() }))
+      return await trip.finish(await upgradeTools(ctx, { upTo: up_to, armour, bucket, shield, kinds, prospect, safe, maxSteps: 30, beginTrip: () => trip.begin() }))
     } catch (e) {
       if (isTurnBack(e)) return trip.finish(fail(e.message))
       throw e
@@ -525,7 +614,7 @@ export const progressionSkill = () => defineSkill({
   name: 'progression',
   capabilities: ['move', 'dig', 'craft'],
   description: 'Tool progression: stone, iron and diamond tools.',
-  actions: [upgradeAction],
+  actions: [upgradeAction, digMineAction],
   observe: (_agent, bot) => ({ tools: toolSummary(inventoryCounts(bot)) })
 })
 
