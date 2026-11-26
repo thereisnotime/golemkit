@@ -928,10 +928,12 @@ before `farm`.
    farmland within 3 blocks rule a site out. At least 8 cells must be grass/dirt with air or a
    plant on top, or a one-block grass bank it can dig off (farmland only stays wet with water
    at its own height or one above); more such cells, closer and fewer extra water holes is
-   better. Without natural water it tries a water spot it saw while scouting, then a water
-   bucket (filling an empty bucket first);
-2. seeds: breaks grass until it has `seeds` (wheat seeds drop 1 in 8), or uses carrots,
-   potatoes or beetroot seeds it carries;
+   better. Without natural water it tries a water spot it saw while scouting, then a frozen
+   shore (breaks the ice for a source, see [farming on cold ground](./needs-and-idle#farming-on-cold-ground)),
+   then a water bucket (filling an empty bucket first). In a cold biome the water is kept from
+   freezing with a cheap block over it or a torch next to it;
+2. seeds: takes wheat seeds from its own chests, then breaks grass until it has `seeds` (wheat
+   seeds drop 1 in 8), or uses carrots, potatoes or beetroot seeds it carries;
 3. a hoe: from the inventory, crafted, or crafted after chopping a few logs;
 4. till every usable cell around the water (one source hydrates 4 blocks out, so 9x9 is
    the most), plant, fence the ring outside with a gap on the south side and torch the corners

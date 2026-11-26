@@ -124,6 +124,8 @@ can't change their own.
 | `idle.exploreRadius` | 32–1024 | explore mode: how far a scouting trip goes (default 200) |
 | `idle.exploreMinutes` | 1–30 | explore mode: how long a scouting trip may take (default 8) |
 | `idle.chores.<chore>` | on/off | one idle chore on or off (`!config_set idle.chores.scout_nearby off`) |
+| `farming.iceWater` | on/off | cold ground: break ice on a frozen shore for a new farm's water when there is no open water or bucket ([cold ground](./needs-and-idle#farming-on-cold-ground); default on) |
+| `farming.protectWater` | auto / cover / torch / off | keep a farm's water from freezing in a cold biome: a cheap block over it, else a torch next to it (default auto) |
 | `sites.enabled` | on/off | [site health](./needs-and-idle#site-health): check the farm, bed, chests and home and mark bad ones (default on) |
 | `sites.failures` | 1–20 | unreachable or no-work checks in a row before a site is bad (default 3) |
 | `sites.checkMinutes` | 0.5–240 | one site checked at most this often (default 5) |

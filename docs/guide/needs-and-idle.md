@@ -111,9 +111,56 @@ new farm goes near home". Bad sites are looked at again every `sites.recheckHour
 bot is near; when a player fixed it, it is ok again ("looks fine again") and a dropped farm goes
 back on the list.
 
-A new farm (`start_farm`) never goes within a bad farm's plot plus 8 blocks, on water in a biome
-cold enough to freeze, on cells without sky light (under a roof), or next to lava or ice; the
-protected-area and spawn-clearance rules stay. Its name skips the names bad farms still have.
+A new farm (`start_farm`) never goes within a bad farm's plot plus 8 blocks, on cells without sky
+light (under a roof), or next to lava; the protected-area and spawn-clearance rules stay. Water in a
+cold biome is used only when it can be kept open ([farming on cold ground](#farming-on-cold-ground)).
+Its name skips the names bad farms still have.
+
+A farm remembers which cells of its square were land when it was made (`land` in the farm record).
+The flood check counts only those cells, so a shore farm with the lake on one side is not
+"flooded" from its first check, which is what happened to Pax's farm:1. A frozen centre still makes
+it bad ("the water froze"). Older farms without the record are judged on the whole square.
+
+## Farming on cold ground
+
+Pax's home is on snowy ground by a frozen lake, and it had no bucket. `start_farm` found no water
+that wouldn't freeze, so food never got past the bread in the pantry. Now it works with the 1.21.1
+rules (`src/skills/coldFarmPlan.ts`, checked against the game code and the wiki):
+
+| rule | 1.21.1 |
+|---|---|
+| ice broken without Silk Touch | becomes a water source when the block under it blocks movement or is a fluid; over air it just vanishes; in the Nether never water. A bare hand works too |
+| ice melting | on a random tick when the block light next to it is above 11 (a torch 1 to 2 blocks away), in any biome; sky light doesn't count. Slow (about a minute per block), so it is not used to get water |
+| water freezing | only in a cold biome, when the water is the top block under the sky, its block light is below 10 and a non-water block is next to it |
+| what stops it | anything that blocks movement over the water (a block or a slab), or a torch close enough (light 14 at the torch, one less per block: on the shore cell next to the water it gets 12) |
+| crops | grow in snowy biomes with light 9+ and wet farmland; snow never settles on farmland or crops |
+
+What `start_farm` tries, in order:
+
+1. Open shore water near home, as before. In a cold biome it is kept open (step 4).
+2. A water spot it saw while scouting.
+3. A frozen shore (`farming.iceWater`): surface ice with land next to it, open above (air or snow,
+   no roof), water or ground under it, within the radius and then out to 96 blocks. Sites are
+   scored like water sites, with the ice counted as the lake. Protected areas, spawn clearance,
+   somebody's builds, bad farm sites and lava still rule a site out. Standing on the shore, it
+   breaks the centre ice with a tool without Silk Touch (or a bare hand) and checks that water came.
+4. Keeping the water open (`farming.protectWater`):
+   - `auto` (the default): a cheap block (dirt, cobblestone, andesite...; 2 needed, from its
+     chests when it carries none) goes over the water. Open water has no face to place it
+     against, so it first puts a helper block on the shore cell next to it and digs that back
+     afterwards.
+   - Without blocks, a torch on that shore cell. That cell is then not tilled.
+   - `cover` or `torch` uses only that one. `off` never uses water that would freeze.
+5. With a bucket (or once one exists): a poured water hole in flat grass, kept open the same way
+   in the cold.
+
+Seeds come from its own chests first, then from grass. The farm record says where its water came
+from (`water: natural | ice | bucket`) and what keeps it open (`keptOpen: cover | torch`). It is
+checked by site health like any farm: if the cover is broken and the water freezes, the farm is
+marked bad and a new one is made.
+
+Not done yet: an indoor farm inside the fortress. Crops grow under torchlight, and water under a
+roof never freezes, but the site rules still want sky light, and indoors it needs a bucket.
 
 ## Idle modes
 
@@ -136,16 +183,48 @@ cooldown and only runs when it would do something.
 | `rest_by_bed` | idle | night | 1 min | home, then wait by the bed |
 | `tidy_storage` | active | day | 10 min | deposit_when_full's run once the inventory is half full |
 | `top_up_wood` | active | day | 10 min | fell a tree near home with fewer than 16 logs |
-| `top_up_seeds` | active | day | 15 min | break grass for seeds when its farm has fewer than 16 |
+| `top_up_seeds` | active | day | 15 min | break grass for seeds while it has fewer than 16 (carried and in its chests), farm or not |
 | `extend_farm` | active | day | 10 min | tend_farm when there is work, start_farm with 8+ seeds and no farm |
 | `craft_spares` | active | any | 10 min | torches up to 16, a second stone pickaxe |
-| `light_dark_spots` | active | day | 30 min | `light_up` around home, 8 torches at most |
+| `light_dark_spots` | active | day | 30 min (quiet 4 h) | `light_up` around home, 8 torches at most |
 | `scout_nearby` | active | day | 30 min | `find_target` iron, then coal, within twice the radius, while it doesn't know where they are |
 | `explore` | explore | day | 20 min | a trip to `idle.exploreRadius` for iron, coal, a village, diamonds it doesn't know of yet |
 
 Every chore takes `true`/`false` or `{ enabled, radius, when: day | night | any, hours: [from, to],
-cooldownMinutes }`. Hours are the game clock: 0 is midnight, 6 sunrise, 18 sunset; `[22, 4]`
-wraps past midnight.
+cooldownMinutes, quietMinutes }`. Hours are the game clock: 0 is midnight, 6 sunrise, 18 sunset;
+`[22, 4]` wraps past midnight.
+
+A run can find nothing to do: a dark-spot pass that placed no torch, a scout that found no ore, a
+seed run with no grass, or tidying that stored nothing. The chore then waits `quietMinutes`, not its
+cooldown. The default is three cooldowns and at least 30 minutes; light_dark_spots waits 4 hours.
+That way one chore that keeps finding nothing doesn't take every slot.
+
+Whether a chore has work is one pure function, `choreIdle` in `src/skills/needPlan.ts`
+(`test/idle-chores.test.ts` runs it with Pax's conditions). When nothing runs, the status says why
+each chore was passed over:
+
+```
+IDLE: idle (active): tidy_storage not needed (nothing to store yet), top_up_wood not needed (20 logs, enough),
+  top_up_seeds not needed (35 seeds, enough), extend_farm again in 8m, craft_spares not needed (nothing spare
+  to craft from what it carries), light_dark_spots not needed (no torches, coal or charcoal)
+```
+
+### Why Pax stood around
+
+With `idle: active`, snowy ground, a frozen farm, full chests, 35 seeds in the pantry, stone tools
+and no coal, every chore had a reason to do nothing:
+
+| chore | why it did nothing | now |
+|---|---|---|
+| `extend_farm` / farm_setup | no farm; `start_farm` failed every time (no water that doesn't freeze, no bucket), so both cooled down for up to 30 min | a frozen-shore farm without a bucket (above) |
+| `top_up_seeds` | waited for a farm, while the farm waited for seeds | runs with no farm; start_farm takes the pantry's seeds |
+| `stroll` | `wander` took the top-most ground at each spot: the house roof and the walls, unreachable ("found nowhere to wander to") | takes the ground nearest the bot's height, then closer spots |
+| `light_dark_spots` | no torches or coal; light_home said the 9 dark spots took no torch, because 283 cells had a snow layer | a single snow layer takes a torch; a pass that lights nothing waits 4 h |
+| `tidy_storage`, `top_up_wood`, `craft_spares` | nothing to store, 16+ logs, nothing spare to craft (no coal) | correct; the status now says so |
+| `scout_nearby` | ran every 30 min and found nothing in reach | a scout that finds nothing waits its quiet pause |
+
+Coal (torches) and the bucket come from mining and smelting, which belong to the gear and
+progression work, not to idle.
 
 ## Configuration
 
@@ -154,6 +233,8 @@ wraps past midnight.
 idle: active                      # or { mode: active, radius: 24, chores: { ... } }
 
 # all the options, with their defaults
+settings:
+  farming: { iceWater: true, protectWater: auto }   # cold ground: ice for water, keep it open (auto | cover | torch | off)
 needs:
   enabled: true
   boost: 15                       # added at urgency 1
@@ -185,6 +266,8 @@ Live, without a restart ([feature toggles](./live-config)):
 !config_set needs.gear.threshold 0.3
 !config_set needs.search.radius 96
 !config_set sites.recheckHours 2
+!config_set farming.protectWater torch
+!config_set farming.iceWater off
 ```
 
 `needs: false`, `idle: off` and `sites: false` switch each part off. A brain without the layer:
