@@ -80,10 +80,10 @@ function surfaceAt (bot: Bot, x: number, z: number, yHint: number): P | null {
   for (let y = yHint + 12; y >= yHint - 16; y--) {
     const b = bot.blockAt(vec(bot, x, y, z))
     if (!b) return null
-    if (b.boundingBox === 'block' && !/leaves|_log$|glass/.test(b.name)) {
+    if (b.boundingBox === 'block' && !/leaves|_log$|glass|^snow$/.test(b.name)) {
       const a = bot.blockAt(vec(bot, x, y + 1, z))
       const h = bot.blockAt(vec(bot, x, y + 2, z))
-      if (!a || !h || a.boundingBox === 'block' || h.boundingBox === 'block') return null
+      if (!a || !h || (a.boundingBox === 'block' && a.name !== 'snow') || h.boundingBox === 'block') return null
       return { x, y: y + 1, z }
     }
   }
@@ -371,6 +371,7 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
         mine.deepest = Math.min(mine.deepest, feet.y)
         continue
       }
+      phase = next.go
       if (phase === 'main' && !mine.bottom) { mine.bottom = feet; mainDir = dir; mine.faceDir = dir }
       if (phase === 'main') {
         if (mainSinceBranch >= branchEvery(s)) {
