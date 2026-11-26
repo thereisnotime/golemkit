@@ -165,6 +165,8 @@ export function findBase (agent: Agent, bot: Bot, s = settingsOf(agent)): Base |
   if (!me || Math.hypot(me.x - home.x, me.z - home.z) > 32) return 'no base found yet; a spot for a new one is picked once I am home'
   const site = planSite({ bot, agent }, bp.name)
   if (typeof site === 'string') return `no base found, and no spot for a new ${bp.name} near home: ${site}`
+  // kept from now on, so what is proposed is where it gets built (the spot build picks moves with the bot)
+  saveSpots(agent, { ...spots, anchor: { origin: site.origin, facing: site.facing, source: 'a new spot near home' } })
   return baseFrom(agent, bot, bp, site.origin, site.facing, 'a new spot near home', true)
 }
 
