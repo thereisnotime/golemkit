@@ -565,6 +565,8 @@ const BUILD = /(_planks|cobblestone|stone_bricks|bricks|glass|_fence|_wall|door|
 /** Near a plot these rule it out: lava burns, ice means the water freezes there. */
 const HAZARD = /^(lava|ice|packed_ice|blue_ice|frosted_ice|powder_snow|magma_block|fire)$/
 const ICE = /^(ice|packed_ice|blue_ice|frosted_ice)$/
+/** A one-block layer over the ground it may dig off to till under it: grass or dirt, or a snow block on snowy ground. */
+const isBank = (name: string) => TILLABLE.includes(name) || name === 'snow_block'
 const FENCES = /^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|bamboo|crimson|warped)_fence$/
 
 /** What a plot cell is (ground at y, the block above at y+1). */
@@ -582,7 +584,7 @@ function cellKind (agent: Agent, bot: Bot, x: number, y: number, z: number, clea
   // a bank one block above the water: dig the top layer off and till the dirt under it
   // (farmland is only kept wet by water at its own height or one above)
   const a2 = bot.blockAt(vec(bot, x, y + 2, z))
-  if (TILLABLE.includes(g.name) && TILLABLE.includes(a.name) && a2 && (a2.name === 'air' || PLANTS.test(a2.name))) return 'tillable'
+  if (TILLABLE.includes(g.name) && isBank(a.name) && a2 && (a2.name === 'air' || PLANTS.test(a2.name))) return 'tillable'
   return 'other'
 }
 
@@ -615,7 +617,7 @@ export function siteAt (agent: Agent, bot: Bot, water: Vec3, size: number, from:
     const [dx, dz] = k.split(',').map(Number)
     const up = bot.blockAt(vec(bot, water.x + dx!, water.y + 1, water.z + dz!))
     // a bank one above the water: the light that counts is on top of it
-    const top = up && TILLABLE.includes(up.name) ? bot.blockAt(vec(bot, water.x + dx!, water.y + 2, water.z + dz!)) : up
+    const top = up && isBank(up.name) ? bot.blockAt(vec(bot, water.x + dx!, water.y + 2, water.z + dz!)) : up
     const l = (top as { skyLight?: number } | null)?.skyLight
     if (typeof l === 'number') sky[k] = l
   }
@@ -811,12 +813,12 @@ async function fillBucket (bot: Bot, water: Vec3, signal: AbortSignal): Promise<
 async function tillAt (bot: Bot, pos: Vec3, signal: AbortSignal): Promise<boolean> {
   // lower a one-block bank first: plant on top, then the grass/dirt itself
   const top = bot.blockAt(pos.offset(0, 2, 0))
-  if (top && top.name !== 'air' && PLANTS.test(top.name) && TILLABLE.includes(bot.blockAt(pos.offset(0, 1, 0))?.name ?? '')) {
+  if (top && top.name !== 'air' && PLANTS.test(top.name) && isBank(bot.blockAt(pos.offset(0, 1, 0))?.name ?? '')) {
     await reachBlock(bot, top.position, signal, 2, 15_000)
     await digBlock(bot, top, signal)
   }
   const bank = bot.blockAt(pos.offset(0, 1, 0))
-  if (bank && TILLABLE.includes(bank.name)) {
+  if (bank && isBank(bank.name)) {
     await reachBlock(bot, bank.position, signal, 2, 15_000)
     await digBlock(bot, bank, signal)
   }
