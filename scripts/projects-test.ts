@@ -230,12 +230,7 @@ async function run (): Promise<void> {
   bot.on('session', b => { watch(b); log('bot reconnected') })
 
   const owner = new Agent(defineVariant({ name: 'owner', skills: standardSkills(), brains: [] }), server, { username: OWNER, dataDir: join(DATA, 'owner') })
-  await connect(owner)
-  await d.cmd(`/gamemode spectator ${OWNER}`)
-  await d.cmd(`/tp ${OWNER} ${start.x + 0.5} ${start.y + 30} ${start.z + 0.5}`)
-  await d.cmd(`/tp ${DIRECTOR} ${start.x + 0.5} ${start.y + 60} ${start.z + 0.5}`)
-  await d.stop()
-
+  // listening before it is online: the first proposal comes as soon as it joins
   const said: string[] = []
   owner.on('chat', m => {
     if (m.from !== BOT) return
@@ -244,6 +239,12 @@ async function run (): Promise<void> {
     const ask = /Say "\S+ approve (\w+)"/.exec(m.message)
     if (ask) setTimeout(() => { log(`${OWNER}: approve ${ask[1]}`); owner.whisper(BOT, `approve ${ask[1]}`) }, 8000)
   })
+  await connect(owner)
+  await d.cmd(`/gamemode spectator ${OWNER}`)
+  await d.cmd(`/tp ${OWNER} ${start.x + 0.5} ${start.y + 30} ${start.z + 0.5}`)
+  await d.cmd(`/tp ${DIRECTOR} ${start.x + 0.5} ${start.y + 60} ${start.z + 0.5}`)
+  await d.stop()
+
   bot.on('actionStart', i => { if (/work_on_base|light_up|build|gather/.test(i.name)) log(`start ${i.name} ${JSON.stringify(i.params)}`) })
   bot.on('actionEnd', (i, r) => { if (/work_on_base|light_up|project|plan_base/.test(i.name)) log(`end ${i.name}: ${r.ok ? 'ok' : 'FAIL'} ${r.message.slice(0, 400).replace(/\n/g, ' | ')}`) })
 
