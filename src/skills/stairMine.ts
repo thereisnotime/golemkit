@@ -58,12 +58,12 @@ export function knownLitMine (agent: Agent, bot: Bot): MineSite | null {
   return m && mineLit(m, miningSettings(agent.settings.mining).torchEvery) ? m : null
 }
 
-/** The first stair steps of a mine as the site check sees them; null when not loaded. */
+/** The first stair steps of a mine as the site check sees them; null when not loaded or not dug yet. */
 export function mineEntranceLook (bot: Bot, m: MineSite): { steps: ('air' | 'water' | 'lava' | 'solid')[] } | null {
+  // a mine whose stairs aren't dug yet can't be judged (the first live check called a brand-new mine "filled in")
+  if (!m.start?.length) return null
   const steps: ('air' | 'water' | 'lava' | 'solid')[] = []
-  let p = m.entrance
-  for (let i = 1; i <= 3; i++) {
-    p = add(p, m.dir.x, -1, m.dir.z)
+  for (const p of m.start) {
     for (const q of [p, add(p, 0, 1, 0)]) {
       const b = bot.blockAt(vec(bot, q.x, q.y, q.z))
       if (!b) return null
@@ -256,6 +256,18 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
   let retreat = ''
   const oresMined: Record<string, number> = {}
   const before = inventoryCounts(bot)
+  let recorded = false
+  // the trip goes on the mine's record once, however it ends (taken over down there by a reflex, night, a fight)
+  const record = () => {
+    if (recorded) return
+    recorded = true
+    const after = inventoryCounts(bot)
+    for (const f of Object.values(ORE_FAMILIES)) { const d = (after[f.drop] ?? 0) - (before[f.drop] ?? 0); if (d > 0) mine.got[f.drop] = (mine.got[f.drop] ?? 0) + d }
+    mine.trips++
+    mine.lastAt = Date.now()
+    saveMine(agent, mine)
+    agent.storage.set(LAST_TRIP_KEY, Date.now())
+  }
 
   const breakAt = async (p: P): Promise<boolean> => {
     const b = bot.blockAt(vec(bot, p.x, p.y, p.z))
@@ -369,6 +381,7 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
         }
         mine.stairSteps++
         if (mine.stairSteps % 4 === 0) mine.path.push(feet)
+        if (mine.stairSteps <= 3) { mine.start = [...(mine.start ?? []), feet]; saveMine(agent, mine) }
         mine.deepest = Math.min(mine.deepest, feet.y)
         continue
       }
@@ -416,39 +429,29 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
       }
     }
   } catch (e) {
-    if (signal.aborted) {
-      // taken over down there (night, a fight): what it dug and got is still the mine's
-      const after = inventoryCounts(bot)
-      for (const f of Object.values(ORE_FAMILIES)) { const d = (after[f.drop] ?? 0) - (before[f.drop] ?? 0); if (d > 0) mine.got[f.drop] = (mine.got[f.drop] ?? 0) + d }
-      mine.trips++
-      mine.lastAt = Date.now()
-      saveMine(agent, mine)
-      agent.storage.set(LAST_TRIP_KEY, Date.now())
-    }
+    if (signal.aborted) record()
     checkAborted(signal)
     stopped = (e as Error).message
   }
 
-  // back up the stairs: the whole way in one path, else the way it came, step by step
-  if (!retreat) await pickupNearby(bot, signal, { radius: 6, maxMs: 6000 }).catch(() => 0)
   let up = false
-  try { await goTo(mine.entrance, 1, 120_000); up = true } catch (e) { checkAborted(signal) }
-  if (!up) {
-    const back = [...trail].reverse().filter((_, i) => i % 3 === 0)
-    for (const w of [...back, ...[...mine.path].reverse(), mine.entrance]) {
-      try { await goTo(w, 1, 15_000) } catch (e) { checkAborted(signal) }
+  try {
+    // back up the stairs: the whole way in one path, else the way it came, step by step
+    if (!retreat) await pickupNearby(bot, signal, { radius: 6, maxMs: 6000 }).catch(() => 0)
+    try { await goTo(mine.entrance, 1, 120_000); up = true } catch (e) { checkAborted(signal) }
+    if (!up) {
+      const back = [...trail].reverse().filter((_, i) => i % 3 === 0)
+      for (const w of [...back, ...[...mine.path].reverse(), mine.entrance]) {
+        try { await goTo(w, 1, 15_000) } catch (e) { checkAborted(signal) }
+      }
+      up = Math.hypot(bot.entity.position.x - mine.entrance.x, bot.entity.position.y - mine.entrance.y, bot.entity.position.z - mine.entrance.z) <= 3
     }
-    up = Math.hypot(bot.entity.position.x - mine.entrance.x, bot.entity.position.y - mine.entrance.y, bot.entity.position.z - mine.entrance.z) <= 3
+  } catch (e) {
+    if (signal.aborted) record()
+    throw e
   }
-  mine.trips++
-  mine.lastAt = Date.now()
+  record()
   const after = inventoryCounts(bot)
-  for (const f of Object.values(ORE_FAMILIES)) {
-    const d = (after[f.drop] ?? 0) - (before[f.drop] ?? 0)
-    if (d > 0) mine.got[f.drop] = (mine.got[f.drop] ?? 0) + d
-  }
-  saveMine(agent, mine)
-  agent.storage.set(LAST_TRIP_KEY, Date.now())
   const gotText = Object.values(ORE_FAMILIES).map(f => [f.drop, (after[f.drop] ?? 0) - (before[f.drop] ?? 0)] as const).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${k}`).join(', ')
   const secs = Math.round((Date.now() - t0) / 1000)
   const where = `${mine.id} (${fmtPos(mine.entrance)}, down to y ${mine.deepest}${mine.branches ? `, ${mine.branches} branches` : ''}${mineLit(mine, ms.torchEvery) ? ', lit' : ''})`

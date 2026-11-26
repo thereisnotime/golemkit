@@ -324,6 +324,8 @@ export interface MineSite {
   faceDir?: Dir
   /** Stair steps on the way down, every 4th, for walking it again. */
   path: P[]
+  /** The first 3 stair steps (where the bot stood), for the site check. */
+  start?: P[]
   /** Deepest y reached. */
   deepest: number
   /** Main-tunnel steps and branch pairs dug, over all trips. */
