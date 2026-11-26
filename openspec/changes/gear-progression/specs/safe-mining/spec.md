@@ -17,3 +17,10 @@ A mine SHALL be remembered in agent storage (`mines`) with its entrance, directi
 #### Scenario: Second trip
 - **WHEN** the bot dug mine:1 to y 16 with two branch pairs and goes again 30 minutes later
 - **THEN** it walks down mine:1's stairs to the face and digs the next branches
+
+### Requirement: Night down the mine
+stay_safe SHALL NOT send the bot home for the night while dig_mine runs. A trip taken over (a reflex, a fight) SHALL still be recorded on the mine. The mine site check SHALL judge only stairs it dug (the first three stair steps it stood on) and SHALL say nothing for a mine with no stairs yet.
+
+#### Scenario: Dusk at y 16
+- **WHEN** night falls while the bot is branch mining at y 16
+- **THEN** it carries on until a trip limit and walks up the stairs itself

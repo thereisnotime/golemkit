@@ -10,3 +10,4 @@
 - [x] mine.* toggles, settings.mine checked; goldens
 - [x] docs: progression (chain, staircase mine, mermaid), needs-and-idle, config, live-config
 - [x] survival bench: endItems and mines in the results; a stone-kit run
+- [x] live fixes: wood before the mine, shield planks, furnace needs a table, stay_safe night in the mine, trip records on abort, site check on dug stairs, torches after coal, old tunnels not counted as branches

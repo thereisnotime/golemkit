@@ -45,3 +45,10 @@ A need search MAY say it is committed while it runs (`NeedSearch.committed`). Wh
 #### Scenario: A tree to fell
 - **WHEN** the gear search is walking home for its mine trip and chop_wood_loop scores 38
 - **THEN** the gear search goes on
+
+### Requirement: Wood for the mine and the furnace
+Before a mine trip from the gear search the bot SHALL fell a tree when it holds less than 3 logs' worth of wood. The tool planner SHALL NOT pick "craft a furnace" without a crafting table near, one carried, or 4 planks' worth of wood; it SHALL get logs first. A crafting table SHALL be made from a log when the planks alone are too few, and a shield's 6 planks SHALL be made from logs before crafting it.
+
+#### Scenario: Back up with raw iron and no planks
+- **WHEN** the bot has 6 raw iron, 40 cobblestone, coal, no wood and no crafting table near
+- **THEN** the next step is to get logs
