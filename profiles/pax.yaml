@@ -116,6 +116,13 @@ behaviors:
 # for exposed iron ore within 160 blocks by day (a trip, then home) when nothing in sight helps. When
 # nothing needs doing it does chores near home: tidy its chests, wood and seeds, the farm, torches, scouting.
 idle: active
+# Base projects (docs/guide/base-projects.md): between other chores Pax improves its fortress at
+# 560 67 -43 by itself: walls and gate torches, a farm plot kept free, the stone floor, torches
+# inside, a chest row (its chests are full), a workshop, the walkway, the corner towers. Small
+# projects go ahead; ones over 150 blocks (floor, towers) wait for an owner's ok, except what the
+# paused fortress v2 goal already asked for. "pax projects", "pax plan fortress", "pax skip walkway",
+# "pax build towers next", "pax pause building".
+projects: { policy: auto, askAbove: 150, onTimeout: wait }
 # Plain-language commands without the LLM (docs/guide/intents.md): "pax follow me", "pax chop some
 # wood". first = simple requests are handled directly (no tokens), everything else goes to the LLM.
 intents:
