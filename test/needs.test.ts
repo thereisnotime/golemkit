@@ -296,6 +296,38 @@ test('controller: a gear search taken over in its first seconds keeps its full r
   c.stop()
 })
 
+test('controller: a committed search (down its mine) keeps the body against ordinary work, not against danger', async () => {
+  const f = fake(['wander', 'deposit', 'find_target'])
+  const score = { v: 0 }
+  const tools: Behavior = { name: 'tools', score: () => 0, run: async () => 'ok' }
+  const work: Behavior = { name: 'chop', score: () => score.v, run: async () => 'ok' }
+  const prov = provider({ urgency: { v: 0.7 } })
+  const state = { committed: false }
+  let aborted = false
+  prov.needs[0]!.search!.committed = () => state.committed
+  prov.needs[0]!.search!.run = async (ctx) => {
+    await new Promise<void>(res => { ctx.signal.addEventListener('abort', () => { aborted = true; res() }) })
+    ctx.signal.throwIfAborted()
+    return ok('done')
+  }
+  const layer = new NeedsLayer(f.agent, prov, { now: () => f.clock.t })
+  const c = new NpcController(f.agent, f.bot as any, { behaviors: [tools, work], needs: layer, now: () => f.clock.t, autoHome: false })
+  f.settings.needs = { gear: { enabled: true } }
+  await c.tick(); await flush()
+  assert.equal(c.snapshot().behavior, 'need:gear')
+  state.committed = true
+  score.v = 38
+  f.clock.t += 2000
+  await c.tick(); await flush()
+  assert.equal(c.snapshot().behavior, 'need:gear', 'chopping wood does not pull it out of the mine')
+  assert.equal(aborted, false)
+  score.v = 85
+  f.clock.t += 2000
+  await c.tick(); await flush(); await flush()
+  assert.equal(aborted, true, 'danger does')
+  c.stop()
+})
+
 test('controller: a need that is automatic stays off without its behaviour; boosts reach the serving behaviour', async () => {
   const f = fake(['wander', 'find_target'])
   const layer = new NeedsLayer(f.agent, provider({ urgency: { v: 0.9 } }), { now: () => f.clock.t })

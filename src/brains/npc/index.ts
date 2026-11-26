@@ -7,7 +7,7 @@ import { NpcController, INTERRUPT_ACTION, type NpcOptions } from './controller.t
 import { helpDesk } from './help.ts'
 
 export { NpcController, INTERRUPT_ACTION, type NpcOptions, type BehaviorStats, type NpcSnapshot } from './controller.ts'
-export { NeedsLayer, planNeeds, searchDue, cutShort, CUT_SHORT_MS, IDLE_BAND, SEARCH_SCORE, CHORE_SCORES, type NeedsProvider, type NeedDef, type NeedSearch, type ChoreDef, type SiteProbe, type NeedInput, type NeedsPlan, type LayerView, type SearchRecord } from './needs.ts'
+export { NeedsLayer, planNeeds, searchDue, cutShort, CUT_SHORT_MS, IDLE_BAND, SEARCH_SCORE, COMMITTED_SCORE, CHORE_SCORES, type NeedsProvider, type NeedDef, type NeedSearch, type ChoreDef, type SiteProbe, type NeedInput, type NeedsPlan, type LayerView, type SearchRecord } from './needs.ts'
 export { pickChore, inHours, windowOk, MODE_RANK, type ChoreSpec, type ChoreWhen } from './idle.ts'
 export { Blackboard, type Needs, type Facts, type BlackboardOptions } from './blackboard.ts'
 export { decide, best, failureCooldown, flipCooldown, isFlip, type Decision, type Scored, type SelectOptions } from './select.ts'

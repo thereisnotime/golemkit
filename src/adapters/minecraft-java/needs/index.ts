@@ -84,6 +84,7 @@ export function minecraftNeeds (agent: Agent): NeedsProvider {
     })
   })
 
+  let mineLeg = false
   const needs: NeedDef[] = [
     {
       name: 'safety',
@@ -122,6 +123,8 @@ export function minecraftNeeds (agent: Agent): NeedsProvider {
           const s = stairMineConfig(agent)
           return s.enabled && s.atNight && !!agent.getAction('dig_mine') && !!knownLitMine(agent, bot(ctx)) && mineTripDue(lastMineTrip(agent), ctx.now, s)
         },
+        // down the mine and smelting after it: chopping wood or tending the farm doesn't pull it out
+        committed: () => mineLeg,
         async run (ctx, o) {
           const t = gearTarget(agent)
           const b = bot(ctx)
@@ -146,19 +149,22 @@ export function minecraftNeeds (agent: Agent): NeedsProvider {
           }
           if (!mineOk) { await home(); return { ok: false, message: parts.join('; ') || 'no mine trip due' } }
           // 2. its staircase mine near home: food from the pantry and a weapon first, then down for the iron the chain still needs
-          await home()
-          if (agent.getAction('prepare_trip')) {
-            const p = await ctx.act('prepare_trip', { purpose: 'a trip down the mine', kind: 'ore', waive: [] })
-            if (!p.ok) return { ok: false, message: [...parts, p.message].join('; '), ...(p.data ? { data: p.data } : {}) }
-          }
-          const want = Math.min(32, Math.max(3, ironWanted({ held: heldItems(b), ...t, bucketNeeded: ctx.bb.need(BUCKET_NEED) > 0 })))
-          const m = await ctx.act('dig_mine', { ore: 'iron', count: want })
-          parts.push(m.message)
-          // 3. smelt and craft at home
-          await home()
-          const u = await upgrade()
-          parts.push(u.message)
-          return { ok: m.ok || u.ok, message: parts.join('; ') }
+          mineLeg = true
+          try {
+            await home()
+            if (agent.getAction('prepare_trip')) {
+              const p = await ctx.act('prepare_trip', { purpose: 'a trip down the mine', kind: 'ore', waive: [] })
+              if (!p.ok) return { ok: false, message: [...parts, p.message].join('; '), ...(p.data ? { data: p.data } : {}) }
+            }
+            const want = Math.min(32, Math.max(3, ironWanted({ held: heldItems(b), ...t, bucketNeeded: ctx.bb.need(BUCKET_NEED) > 0 })))
+            const m = await ctx.act('dig_mine', { ore: 'iron', count: want })
+            parts.push(m.message)
+            // 3. smelt and craft at home
+            await home()
+            const u = await upgrade()
+            parts.push(u.message)
+            return { ok: m.ok || u.ok, message: parts.join('; ') }
+          } finally { mineLeg = false }
         }
       }
     },

@@ -18,6 +18,8 @@ import type { Scored } from './select.ts'
 /** Scores of the layer's own behaviours. The idle band (wander, idle_look...) is 5-15. */
 export const IDLE_BAND = 15
 export const SEARCH_SCORE = 18
+/** A running search that says it is committed keeps this score: above work (chop_wood_loop 30-38, keep_tools_upgraded 28), below danger. */
+export const COMMITTED_SCORE = 45
 export const CHORE_SCORES: Record<Exclude<IdleMode, 'off'>, number> = { passive: 5, idle: 12, active: 16, explore: 16 }
 
 export interface NeedSearch {
@@ -29,6 +31,11 @@ export interface NeedSearch {
   ready? (ctx: NpcContext): boolean
   /** Whether it may run at night now although needs.search.atNight is off (a lit mine near home, say). Default false. */
   night? (ctx: NpcContext): boolean
+  /**
+   * While running: whether it is in a part it shouldn't be pulled out of by ordinary work (down a
+   * mine, say). It then keeps COMMITTED_SCORE even when other behaviours score; danger still wins.
+   */
+  committed? (ctx: NpcContext): boolean
   run (ctx: BehaviorContext, o: { radius: number, minutes: number, atNight: boolean }): Promise<ActionResult>
 }
 
@@ -347,7 +354,12 @@ export class NeedsLayer {
     const idle = this.idleSettings()
     this.fallback = null
     let idleWhy: string | null = null
-    if (p.quiet) {
+    const runningNeed = running?.startsWith('need:') ? this.provider.needs.find(n => `need:${n.name}` === running) : undefined
+    let committed = false
+    try { committed = !!runningNeed?.search?.committed?.(ctx) } catch {}
+    if (committed && running && !p.scores.some(x => x.score >= COMMITTED_SCORE)) {
+      this.fallback = { behavior: running, reason: `finishing ${running} (committed: ${runningNeed!.search!.what})`, score: COMMITTED_SCORE }
+    } else if (p.quiet) {
       if (running && (running.startsWith('need:') || running.startsWith('idle:'))) {
         // finish what it started
         const chore = running.startsWith('idle:') ? this.provider.chores.find(c => `idle:${c.name}` === running) : null
