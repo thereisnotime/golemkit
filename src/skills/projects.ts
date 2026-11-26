@@ -623,10 +623,14 @@ const workOnBase = defineAction({
 })
 
 /**
- * The base's own blocks (walls, floor, towers, the rows), so the pathfinder never tunnels through
- * them: a bot leaving its outpost dug a wall block every time and rebuilt it the next session.
- * Only once the base is settled (settings.projects.base or remembered when work started).
+ * The base's own blocks (walls, floor, towers, the rows), which the pathfinder only digs through
+ * when there is no other way: a bot leaving its outpost dug a wall block on every trip and rebuilt
+ * it the next session. Not forbidden outright: mineflayer-pathfinder can't walk through a door, so
+ * with the gate shut a closed base would lock the bot in or out (it stood outside for 7 minutes in
+ * a live run); the survey puts back what it dug. Only once the base is settled (settings or
+ * remembered when work started).
  */
+export const BASE_BREAK_COST = 40
 function baseBlockKeys (agent: Agent): Set<string> {
   const out = new Set<string>()
   const s = settingsOf(agent)
@@ -652,7 +656,7 @@ function guardBase (agent: Agent, bot: Bot): () => void {
   const cost = (b: { position: Pos }) => {
     const now = Date.now()
     if (now - at > 30_000) { at = now; try { keys = baseBlockKeys(agent) } catch { keys = new Set() } }
-    return keys.has(key(b.position)) ? Infinity : 0
+    return keys.has(key(b.position)) ? BASE_BREAK_COST : 0
   }
   let attached: { exclusionAreasBreak: unknown[] } | null = null
   const attach = () => {

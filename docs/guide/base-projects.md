@@ -84,9 +84,12 @@ A session (`work_on_base`, at most `sessionMinutes`) works the first ready proje
    session (the rest is for the next session);
 4. builds only the stage's cells, then surveys again and records progress.
 
-Once the base is settled, the pathfinder never digs through its blocks (walls, floor, towers, the
-rows): in the first live run the bot tunnelled out through its new wall on every trip and rebuilt
-it the next session. The chore is sticky, so picking up a few drops doesn't cut a session short.
+Once the base is settled, its blocks (walls, floor, towers, the rows) cost the pathfinder a lot to
+dig through, so it takes any other way first: in the first live run the bot tunnelled out through
+its new wall on every trip and rebuilt it the next session. They aren't forbidden outright, because
+mineflayer-pathfinder can't walk through a door: with the gate shut and digging forbidden, the bot
+stood locked out for seven minutes. A closed base still costs a block when there is no other way
+out; the next survey puts it back. The chore is sticky, so picking up a few drops doesn't cut a session short.
 
 Progress is the world itself plus `projects.state` in agent storage, so a session cut short by a
 reflex, a death, a disconnect or a restart picks up where it was. A project that got nothing done
