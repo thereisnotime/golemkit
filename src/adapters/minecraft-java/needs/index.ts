@@ -158,6 +158,9 @@ export function minecraftNeeds (agent: Agent): NeedsProvider {
               const p = await ctx.act('prepare_trip', { purpose: 'a trip down the mine', kind: 'ore', waive: [] })
               if (!p.ok) return { ok: false, message: [...parts, p.message].join('; '), data: { retry: true } }
             }
+            // wood for the mine first: a spare pickaxe, sticks for torches, a crafting table (the first
+            // live trip came up early with its only stone pickaxe worn out and no sticks to make another)
+            if (woodStock(b) < 3 && agent.getAction('chop_tree')) await ctx.act('chop_tree', { radius: 32, avoid_spawn: 48 })
             const want = Math.min(32, Math.max(3, ironWanted({ held: heldItems(b), ...t, bucketNeeded: ctx.bb.need(BUCKET_NEED) > 0 })))
             const m = await ctx.act('dig_mine', { ore: 'iron', count: want })
             parts.push(m.message)

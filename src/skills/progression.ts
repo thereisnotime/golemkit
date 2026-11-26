@@ -6,7 +6,7 @@
 // cheap steps (stone tools cost 3 cobblestone and 2 sticks once a wooden pickaxe exists).
 import type { ActionContext, ActionResult } from '../core/index.ts'
 import { defineSkill, defineAction, z, ok, fail, checkAborted, needsSurvival, goals } from '../core/index.ts'
-import { TOOL_SHAPE, toolTier, inventoryCounts, plankUnits, usablePlankUnits, ensureTool, ensurePlanks, type ToolKind, type Tier } from './toolkit.ts'
+import { TOOL_SHAPE, toolTier, inventoryCounts, plankUnits, usablePlankUnits, ensureTool, ensurePlanks, ensureSamePlanks, type ToolKind, type Tier } from './toolkit.ts'
 import { craftItem, smeltItem } from './crafting.ts'
 import { collectBlocks } from './gather.ts'
 import { fellTree } from './woodcutting.ts'
@@ -362,6 +362,8 @@ export async function runUpgradeStep (ctx: Ctx, s: UpgradeStep, safe = true): Pr
       return typeof r === 'object' && r ? r : fail(`could not take a ${s.item}`)
     }
     case 'craft': {
+      // a shield takes 6 planks: make them from logs first (the planner counts logs as planks)
+      if (s.item === 'shield') await ensureSamePlanks(bot, signal, 6).catch(e => { checkAborted(signal); ctx.log.debug('shield: no planks', { error: (e as Error).message }) })
       if (s.kind === 'armour' || s.kind === 'item') return craftItem(bot, signal, s.item, 1)
       const r = await ensureTool(bot, signal, s.kind, { minTier: s.tier })
       return r.ok ? ok(r.message) : r
