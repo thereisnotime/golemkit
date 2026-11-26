@@ -121,7 +121,8 @@ export interface ColdWaterPlan {
 /**
  * The steps to get a farm water source at a site in the cold, without a bucket: break the ice
  * (when the centre is ice) and keep the water from freezing (protectionFor), taking two cheap
- * blocks from its chests first when it has none and a cover is the plan.
+ * blocks from its chests (or digging two dirt) first when it has none and a cover is the plan.
+ * A cover over ice goes on before the ice is broken; a torch goes after.
  */
 export function planColdWater (o: {
   centre: 'ice' | 'water'
@@ -153,8 +154,10 @@ export function planColdWater (o: {
   const steps: ColdStep[] = []
   if (take && protection.how === 'cover') steps.push('take_blocks')
   if (dig && protection.how === 'cover') steps.push('dig_blocks')
-  if (o.centre === 'ice') steps.push('break_ice')
+  // ice: the cover goes on top of the ice first (the ice is something to place against; open
+  // water is not), then the ice is broken from the side under it
   if (protection.how === 'cover') steps.push('cover')
+  if (o.centre === 'ice') steps.push('break_ice')
   if (protection.how === 'torch') steps.push('torch')
   const what = o.centre === 'ice' ? 'break the ice for water' : 'use the open water'
   return { ok: true, steps, protection, reason: `${what}; ${protection.reason}` }

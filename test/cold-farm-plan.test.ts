@@ -57,18 +57,18 @@ test('ice sources: open above (snow is fine), not under a roof, water or ground 
   assert.equal(iceSourceOk({ ...c, below: 'air' }), false)
 })
 
-test("Pax's frozen shore: no bucket, no torches, dirt in its chests: take two, break the ice, cover it", () => {
+test("Pax's frozen shore: no bucket, no torches, dirt in its chests: take two, cover the ice, break it", () => {
   const p = planColdWater({ centre: 'ice', freezes: true, mode: 'auto', inv: { spruce_log: 20, stone_pickaxe: 1 }, stored: { dirt: 30, cobblestone: 38 }, torches: 0, side: true, iceWater: true })
   assert.equal(p.ok, true)
-  assert.deepEqual(p.steps, ['take_blocks', 'break_ice', 'cover'])
+  assert.deepEqual(p.steps, ['take_blocks', 'cover', 'break_ice'], 'the cover goes on the ice, then the ice is broken under it')
   const carried = planColdWater({ centre: 'ice', freezes: true, mode: 'auto', inv: { cobblestone: 9 }, torches: 0, side: true, iceWater: true })
-  assert.deepEqual(carried.steps, ['break_ice', 'cover'])
+  assert.deepEqual(carried.steps, ['cover', 'break_ice'])
   const torch = planColdWater({ centre: 'ice', freezes: true, mode: 'auto', inv: {}, stored: { dirt: 30 }, torches: 4, side: true, iceWater: true })
   assert.deepEqual(torch.steps, ['break_ice', 'torch'], 'a torch it carries beats a walk to the chests')
   const open = planColdWater({ centre: 'water', freezes: true, mode: 'auto', inv: { dirt: 2 }, torches: 0, side: true, iceWater: true })
   assert.deepEqual(open.steps, ['cover'], 'open water in the cold: just keep it open')
   assert.equal(planColdWater({ centre: 'ice', freezes: true, mode: 'auto', inv: {}, stored: {}, torches: 0, side: true, iceWater: true }).ok, false)
-  assert.deepEqual(planColdWater({ centre: 'ice', freezes: true, mode: 'auto', inv: {}, stored: {}, torches: 0, side: true, iceWater: true, canDigBlocks: true }).steps, ['dig_blocks', 'break_ice', 'cover'], 'nothing anywhere: dig two dirt beside the plot')
+  assert.deepEqual(planColdWater({ centre: 'ice', freezes: true, mode: 'auto', inv: {}, stored: {}, torches: 0, side: true, iceWater: true, canDigBlocks: true }).steps, ['dig_blocks', 'cover', 'break_ice'], 'nothing anywhere: dig two dirt beside the plot')
   assert.match(planColdWater({ centre: 'ice', freezes: true, mode: 'auto', inv: { dirt: 2 }, torches: 0, side: true, iceWater: false }).reason, /iceWater is off/)
 })
 

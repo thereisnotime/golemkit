@@ -11,7 +11,7 @@ import { defineSkill, defineAction, z, ok, fail, goals, travel, sleep, checkAbor
 import { huntRefusal, inPen, herdSurplus, unreachableAnimals, HUNTABLE, type HuntCandidate } from './combat.ts'
 import { CROPS, isMature, plantOn, TILLABLE } from './farming.ts'
 import { getHome, getPlaces, setPlace, sameDimension, reachDryLand, type Place } from './navigation.ts'
-import { digBlock, DigRefusedError, findItem, countItem, placeAt, reachBlock, vec, within, gotoWithin } from './world.ts'
+import { digBlock, DigRefusedError, findItem, countItem, placeAt, reachBlock, vec, within, gotoWithin, findPlaceFace, isReplaceable } from './world.ts'
 import { pickupNearby, droppedItemName } from './pickup.ts'
 import { climbOut, roofAbove } from './survival.ts'
 import { ensureTool } from './toolkit.ts'
@@ -940,7 +940,7 @@ export async function keepWaterOpen (ctx: Pick<ActionContext, 'bot' | 'agent' | 
       const r = await takeItemsFromOwnChests(ctx, { [item]: 2 }, 128, {}, chestView(agent, bot)).catch(e => { checkAborted(signal); return { took: {} as Record<string, number> } })
       if ((r.took[item] ?? 0) >= 2) done.push(`took 2 ${item} from my chests`)
     } else if (step === 'dig_blocks') {
-      // two ground blocks from just outside the plot (grass drops dirt), never protected or built
+      // two ground blocks from just outside the plot (grass drops dirt, stone cobblestone), never protected or built
       const h = (Math.sqrt(Object.keys(site.cells).length) - 1) / 2
       let got = 0
       for (let r = h + 2; r <= h + 4 && got < 2; r++) {
@@ -948,21 +948,24 @@ export async function keepWaterOpen (ctx: Pick<ActionContext, 'bot' | 'agent' | 
           if (got >= 2 || coverItem(inventory(bot))) break
           const g = bot.blockAt(vec(bot, w.x + dx, w.y, w.z + dz))
           const up = bot.blockAt(vec(bot, w.x + dx, w.y + 1, w.z + dz))
-          if (!g || !/^(grass_block|dirt|coarse_dirt)$/.test(g.name) || !up || !/^(air|snow|short_grass)$/.test(up.name)) continue
+          if (!g || !/^(grass_block|dirt|coarse_dirt|stone|andesite|diorite|granite)$/.test(g.name) || !up || !/^(air|snow|short_grass)$/.test(up.name)) continue
           if (offLimits(agent, bot, g.position, 0)) continue
           try { await reachBlock(bot, g.position, signal, 3, 15_000); await digBlock(bot, g, signal); got++ } catch (e) { checkAborted(signal) }
         }
       }
       await pickupNearby(bot, signal, { radius: 6, maxMs: 6000 }).catch(() => 0)
-      if (!coverItem(inventory(bot))) return { ok: false, how: 'none', message: 'could not dig two blocks of dirt to cover the water' }
-      done.push('dug 2 dirt beside the plot')
+      if (!coverItem(inventory(bot))) return { ok: false, how: 'none', message: `could not dig two blocks to cover the water (dug ${got})` }
+      done.push(`dug ${got} blocks beside the plot for a cover`)
     } else if (step === 'break_ice') {
       // from the shore cell, never standing on the ice it breaks
       if (sidePos) { try { await gotoWithin(bot, new goals.GoalBlock(sidePos.x, sidePos.y, sidePos.z), signal, 30_000) } catch (e) { checkAborted(signal) } }
       const ice = bot.blockAt(w)
       if (!ice || !ICE.test(ice.name)) return { ok: false, how: 'none', message: `the ice at ${fmtPos(w)} is gone (${ice?.name ?? 'not loaded'})` }
       await holdNoSilk(bot)
-      try { await reachBlock(bot, w, signal, 3, 15_000); await digBlock(bot, ice, signal, 400) } catch (e) {
+      // covered already: dig it through its shore-side face (the server checks reach, not sight)
+      const covered = bot.blockAt(w.offset(0, 1, 0))?.boundingBox === 'block'
+      const face = covered && side ? vec(bot, side[0], 0, side[1]) : undefined
+      try { await reachBlock(bot, w, signal, 3, 15_000); await digBlock(bot, ice, signal, 400, face) } catch (e) {
         checkAborted(signal)
         return { ok: false, how: 'none', message: `could not break the ice at ${fmtPos(w)}: ${(e as Error).message}` }
       }
@@ -972,21 +975,32 @@ export async function keepWaterOpen (ctx: Pick<ActionContext, 'bot' | 'agent' | 
       const item = coverItem(inventory(bot))
       if (!item) return { ok: false, how: 'none', message: 'no blocks left to cover the water' }
       const over = w.offset(0, 1, 0)
-      try {
-        // nothing to place against over open water: a helper block on the shore cell next to it first
-        const snow = bot.blockAt(sidePos)
-        if (snow && snow.name === 'snow') await digBlock(bot, snow, signal)
-        await placeAt(bot, item, sidePos, signal)
-        await placeAt(bot, item, over, signal)
-        const helper = bot.blockAt(sidePos)
-        if (helper && helper.name === item) { await reachBlock(bot, sidePos, signal, 3, 15_000); await digBlock(bot, helper, signal) }
-        await pickupNearby(bot, signal, { radius: 4, maxMs: 4000 }).catch(() => 0)
-      } catch (e) {
-        checkAborted(signal)
-        log.debug('start_farm: could not cover the water', { error: (e as Error).message })
+      const errors: string[] = []
+      const put = async (pos: Vec3): Promise<boolean> => {
+        try {
+          const snow = bot.blockAt(pos)
+          if (snow && snow.name === 'snow') await digBlock(bot, snow, signal)
+          await placeAt(bot, item, pos, signal)
+          return true
+        } catch (e) { checkAborted(signal); errors.push(`${fmtPos(pos)}: ${(e as Error).message}`); return false }
       }
-      if (bot.blockAt(over)?.boundingBox !== 'block') return { ok: false, how: 'none', message: `could not put a block over the water at ${fmtPos(w)}` }
-      done.push(`covered it with ${item} so it doesn't freeze`)
+      let helper: Vec3 | null = null
+      // on ice the ice itself takes the block; over open water it needs a block next to it at that height
+      if (!findPlaceFace(bot, over)) {
+        const cands = [sidePos, ...[[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => over.offset(dx!, 0, dz!))]
+        for (const c of cands) {
+          if (c.equals(over) || !isReplaceable(bot.blockAt(c)?.name) || !findPlaceFace(bot, c)) continue
+          if (offLimits(agent, bot, c, 0)) continue
+          if (await put(c)) { helper = c; break }
+        }
+      }
+      await put(over)
+      if (helper && bot.blockAt(helper)?.name === item) {
+        try { await reachBlock(bot, helper, signal, 3, 15_000); await digBlock(bot, bot.blockAt(helper)!, signal) } catch (e) { checkAborted(signal) }
+        await pickupNearby(bot, signal, { radius: 4, maxMs: 4000 }).catch(() => 0)
+      }
+      if (bot.blockAt(over)?.boundingBox !== 'block') return { ok: false, how: 'none', message: `could not put a block over the water at ${fmtPos(w)}${errors.length ? ` (${errors.slice(-2).join('; ')})` : ''}` }
+      done.push(`covered ${fmtPos(w)} with ${item} so it doesn't freeze`)
     } else if (step === 'torch' && sidePos) {
       if (!countItem(bot, 'torch')) {
         if (!countItem(bot, 'stick')) await craftItem(bot, signal, 'stick', 4).catch(() => null)

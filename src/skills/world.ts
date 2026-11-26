@@ -195,7 +195,7 @@ export class DigRefusedError extends Error {
 /** Items a creative player can't break blocks with: the server puts the block straight back. */
 export const CREATIVE_NO_BREAK = /_sword$|^trident$|^mace$|^debug_stick$/
 
-export async function digBlock (bot: Bot, block: Block, signal: AbortSignal, settleMs = 250): Promise<void> {
+export async function digBlock (bot: Bot, block: Block, signal: AbortSignal, settleMs = 250, face?: Vec3): Promise<void> {
   const pos = block.position
   // creative: a sword in hand doesn't break anything (seen live: every dig "refused", the build
   // then stopped as if in a protected area); put it away first
@@ -216,7 +216,8 @@ export async function digBlock (bot: Bot, block: Block, signal: AbortSignal, set
     const onAbort = () => bot.stopDigging()
     signal.addEventListener('abort', onAbort, { once: true })
     try {
-      await bot.dig(block, true)
+      // a face given: dig through it even when the block is covered (the server checks reach, not sight)
+      await (face ? bot.dig(block, true, face) : bot.dig(block, true))
     } finally {
       signal.removeEventListener('abort', onAbort)
     }
