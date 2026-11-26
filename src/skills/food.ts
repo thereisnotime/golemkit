@@ -14,7 +14,7 @@ import { getHome, getPlaces, setPlace, sameDimension, reachDryLand, type Place }
 import { digBlock, DigRefusedError, findItem, countItem, placeAt, reachBlock, vec, within, gotoWithin, findPlaceFace, isReplaceable } from './world.ts'
 import { pickupNearby, droppedItemName } from './pickup.ts'
 import { climbOut, roofAbove } from './survival.ts'
-import { ensureTool } from './toolkit.ts'
+import { ensureTool, equipFor } from './toolkit.ts'
 import { collectBlocks } from './gather.ts'
 import { craftItem, pickFuel } from './crafting.ts'
 import { planFarmWork, farmWorkCount, oddSize, type FarmCell, type FarmGrid, type FarmWork } from './farmPlan.ts'
@@ -950,7 +950,7 @@ export async function keepWaterOpen (ctx: Pick<ActionContext, 'bot' | 'agent' | 
           const up = bot.blockAt(vec(bot, w.x + dx, w.y + 1, w.z + dz))
           if (!g || !/^(grass_block|dirt|coarse_dirt|stone|andesite|diorite|granite)$/.test(g.name) || !up || !/^(air|snow|short_grass)$/.test(up.name)) continue
           if (offLimits(agent, bot, g.position, 0)) continue
-          try { await reachBlock(bot, g.position, signal, 3, 15_000); await digBlock(bot, g, signal); got++ } catch (e) { checkAborted(signal) }
+          try { await reachBlock(bot, g.position, signal, 3, 15_000); await equipFor(bot, g).catch(() => {}); await digBlock(bot, g, signal); got++ } catch (e) { checkAborted(signal) }
         }
       }
       await pickupNearby(bot, signal, { radius: 6, maxMs: 6000 }).catch(() => 0)
