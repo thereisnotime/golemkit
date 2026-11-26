@@ -88,7 +88,8 @@ better, digging is on and iron (tools, armour, a bucket, a shield) is what is mi
    shallow cave), so it is ore it may mine. Found: `upgrade_tools` there under the
    [safe-mining](./progression#safe-mining) rules, then home. Skipped once its mine reached depth;
 2. nothing found (or skipped), and a mine trip is due (`mine.enabled`, `mine.cooldownMinutes` since the
-   last one): home, `prepare_trip` (pantry food, a weapon), then
+   last one): home, `prepare_trip` (pantry food, a weapon), a tree when it holds less than 3 logs'
+   worth of wood (the spare pickaxe, sticks for torches and a crafting table come from it), then
    [`dig_mine`](./progression#the-staircase-mine) for the raw iron the [iron chain](./progression#the-iron-chain)
    still needs (3 to 32): its staircase mine near home, down to y 16, branches, the ore in the walls,
    back up;
