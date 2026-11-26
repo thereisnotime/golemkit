@@ -144,6 +144,8 @@ export function minecraftNeeds (agent: Agent): NeedsProvider {
               const u = await upgrade()
               return { ok: u.ok, message: `${f.message}; ${u.message}` }
             })
+            // not fit for a trip yet (health, food): no mine either, and it doesn't count as a search
+            if (!r.ok && /^not ready for a trip/.test(r.message)) return { ok: false, message: r.message, data: { retry: true } }
             if (r.ok || (r.data as { turnedBack?: unknown } | undefined)?.turnedBack || !mineOk) { await home(); return r }
             parts.push(r.message)
           }
@@ -154,7 +156,7 @@ export function minecraftNeeds (agent: Agent): NeedsProvider {
             await home()
             if (agent.getAction('prepare_trip')) {
               const p = await ctx.act('prepare_trip', { purpose: 'a trip down the mine', kind: 'ore', waive: [] })
-              if (!p.ok) return { ok: false, message: [...parts, p.message].join('; '), ...(p.data ? { data: p.data } : {}) }
+              if (!p.ok) return { ok: false, message: [...parts, p.message].join('; '), data: { retry: true } }
             }
             const want = Math.min(32, Math.max(3, ironWanted({ held: heldItems(b), ...t, bucketNeeded: ctx.bb.need(BUCKET_NEED) > 0 })))
             const m = await ctx.act('dig_mine', { ore: 'iron', count: want })

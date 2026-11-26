@@ -110,6 +110,7 @@ test('cutShort: taken over or thrown in the first minute', () => {
   assert.equal(cutShort({ ok: false, message: 'nothing in sight within 160 blocks' }, 3000), false)
   assert.equal(cutShort({ ok: false, message: 'replaced' }, 5 * 60_000), false)
   assert.equal(cutShort(null, 5 * 60_000), false)
+  assert.equal(cutShort({ ok: false, message: 'not ready for a trip: health 7/20', data: { retry: true } }, 6000), true, 'could not start')
 })
 
 // ------------------------------------------------------------------ pickChore

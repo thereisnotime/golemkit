@@ -169,10 +169,14 @@ export const CUT_SHORT_MS = 60_000
 const STALE_START_MS = 45 * 60_000
 const ABORTED = /^(replaced|preempted|aborted|interrupted|cancelled|suspended)\b/i
 
-/** Whether a finished run was cut short: it threw or was taken over, in its first minute. */
-export function cutShort (r: { ok: boolean, message: string } | null, ms: number): boolean {
+/**
+ * Whether a finished run was cut short: it threw or was taken over in its first minute, or said
+ * so itself (`data.retry`: it couldn't start, e.g. not fit for the trip yet).
+ */
+export function cutShort (r: { ok: boolean, message: string, data?: unknown } | null, ms: number): boolean {
   if (ms >= CUT_SHORT_MS) return false
-  return !r || (!r.ok && ABORTED.test(r.message))
+  if (!r) return true
+  return !r.ok && (ABORTED.test(r.message) || (r.data as { retry?: unknown } | undefined)?.retry === true)
 }
 
 /**
