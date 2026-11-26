@@ -35,6 +35,7 @@ import { loadProfile } from '../src/core/profile.ts'
 import { standardSkills, extendedSkills, navigation, modsSkill, setHome } from '../src/skills/index.ts'
 import { isNaturalLeaves } from '../src/skills/woodcutting.ts'
 import { farmWaterSurvey } from '../src/skills/food.ts'
+import { heldCounts } from '../src/skills/gear.ts'
 import { reflexes, behaviorsBrain, commandBrain } from '../src/brains/index.ts'
 import {
   KEEP_AWAY, SCENARIOS, TEST_AREAS, aliveSeconds, countTrees, terrainNote, type Terrain, compareTable, gathered, isFoodName, parseResults, pathLength, startFor, stuckLoops, summaryTable,
@@ -540,6 +541,11 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
   await pause(6000) // a death right at the end gets its report
   measuring = false
   savePending(pending)
+  // what it ended with (worn armour and the offhand count) and the mines it dug (gear-progression)
+  let endItems: Record<string, number> = {}
+  try { endItems = heldCounts(agent.bot) } catch {}
+  const mines = agent.storage.get<{ id: string, entrance: { x: number, y: number, z: number }, deepest: number, branches: number, trips: number, got: Record<string, number> }[]>('mines', [])
+    .map(m => `${m.id} at ${m.entrance.x} ${m.entrance.y} ${m.entrance.z} to y ${m.deepest}, ${m.branches} branches, ${m.trips} trips, got ${JSON.stringify(m.got)}`)
   await agent.stop().catch(() => {})
   await owner.stop().catch(() => {})
   await pause(3000)
@@ -590,7 +596,7 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
     distance: Math.round(pathLength(path)), maxFromStart: Math.round(Math.max(0, ...path.map(p => Math.hypot(p.x - start.x, p.z - start.z)))), minY,
     disconnects: kicks, maxLagS: Math.round(maxLagMs / 100) / 10,
     helpAsks: helpAsks.length, helpReasons: helpAsks.slice(0, 10),
-    badFarm: BAD_FARM, sites, searches, choresRun, farmsAtEnd,
+    badFarm: BAD_FARM, sites, searches, choresRun, farmsAtEnd, endItems, mines,
     ownerHeard: heard.length,
     whispers: whispers.length, chatLines: chatOut.length - whispers.length, said: chatOut.slice(0, 20).map(m => (m.to ? `(w ${m.to}) ` : '') + m.message),
     playersNear: Object.fromEntries(Object.entries(playersNear).filter(([, dist]) => dist < 200)),
