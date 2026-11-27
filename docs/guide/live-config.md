@@ -66,7 +66,7 @@ can't change their own.
 | `combat.dodge.meleeMargin` | 0–2 | blocks beyond a melee mob's reach to be at when its swing is ready (default 0.35) |
 | `combat.dodge.meleeLeadMs` | 0–1000 | be out of reach this long before its next swing, on top of `latencyMs` (default 150) |
 | `combat.dodge.meleeCooldownMs` | 250–3000 | attack cooldown assumed for melee mobs not in the table (default 1000, 20 ticks) |
-| `combat.dodge.creeperLeapMs` | 0–3000 | how long the creeper leap keeps going, longer while the fuse is still lit close by (default 900) |
+| `combat.dodge.creeperLeapMs` | 0–3000 | longest the creeper leap keeps going; it stops once the fuse is out or the creeper is 7.2 blocks off (default 1500) |
 | `combat.dodge.minGapMs` | 0–2000 | shortest gap between two leaps (default 300) |
 | `combat.pvp` | off / defend / revenge / targets / all | [PvP mode](../concepts/world#pvp): `defend` fights back; `revenge` also goes after whoever killed or attacked the bot, an owner or the guarded player; `targets` attacks the target list; `all` every player in range. Never owners, friends or creative players; changes are whispered to the owners (default off) |
 | `combat.friends` | names | players never fought in any PvP mode (comma separated; owners are always spared) |

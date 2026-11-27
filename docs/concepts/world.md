@@ -348,8 +348,10 @@ going the same way three times running, so an archer can't learn the pattern and
 drift off in one direction.
 
 - **Creeper leap** (`combat.dodge.creeperLeap`): where `tactics.creeperMove` says to back off from
-  a lit fuse, it now says `leap`. The bot sprint-jumps away (several hops, `creeperLeapMs`, longer
-  while the fuse still burns within 7.5 blocks) instead of walking, steering around unsafe
+  a lit fuse, it now says `leap`. The bot sprint-jumps away instead of walking, but only as far as
+  the fuse needs: it stops once the fuse is out or the creeper is 7.2 blocks off (a fuse stops
+  at 7), or after `creeperLeapMs`. The first bench leapt a fixed time, ended up 8 to 9 blocks
+  away, and `defend` then gave up the creeper at its chase limit, so it killed none. It steers around unsafe
   ground, and only walks off with the pathfinder when no direction is safe. The shield-or-run
   choice (`creeperEscape`) counts the faster escape (3.5 blocks a second gained instead of 2), so
   more fuses are outrun than blocked.

@@ -55,7 +55,7 @@ export interface DodgeSettings {
   meleeLeadMs: number
   /** Attack cooldown of melee mobs not in the table, ms (zombies and most others: 20 ticks). Default 1000. */
   meleeCooldownMs: number
-  /** How long the creeper leap keeps sprint-jumping away, ms. Default 900. */
+  /** Longest the creeper leap keeps sprint-jumping away, ms; it stops sooner once the fuse is out or the creeper is 7.2 blocks off. Default 1500. */
   creeperLeapMs: number
   /** Shortest gap between two leaps, ms (a leap that just ended needs its landing). Default 300. */
   minGapMs: number
@@ -76,7 +76,7 @@ export const DODGE_DEFAULTS: DodgeSettings = {
   meleeMargin: 0.35,
   meleeLeadMs: 150,
   meleeCooldownMs: 1000,
-  creeperLeapMs: 900,
+  creeperLeapMs: 1500,
   minGapMs: 300
 }
 

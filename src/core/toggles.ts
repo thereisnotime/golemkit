@@ -59,7 +59,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'combat.dodge.meleeMargin', description: "blocks beyond a melee mob's reach to be at when its swing is ready (default 0.35)", schema: z.number().min(0).max(2) },
   { key: 'combat.dodge.meleeLeadMs', description: "be out of reach this long before a melee mob's next swing, ms, on top of latencyMs (default 150)", schema: z.number().min(0).max(1000) },
   { key: 'combat.dodge.meleeCooldownMs', description: 'attack cooldown assumed for melee mobs not in the table, ms (default 1000, 20 ticks)', schema: z.number().min(250).max(3000) },
-  { key: 'combat.dodge.creeperLeapMs', description: 'how long the creeper leap keeps sprint-jumping away, ms (default 900; longer while the fuse is still lit close by)', schema: z.number().min(0).max(3000) },
+  { key: 'combat.dodge.creeperLeapMs', description: 'longest the creeper leap keeps sprint-jumping away, ms; it stops once the fuse is out or the creeper is 7.2 blocks off (default 1500)', schema: z.number().min(0).max(3000) },
   { key: 'combat.dodge.minGapMs', description: 'shortest gap between two leaps, ms (default 300)', schema: z.number().min(0).max(2000) },
   { key: 'combat.pvp', description: 'off (never fight players) | defend (fight back a player who attacks the bot or the player it guards) | revenge (defend, and go after whoever killed or attacked the bot, an owner or the guarded player) | targets (attack the players on combat.targets, and grudges) | all (attack every player in range); never owners, friends or creative players', schema: z.enum(['off', 'defend', 'revenge', 'targets', 'all']) },
   { key: 'combat.friends', description: 'players never fought in any PvP mode (comma separated; owners are always spared)', schema: z.array(z.string().min(1)) },

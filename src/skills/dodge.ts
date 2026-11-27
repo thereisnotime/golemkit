@@ -306,7 +306,8 @@ export function dodgeLayer (bot: Bot, s: DodgeSettings, rnd: () => number = Math
           const me = bot.entity.position
           const d = creeper.position.distanceTo(me)
           const stillLit = (creeper as any).isValid !== false && lit()
-          if (elapsed > 2000 || (elapsed >= s.creeperLeapMs && !(stillLit && d < 7.5)) || d >= 9) break
+          // only as far as the fuse needs (it stops at 7): further and the fight's chase limit ends the fight
+          if (elapsed > s.creeperLeapMs || (hops > 0 && (!stillLit || d >= 7.2))) break
           const away = unit({ x: me.x - creeper.position.x, z: me.z - creeper.position.z })
           const turn = (a: number) => ({ x: away.x * Math.cos(a) - away.z * Math.sin(a), z: away.x * Math.sin(a) + away.z * Math.cos(a) })
           const dir = [0, 0.6, -0.6, 1.2, -1.2].map(turn).find(x => safe(x, 2))
