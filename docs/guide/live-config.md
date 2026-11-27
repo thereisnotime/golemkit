@@ -91,7 +91,7 @@ can't change their own.
 | `retreat.healSeconds` | 0–600 | longest wait to heal after an escape (default 60) |
 | `retreat.comeBack` | on/off | after healing, fight the mobs still around: at home after going home, where it left otherwise (default on) |
 | `retreat.maxEscapes` | 0–10 | escapes per `defend` run before it fights where it stands (default 2) |
-| `retreat.routes` | list | escape routes in the order tried: `home`, `pillar`, `bunker`, `sprint`; leave one out to turn it off (default all four in that order) |
+| `retreat.routes` | list | escape routes in the order tried: `home`, `pillar`, `sprint`, `bunker`; leave one out to turn it off (default all four in that order) |
 | `retreat.homeRadius` | 0–256 | escape home only when home is this close (default 40) |
 | `retreat.closeDoors` | on/off | shut open wooden doors next to it once home (default on) |
 | `retreat.pillarHeight` | 1–4 | pillar height for the pillar route (default 2: above zombie reach, still able to hit down) |

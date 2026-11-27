@@ -33,7 +33,7 @@ export const RetreatSchema = z.object({
   healSeconds: z.number().min(0).max(600).default(60).describe('longest wait for health to come back after escaping'),
   comeBack: z.boolean().default(true).describe('after healing, fight the mobs still around (at home after going home, where it left otherwise)'),
   maxEscapes: z.number().int().min(0).max(10).default(2).describe('escapes per defend run; after that it fights where it stands'),
-  routes: z.array(z.enum(ROUTE_IDS)).default(['home', 'pillar', 'bunker', 'sprint']).describe('escape routes tried in this order; leave one out to turn it off'),
+  routes: z.array(z.enum(ROUTE_IDS)).default(['home', 'pillar', 'sprint', 'bunker']).describe('escape routes tried in this order; leave one out to turn it off'),
   homeRadius: z.number().min(0).max(256).default(40).describe('go home to escape only when home is this close (blocks)'),
   closeDoors: z.boolean().default(true).describe('shut open doors next to it once home'),
   pillarHeight: z.number().int().min(1).max(4).default(2).describe('blocks to pillar up (2 is above zombie reach, low enough to hit down)'),

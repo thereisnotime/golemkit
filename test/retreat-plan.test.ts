@@ -99,7 +99,7 @@ const input = (o: Partial<EscapeInput> = {}): EscapeInput => ({
 })
 
 test('escape: routes in the configured order, each with its own refusal', () => {
-  assert.deepEqual(planEscape(input(), S.routes, ESCAPE_ROUTES).usable, ['home', 'pillar', 'bunker', 'sprint'])
+  assert.deepEqual(planEscape(input(), S.routes, ESCAPE_ROUTES).usable, ['home', 'pillar', 'sprint', 'bunker'])
   assert.deepEqual(planEscape(input(), ['sprint', 'pillar'], ESCAPE_ROUTES).usable, ['sprint', 'pillar'], 'order and on/off from settings')
   const far = planEscape(input({ home: { dist: 90, throughThreats: false } }), S.routes, ESCAPE_ROUTES)
   assert.deepEqual(far.skipped, [{ id: 'home', why: 'home is 90 blocks away' }])
@@ -150,11 +150,11 @@ test('recover: fight when cornered, eat when it heals, come back healthy, give u
 test('settings: defaults, bad values keep the default, every key has a toggle', () => {
   assert.equal(S.hits, 2)
   assert.equal(S.floor, 4)
-  assert.deepEqual(S.routes, ['home', 'pillar', 'bunker', 'sprint'])
+  assert.deepEqual(S.routes, ['home', 'pillar', 'sprint', 'bunker'])
   const s = retreatSettings({ hits: 3, floor: 'x', routes: ['sprint', 'teleport'], avoidFactors: 3 })
   assert.equal(s.hits, 3)
   assert.equal(s.floor, 4)
-  assert.deepEqual(s.routes, ['home', 'pillar', 'bunker', 'sprint'])
+  assert.deepEqual(s.routes, ['home', 'pillar', 'sprint', 'bunker'])
   assert.equal(s.avoidFactors, 3)
   assert.deepEqual(retreatSettings(undefined), S)
   const keys = new Set(TOGGLES.filter(t => t.key.startsWith('retreat.')).map(t => t.key.slice(8)))

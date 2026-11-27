@@ -252,7 +252,7 @@ at the edge. Creepers are left to the creeper rules (their blast would make ever
 retreat).
 
 **Where to go.** The escape routes are a list, tried in the order of `retreat.routes` (default
-`home, pillar, bunker, sprint`); leave one out to turn it off. Each has its own check:
+`home, pillar, sprint, bunker`: bunker last, since digging three blocks under a crowd failed in every live try while sprinting worked); leave one out to turn it off. Each has its own check:
 
 | route | does | not when |
 |---|---|---|

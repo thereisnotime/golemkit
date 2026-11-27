@@ -84,7 +84,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'retreat.healSeconds', description: 'longest wait to heal after escaping, seconds (default 60)', schema: z.number().min(0).max(600) },
   { key: 'retreat.comeBack', description: 'after healing, fight the mobs still around (at home after going home, where it left otherwise; default on)', schema: bool },
   { key: 'retreat.maxEscapes', description: 'escapes per defend run before it fights where it stands (default 2)', schema: z.number().int().min(0).max(10) },
-  { key: 'retreat.routes', description: 'escape routes in the order tried: home, pillar, bunker, sprint (comma separated; leave one out to turn it off)', schema: z.array(z.enum(['home', 'pillar', 'bunker', 'sprint'])) },
+  { key: 'retreat.routes', description: 'escape routes in the order tried: home, pillar, sprint, bunker (default in that order; comma separated; leave one out to turn it off)', schema: z.array(z.enum(['home', 'pillar', 'bunker', 'sprint'])) },
   { key: 'retreat.homeRadius', description: 'escape home only when home is this close, blocks (default 40)', schema: z.number().min(0).max(256) },
   { key: 'retreat.closeDoors', description: 'shut open wooden doors next to it after escaping home (default on)', schema: bool },
   { key: 'retreat.pillarHeight', description: 'blocks to pillar up when escaping melee mobs (default 2; never against archers, spiders or endermen)', schema: z.number().int().min(1).max(4) },
