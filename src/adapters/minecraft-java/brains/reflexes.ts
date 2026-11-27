@@ -14,6 +14,7 @@ import { isRangedMob } from '../../../skills/weapons.ts'
 import { threats } from '../../../skills/combat.ts'
 import { fightFood } from '../../../skills/fight.ts'
 import { retreatOf, retreatCheck } from '../../../skills/retreat.ts'
+import { isEscaping } from '../../../skills/escape.ts'
 import { gearPlan, hasGearUpgrade } from '../../../skills/gear.ts'
 import { escorting } from '../../../skills/bodyguard.ts'
 import { rangedSituation, onRangedAlarm, noteUnexplainedHit } from '../../../skills/ranged.ts'
@@ -234,7 +235,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         if (!c.selfDefense || !c.rangedDefense || !needsSurvival(bot) || !bot.entity || bot.health <= 0) return
         if (!agent.getAction('ranged_defense') || Date.now() - rangedTriedAt < 1500) return
         const cur = agent.currentAction?.name ?? ''
-        if (RANGED_KEEP.has(cur)) return
+        if (RANGED_KEEP.has(cur) || isEscaping(bot)) return
         const s = rangedSituation(bot)
         if (!s.active.length || !(s.underFire || s.aimed)) return
         if (climbingAway(s.active[0]!.e)) return
@@ -273,7 +274,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           bot.nearestEntity((e: any) => isHostile(e) && FLYING.has(e.name ?? '') && e.position.distanceTo(bot.entity.position) < 20)
         if (!mob) return
         const cur = agent.currentAction?.name
-        if (cur === 'bunker' || PVP_ACTIONS.has(cur ?? '') || cur === 'water_bucket' || cur === 'air') return
+        if (cur === 'bunker' || PVP_ACTIONS.has(cur ?? '') || cur === 'water_bucket' || cur === 'air' || isEscaping(bot)) return
         // Phantoms at night with no weapon (or hurt): dig in instead of punching the sky.
         const unarmed = !bot.inventory.items().some(i => /_(sword|axe)$/.test(i.name))
         const night = bot.time.timeOfDay >= 12_500 && bot.time.timeOfDay <= 23_500
@@ -331,6 +332,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
 
       const timer = setInterval(() => {
         if (!needsSurvival(bot)) return // creative/spectator: no hunger, no danger
+        if (isEscaping(bot)) return // leaving a fight (escape.ts): it eats and fights back on its own until it is done
         const { selfDefense, autoEat, eatBelow, retreatBelow } = cfg()
         // Low health with a hostile close by: get away even before the next hit.
         const mob = selfDefense ? nearestHostile(bot, bot.entity.position, 6) : null

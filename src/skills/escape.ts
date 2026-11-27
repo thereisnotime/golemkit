@@ -178,6 +178,12 @@ async function recover (ctx: ActionContext, s: RetreatSettings): Promise<'healed
   }
 }
 
+const escaping = new WeakMap<Bot, number>()
+/** An escape is running for this bot (the reflexes leave it alone: seen live, ranged_defense kept taking over to build cover with a zombie on the bot). */
+export function isEscaping (bot: Bot): boolean {
+  return (escaping.get(bot) ?? 0) > 0
+}
+
 export interface EscapeResult {
   /** A route worked. */
   ok: boolean
@@ -195,6 +201,11 @@ export interface EscapeResult {
  * retreat rule's reason. Logs and notes (status, retreatHistory) why it left and where it went.
  */
 export async function escapeFight (ctx: ActionContext, why: string, s: RetreatSettings, order: readonly RouteId[] = s.routes): Promise<EscapeResult> {
+  escaping.set(ctx.bot, (escaping.get(ctx.bot) ?? 0) + 1)
+  try { return await runEscape(ctx, why, s, order) } finally { escaping.set(ctx.bot, Math.max(0, (escaping.get(ctx.bot) ?? 1) - 1)) }
+}
+
+async function runEscape (ctx: ActionContext, why: string, s: RetreatSettings, order: readonly RouteId[]): Promise<EscapeResult> {
   const { bot, agent, log } = ctx
   const plan = planEscape(escapeInputs(ctx, s), order, ESCAPE_ROUTES)
   const skipped = plan.skipped.map(x => `${x.id}: ${x.why}`).join('; ')

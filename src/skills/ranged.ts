@@ -17,6 +17,7 @@ import type { Entity } from 'prismarine-entity'
 import { defineAction, z, ok, fail, goals, isHostile, sleep, checkAborted, dangerMemory, fmtPos, type Agent } from '../core/index.ts'
 import { fightTarget, lineOfSight, eatNow, fightFood, meleeNear } from './fight.ts'
 import { escapeFight } from './escape.ts'
+import { retreatCheck } from './retreat.ts'
 import { combatRefusal } from './combat.ts'
 import { weaponFlags, hasRanged, readyShield, bestMeleeDamage, blockWithShield } from './weapons.ts'
 import { getHome, sameDimension } from './navigation.ts'
@@ -557,6 +558,16 @@ export const rangedDefense = defineAction({
           continue
         }
         quietSince = 0
+        // losing with a melee mob on it as well: cover and walls don't stop a zombie, take an escape route (retreat.ts)
+        if (flags.retreat?.enabled && escapes < flags.retreat.maxEscapes && meleeNear(bot, 4) > 0) {
+          const why = retreatCheck(bot, flags.retreat, flags.disengageToHeal ?? true)
+          if (why) {
+            escapes++
+            const e = await escapeFight(ctx, why, flags.retreat)
+            log.info(`ranged: ${e.note}`)
+            if (e.ok) continue
+          }
+        }
         rememberShooters(agent, s)
         // a melee mob in our face goes first (a vindicator with the patrol, a zombie)
         const face = bot.nearestEntity(e => isHostile(e) && !isShooter(e.name, (e as any).heldItem?.name) && e.position.distanceTo(bot.entity.position) <= 3 && !combatRefusal(bot, e))

@@ -272,7 +272,9 @@ off its spot, and the pathfinder's back-off re-planned under every hit while two
 works, it falls back to backing off to eat and then fights where it stands. Shooters stay with
 `ranged_defense`, which hides behind cover, builds a wall or digs in when a fight ends this way;
 when melee mobs are on it as well (zombies while it charges a skeleton, how the mixed duels killed
-it) it takes the escape routes instead, since cover doesn't stop a zombie.
+it) it takes the escape routes instead, since cover doesn't stop a zombie. While an escape runs the
+reflexes leave the bot alone (in the first mixed runs `ranged_defense` kept taking over to build
+cover with a zombie on the bot).
 
 **Whether to fight in the open at all.** Before `defend` takes on the first mob it counts what is
 against it: no armour (under `minArmour` points), night, and `outnumberedAt` (2) or more melee
