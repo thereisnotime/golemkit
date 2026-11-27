@@ -259,15 +259,20 @@ retreat).
 | `home` | `go_home`, then shuts open wooden doors next to it (`closeDoors`) | no home, home further than `homeRadius` (40), the way home runs through the mobs, a mob that outruns it (vindicator, ravager, wolf...) |
 | `pillar` | pillars `pillarHeight` (2) blocks: zombie reach ends below its feet and it still hits their heads; fights from the top, eats, waits to heal | no blocks, may not place, protected area, in water, no room above, an archer (it would be shot off), spiders, endermen, slimes or flyers |
 | `bunker` | the `bunker` action: dig down 3, seal the hole, wait for the mobs to leave | may not dig, protected area, in water, already under a roof, nothing to seal with |
-| `sprint` | `retreat` 24 blocks (`sprintDistance`) | a mob that outruns it |
+| `sprint` | sprints straight away from the mobs (steering around drops, water and walls, jumping when stuck) until the nearest is `sprintDistance` (24) blocks off; 12 blocks ahead still counts | a mob that outruns it |
 
 After the route it eats (when hungry and it has food) and waits until health is `returnAbove`
 (16), at most `healSeconds` (60). With `comeBack` on it then fights the mobs that are still around:
 after going home the fight is anchored at home (it doesn't walk back out after mobs it left
 behind), after the other routes where it left. A mob right on it ends the wait and it fights.
+With a melee mob within 3 blocks the pillar and bunker routes first sprint a few blocks off:
+in the first live runs every pillar and bunker failed because the zombies' hits knocked the bot
+off its spot, and the pathfinder's back-off re-planned under every hit while two zombies kept up.
 `maxEscapes` (2) per `defend` run stops it from running in circles; after that, or when no route
 works, it falls back to backing off to eat and then fights where it stands. Shooters stay with
-`ranged_defense`, which hides behind cover, builds a wall or digs in when a fight ends this way.
+`ranged_defense`, which hides behind cover, builds a wall or digs in when a fight ends this way;
+when melee mobs are on it as well (zombies while it charges a skeleton, how the mixed duels killed
+it) it takes the escape routes instead, since cover doesn't stop a zombie.
 
 **Whether to fight in the open at all.** Before `defend` takes on the first mob it counts what is
 against it: no armour (under `minArmour` points), night, and `outnumberedAt` (2) or more melee

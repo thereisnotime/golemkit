@@ -303,12 +303,16 @@ export interface EscapeRoute<Id extends string = string> {
   refuse: (s: EscapeInput) => string | null
 }
 
-/** Mobs that run down a sprinting bot: sprinting or walking home only turns its back. */
-export const OUTRUN_US = new Set(['vindicator', 'ravager', 'wolf', 'piglin_brute', 'hoglin', 'zoglin', 'vex', 'phantom'])
+/**
+ * Ground mobs that run down a sprinting bot: sprinting or walking home only turns its back.
+ * Flyers (phantoms, vexes) are left out: they catch it whatever it does, so they mustn't stop it
+ * running from the zombies (seen live: a phantom overhead blocked every sprint at night).
+ */
+export const OUTRUN_US = new Set(['vindicator', 'ravager', 'wolf', 'piglin_brute', 'hoglin', 'zoglin'])
 /** Mobs a pillar doesn't keep off: they climb, teleport or reach up. */
 const PILLAR_USELESS = new Set(['spider', 'cave_spider', 'enderman', 'ravager', 'slime', 'magma_cube', 'vex', 'phantom'])
 
-const outrun = (s: EscapeInput) => s.threats.find(t => OUTRUN_US.has(t.name))?.name ?? null
+const outrun = (s: EscapeInput) => s.threats.find(t => !t.flying && OUTRUN_US.has(t.name))?.name ?? null
 
 export const ESCAPE_ROUTES: EscapeRoute<RouteId>[] = [
   {

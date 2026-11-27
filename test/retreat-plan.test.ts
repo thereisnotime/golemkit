@@ -124,6 +124,9 @@ test('escape: running from a mob that outruns the bot is refused', () => {
   const v = planEscape(input({ threats: [{ name: 'vindicator', ranged: false, flying: false }] }), S.routes, ESCAPE_ROUTES)
   assert.deepEqual(v.usable, ['pillar', 'bunker'])
   assert.deepEqual(v.skipped.map(x => x.id), ['home', 'sprint'])
+  // a phantom overhead catches it anyway: it doesn't stop it running from the zombies
+  const p = planEscape(input({ threats: [{ name: 'zombie', ranged: false, flying: false }, { name: 'phantom', ranged: false, flying: true }] }), ['sprint', 'home'], ESCAPE_ROUTES)
+  assert.deepEqual(p.usable, ['sprint', 'home'])
 })
 
 test('home through threats: home on the mobs\' side with a mob in between', () => {
