@@ -378,3 +378,9 @@ test('intents: "why are you idle" and friends ask for the status', async () => {
   }
   assert.notEqual(parseIntent('why did you stop?', { speaker: 'Robin' })?.intent, 'status')
 })
+
+test('formatStatus shows the last event (a retreat, say) when there is one', () => {
+  const lines = formatStatus(status({ lastEvent: { what: 'left the fight (health 9), escaped to a 2-block pillar', at: NOW - 30_000 } }), NOW)
+  assert.ok(lines.some(l => /^ {2}event {5}30s ago: left the fight/.test(l)), lines.join('\n'))
+  assert.ok(!formatStatus(status(), NOW).some(l => /event/.test(l)))
+})

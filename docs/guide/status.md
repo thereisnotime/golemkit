@@ -48,6 +48,7 @@ Pax (profile pax): STUCK
 | need, goal | shown when the decision loop reports them (`DeciderSnapshot.need`, `.goal`) |
 | progress | the last time something got done: an exclusive action that ended ok, a behaviour run that succeeded, more items in the inventory than at the last sample, or 16+ blocks away from where it last made progress (moving back and forth on the spot does not count). A loop can report its own `lastProgressAt`; other code can call `agent.status.noteProgress('what')` |
 | failed | the last failure: an action that failed for a real reason (not `busy`, `preempted`, `stopped` and the like) or a failed behaviour run |
+| event | the last notable thing the bot did on its own that is neither progress nor a failure, from `agent.status.noteEvent()`: today why it left a fight and where it went ([Leaving fights](/concepts/world#leaving-fights)) |
 | self | health, food, position and dimension from `agent.adapter.self()` |
 | process | pid, resident memory (`process.memoryUsage.rss()`), uptime |
 
