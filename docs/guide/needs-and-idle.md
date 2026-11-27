@@ -96,6 +96,11 @@ better, digging is on and iron (tools, armour, a bucket, a shield) is what is mi
 3. home, and `upgrade_tools` with keep_tools_upgraded's target: smelt (furnace by home) and craft
    pickaxe, bucket, shield, armour, tools.
 
+A search **starts** while no other work scores above `needs.search.startBelow` (30). It then scores
+just above that and goes next, when the running behaviour ends; it doesn't cut into it. Before this
+the search only started when nothing scored above the idle band (15), and ordinary upkeep (wood at
+30) kept Pax from starting a single gear search for 16 hours. 15 restores that rule.
+
 A running search **holds** its slot: it keeps `needs.search.holdScore` (30) against other work, so
 only a behaviour scoring 40 or more (the hold plus the switch margin of 10) takes over: a full
 inventory (deposit_when_full 45), real hunger, a fight, danger, wood when there is none at all.

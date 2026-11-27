@@ -137,6 +137,7 @@ can't change their own.
 | `needs.search.cooldownMinutes` | 1–1440 | minutes between searches for one need (default 30) |
 | `needs.search.retryMinutes` | 0–1440 | a search taken over in its first minute doesn't count; minutes before it may run again (default 5) |
 | `needs.search.perDay` | 0–100 | searches per need a day at most (default 6) |
+| `needs.search.startBelow` | 0–79 | a search may start while no other work scores above this; it then goes next, after the running behaviour (default 30, 15 = only when nothing else wants the body) |
 | `needs.search.holdScore` | 0–79 | a running search keeps this score against other work: only work scoring it plus the switch margin (10) takes over (default 30, 0 = anything above the idle band ends it) |
 | `needs.search.resumes` | 0–20 | a search cut short because the body was taken (a reflex eating or fighting, a player) may start again at once this many times per `cooldownMinutes` (default 3) |
 | `needs.search.atNight` | on/off | also search at night (default off) |

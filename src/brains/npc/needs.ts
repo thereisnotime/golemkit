@@ -126,6 +126,8 @@ export interface PlanOptions {
   idleBand?: number
   /** Boosts never push a score to this or above (danger keeps the top band). Default 80. */
   urgentScore?: number
+  /** A search may start while nothing scores above this (default: the idle band, only when quiet). */
+  searchStartBelow?: number
 }
 
 /**
@@ -152,7 +154,10 @@ export function planNeeds (needs: readonly NeedInput[], scores: readonly Scored[
   for (const k of Object.keys(boosted)) if (!(scores.find(s => s.name === k)?.score! > 0)) delete boosted[k]
   const quiet = !out.some(s => s.score > band)
   const score = (name: string) => scores.find(s => s.name === name)?.score ?? 0
-  const search = quiet ? urgent.find(n => n.canSearch && n.servedBy.every(b => !(score(b) > 0)))?.name ?? null : null
+  // a search may start while nothing scores above searchStartBelow (the idle band by default):
+  // ordinary upkeep (wood, tidying) used to keep it from ever starting
+  const startable = !out.some(s => s.score > Math.max(band, o.searchStartBelow ?? band))
+  const search = startable ? urgent.find(n => n.canSearch && n.servedBy.every(b => !(score(b) > 0)))?.name ?? null : null
   return { scores: out, boosted, top: active[0] ? { name: active[0].name, urgency: active[0].urgency } : null, urgent: urgent.map(n => n.name), quiet, search }
 }
 
@@ -399,7 +404,7 @@ export class NeedsLayer {
       }
       return { name: n.name, urgency, active, threshold: ns.threshold, boost: ns.boost, servedBy: n.servedBy, canSearch }
     })
-    const p = planNeeds(inputs, regular, o)
+    const p = planNeeds(inputs, regular, { ...o, searchStartBelow: st.search.startBelow })
     const idle = this.idleSettings()
     this.fallback = null
     let idleWhy: string | null = null
@@ -417,6 +422,11 @@ export class NeedsLayer {
       // a sticky chore (a base-project session) keeps the body for a passing behaviour
       const sticky = this.provider.chores.find(c => `idle:${c.name}` === running)!
       this.fallback = { behavior: running, reason: this.view.fallback?.behavior === running ? this.view.fallback.reason : `finishing ${running}`, score: CHORE_SCORES[sticky.mode] }
+    } else if (!p.quiet && p.search && !running?.startsWith('need:')) {
+      // not quiet, but nothing above needs.search.startBelow: the search scores just above it, so it
+      // goes next when the running behaviour ends (it doesn't cut into it: switching needs the margin)
+      const n = this.provider.needs.find(x => x.name === p.search)!
+      this.fallback = { behavior: `need:${n.name}`, reason: `${n.name} need ${round(inputs.find(i => i.name === n.name)!.urgency)} comes before upkeep scoring ${st.search.startBelow} or less: looking for ${n.search!.what}`, score: Math.min(COMMITTED_SCORE - 1, st.search.startBelow + 1) }
     } else if (p.quiet) {
       if (running && (running.startsWith('need:') || running.startsWith('idle:'))) {
         // finish what it started

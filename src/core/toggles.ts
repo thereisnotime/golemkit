@@ -156,6 +156,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'needs.search.cooldownMinutes', description: 'minutes between searches for the same need (default 30)', schema: z.number().min(1).max(1440) },
   { key: 'needs.search.retryMinutes', description: 'a need search taken over by other work in its first minute does not count; minutes before it may run again (default 5)', schema: z.number().min(0).max(1440) },
   { key: 'needs.search.perDay', description: 'searches per need per day at most (default 6, 0 = never)', schema: z.number().int().min(0).max(100) },
+  { key: 'needs.search.startBelow', description: 'a need search may start while no other work scores above this (default 30; 15 = only when nothing else wants the body)', schema: z.number().min(0).max(79) },
   { key: 'needs.search.holdScore', description: 'a running need search keeps this score against other work; only one scoring it plus the switch margin takes over (default 30, 0 = any work above the idle band)', schema: z.number().min(0).max(79) },
   { key: 'needs.search.resumes', description: 'a need search cut short because the body was taken (a reflex, a player) may start again at once this many times per cooldown (default 3)', schema: z.number().int().min(0).max(20) },
   { key: 'needs.search.atNight', description: 'also search at night (default off)', schema: bool },

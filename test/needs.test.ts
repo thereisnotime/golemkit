@@ -13,7 +13,7 @@ import { findToggle, parseToggleValue } from '../src/core/toggles.ts'
 test('needs settings: defaults, per-need overrides, booleans and off', () => {
   const d = needsSettings(undefined)
   assert.equal(d.enabled, true)
-  assert.deepEqual(d.search, { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, retryMinutes: 5, perDay: 6, holdScore: 30, resumes: 3, atNight: false })
+  assert.deepEqual(d.search, { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, retryMinutes: 5, perDay: 6, holdScore: 30, startBelow: 30, resumes: 3, atNight: false })
   assert.deepEqual(d.need('gear'), { enabled: null, threshold: 0.5, boost: 15, search: true, radius: 160, minutes: 6 })
   const s = needsSettings({ boost: 20, search: { radius: 96 }, gear: { threshold: 0.3, minutes: 3 }, rest: false })
   assert.equal(s.need('gear').threshold, 0.3)
@@ -500,4 +500,15 @@ test('site health through the layer: a flooded farm is marked bad, replaced and 
   assert.equal(book.get('farm', 'farm:1')!.status, 'ok')
   assert.match(f.whispers.at(-1)![1], /looks fine again/)
   c.stop()
+})
+
+test('needs.search.startBelow: a search starts while upkeep scores at or below it', () => {
+  // Pax never started a gear search for 16 hours: chop_wood_loop (30) kept it from being quiet
+  const gear = need('gear', 0.6, ['keep_tools_upgraded'], { canSearch: true })
+  const upkeep = [{ name: 'keep_tools_upgraded', score: 0 }, { name: 'chop_wood_loop', score: 30 }]
+  assert.equal(planNeeds([gear], upkeep).search, null)
+  assert.equal(planNeeds([gear], upkeep, { searchStartBelow: 30 }).search, 'gear')
+  assert.equal(planNeeds([gear], [...upkeep, { name: 'deposit_when_full', score: 45 }], { searchStartBelow: 30 }).search, null)
+  // a serving behaviour that can still act goes first
+  assert.equal(planNeeds([gear], [{ name: 'keep_tools_upgraded', score: 28 }], { searchStartBelow: 30 }).search, null)
 })

@@ -1,0 +1,3 @@
+- [x] planNeeds searchStartBelow with tests
+- [x] layer fallback when not quiet
+- [x] setting, toggle, docs
