@@ -52,6 +52,22 @@ can't change their own.
 | `combat.endermanGaze` | on/off | never look an enderman in the eyes unless fighting it (default on) |
 | `combat.fightFastMobs` | on/off | at low health keep fighting mobs faster than the bot (vindicators, ravagers, spiders, wolves, piglin brutes, hoglins) instead of backing off at `retreatBelow`; the water back-off (`waterFightAbove`) still applies (default on) |
 | `combat.chokepoints` | on/off | against 3+ melee mobs with half health or more, fight from a 1-wide gap nearby (default on) |
+| `combat.dodge.enabled` | on/off | the [dodge layer](../concepts/world#dodging) in mob fights; off turns every `combat.dodge.*` technique off (default on) |
+| `combat.dodge.draws` | on/off | leap sideways just before a skeleton within `drawRange` lets go of its drawn bow, and while a pillager holds a charged crossbow (default on) |
+| `combat.dodge.arrows` | on/off | leap out of the path of an arrow or other projectile in flight that would hit (default on) |
+| `combat.dodge.meleeTiming` | on/off | track each melee mob's attack cooldown: stay in while it recharges, be out of reach before it swings (default on) |
+| `combat.dodge.creeperLeap` | on/off | sprint-jump away from a lit creeper instead of walking (default on) |
+| `combat.dodge.latencyMs` | 0–500 | round trip the dodges allow for, ms (default 75) |
+| `combat.dodge.drawRange` | 0–32 | react to the draw within this many blocks, to the arrow beyond (default 10) |
+| `combat.dodge.arrowMargin` | 0–1 | extra room around the hitbox when judging a projectile, blocks (default 0.15) |
+| `combat.dodge.leapMs` | 50–600 | how long a leap faces away before snapping back to the target, ms (default 200) |
+| `combat.dodge.leapDistance` | 1–5 | how far along a leap the ground is checked, blocks (default 2.5) |
+| `combat.dodge.maxDrop` | 0–4 | deepest drop a leap may land in (default 2) |
+| `combat.dodge.meleeMargin` | 0–2 | blocks beyond a melee mob's reach to be at when its swing is ready (default 0.35) |
+| `combat.dodge.meleeLeadMs` | 0–1000 | be out of reach this long before its next swing, on top of `latencyMs` (default 150) |
+| `combat.dodge.meleeCooldownMs` | 250–3000 | attack cooldown assumed for melee mobs not in the table (default 1000, 20 ticks) |
+| `combat.dodge.creeperLeapMs` | 0–3000 | how long the creeper leap keeps going, longer while the fuse is still lit close by (default 900) |
+| `combat.dodge.minGapMs` | 0–2000 | shortest gap between two leaps (default 300) |
 | `combat.pvp` | off / defend / revenge / targets / all | [PvP mode](../concepts/world#pvp): `defend` fights back; `revenge` also goes after whoever killed or attacked the bot, an owner or the guarded player; `targets` attacks the target list; `all` every player in range. Never owners, friends or creative players; changes are whispered to the owners (default off) |
 | `combat.friends` | names | players never fought in any PvP mode (comma separated; owners are always spared) |
 | `combat.targets` | names | players attacked on sight in `targets` and `all` (`!attack_player`, `!spare_player` edit it) |

@@ -94,13 +94,17 @@ const FUSE_CANCEL = 7
 /**
  * A creeper with a lit fuse (1.5 s): run if backing off for the rest of the fuse gets the bot past
  * the 7 blocks where the fuse stops, otherwise face it with a shield up (a blocked explosion does
- * no damage). Without a shield, run.
+ * no damage). Without a shield, run. `gain` is the distance gained per second (GAIN walking,
+ * LEAP_GAIN sprint-jumping).
  */
-export function creeperEscape (s: { dist: number, msLeft: number, shield: boolean }): 'run' | 'shield' {
-  const reach = s.dist + GAIN * Math.max(0, s.msLeft) / 1000
+export function creeperEscape (s: { dist: number, msLeft: number, shield: boolean, gain?: number }): 'run' | 'shield' {
+  const reach = s.dist + (s.gain ?? GAIN) * Math.max(0, s.msLeft) / 1000
   if (reach >= FUSE_CANCEL || !s.shield) return 'run'
   return 'shield'
 }
+
+/** Distance gained per second sprint-jumping away from a creeper (combat.dodge.creeperLeap): ~7 blocks/s against its ~2.5, kept low to be safe. */
+export const LEAP_GAIN = 3.5
 
 /** Creeper fuse, ms. */
 export const CREEPER_FUSE_MS = 1500

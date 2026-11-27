@@ -2,12 +2,12 @@
 // gets hit with the bodyguard armed, with follow_owner only, and with no bot at all.
 //   node scripts/guard-bench.ts [x z] [--minutes 4] [--repeats 2] [--phases guard,follow,none]
 //        [--seed 1] [--sword stone|iron] [--armour] [--tester-food 8] [--interval 30] [--cap 8]
-//        [--time day|night] [--phantoms] [--waves mixed|ranged] [--bow] [--blocks 0] [--no-intercept] [--no-pull] [--variants a,b]
+//        [--time keep|day|night] [--wait-day] [--phantoms] [--waves mixed|ranged] [--bow] [--blocks 0] [--no-intercept] [--no-pull] [--variants a,b]
 //        [--tag run] [--scout] [--cleanup] [--force]
-//        [--duel zombie,skeleton,creeper,vindicator] [--duel-count 2] [--clutch 5] [--clutch-height 22]
+//        [--duel zombie,skeleton,creeper,vindicator,mixed] [--duel-count 2] [--dodge on,off] [--clutch 5] [--clutch-height 22]
 //        [--no-shield] [--bread 16]
-// DIRECTOR (default ClaudeTest, an op) runs everything with commands: before every phase it sets
-// the time, kills leftover tagged mobs, fills explosion holes in the arena floor, resets both
+// DIRECTOR (default ClaudeTest, an op) runs everything with commands: before every phase it
+// kills leftover tagged mobs, fills explosion holes in the arena floor, resets both
 // players to full health and hunger, gives the same gear (GUARD_BOT: a sword, a shield, 16 bread,
 // iron armour with --armour; GUARD_TESTER: bread only) and teleports them to the spot, the bot 3
 // blocks east of the tester. It then summons a fixed, seeded schedule of tagged waves 8-14 blocks
@@ -24,21 +24,27 @@
 // phase for each in one session. The tester stands still (no self-defence, eats). Phases: guard (bodyguard armed for
 // the tester), follow (follow_owner only), none (the bot is offline: the baseline). The phase
 // order flips on every repeat. A tester death is counted, the mobs alive are killed and the
-// tester is reset on the spot. --time day (default) keeps natural spawns out; zombies and
-// skeletons wear leather helmets so they don't burn, and spiders don't pick targets in daylight.
+// tester is reset on the spot. --time keep (default) leaves the server's time alone (shared servers:
+// no /time set); --wait-day then waits up to 10 min for the server's daytime before every phase, so
+// natural night spawns don't mix in; --time day or night sets it before every phase.
+// Zombies and skeletons wear leather helmets so they don't burn, and spiders don't pick targets in daylight.
 // --scout only checks the spot (flat, dry, solid) and Robin's distance; --cleanup only kills the
 // tagged mobs and clears both players (also done at the end of a run, even a failed one). Results append to
 // data/guard-bench/results.jsonl; a summary table goes to stdout.
 // --duel runs the bot alone (no tester) against one mob kind at a time: --duel-count of them (default
 // 2) kept alive 8-12 blocks around the spot, refilled 3 s after one dies, for --minutes per kind and
 // --repeats rounds. It counts the bot's deaths, health lost, kills, kills per minute and health
-// lost per kill. The bot runs on its reflexes alone (defend, ranged_defense, stay_safe).
+// lost per kill. The bot runs on its reflexes alone (defend, ranged_defense, stay_safe). --duel mixed
+// keeps a zombie, a skeleton and a creeper (in turn, --duel-count in all) alive at once. --dodge on,off
+// plays every duel once per dodge setting (combat.dodge.enabled, set live, reset at the end; order
+// flipped on every repeat) and counts the dodge layer's leaps, arrows dodged and projectile hits.
 // --clutch N tests the water bucket reflex alone: N drops from --clutch-height (default 22, 19 damage without water) blocks
 // above the arena floor with a water bucket, then N stands on a fire block; counts health lost and
 // what the water_bucket action reported. Water and fire left in the arena are removed afterwards.
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { Agent, defineVariant, serverFromEnv, PRIORITY, fmtPos, type ActionResult } from '../src/core/index.ts'
 import { standardSkills, extendedSkills, navigation, pickup } from '../src/skills/index.ts'
+import { dodgeStats, type DodgeStats } from '../src/skills/dodge.ts'
 import { reflexes, behaviorsBrain } from '../src/brains/index.ts'
 /** The player test bots keep away from (the real owner): MC_OWNER in .env. */
 const AVOID = process.env.MC_OWNER || 'Robin'
@@ -48,7 +54,7 @@ const AVOID = process.env.MC_OWNER || 'Robin'
 const argv = process.argv.slice(2)
 const flag = (name: string) => argv.includes(`--${name}`)
 const opt = (name: string, def: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : def }
-const BOOL_FLAGS = ['--armour', '--phantoms', '--scout', '--force', '--cleanup', '--bow', '--no-intercept', '--no-pull', '--no-shield']
+const BOOL_FLAGS = ['--wait-day', '--armour', '--phantoms', '--scout', '--force', '--cleanup', '--bow', '--no-intercept', '--no-pull', '--no-shield']
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(i > 0 && argv[i - 1].startsWith('--') && !BOOL_FLAGS.includes(argv[i - 1])))
 const X = Number(positional[0] ?? 1250)
 const Z = Number(positional[1] ?? 445)
@@ -61,7 +67,9 @@ const ARMOUR = flag('armour')
 const TESTER_FOOD = Number(opt('tester-food', '8'))
 const INTERVAL_S = Number(opt('interval', '30'))
 const CAP = Number(opt('cap', '8'))
-const TIME = opt('time', 'day')
+const TIME = opt('time', 'keep') as 'keep' | 'day' | 'night'
+/** With --time keep: wait (up to 10 min) for the server's own daytime before each phase. */
+const WAIT_DAY = flag('wait-day')
 const PHANTOMS = flag('phantoms')
 const WAVES = opt('waves', 'mixed') as 'mixed' | 'ranged'
 const BOW = flag('bow')
@@ -76,6 +84,10 @@ const tactics = (v: Variant) => ({ intercept: v === 'all' || v === 'no-pull', pu
 const RUN_TAG = opt('tag', 'run')
 const DUEL = opt('duel', '') ? opt('duel', '').split(',').map(s => s.trim()).filter(Boolean) : []
 const DUEL_COUNT = Number(opt('duel-count', '2'))
+/** combat.dodge.enabled per duel run: --dodge on,off plays each duel with and without the dodge layer. */
+const DODGE = opt('dodge', 'on').split(',').map(x => x.trim()).filter(x => x === 'on' || x === 'off') as ('on' | 'off')[]
+/** The mixed duel: these, in turn. */
+const MIXED = ['zombie', 'skeleton', 'creeper']
 const CLUTCH = Number(opt('clutch', '0'))
 const CLUTCH_HEIGHT = Number(opt('clutch-height', '22'))
 
@@ -227,6 +239,13 @@ async function main (): Promise<void> {
     log('no answer to /data get Robin; assuming offline')
     return null
   }
+  // daytime by the server's clock (mobs spawn from about 12500 to 23500); never sets it
+  const night = () => { const t = (dir.bot as any).time?.timeOfDay ?? 0; return t > 12300 && t < 23600 }
+  const waitForDay = async () => {
+    const until = Date.now() + 10 * 60_000
+    if (night()) log(`night (time ${(dir.bot as any).time?.timeOfDay}): waiting for the day`)
+    while (night() && Date.now() < until) await pause(5000)
+  }
   const checkOwnerFar = async () => {
     const d = await RobinDistance()
     log(`Robin: ${d === null ? 'offline' : `${Math.round(d)} blocks away`}`)
@@ -290,6 +309,16 @@ async function main (): Promise<void> {
   let measuring = false
   let testerDied = false
   let botDied = false
+  /** Dodge counters at the start of the measured run, and what earlier sessions (before a death) added. */
+  let dodge0: DodgeStats | null = null
+  let dodgeCarry: DodgeStats = { dodges: 0, arrowDodges: 0, arrowsDodged: 0, arrowHits: 0, meleeSteps: 0, creeperLeaps: 0 }
+  const dodgeDelta = (): DodgeStats => {
+    const now = live(bot) ? dodgeStats(bot.bot) : null
+    const out = { ...dodgeCarry }
+    if (now && dodge0) for (const k of Object.keys(out) as (keyof DodgeStats)[]) out[k] += now[k] - dodge0[k]
+    dodgeCarry = { dodges: 0, arrowDodges: 0, arrowsDodged: 0, arrowHits: 0, meleeSteps: 0, creeperLeaps: 0 }
+    return out
+  }
   /** Blocks the bot placed: "x y z" -> block name. */
   const placedBlocks = new Map<string, string>()
   const spot = { x: X + 0.5, y: G + 1, z: Z + 0.5 }
@@ -344,7 +373,15 @@ async function main (): Promise<void> {
         const t = hitAt.get(e.id)
         if (measuring && t && Date.now() - t < 4000 && e !== b.entity && e.type !== 'player') { st.kills[e.name] = (st.kills[e.name] ?? 0) + 1; log(`KILL ${e.name}`) }
       })
+      dodgeStats(b) // installs the dodge watch now, so projectile hits count from the start
+      if (measuring) dodge0 = dodgeStats(b)
       b.on('death', () => { if (measuring) { st.botDeaths++; botDied = true } log(`BOT DIED (${state(a)})`) })
+      b.on('end', () => {
+        if (!measuring || !dodge0) return
+        const now = dodgeStats(b)
+        for (const k of Object.keys(dodgeCarry) as (keyof DodgeStats)[]) dodgeCarry[k] += now[k] - dodge0[k]
+        dodge0 = null
+      })
       ;(b as any)._client.on('explosion', (p: any) => {
         if (!measuring || !b.entity || !DUEL.length) return
         st.explosions++
@@ -354,6 +391,10 @@ async function main (): Promise<void> {
       b.on('blockUpdate', (old: any, now: any) => {
         if (!now || !/^(cobblestone|dirt)$/.test(now.name) || (old && old.boundingBox === 'block') || !b.entity) return
         if (now.position.distanceTo(b.entity.position) <= 6) placedBlocks.set(`${now.position.x} ${now.position.y} ${now.position.z}`, now.name)
+      })
+      b.on('entityHurt', (e: any, source: any) => {
+        if (e !== b.entity || !measuring || !DUEL.length) return
+        log(`bot hit by ${source?.name ?? '?'}${source?.position ? `@${source.position.distanceTo(b.entity.position).toFixed(1)}` : ''} hp ${Math.round(b.health)}`)
       })
       // the bot's own hits taken (any drop in health while measuring; hunger can't hurt it, it carries bread)
       let lastHp = b.health
@@ -439,6 +480,7 @@ async function main (): Promise<void> {
     for (const [at, name] of placedBlocks) await cmd(`/execute if block ${at} minecraft:${name} run setblock ${at} minecraft:air`)
     if (placedBlocks.size) log(`removed up to ${placedBlocks.size} blocks the bot placed`)
     if (live(bot)) await disarmAll()
+    if (DUEL.length) bot.resetToggle('combat.dodge.enabled')
     await cmd(`/clear ${BOT}`)
     await cmd(`/clear ${TESTER}`)
     await cmd(`/effect clear ${BOT}`)
@@ -456,12 +498,15 @@ async function main (): Promise<void> {
     const results: any[] = []
     const placeBotCentre = () => cmd(`/tp ${BOT} ${spot.x} ${spot.y} ${spot.z} 180 0`)
     for (let rep = 0; rep < REPEATS; rep++) {
-      const order = rep % 2 === 0 ? DUEL : [...DUEL].reverse()
-      for (const mob of order) {
+      const runs = DUEL.flatMap(mob => DODGE.map(dodge => ({ mob, dodge })))
+      const order = rep % 2 === 0 ? runs : [...runs].reverse()
+      for (const { mob, dodge } of order) {
+        const kinds = mob === 'mixed' ? MIXED : [mob]
         await checkOwnerFar()
-        log(`== repeat ${rep + 1}, duel ${mob}: resetting`)
+        log(`== repeat ${rep + 1}, duel ${mob}, dodge ${dodge}: resetting`)
         measuring = false
-        await cmd(`/time set ${TIME === 'night' ? 14000 : 1000}`)
+        if (TIME !== 'keep') await cmd(`/time set ${TIME === 'night' ? 14000 : 1000}`)
+        else if (WAIT_DAY) await waitForDay()
         await killTagged()
         await parkPlayers()
         await pause(1000)
@@ -488,7 +533,11 @@ async function main (): Promise<void> {
           if (ok) break
           log(`reset again: ${state(bot)}`)
         }
+        const tg = bot.setToggle('combat.dodge.enabled', dodge === 'on')
+        if (!tg.ok) throw new Error(`combat.dodge.enabled: ${tg.error}`)
         st = fresh()
+        dodge0 = live(bot) ? dodgeStats(bot.bot) : null
+        let spawnTurn = 0
         botDied = false
         measuring = true
         const start = Date.now()
@@ -512,12 +561,13 @@ async function main (): Promise<void> {
               continue
             }
             if (!live(bot)) continue
-            const alive = Object.values(bot.bot.entities).filter((e: any) => e.name === mob && e.position && e.position.distanceTo(spotV) < 40).length
+            const alive = Object.values(bot.bot.entities).filter((e: any) => kinds.includes(e.name) && e.position && e.position.distanceTo(spotV) < 40).length
             if (alive < DUEL_COUNT && Date.now() >= nextAt) {
               for (let i = alive; i < DUEL_COUNT; i++) {
                 const a = rnd() * Math.PI * 2
                 const r = 8 + rnd() * 4
-                await cmd(`/summon minecraft:${mob} ${(spot.x + Math.cos(a) * r).toFixed(1)} ${spot.y} ${(spot.z + Math.sin(a) * r).toFixed(1)} ${summonNbt(mob)}`)
+                const kind = kinds[spawnTurn++ % kinds.length]!
+                await cmd(`/summon minecraft:${kind} ${(spot.x + Math.cos(a) * r).toFixed(1)} ${spot.y} ${(spot.z + Math.sin(a) * r).toFixed(1)} ${summonNbt(kind)}`)
                 st.summoned++
               }
               nextAt = Date.now() + 3000
@@ -529,13 +579,15 @@ async function main (): Promise<void> {
           } catch (e) { log(`loop: ${(e as Error).message}`) }
         }
         measuring = false
-        const kills = st.kills[mob] ?? 0
+        const kills = kinds.reduce((n, k) => n + (st.kills[k] ?? 0), 0)
+        const dz = dodgeDelta()
         const result = {
-          tag: RUN_TAG, mode: 'duel', mob, count: DUEL_COUNT, repeat: rep + 1, at: new Date().toISOString(), spot: [X, G + 1, Z],
+          tag: RUN_TAG, mode: 'duel', mob, dodge, time: TIME, count: DUEL_COUNT, repeat: rep + 1, at: new Date().toISOString(), spot: [X, G + 1, Z],
           minutes: MINUTES, seed: SEED, sword: SWORD, armour: ARMOUR, bow: BOW, shield: SHIELD, blocks: BLOCKS, summoned: st.summoned,
           kills, killsPerMin: Math.round(kills / MINUTES * 10) / 10, botDeaths: st.botDeaths, botHits: st.botHits,
           botDamage: Math.round(st.botDamage), damagePerKill: kills ? Math.round(st.botDamage / kills * 10) / 10 : null,
-          explosions: st.explosions, explosionsNearBot: st.explosionsNear
+          explosions: st.explosions, explosionsNearBot: st.explosionsNear,
+          dodges: dz.dodges, arrowDodges: dz.arrowDodges, arrowsDodged: dz.arrowsDodged, arrowHits: dz.arrowHits, meleeSteps: dz.meleeSteps, creeperLeaps: dz.creeperLeaps
         }
         log(`RESULT ${JSON.stringify(result)}`)
         appendFileSync(`${DATA}/results.jsonl`, JSON.stringify(result) + '\n')
@@ -619,7 +671,8 @@ async function main (): Promise<void> {
         await checkOwnerFar()
         log(`== repeat ${rep + 1}, phase ${phase}: resetting`)
         measuring = false
-        await cmd(`/time set ${TIME === 'night' ? 14000 : 1000}`)
+        if (TIME !== 'keep') await cmd(`/time set ${TIME === 'night' ? 14000 : 1000}`)
+        else if (WAIT_DAY) await waitForDay()
         await killTagged()
         await parkPlayers()
         await pause(1000)
@@ -779,14 +832,15 @@ export function printSummary (results: any[]): void {
 }
 
 export function printDuelSummary (results: any[]): void {
-  const row = (cells: (string | number)[]) => cells.map((c, i) => String(c).padStart(i === 0 ? 11 : 9)).join(' ')
-  console.log('\n' + row(['duel', 'run', 'summoned', 'kills', 'kills/min', 'deaths', 'damage', 'dmg/kill', 'booms@6']))
-  for (const mob of [...new Set(results.map(r => r.mob))]) {
-    const rs = results.filter(r => r.mob === mob)
-    for (const r of rs) console.log(row([mob, r.repeat, r.summoned, r.kills, r.killsPerMin, r.botDeaths, r.botDamage, r.damagePerKill ?? '-', r.explosionsNearBot]))
+  const row = (cells: (string | number)[]) => cells.map((c, i) => String(c).padStart(i === 0 ? 15 : 9)).join(' ')
+  console.log('\n' + row(['duel', 'run', 'summoned', 'kills', 'kills/min', 'deaths', 'damage', 'dmg/kill', 'booms@6', 'dodges', 'arr.dodged', 'arr.hits']))
+  const label = (r: any) => r.dodge ? `${r.mob} dodge:${r.dodge}` : r.mob
+  for (const l of [...new Set(results.map(label))]) {
+    const rs = results.filter(r => label(r) === l)
+    for (const r of rs) console.log(row([l, r.repeat, r.summoned, r.kills, r.killsPerMin, r.botDeaths, r.botDamage, r.damagePerKill ?? '-', r.explosionsNearBot, r.dodges ?? '-', r.arrowsDodged ?? '-', r.arrowHits ?? '-']))
     const sum = (k: string) => rs.reduce((a, r) => a + (r[k] ?? 0), 0)
     const minutes = sum('minutes')
-    console.log(row([mob, 'total', sum('summoned'), sum('kills'), (sum('kills') / minutes).toFixed(1), sum('botDeaths'), sum('botDamage'), sum('kills') ? (sum('botDamage') / sum('kills')).toFixed(1) : '-', sum('explosionsNearBot')]))
+    console.log(row([l, 'total', sum('summoned'), sum('kills'), (sum('kills') / minutes).toFixed(1), sum('botDeaths'), sum('botDamage'), sum('kills') ? (sum('botDamage') / sum('kills')).toFixed(1) : '-', sum('explosionsNearBot'), sum('dodges'), sum('arrowsDodged'), sum('arrowHits')]))
   }
 }
 

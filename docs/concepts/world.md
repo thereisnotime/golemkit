@@ -292,6 +292,67 @@ Not done, and why: ender pearls (aiming a pearl to a safe spot needs landing pre
 costs 5 HP; little use against mobs), building cover walls mid-fight against crowds (the
 `ranged_defense` reflex already builds cover against archers), cobwebs against spiders, potions.
 
+### Dodging
+
+Most of Pax's deaths are arrows (38 of 126, 34 of them skeletons) and melee mobs (42, 31 of them
+zombies), with creepers a distant third. Before this layer the fight loop only defended by
+walking: a left/right strafe flipped on a random timer, a short walk back after each hit, and a
+zig-zag on the way to an archer. It never looked at an arrow. The dodge layer
+(`src/skills/dodgePlan.ts`, pure and tested in `test/dodge-plan.test.ts`; `src/skills/dodge.ts`
+wires it to the world) owns how the bot moves during a fight. When to leave a fight stays with
+`tactics.ts` and `combat.ts`.
+
+The basic move is a **leap**. Vanilla only sprints forward, but a bot turns in one tick, so it
+faces the way it wants to go, sprints and jumps, and snaps back to its target after `leapMs`
+(200 ms). A sprint-jump covers about 1.5 blocks in 6 ticks, enough to take the 0.6-wide body out
+of an arrow's path or out of a zombie's reach. Every leap is checked first: along the way and
+where it lands there must be no wall, water, lava, fire, powder snow or harmful block, and no
+drop deeper than `maxDrop` (2). The old `safeStep` only looked one step ahead.
+
+The per-tick techniques sit in a small list (`DODGE_TECHNIQUES`). The first one with an answer
+wins, and a new technique is one more entry in the list:
+
+- **Draws** (`combat.dodge.draws`): a skeleton fires 20 ticks after it raises its bow, and the
+  raised bow shows in its metadata (living entity flags, hand active). Close by (`drawRange`,
+  10 blocks) an arrow is too fast to react to: at 8 blocks it arrives in about 5 ticks, and with
+  50 to 100 ms of latency the bot sees it late and its move lands late. So it reacts to the draw
+  and leaps a tick before the release, which is enough because the skeleton aims at where the
+  bot stands when it lets go. A pillager's crossbow is less predictable: it fires 20 to 39 ticks
+  after charging (`is_charging_crossbow` going off), so in that window the bot jukes sideways
+  every few hundred ms instead.
+- **Arrows** (`combat.dodge.arrows`): every projectile in flight is simulated with its own drag
+  and gravity against the bot's box (inflated by the projectile's size and `arrowMargin`), with
+  the bot's current motion included. The server sends arrow positions only every 20 ticks, so the
+  layer moves each one forward itself from the spawn velocity. When one will hit, it works out
+  how far it must move to each side to be clear and how far a leap gets in the ticks left (minus
+  `latencyMs`), then leaps to a side that clears in time.
+- **Melee timing** (`combat.dodge.meleeTiming`): zombies and most melee mobs swing at most once
+  every 20 ticks. The layer notes each mob's swing (the arm-swing animation, or the hit it lands)
+  and knows when it can swing again. Its reach comes from vanilla's attack box, which is its own
+  box grown by 0.83 on each side and is axis-aligned, so a zombie reaches 1.43 blocks along an
+  axis and about 2 on the diagonal. While every close mob is recharging the bot holds its ground
+  and hits (no step back after its own hit). Before a mob's swing is ready (`meleeLeadMs` plus
+  `latencyMs`) it gets out to the mob's reach plus `meleeMargin`, walking back if that is fast
+  enough and leaping along the axis that clears the box soonest if not. The sprint for a W-tap is
+  skipped while it does.
+
+Which side to leap to is never fixed. Of the sides that are safe and clear in time it picks the
+one with fewer mobs where it lands, and between equal sides it picks at random. It also avoids
+going the same way three times running, so an archer can't learn the pattern and the bot doesn't
+drift off in one direction.
+
+- **Creeper leap** (`combat.dodge.creeperLeap`): where `tactics.creeperMove` says to back off from
+  a lit fuse, it now says `leap`. The bot sprint-jumps away (several hops, `creeperLeapMs`, longer
+  while the fuse still burns within 7.5 blocks) instead of walking, steering around unsafe
+  ground, and only walks off with the pathfinder when no direction is safe. The shield-or-run
+  choice (`creeperEscape`) counts the faster escape (3.5 blocks a second gained instead of 2), so
+  more fuses are outrun than blocked.
+
+The fight result counts `dodges` (leaps of every kind) and `arrowsDodged` (arrow or draw leaps
+with no projectile hit in the next 1.2 s); `defend` reports them next to the other technique
+counters. `just guard-bench --duel ... --dodge on,off` measures the layer against the old
+movement.
+
 ### PvP
 
 Bots don't fight players unless the owner says so. `combat.pvp` picks how far it goes (default

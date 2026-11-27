@@ -10,7 +10,9 @@ import type { Entity } from 'prismarine-entity'
 import { goals, FLYING, isHostile, sleep, checkAborted } from '../core/index.ts'
 import { equipForTarget, hasRanged, shootAt, readyShield, isRangedMob, meleeDamage, DEFAULT_MAX_CHASE, type WeaponFlags } from './weapons.ts'
 import { attackCooldownMs, swingDecision, spacing, chaseRefusal, outnumbered, shouldDisengageToHeal, shouldEatInLull, creeperMove, MELEE_REACH } from './tactics.ts'
-import { hitStyle, sweepWorth, wantKnockback, shieldAgainstMelee, creeperEscape, goldenAppleNow, rangedUseless, SPRINT_LEAD_MS, CREEPER_FUSE_MS, type HitStyle } from './techniques.ts'
+import { hitStyle, sweepWorth, wantKnockback, shieldAgainstMelee, creeperEscape, goldenAppleNow, rangedUseless, SPRINT_LEAD_MS, CREEPER_FUSE_MS, LEAP_GAIN, type HitStyle } from './techniques.ts'
+import { dodgeLayer } from './dodge.ts'
+import { DODGE_DEFAULTS } from './dodgePlan.ts'
 import { bestFood } from './survival.ts'
 
 export type FightEnd = 'killed' | 'escaped' | 'timeout' | 'gave_up' | 'heal' | 'outnumbered' | 'retarget'
@@ -18,6 +20,8 @@ export interface FightResult {
   end: FightEnd, killed: boolean, reason?: string, hits: number, crits: number
   /** Technique counters: sprint (W-tap) hits, sweep hits, shield raises against melee, golden apples eaten, creeper blasts blocked. */
   sprints?: number, sweeps?: number, blocks?: number, apples?: number, creeperBlocks?: number
+  /** Dodge layer (dodge.ts): leaps of any kind, and arrows or shots dodged (no projectile hit right after the leap). */
+  dodges?: number, arrowsDodged?: number
 }
 
 // ---- shield cooldown: an axe hit on a raised shield disables it (set_cooldown for the shield item) ----
@@ -206,7 +210,10 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
   const archer = isRangedMob(target.name)
   const start = Date.now()
   const origin = bot.entity.position.clone()
-  const res: FightResult = { end: 'timeout', killed: false, hits: 0, crits: 0, sprints: 0, sweeps: 0, blocks: 0, apples: 0, creeperBlocks: 0 }
+  const res: FightResult = { end: 'timeout', killed: false, hits: 0, crits: 0, sprints: 0, sweeps: 0, blocks: 0, apples: 0, creeperBlocks: 0, dodges: 0, arrowsDodged: 0 }
+  // movement during the fight: arrow and draw leaps, melee timing, the creeper leap (combat.dodge.*)
+  const dodge = dodgeLayer(bot, flags.dodge ?? DODGE_DEFAULTS)
+  const creeperLeap = dodge.settings.enabled && dodge.settings.creeperLeap
   const canShoot = flags.ranged && !rangedUseless(target.name)
   let fuseSince = 0 // when the target creeper's fuse was first seen lit
   let style: HitStyle = 'crit'
@@ -259,6 +266,9 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
     res.end = end
     res.killed = end === 'killed'
     if (reason) res.reason = reason
+    const d = dodge.delta()
+    res.dodges = d.dodges
+    res.arrowsDodged = d.arrowsDodged
     return res
   }
 
@@ -310,9 +320,9 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
       const lit = target.name === 'creeper' && creeperFuseLit(target)
       if (!lit) fuseSince = 0
       else if (!fuseSince) fuseSince = Date.now()
-      const creeper = target.name === 'creeper' ? creeperMove({ dist, fuseLit: lit, bow: !!(canShoot && hasRanged(bot)), holdFire: opts.holdFire?.(target) }) : null
-      if (creeper === 'back_off' && flags.shieldMelee !== false && !shieldDisabled(bot) &&
-          creeperEscape({ dist, msLeft: CREEPER_FUSE_MS - (Date.now() - fuseSince), shield: bot.inventory.slots[45]?.name === 'shield' || bot.inventory.items().some(i => i.name === 'shield') }) === 'shield') {
+      let creeper = target.name === 'creeper' ? creeperMove({ dist, fuseLit: lit, bow: !!(canShoot && hasRanged(bot)), holdFire: opts.holdFire?.(target), leap: creeperLeap }) : null
+      if ((creeper === 'back_off' || creeper === 'leap') && flags.shieldMelee !== false && !shieldDisabled(bot) &&
+          creeperEscape({ dist, msLeft: CREEPER_FUSE_MS - (Date.now() - fuseSince), shield: bot.inventory.slots[45]?.name === 'shield' || bot.inventory.items().some(i => i.name === 'shield'), gain: creeper === 'leap' ? LEAP_GAIN : undefined }) === 'shield') {
         // too close to outrun the rest of the fuse: face it behind the shield (a blocked blast does no damage)
         if (mode === 'path') { bot.pathfinder.setGoal(null); mode = 'still' }
         clearMoves(bot)
@@ -329,6 +339,14 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
           continue
         }
       }
+      if (creeper === 'leap') {
+        // sprint-jump away (dodge.ts); walk off with the pathfinder when no direction is safe
+        lowerShield()
+        if (mode === 'path') { bot.pathfinder.setGoal(null); mode = 'still' }
+        clearMoves(bot)
+        if (await dodge.creeperLeap(target, signal, () => creeperFuseLit(target))) continue
+        creeper = 'back_off'
+      }
       if (creeper === 'back_off') {
         lowerShield()
         clearMoves(bot)
@@ -342,6 +360,10 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
       }
 
       if (dist > (flying ? 40 : 24)) return finish('escaped', 'too far away')
+
+      // the dodge layer: a leap away from a shot or a swing happens here; 'back' / 'hold' shape the spacing below
+      const dodged = tactical ? await dodge.tick(target, signal) : null
+      if (dodged === 'leapt') { mode = 'still'; continue }
 
       // Chasing: limits on distance from where the fight started and on where we follow it.
       if (!flying && reach > MELEE_REACH) {
@@ -482,7 +504,7 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
         hurry: target.name === 'creeper'
       })
       // W-tap: sprint goes on again a tick or two before the charge completes, so the hit carries knockback
-      const sprinting = style === 'sprint' && decision !== 'jump' && cdLeft <= SPRINT_LEAD_MS && bot.entity.onGround
+      const sprinting = style === 'sprint' && decision !== 'jump' && cdLeft <= SPRINT_LEAD_MS && bot.entity.onGround && dodged !== 'back'
       if (sprinting && !bot.getControlState('sprint')) {
         lowerShield()
         bot.setControlState('forward', safeStep(bot, 'forward'))
@@ -535,9 +557,11 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
       if (sprinting) {
         // W-tap in progress: keep running into the hit
       } else if (strafe) {
-        if (Date.now() < backUntil) press('back')
+        if (dodged === 'hold') backUntil = 0 // it is recharging: stay in and hit
+        if (Date.now() < backUntil || dodged === 'back') press('back')
         else {
-          const s = spacing(hd)
+          const sp = spacing(hd)
+          const s = dodged === 'hold' && sp === 'back' ? 'strafe' : sp
           if (s === 'strafe') {
             if (Date.now() > strafeFlip || !safeStep(bot, strafeDir)) { strafeDir = strafeDir === 'left' ? 'right' : 'left'; strafeFlip = Date.now() + 700 + Math.random() * 700 }
             press(strafeDir)

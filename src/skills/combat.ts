@@ -291,7 +291,7 @@ const defend = defineAction({
     let hits = 0
     let crits = 0
     let choked = false
-    const extra = { sprints: 0, sweeps: 0, blocks: 0, apples: 0, creeperBlocks: 0 }
+    const extra = { sprints: 0, sweeps: 0, blocks: 0, apples: 0, creeperBlocks: 0, dodges: 0, arrowsDodged: 0 }
     const until = Date.now() + 60_000
     while (Date.now() < until) {
       checkAborted(signal)
@@ -342,7 +342,8 @@ const defend = defineAction({
     if (!killed.length && !notes.length) return fail('nothing to fight')
     const k = killed.length ? `killed ${[...new Set(killed)].map(n => `${killed.filter(x => x === n).length} ${n}`).join(', ')}` : 'killed nothing'
     const tech = [extra.sprints && `${extra.sprints} sprint hits`, extra.sweeps && `${extra.sweeps} sweeps`, extra.blocks && `${extra.blocks} shield blocks`,
-      extra.creeperBlocks && `${extra.creeperBlocks} creeper blasts blocked`, extra.apples && `${extra.apples} golden apples`].filter(Boolean)
+      extra.creeperBlocks && `${extra.creeperBlocks} creeper blasts blocked`, extra.apples && `${extra.apples} golden apples`,
+      extra.dodges && `${extra.dodges} dodges`, extra.arrowsDodged && `${extra.arrowsDodged} arrows dodged`].filter(Boolean)
     return ok([k + (hits ? ` (${[`${hits} hits`, `${crits} crits`, ...tech].join(', ')})` : ''), ...notes].join('; '))
   }
 })

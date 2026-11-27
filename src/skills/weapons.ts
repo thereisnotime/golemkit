@@ -12,6 +12,7 @@ import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
 import type { Agent } from '../core/index.ts'
 import { aimArrow } from './tactics.ts'
+import { dodgeSettings, type DodgeSettings } from './dodgePlan.ts'
 
 /** Vanilla 1.21 attack damage and attacks per second. */
 const MELEE: Record<string, { damage: number, speed: number }> = {
@@ -54,6 +55,8 @@ export interface WeaponFlags {
   sweep?: boolean
   shieldMelee?: boolean
   goldenApple?: boolean
+  /** combat.dodge.* (dodgePlan.ts); missing = the defaults (on). */
+  dodge?: DodgeSettings
 }
 
 export const DEFAULT_MAX_CHASE = 16
@@ -71,7 +74,8 @@ export function weaponFlags (agent: Agent): WeaponFlags {
     sprintReset: c.sprintReset ?? true,
     sweep: c.sweep ?? true,
     shieldMelee: c.shieldMelee ?? true,
-    goldenApple: c.goldenApple ?? true
+    goldenApple: c.goldenApple ?? true,
+    dodge: dodgeSettings((c as { dodge?: unknown }).dodge)
   }
 }
 

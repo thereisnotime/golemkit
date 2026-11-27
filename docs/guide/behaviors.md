@@ -395,7 +395,7 @@ The actions behind it are usable on their own: `protect` (the loop) and `feed_pl
 
 `scripts/guard-bench.ts` is the controlled version. ClaudeTest (an op) directs; GuardTest is
 the bot and GuardTester the owner, who stands still (no self-defence, eats bread). Before every
-phase the director sets the time to morning, kills leftover tagged mobs, fills creeper holes in
+phase the director kills leftover tagged mobs, fills creeper holes in
 the arena floor, resets both players to full health and hunger, gives the same gear (bot: iron
 sword, shield, 16 bread, iron armour with `--armour`; tester: 8 bread) and teleports both to the
 spot, the bot 3 blocks east. Then it summons a seeded wave schedule 8 to 14 blocks around the
@@ -417,7 +417,15 @@ tester, so nobody else on the server sees them.
 Two more modes test the bot on its own (no tester, reflexes and stay_safe only). `--duel
 zombie,skeleton,creeper,vindicator` keeps `--duel-count` (2) of one kind alive 8 to 12 blocks
 around the spot, refilled 3 s after each kill, for `--minutes` per kind, and counts kills, deaths
-and health lost per kill. `--clutch N` does N drops from `--clutch-height` (22) blocks with a water
+and health lost per kill. `--duel mixed` keeps zombies, skeletons and creepers alive at once (in
+turn). `--dodge on,off` plays each duel once with the [dodge layer](../concepts/world#dodging) and
+once without (`combat.dodge.enabled`, set live and reset at the end), and every result also
+carries the layer's leaps, arrows dodged and projectile hits taken.
+
+The bench never changes the time by default (`--time keep`): the server is shared, so it leaves
+the clock alone. `--wait-day` waits up to 10 minutes for the server's own day before each phase,
+so natural night spawns don't mix into a duel; `--time day` or `--time night` still set it on a
+private server. `--clutch N` does N drops from `--clutch-height` (22) blocks with a water
 bucket, then N stands on a fire block, and removes the water and fire afterwards.
 
 Other options: `--seed` (1), `--sword stone|iron` (iron), `--tester-food` (8), `--interval` (30 s
