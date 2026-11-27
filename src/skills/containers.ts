@@ -19,7 +19,10 @@ import {
 
 const SEARCH = 32
 const SETTLE_MS = 150
-export const CONTAINER_RE = /^(chest|trapped_chest|barrel|.*shulker_box)$/
+/** Blocks that hold items it can take from (and remembers what is in). */
+export const CONTAINER_RE = /^(chest|trapped_chest|barrel|.*shulker_box|furnace|smoker|blast_furnace|hopper|dropper|dispenser|brewing_stand|crafter)$/
+/** The ones it stores things in: a furnace or a hopper is never where its things go. */
+export const STORAGE_RE = /^(chest|trapped_chest|barrel|.*shulker_box)$/
 
 export { isToolOrArmor }
 
@@ -363,7 +366,7 @@ function findContainer (bot: Bot, at?: { x?: number, y?: number, z?: number }, a
     }
     return b
   }
-  const ids = Object.values(bot.registry.blocksByName).filter(b => CONTAINER_RE.test(b.name)).map(b => b.id)
+  const ids = Object.values(bot.registry.blocksByName).filter(b => STORAGE_RE.test(b.name)).map(b => b.id)
   if (!skip) return bot.findBlock({ matching: ids, maxDistance: SEARCH }) ?? `no chest or barrel within ${SEARCH} blocks`
   const me = bot.entity.position
   const found = bot.findBlocks({ matching: ids, maxDistance: SEARCH, count: 32 })
@@ -404,13 +407,14 @@ export function ownChests (agent: Agent): Pos[] {
 }
 
 /**
- * The chests it may use: the ones it placed, the configured ones and, with storage.anyChest on,
- * every container it remembers (any chest it has seen counts as its own; protected areas still
- * apply where the callers check them).
+ * The containers it may take from: the chests it placed, the configured ones and, with
+ * storage.anyContainer on, every container it remembers (chests, barrels, shulker boxes,
+ * furnaces, smokers, hoppers, droppers, dispensers, brewing stands: all of it counts as its own;
+ * protected areas still apply where the callers check them).
  */
 export function usableChests (agent: Agent): Pos[] {
   const list = [...ownChests(agent), ...configuredChests(agent)]
-  const any = (agent.settings as { storage?: { anyChest?: unknown } } | undefined)?.storage?.anyChest === true
+  const any = (agent.settings as { storage?: { anyContainer?: unknown } } | undefined)?.storage?.anyContainer === true
   if (any) for (const c of knownContainers(agent, { includeUnknown: true })) list.push({ x: c.x, y: c.y, z: c.z })
   return list
 }
@@ -770,7 +774,7 @@ const placeChest = defineAction({
     }
     await sleep(300, signal)
     const b = bot.blockAt(vec(bot, spot.at.x, spot.at.y, spot.at.z))
-    if (!b || !CONTAINER_RE.test(b.name)) return fail(`placing a chest at ${posKey(spot.at)} did nothing`)
+    if (!b || !STORAGE_RE.test(b.name)) return fail(`placing a chest at ${posKey(spot.at)} did nothing`)
     addOwnChest(agent, spot.at)
     noteSeen(agent, bot, b, 'placed by me')
     book(agent)!.put(scopeOf(agent, bot), spot.at, { block: b.name, contents: {}, at: Date.now(), verifiedAt: Date.now() })

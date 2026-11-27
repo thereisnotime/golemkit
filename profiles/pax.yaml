@@ -59,7 +59,7 @@ settings:
   mining: { gear: shield_or_armour, minFood: 4, retreatBelow: 12, retreatHostiles: 2 }
   # Pantry in the room by home (placed by the owner's OK on 2026-11-23): keep_fed walks over and
   # looks inside when it has no food, so it works after a restart too.
-  storage: { anyChest: true, chests: [{ at: [559, 69, -47], role: pantry }, { at: [561, 69, -47], role: gear }] }
+  storage: { anyContainer: true, chests: [{ at: [559, 69, -47], role: pantry }, { at: [561, 69, -47], role: gear }] }
   # Container memory (docs/guide/search.md#container-memory): what it saw in chests survives a
   # restart; a sighting older than a day is only a hint and is re-checked on the spot. By day it
   # looks into its own and the pantry chest near home once an hour, whispers ${MC_OWNER:-Robin} when the

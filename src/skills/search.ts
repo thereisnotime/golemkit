@@ -23,7 +23,7 @@ import { miningSettings } from './minePlan.ts'
 import { upgradeTools } from './progression.ts'
 import { toolTier, bestToolIn } from './toolkit.ts'
 import { CROPS, isMature, plantOn } from './farming.ts'
-import { withdraw as withdrawAction, knownContainers, knownAt, CONTAINER_RE, ownChests, configuredChests, OWN_CHESTS_KEY } from './containers.ts'
+import { withdraw as withdrawAction, knownContainers, knownAt, CONTAINER_RE, STORAGE_RE, ownChests, configuredChests, OWN_CHESTS_KEY } from './containers.ts'
 import { moddedNames } from './mods.ts'
 import { offLimits, spawnOf, surfaceAt, topY, isNight, inOwnFarm, getFoodSpots } from './food.ts'
 import {
@@ -112,7 +112,7 @@ function setup (agent: Agent, bot: Bot): () => void {
     try {
       const p = ref.position.plus(face)
       const b = bot.blockAt(p)
-      if (b && CONTAINER_RE.test(b.name)) {
+      if (b && STORAGE_RE.test(b.name)) {
         const st = store(agent)
         const pos = floorPos(p)
         if (st && !isOwnChest(pos, ownChests(agent), [])) st.set(OWN_CHESTS_KEY, [...ownChests(agent), pos].slice(-64))

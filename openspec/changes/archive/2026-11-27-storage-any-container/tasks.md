@@ -1,0 +1,2 @@
+- [x] CONTAINER_RE covers every block with items, STORAGE_RE for where things go
+- [x] toggle renamed, docs, test

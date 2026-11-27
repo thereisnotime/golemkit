@@ -336,7 +336,7 @@ test('pantry: own and configured chests near home, the same set for the low repo
   assert.deepEqual(tripPantry(w.bot, a.agent), [], 'out of walking range; the outpost chest 100 blocks away is no pantry')
 })
 
-test('storage.anyChest: every chest it remembers counts as its own; off, only placed and configured ones', async () => {
+test('storage.anyContainer: every container it remembers counts as its own; off, only placed and configured ones', async () => {
   const { usableChests, chestView } = await import('../src/skills/containers.ts')
   const kv = new FakeKV()
   const w = world()
@@ -346,8 +346,11 @@ test('storage.anyChest: every chest it remembers counts as its own; off, only pl
   kv.set('home', { x: 0, y: 64, z: 0 })
   opened(off.agent, w.bot, w.bot.blockAt({ x: 8, y: 64, z: 8 }), items({ cobblestone: 495 }) as any, Date.now())
   assert.deepEqual(usableChests(off.agent), [{ x: 5, y: 64, z: 5 }], 'someone else\'s chest is not its own')
-  const on = agentWith(kv, { ...ON, storage: { ...ON.storage, anyChest: true } })
+  const on = agentWith(kv, { ...ON, storage: { ...ON.storage, anyContainer: true } })
   ;(on.agent as any).bot = w.bot
-  assert.ok(usableChests(on.agent).some(p => p.x === 8 && p.z === 8), 'with anyChest the seen chest counts')
+  assert.ok(usableChests(on.agent).some(p => p.x === 8 && p.z === 8), 'with anyContainer the seen chest counts')
   assert.equal(chestView(on.agent, w.bot).find(c => c.x === 8)?.contents?.cobblestone, 495, 'and its contents are in the view the material planner reads')
+  w.set(9, 64, 9, 'furnace')
+  opened(on.agent, w.bot, w.bot.blockAt({ x: 9, y: 64, z: 9 }), items({ iron_ingot: 7 }) as any, Date.now())
+  assert.equal(chestView(on.agent, w.bot).find(c => c.x === 9)?.contents?.iron_ingot, 7, 'a furnace is taken from too')
 })
