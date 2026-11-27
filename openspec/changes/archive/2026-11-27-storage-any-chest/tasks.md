@@ -1,0 +1,2 @@
+- [x] usableChests() in containers.ts replaces the own+configured list everywhere it was built
+- [x] toggle, docs, test

@@ -186,6 +186,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'inventoryMemory.maxAgeHours', description: 'container memory older than this is a hint, re-checked before relying on it (default 24)', schema: z.number().min(0.1).max(24 * 30) },
   { key: 'inventoryMemory.indexOwn', description: 'by day, look into its own and configured chests near home now and then (check_storage) and say when the pantry runs low', schema: bool },
   { key: 'inventoryMemory.refreshMinutes', description: 'check_storage looks into a chest not seen for this long (default 60)', schema: z.number().int().min(1).max(24 * 60) },
+  { key: 'storage.anyChest', description: 'treat every chest it knows near home as its own: take from it, check it, count it (off = only chests it placed and storage.chests)', schema: bool },
   { key: 'inventoryMemory.radius', description: 'check_storage: chests within this many blocks of home (default 48)', schema: z.number().int().min(4).max(256) },
   { key: 'inventoryMemory.lowFood', description: 'tell the owners when the pantry holds fewer food items than this (default 8, 0 = never)', schema: z.number().int().min(0).max(1000) },
   { key: 'inventoryMemory.grumble', description: 'grumble once in chat when its own chest is raided, moved or broken', schema: bool },

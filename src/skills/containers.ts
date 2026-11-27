@@ -110,7 +110,7 @@ const samePos = (a: Pos, b: Pos) => a.x === b.x && a.y === b.y && a.z === b.z
 
 /** Its own (placed) or a configured chest, by either half. */
 function isMine (agent: Agent, p: Pos, alt?: Pos | null): boolean {
-  return [...ownChests(agent), ...configuredChests(agent)].some(c => samePos(c, p) || (!!alt && samePos(c, alt)))
+  return usableChests(agent).some(c => samePos(c, p) || (!!alt && samePos(c, alt)))
 }
 
 function isFoodName (bot: Bot | null, name: string): boolean {
@@ -403,6 +403,18 @@ export function ownChests (agent: Agent): Pos[] {
   return (agent as { storage?: Agent['storage'] }).storage?.get<Pos[]>(OWN_CHESTS_KEY, []) ?? []
 }
 
+/**
+ * The chests it may use: the ones it placed, the configured ones and, with storage.anyChest on,
+ * every container it remembers (any chest it has seen counts as its own; protected areas still
+ * apply where the callers check them).
+ */
+export function usableChests (agent: Agent): Pos[] {
+  const list = [...ownChests(agent), ...configuredChests(agent)]
+  const any = (agent.settings as { storage?: { anyChest?: unknown } } | undefined)?.storage?.anyChest === true
+  if (any) for (const c of knownContainers(agent, { includeUnknown: true })) list.push({ x: c.x, y: c.y, z: c.z })
+  return list
+}
+
 /** Chests listed in the profile (storage.chests). */
 export function configuredChests (agent: Agent): Pos[] {
   const s = (agent.settings as { storage?: { chests?: unknown } } | undefined)?.storage
@@ -441,7 +453,7 @@ export function chestView (agent: Agent, bot: Bot, radius = memoryOptions(agent)
   if (!center || !bot.entity) return []
   const known = knownContainers(agent)
   const me = bot.entity.position
-  return uniquePositions([...ownChests(agent), ...configuredChests(agent)])
+  return uniquePositions(usableChests(agent))
     .filter(p => Math.hypot(p.x - center.x, p.z - center.z) <= radius && !agent.protectedAreas?.isProtected?.(p as any) && !missingChest(bot, p))
     .filter((p, i, a) => { const k = knownAt(known, p); return !k || a.findIndex(q => knownAt(known, q) === k) === i })
     .map(p => { const k = knownAt(known, p); return { ...p, contents: k ? k.contents : null } })
@@ -521,7 +533,7 @@ async function takeFromOwnChests (
   const { bot, agent, signal } = ctx
   const here = bot.entity.position
   const seenList = knownContainers(agent)
-  const own = uniquePositions(chests ?? [...ownChests(agent), ...configuredChests(agent)])
+  const own = uniquePositions(chests ?? usableChests(agent))
     .filter(p => Math.hypot(p.x - here.x, p.y - here.y, p.z - here.z) <= range && !agent.protectedAreas?.isProtected?.(p as any))
     .map(p => {
       const s = knownAt(seenList, p)
@@ -868,7 +880,7 @@ export function storageDue (agent: Agent, bot: Bot, radius: number, now = Date.n
   const known = knownContainers(agent, { now })
   const tried = attempted.get(agent)
   const refreshMs = all ? 0 : o.refreshMinutes * 60_000
-  const chests = [...ownChests(agent), ...configuredChests(agent)]
+  const chests = usableChests(agent)
     .filter((p, i, a) => a.findIndex(q => samePos(p, q) || (!!knownAt(known, q) && knownAt(known, q) === knownAt(known, p))) === i)
     .filter(p => Math.hypot(p.x - center.x, p.z - center.z) <= radius && !agent.protectedAreas?.isProtected?.(p as any))
     .filter(p => all || now - (tried?.get(posKey(p)) ?? 0) >= refreshMs)
@@ -902,7 +914,7 @@ function uniquePositions (list: Pos[]): Pos[] {
 export function pantryChests (agent: Agent, bot: Bot, radius = memoryOptions(agent).radius): Pos[] {
   const center = homeOf(agent, bot) ?? bot.entity?.position
   if (!center) return []
-  return uniquePositions([...ownChests(agent), ...configuredChests(agent)])
+  return uniquePositions(usableChests(agent))
     .filter(p => Math.hypot(p.x - center.x, p.z - center.z) <= radius)
 }
 

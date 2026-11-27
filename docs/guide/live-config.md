@@ -167,6 +167,7 @@ can't change their own.
 | `inventoryMemory.maxAgeHours` | 0.1–720 | sightings older than this are hints, re-checked before relying on them (default 24) |
 | `inventoryMemory.indexOwn` | on/off | by day, look into its own and configured chests near home now and then ([check_storage](./behaviors#container-memory-check-storage)) and say when the pantry runs low (default off) |
 | `inventoryMemory.refreshMinutes` | 1–1440 | check_storage looks into a chest not seen inside for this long (default 60) |
+| `storage.anyChest` | on/off | treat every chest it knows near home as its own: take from it, check it, count it (off = only chests it placed and `storage.chests`) |
 | `inventoryMemory.radius` | 4–256 | check_storage: chests within this many blocks of home (default 48) |
 | `inventoryMemory.lowFood` | 0–1000 | tell the owners when the pantry holds fewer food items than this (default 8, 0 = never) |
 | `inventoryMemory.grumble` | on/off | grumble once in chat when its own chest is raided, moved or broken (default off) |
