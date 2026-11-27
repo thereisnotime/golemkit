@@ -83,9 +83,10 @@ async function findGround (d: Director, x: number, z: number): Promise<P | null>
           for (; y > -60; y--) {
             const b = d.agent.bot.blockAt(d.agent.bot.entity.position.clone().set(x + dx, y, z + dz))
             if (!b) { unloaded = true; break }
-            if (b.boundingBox === 'block' || /water|lava/.test(b.name)) { name = b.name; break }
+            if (/leaves|_log$|snow$/.test(b.name)) continue
+            if (b.boundingBox === 'block' || /water|lava|ice/.test(b.name)) { name = b.name; break }
           }
-          if (!name || !/^(grass_block|dirt|stone|snow_block|sand|coarse_dirt|podzol|andesite|diorite|granite)$/.test(name)) continue
+          if (!name || !/^(grass_block|dirt|stone|snow_block|sand|coarse_dirt|podzol|andesite|diorite|granite|gravel|moss_block|mud|clay|terracotta|red_sand|sandstone|deepslate|tuff)$/.test(name)) continue
           return { x: x + dx, y, z: z + dz }
         }
       }
@@ -144,7 +145,12 @@ async function run (): Promise<void> {
     if (e && Math.hypot(e.position.x - SX, e.position.z - SZ) < 300) { await d.stop(); throw new Error(`${pl.username} is within 300 blocks of the start`) }
   }
   const g = await findGround(d, SX, SZ)
-  if (!g) { await d.stop(); throw new Error('no flat ground at the start') }
+  if (!g) {
+    const col: string[] = []
+    for (let y = 120; y > 40 && col.length < 4; y--) { const n = blockName(d.agent, { x: SX, y, z: SZ }); if (n && n !== 'air') col.push(`${y}:${n}`) }
+    await d.stop()
+    throw new Error(`no ground to dig at the start (column there: ${col.join(', ') || 'not loaded'}); try another --start`)
+  }
   const o = { x: g.x, y: g.y, z: g.z } // the base origin: layer 0 (the floor) at ground level
   log(`base origin ${o.x} ${o.y} ${o.z} (${blockName(d.agent, o)})`)
   await d.cmd(`/tp ${DIRECTOR} ${o.x + 0.5} ${o.y + 25} ${o.z + 0.5}`)
