@@ -28,6 +28,7 @@ import { mayReplace } from '../../../skills/reflexPlan.ts'
 import { airTrigger, airSettings } from '../../../skills/airPlan.ts'
 import { headInWater, oxygen } from '../air.ts'
 import { undergroundNow } from '../../../skills/mining.ts'
+import { phantomSettings, phantomStep } from '../../../skills/phantomPlan.ts'
 import { miningSettings, undergroundRetreat } from '../../../skills/minePlan.ts'
 
 export interface ReflexOptions {
@@ -330,6 +331,66 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       const onSpawn = () => { gearTriedAt = 0 }
       bot.on('spawn', onSpawn)
 
+      // ---- phantoms (combat.phantoms, skills/phantomPlan.ts): a bed resets their timer and they
+      // don't stop sleep; with no bed to use, fight them before the dive instead of after the hit ----
+      const REST_KEY = 'rest.lastAt'
+      const noteRest = () => { try { agent.storage.set(REST_KEY, Date.now()) } catch {} }
+      bot.on('sleep', noteRest)
+      bot.on('death', noteRest) // dying resets the phantom timer too
+      let bedFailedAt: number | null = null
+      let bedSeen: { at: number, dist: number | null } = { at: 0, dist: null }
+      const phantomCheck = (): boolean => {
+        const s = phantomSettings((agent.settings.combat as { phantoms?: unknown } | undefined)?.phantoms)
+        if (!s.enabled || !cfg().selfDefense) return false
+        const t = bot.time?.timeOfDay ?? 0
+        const night = t >= 12_542 && t <= 23_460
+        if (!night) return false
+        const me = bot.entity.position
+        let phantoms = 0
+        let nearest: number | null = null
+        let groundHostile = false
+        for (const e of Object.values(bot.entities) as any[]) {
+          if (!e?.position || e === bot.entity) continue
+          const d = e.position.distanceTo(me)
+          if (e.name === 'phantom') { if (d <= 32) { phantoms++; if (nearest === null || d < nearest) nearest = d } } else if (d <= s.groundClear && isHostile(e) && !FLYING.has(e.name ?? '')) groundHostile = true
+        }
+        if (Date.now() - bedSeen.at > 10_000) {
+          const bed = bot.findBlock({ matching: (b: any) => bot.isABed(b), maxDistance: s.bedRange })
+          bedSeen = { at: Date.now(), dist: bed ? bed.position.distanceTo(me) : null }
+        }
+        const last = agent.storage.get<number>(REST_KEY)
+        const step = phantomStep(s, {
+          night, sleeping: !!bot.isSleeping, phantoms, nearestPhantom: nearest,
+          sinceRestMs: typeof last === 'number' ? Date.now() - last : null, bedDist: bedSeen.dist, groundHostile,
+          sinceBedFailMs: bedFailedAt === null ? null : Date.now() - bedFailedAt, current: agent.currentAction?.name ?? null
+        })
+        if (step.do === 'none') return false
+        if (step.do === 'wake') { agent.log.info(`phantoms: ${step.why}`); void bot.wake().catch(() => {}); return true }
+        if (busy) return false
+        if (step.do === 'sleep' && agent.getAction('sleep')) {
+          if (!arbitrate('sleep')) return false
+          agent.log.info(`phantoms: ${step.why}`)
+          busy = true
+          const stay = step.stay
+          void agent.act('sleep', {}, { caller, priority: PRIORITY.reflex })
+            .then(async r => {
+              if (!r.ok) { bedFailedAt = Date.now(); agent.log.info(`phantoms: no bed: ${r.message}`); return }
+              noteRest()
+              // in and out: the bed reset the timer; the ones overhead still need fighting
+              if (!stay) { await new Promise(res => setTimeout(res, 1200)); if (bot.isSleeping) await bot.wake().catch(() => {}) }
+            })
+            .catch(() => { bedFailedAt = Date.now() })
+            .finally(() => { busy = false })
+          return true
+        }
+        if (step.do === 'engage' && agent.getAction('defend')) {
+          agent.log.info(`phantoms: ${step.why}`)
+          void reflex('defend')
+          return true
+        }
+        return false
+      }
+
       const timer = setInterval(() => {
         if (!needsSurvival(bot)) return // creative/spectator: no hunger, no danger
         if (isEscaping(bot)) return // leaving a fight (escape.ts): it eats and fights back on its own until it is done
@@ -361,6 +422,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
             return
           }
         }
+        if (selfDefense && phantomCheck()) return
         // wear armour (and a shield/totem) as soon as it's in the inventory: gear_up runs beside the current action
         if (combatCfg().autoArmor !== false && agent.getAction('gear_up') && !bot.currentWindow && Date.now() - gearTriedAt > 10_000 && hasGearUpgrade(gearPlan(bot))) {
           gearTriedAt = Date.now()
@@ -378,6 +440,8 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         bot.off('entityHurt', onPlayerHit)
         bot.off('physicsTick', onTick)
         bot.off('health', onHealth)
+        bot.off('sleep', noteRest)
+        bot.off('death', noteRest)
         bot.off('spawn', onSpawn)
         clearInterval(timer)
         clearInterval(rangedTimer)

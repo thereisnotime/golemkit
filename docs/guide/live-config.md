@@ -52,6 +52,14 @@ can't change their own.
 | `combat.endermanGaze` | on/off | never look an enderman in the eyes unless fighting it (default on) |
 | `combat.fightFastMobs` | on/off | at low health keep fighting mobs faster than the bot (vindicators, ravagers, spiders, wolves, piglin brutes, hoglins) instead of backing off at `retreatBelow`; the water back-off (`waterFightAbove`) still applies (default on) |
 | `combat.chokepoints` | on/off | against 3+ melee mobs with half health or more, fight from a 1-wide gap nearby (default on) |
+| `combat.phantoms.enabled` | on/off | phantoms: to bed when they are about or after a long time without a bed, else fight them before the dive (off = only fight back after a hit) |
+| `combat.phantoms.sleep` | on/off | go to bed against phantoms and their spawn timer (default on) |
+| `combat.phantoms.insomniaMinutes` | 0–1440 | real minutes without a bed or a death before it goes to bed at night anyway (default 30; phantoms come after 60) |
+| `combat.phantoms.bedRange` | 1–64 | use a bed this close (default 16) |
+| `combat.phantoms.engageRange` | 0–48 | fight a phantom this close before its dive, 0 = only after a hit (default 16) |
+| `combat.phantoms.groundClear` | 0–32 | no bed with a ground mob this close (default 8) |
+| `combat.phantoms.retrySeconds` | 0–3600 | wait after a refused bed (default 60) |
+| `combat.phantoms.recentMinutes` | 0–120 | a bed this recent reset the timer: fight the phantoms instead of going to bed again (default 5) |
 | `combat.dodge.enabled` | on/off | the [dodge layer](../concepts/world#dodging) in mob fights; off turns every `combat.dodge.*` technique off (default on) |
 | `combat.dodge.draws` | on/off | leap sideways just before a skeleton within `drawRange` lets go of its drawn bow, and while a pillager holds a charged crossbow (default on) |
 | `combat.dodge.arrows` | on/off | leap out of the path of an arrow or other projectile in flight that would hit (default on) |

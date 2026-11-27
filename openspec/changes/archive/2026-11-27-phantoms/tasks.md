@@ -1,0 +1,3 @@
+- [x] phantomPlan with tests
+- [x] reflex hook, rest tracking
+- [x] toggles and docs

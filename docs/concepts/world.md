@@ -370,6 +370,29 @@ Not done, and why: ender pearls (aiming a pearl to a safe spot needs landing pre
 costs 5 HP; little use against mobs), building cover walls mid-fight against crowds (the
 `ranged_defense` reflex already builds cover against archers), cobwebs against spiders, potions.
 
+### Phantoms
+
+Phantoms spawn at night over a player who hasn't been in a bed, or died, for three in-game days
+(an hour of real time). Lying down in a bed resets that timer even when the night doesn't skip,
+and phantoms, unlike zombies and skeletons, don't stop a player from going to bed. They circle
+high, dive, hit and climb away. A bot that only fights back after a hit is always a dive late:
+Pax, out of bed for days, stood under nine of them and took about ten hits.
+
+The reflexes check every 2 s at night (`combat.phantoms`, planner `src/skills/phantomPlan.ts`):
+
+- phantoms about, a bed within `bedRange` (16), no ground mob within `groundClear` (8), and no bed
+  in the last `recentMinutes` (5): into bed and straight out again. The bed resets the timer; the
+  phantoms already up still need fighting.
+- no phantoms, but `insomniaMinutes` (30) without a bed or a death: to bed, and it stays there so
+  the night can skip when the other players sleep too.
+- in bed with a phantom within `engageRange` (16): out of bed.
+- otherwise a phantom within `engageRange`: the fight starts now, before its dive. The fight loop
+  holds still for flyers and swings when they come into reach (or shoots, with a bow).
+- a refused bed (monsters nearby, not night) waits `retrySeconds` (60).
+
+`combat.phantoms: false` (or `engageRange: 0, sleep: false`) is the old behaviour: fight back
+after a hit only.
+
 ### Dodging
 
 Most of Pax's deaths are arrows (38 of 126, 34 of them skeletons) and melee mobs (42, 31 of them
