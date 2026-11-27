@@ -71,7 +71,10 @@ export function checkBase (agent: Agent, bot: Bot): BaseCheck | string {
   const mines = mineFindings(refs, base.area, look, settings.mineClearance)
   const caps = planMineCaps(mines, settings)
   const holeSteps = planHoleFills(scan.holes)
-  const steps = [...caps.steps, ...holeSteps, ...fixes.flatMap(f => f.steps)].sort((a, b) => (ORDER[a.technique] ?? 9) - (ORDER[b.technique] ?? 9))
+  // a torch already standing on the spot is done: the light reading can stay low next to one
+  // (Pax's integrity project stalled three sessions on "torch is already there")
+  const torchThere = (s: FixStep) => s.action === 'torch' && /(^|_)torch$/.test(look(s.pos)?.name ?? '')
+  const steps = [...caps.steps, ...holeSteps, ...fixes.flatMap(f => f.steps)].filter(s => !torchThere(s)).sort((a, b) => (ORDER[a.technique] ?? 9) - (ORDER[b.technique] ?? 9))
   const unfixed = [...caps.unfixed, ...fixes.filter(f => f.unfixed).map(f => `${describeCavity(f.cavity)}: ${f.unfixed}`)]
   const lines = [
     ...mines.filter(f => !f.capped).map(f => `mine ${f.mine.id} at ${fmtPos(f.mine.entrance)}: entrance ${f.problem}${f.caps.length ? `, ${f.caps.length} open block${f.caps.length === 1 ? '' : 's'} to cap` : ''}`),
@@ -159,6 +162,7 @@ export async function secureBase (ctx: Ctx, check: BaseCheck, minutes: number): 
         if (!f) { failed.push('out of filler blocks'); break }
         await placeBlockState(bot, f, vec(bot, s.pos.x, s.pos.y, s.pos.z), undefined, signal, { canDig: false })
       } else if (s.action === 'torch') {
+        if (/(^|_)torch$/.test(bot.blockAt(vec(bot, s.pos.x, s.pos.y, s.pos.z))?.name ?? '')) { done[s.technique] = (done[s.technique] ?? 0) + 1; continue }
         if (!bot.inventory.items().some(i => i.name === 'torch')) { failed.push('out of torches'); continue }
         await placeBlockState(bot, 'torch', vec(bot, s.pos.x, s.pos.y, s.pos.z), undefined, signal, { canDig: false })
       } else {
