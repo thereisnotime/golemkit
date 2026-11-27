@@ -344,7 +344,8 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
         lowerShield()
         if (mode === 'path') { bot.pathfinder.setGoal(null); mode = 'still' }
         clearMoves(bot)
-        if (await dodge.creeperLeap(target, signal, () => creeperFuseLit(target))) continue
+        const before = bot.entity.position.clone()
+        if (await dodge.creeperLeap(target, signal, () => creeperFuseLit(target))) { origin.add(bot.entity.position.minus(before)); continue }
         creeper = 'back_off'
       }
       if (creeper === 'back_off') {
@@ -362,8 +363,10 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
       if (dist > (flying ? 40 : 24)) return finish('escaped', 'too far away')
 
       // the dodge layer: a leap away from a shot or a swing happens here; 'back' / 'hold' shape the spacing below
+      const beforeDodge = bot.entity.position.clone()
       const dodged = tactical ? await dodge.tick(target, signal) : null
-      if (dodged === 'leapt') { mode = 'still'; continue }
+      // a dodge is not a chase: maxChase counts from where the fight would be without it
+      if (dodged === 'leapt') { origin.add(bot.entity.position.minus(beforeDodge)); mode = 'still'; continue }
 
       // Chasing: limits on distance from where the fight started and on where we follow it.
       if (!flying && reach > MELEE_REACH) {

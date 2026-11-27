@@ -505,6 +505,9 @@ async function main (): Promise<void> {
         const kinds = mob === 'mixed' ? MIXED : [mob]
         await checkOwnerFar()
         log(`== repeat ${rep + 1}, duel ${mob}, dodge ${dodge}: resetting`)
+        // first, so a fight still running from the last phase ends (with its mobs) before measuring
+        const tg = bot.setToggle('combat.dodge.enabled', dodge === 'on')
+        if (!tg.ok) throw new Error(`combat.dodge.enabled: ${tg.error}`)
         measuring = false
         if (TIME !== 'keep') await cmd(`/time set ${TIME === 'night' ? 14000 : 1000}`)
         else if (WAIT_DAY) await waitForDay()
@@ -534,8 +537,7 @@ async function main (): Promise<void> {
           if (ok) break
           log(`reset again: ${state(bot)}`)
         }
-        const tg = bot.setToggle('combat.dodge.enabled', dodge === 'on')
-        if (!tg.ok) throw new Error(`combat.dodge.enabled: ${tg.error}`)
+        if (live(bot)) bot.setToggle('combat.dodge.enabled', dodge === 'on') // a new Agent after a disconnect reads the stored override anyway
         st = fresh()
         dodge0 = live(bot) ? dodgeStats(bot.bot) : null
         let spawnTurn = 0
