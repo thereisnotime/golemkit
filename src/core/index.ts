@@ -27,7 +27,7 @@ export { goals, Movements, goto, gotoTimed, travel, reachMovements, type ReachMo
 export { getAir, headInWater, oxygen, planAir, airCells, climbOntoLedge, trackOwnAir, type AirResult } from '../adapters/minecraft-java/air.ts'
 export { isModdedBlock, MODDED_BLOCK } from '../adapters/minecraft-java/modded.ts'
 export {
-  DangerMemory, dangerMemory, rememberDanger, activeZones, isInDanger, avoidZones, crossesDanger, clearDanger, describeZone,
+  DangerMemory, dangerMemory, rememberDanger, activeZones, isInDanger, inZoneHeight, avoidZones, crossesDanger, clearDanger, describeZone,
   DANGER_TTL_MS, PATROL_TTL_MS, DANGER_RADIUS, type DangerZone, type DangerSighting, type DangerPos
 } from './danger.ts'
 export {
@@ -62,8 +62,13 @@ export {
   type SiteFault, type SitePos, type SiteRef, type SiteVerdict, type SiteRecord, type SiteChange
 } from './sites.ts'
 export {
-  PROJECT_POLICIES, TIMEOUT_POLICIES, PROJECT_OPS, PROJECTS_DEFAULTS, MAX_FAILS, FAIL_BACKOFF_MS, ProjectsSettingsSchema, projectsSettings, emptyProjectState, normalizeState,
+  PROJECT_POLICIES, TIMEOUT_POLICIES, PROJECT_OPS, PROJECTS_DEFAULTS, MAX_FAILS, FAIL_BACKOFF_MS, ProjectsSettingsSchema, projectsSettings, emptyProjectState, normalizeState, stuckReason,
   orderProjects, needsOk, projectQueue, nextStep, applyOp, noteSession, restingReason, fmtQueue, goalMentions,
   type ProjectPolicy, type TimeoutPolicy, type ProjectsSettings, type ProjectInfo, type ProjectState, type ProjectProgress, type Decision,
   type QueueStatus, type QueueEntry, type StepContext, type NextStep, type ProjectOp
 } from './projects.ts'
+export {
+  SAFETY_TECHNIQUES, CAP_KINDS, MINE_PLACEMENTS, BASE_SAFETY_DEFAULTS, DEATH_SPOTS_DEFAULTS, DEATH_ZONE_KIND,
+  BaseSafetySettingsSchema, DeathSpotsSettingsSchema, baseSafetySettings, deathSpotsSettings,
+  type SafetyTechnique, type CapKind, type MinePlacement, type BaseSafetySettings, type DeathSpotsSettings
+} from './baseSafety.ts'

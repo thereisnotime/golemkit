@@ -6,6 +6,7 @@
 // No bot, no world: callers pass block readers. Unit tests: test/base-plan.test.ts.
 import type { Blueprint, Facing, Pos, ResolvedRole, WorldCell } from './blueprint.ts'
 import { diffCells, haveFor, isNaturalBlock, isReplaceableName, roleAccepts, solidCells } from './blueprint.ts'
+import { familyOf, opposite, isFacing, DIR_VEC, type Dir, type BlockState } from './blockstate.ts'
 
 // ------------------------------------------------------------------ stages
 
@@ -69,6 +70,8 @@ export interface StageSurvey<T> {
   covered: T[]
   /** Not loaded: can't tell. */
   unknown: T[]
+  /** Hang on a block that isn't there and that nothing will put there (a ladder whose wall spot holds someone's block): left alone. */
+  unsupported: { cell: T, support: Pos }[]
 }
 
 export interface SurveyOptions {
@@ -80,6 +83,8 @@ export interface SurveyOptions {
   planned?: (p: Pos) => boolean
   /** Left out entirely (a reserved farm plot). */
   exclude?: (p: Pos) => boolean
+  /** Attachments: a solid face to hang on is there now, or will be built. Without it, attachments aren't checked. */
+  support?: { solidAt: (p: Pos) => boolean, willBuild: (p: Pos) => boolean }
 }
 
 /**
@@ -89,7 +94,7 @@ export interface SurveyOptions {
  * natural, not air and not planned (the old hut stands on the floor, a torch sits on it).
  */
 export function surveyStage<T extends WorldCell> (cells: readonly T[], blockAt: (p: Pos) => string | undefined, roles: Record<string, ResolvedRole>, o: SurveyOptions): StageSurvey<T> {
-  const out: StageSurvey<T> = { total: 0, done: [], todo: [], blocked: [], covered: [], unknown: [] }
+  const out: StageSurvey<T> = { total: 0, done: [], todo: [], blocked: [], covered: [], unknown: [], unsupported: [] }
   for (const c of solidCells([...cells])) {
     if (o.exclude?.(c)) continue
     out.total++
@@ -103,11 +108,28 @@ export function surveyStage<T extends WorldCell> (cells: readonly T[], blockAt: 
       if (above && !isReplaceableName(above) && !isNaturalBlock(above) && !o.planned?.(up)) { out.covered.push(c); continue }
     }
     const d = diffCells([c], blockAt, roles, o.canDig, o.own)
-    if (d.blocked.length) out.blocked.push(c)
-    else if (d.done.length) out.done.push(c)
-    else out.todo.push(c)
+    if (d.blocked.length) { out.blocked.push(c); continue }
+    if (d.done.length) { out.done.push(c); continue }
+    const sup = o.support && r ? supportOf(r.item, c.state, c) : null
+    if (sup && o.support && !o.support.solidAt(sup) && !o.support.willBuild(sup)) { out.unsupported.push({ cell: c, support: sup }); continue }
+    out.todo.push(c)
   }
   return out
+}
+
+/**
+ * The block an attachment hangs on: behind a ladder or wall torch, below a standing torch or
+ * lantern, above a hanging one. Null for blocks that need no particular neighbour. Pure.
+ */
+export function supportOf (item: string, state: BlockState | undefined, at: Pos): Pos | null {
+  const f = familyOf(item, state)
+  let d: Dir | null = null
+  if (f === 'wall_mounted') d = state && isFacing(state.facing) ? opposite(state.facing) : null
+  else if (f === 'torch') d = 'down'
+  else if (f === 'lantern') d = state?.hanging === 'true' ? 'up' : 'down'
+  if (!d) return null
+  const v = DIR_VEC[d]
+  return { x: at.x + v.x, y: at.y + v.y, z: at.z + v.z }
 }
 
 // ------------------------------------------------------------------ where the base is
@@ -283,7 +305,7 @@ export function sessionWants (wants: Record<string, number>, carry: number): Rec
 
 // ------------------------------------------------------------------ the project list
 
-export type ProjectKind = 'stage' | 'light' | 'row' | 'plot'
+export type ProjectKind = 'stage' | 'light' | 'row' | 'plot' | 'secure'
 
 export interface ProjectDef {
   name: string
@@ -298,6 +320,7 @@ export interface ProjectDef {
 
 /** The projects after the base blueprint's own stages, in working order. */
 export const EXTRA_PROJECTS: readonly ProjectDef[] = [
+  { name: 'integrity', title: 'no way in for mobs: caves, holes and mine entrances under and by the base sealed, capped or lit', kind: 'secure', words: ['integrity', 'base safety', 'caves', 'cave', 'holes', 'mob proof base', 'seal', 'seal the base'] },
   { name: 'farm_plot', title: 'a farm plot kept free inside the walls', kind: 'plot', after: ['walls'], words: ['farm plot', 'plot', 'farm inside'] },
   { name: 'lighting', title: 'torches so no mob spawns inside', kind: 'light', after: ['walls', 'floor'], words: ['lighting', 'lights', 'light', 'torches', 'torch', 'gate torches', 'mob proof', 'spawn proof'] },
   { name: 'storage', title: 'a row of chests', kind: 'row', blueprint: 'storage_row', after: ['floor'], words: ['storage', 'chests', 'chest', 'storage room'] },

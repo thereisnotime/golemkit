@@ -21,6 +21,7 @@ import { TOGGLES } from './toggles.ts'
 import { unknownKeys } from './schemaKeys.ts'
 import { NeedsSettingsSchema, IdleSettingsSchema, SitesSettingsSchema, IDLE_MODES } from './needs.ts'
 import { ProjectsSettingsSchema } from './projects.ts'
+import { BaseSafetySettingsSchema, DeathSpotsSettingsSchema } from './baseSafety.ts'
 
 export const LlmProfileSchema = z.object({
   provider: z.string().optional().describe('claude-subscription | codex | anthropic | opencode | openai'),
@@ -115,6 +116,10 @@ export const ProfileSchema = z.object({
   sites: z.union([z.literal(false), SitesSettingsSchema]).optional().describe('site health checks; false = off'),
   /** Base projects (docs/guide/base-projects.md): the queue of base improvements it works through on its own. false turns it off. Lands in settings.projects. */
   projects: z.union([z.literal(false), ProjectsSettingsSchema]).optional().describe('base projects: improve and extend the base on its own (policy auto | ask | off); false = off'),
+  /** Base safety (docs/guide/base-safety.md): caves, holes and mine entrances under and around the base, found and fixed. false turns it off. Lands in settings.baseSafety. */
+  baseSafety: z.union([z.literal(false), BaseSafetySettingsSchema]).optional().describe('base safety: find and fix caves, holes and mine entrances mobs can use; false = off'),
+  /** Death spots: keep out of the spot it just died in for a while. false turns it off. Lands in settings.deathSpots. */
+  deathSpots: z.union([z.literal(false), DeathSpotsSettingsSchema]).optional().describe('avoid the spot of a recent death for a while; false = off'),
   persona: z.string().optional(),
   server: z.object({
     host: z.string().optional(),
@@ -297,6 +302,8 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (profile.idle !== undefined) settings.idle = typeof profile.idle === 'string' ? { ...(settings.idle as object | undefined), mode: profile.idle } : { ...(settings.idle as object | undefined), ...profile.idle }
   if (profile.sites !== undefined) settings.sites = profile.sites === false ? { enabled: false } : { ...(settings.sites as object | undefined), ...profile.sites }
   if (profile.projects !== undefined) settings.projects = profile.projects === false ? { enabled: false } : { ...(settings.projects as object | undefined), ...profile.projects }
+  if (profile.baseSafety !== undefined) settings.baseSafety = profile.baseSafety === false ? { enabled: false } : { ...(settings.baseSafety as object | undefined), ...profile.baseSafety }
+  if (profile.deathSpots !== undefined) settings.deathSpots = profile.deathSpots === false ? { enabled: false } : { ...(settings.deathSpots as object | undefined), ...profile.deathSpots }
   if (profile.building) settings.building = profile.building
   if (profile.worldedit !== undefined) settings.worldedit = { ...(settings.worldedit as object | undefined), ...(typeof profile.worldedit === 'boolean' ? { enabled: profile.worldedit } : profile.worldedit) }
   if (profile.blueprints) {

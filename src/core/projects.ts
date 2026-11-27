@@ -118,6 +118,8 @@ export interface ProjectInfo {
   requestedBy?: string
   /** Never needs an ok, whatever its size (bookkeeping such as reserving a plot). */
   small?: boolean
+  /** The last sessions got nothing done: what the last one said (shown in the queue and the status). */
+  stuck?: string
 }
 
 export type Decision = 'approved' | 'vetoed' | 'skipped'
@@ -265,7 +267,11 @@ export function nextStep (queue: readonly QueueEntry[], state: ProjectState, s: 
   if (work) return { kind: 'work', entry: work }
   if (ready.length) return { kind: 'none', why: `night: ${ready[0]!.info.name} waits for the day` }
   const open = queue.filter(e => e.status === 'needs_ok' || e.status === 'asked')
-  if (open.length) return { kind: 'none', why: `${open.map(e => e.info.name).join(', ')} wait${open.length === 1 ? 's' : ''} for an owner's ok` }
+  if (open.length) {
+    // nobody to ask: say so, or it reads as if an answer were on its way (Pax's towers waited for days)
+    const why = c.ownerOnline ? '' : open.some(e => e.status === 'needs_ok') ? '; no owner online to ask' : ''
+    return { kind: 'none', why: `${open.map(e => `${e.info.name} (${plural(e.info.left, 'block')})`).join(', ')} wait${open.length === 1 ? 's' : ''} for an owner's ok${why}` }
+  }
   const waiting = queue.find(e => e.status === 'waiting')
   if (waiting) return { kind: 'none', why: `${waiting.info.name} waits (${waiting.why})` }
   return { kind: 'none', why: 'nothing left to build' }
@@ -324,6 +330,12 @@ export const MAX_FAILS = 3
 /** How long a project that keeps failing is put aside. */
 export const FAIL_BACKOFF_MS = 2 * 3_600_000
 
+/** What a project's last sessions said when they got nothing done (fails > 0), else null. Pure. */
+export function stuckReason (p: ProjectProgress | undefined): string | null {
+  if (!p || p.fails <= 0) return null
+  return `${p.fails} session${p.fails === 1 ? '' : 's'} without progress: ${p.last.replace(/^[a-z_]+: /, '').slice(0, 160)}`
+}
+
 /** A project that failed MAX_FAILS sessions in a row rests for FAIL_BACKOFF_MS (then one more try). Pure. */
 export function restingReason (p: ProjectProgress | undefined, now: number): string | null {
   if (!p || p.fails < MAX_FAILS) return null
@@ -335,7 +347,8 @@ export function restingReason (p: ProjectProgress | undefined, now: number): str
 export function fmtQueue (queue: readonly QueueEntry[]): string[] {
   return queue.map((e, i) => {
     const left = e.status === 'done' ? '' : e.info.total ? ` ${e.info.total - e.info.left}/${e.info.total}` : ''
-    return `${i + 1}. ${e.info.name} (${e.info.title})${left}: ${e.status.replace('_', ' ')}${e.why && e.why !== e.status ? `, ${e.why}` : ''}`
+    const stuck = e.info.stuck && e.status !== 'done' && e.status !== 'blocked' ? `; stuck: ${e.info.stuck.slice(0, 120)}` : ''
+    return `${i + 1}. ${e.info.name} (${e.info.title})${left}: ${e.status.replace('_', ' ')}${e.why && e.why !== e.status ? `, ${e.why}` : ''}${stuck}`
   })
 }
 

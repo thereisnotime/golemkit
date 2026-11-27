@@ -209,6 +209,8 @@ export interface EntranceCandidate {
   roofed?: boolean
   /** On or next to a farm. */
   farm?: boolean
+  /** Wrong for the base: too close to its walls, or inside when that isn't allowed (settings baseSafety.mineClearance, minePlacement). */
+  base?: string
   /** How many of the first steps down plan safely (planStep). */
   safeSteps: number
 }
@@ -224,6 +226,7 @@ export function entranceProblem (c: EntranceCandidate, s: Pick<StairMineSettings
   if (c.wet) return 'water, ice or lava close by'
   if (c.roofed) return 'under a roof'
   if (c.farm) return 'on a farm'
+  if (c.base) return /from the base walls/.test(c.base) ? 'too close to the base walls' : c.base
   if (c.safeSteps < ENTRANCE_STEPS) return `only ${c.safeSteps} safe steps down`
   return null
 }
@@ -347,6 +350,8 @@ export interface MineSite {
   lastAt: number
   /** What it got out of it, over all trips. */
   got: Record<string, number>
+  /** A cap over the stairs where they cut the ground (base safety, near the base): taken off for a trip, put back after. */
+  cap?: { cells: P[], kind: string, at: number }
 }
 
 /** Torches (carried, or 4 per coal and stick it could craft) it needs before it starts a mine at night. */

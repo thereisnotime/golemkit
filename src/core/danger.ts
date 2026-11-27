@@ -21,6 +21,8 @@ export interface DangerZone {
   until: number
   /** How many were seen together (a patrol's size), when known. */
   count?: number
+  /** Only positions within this many blocks above or below count (a death in a cave doesn't fence off the ground above). Unset: any height. */
+  yRange?: number
 }
 
 /** How long a lone shooter's zone is remembered. */
@@ -32,7 +34,7 @@ export const DANGER_RADIUS = 24
 /** At most this many zones are kept (the oldest go first). */
 export const MAX_ZONES = 32
 
-export interface DangerSighting extends DangerPos { kind: string, radius?: number, ttlMs?: number, count?: number }
+export interface DangerSighting extends DangerPos { kind: string, radius?: number, ttlMs?: number, count?: number, yRange?: number }
 
 const flat = (a: DangerPos, b: DangerPos) => Math.hypot(a.x - b.x, a.z - b.z)
 
@@ -49,10 +51,10 @@ export function rememberDanger (zones: readonly DangerZone[], s: DangerSighting,
   const y = s.y ?? 64
   if (i >= 0) {
     const old = live[i]!
-    live[i] = { ...old, x: s.x, y, z: s.z, radius: Math.max(old.radius, radius), seenAt: now, until: Math.max(old.until, now + ttl), count: s.count ?? old.count }
+    live[i] = { ...old, x: s.x, y, z: s.z, radius: Math.max(old.radius, radius), seenAt: now, until: Math.max(old.until, now + ttl), count: s.count ?? old.count, ...(s.yRange !== undefined ? { yRange: s.yRange } : {}) }
     return live
   }
-  live.push({ x: s.x, y, z: s.z, kind: s.kind, radius, since: now, seenAt: now, until: now + ttl, ...(s.count !== undefined ? { count: s.count } : {}) })
+  live.push({ x: s.x, y, z: s.z, kind: s.kind, radius, since: now, seenAt: now, until: now + ttl, ...(s.count !== undefined ? { count: s.count } : {}), ...(s.yRange !== undefined ? { yRange: s.yRange } : {}) })
   if (live.length > MAX_ZONES) live.sort((a, b) => b.seenAt - a.seenAt).length = MAX_ZONES
   return live
 }
@@ -62,12 +64,20 @@ export function activeZones (zones: readonly DangerZone[], now: number): DangerZ
   return zones.filter(z => z.until > now)
 }
 
-/** The zone `pos` is in (horizontally, plus `margin`), nearest centre first, or null. */
-export function isInDanger (zones: readonly DangerZone[], pos: DangerPos, now: number, margin = 0): DangerZone | null {
+/** Whether `pos` is within a zone's height band (zones without yRange, or positions without y, always are). */
+export const inZoneHeight = (z: DangerZone, pos: DangerPos): boolean => z.yRange === undefined || pos.y === undefined || Math.abs(pos.y - z.y) <= z.yRange
+
+/**
+ * The zone `pos` is in (horizontally, plus `margin`, and within the zone's height band), nearest
+ * centre first, or null. `kind` only looks at zones of that kind.
+ */
+export function isInDanger (zones: readonly DangerZone[], pos: DangerPos, now: number, margin = 0, kind?: string): DangerZone | null {
   let best: DangerZone | null = null
   let bestD = Infinity
   for (const z of zones) {
     if (z.until <= now) continue
+    if (kind !== undefined && z.kind !== kind) continue
+    if (!inZoneHeight(z, pos)) continue
     const d = flat(z, pos)
     if (d <= z.radius + margin && d < bestD) { best = z; bestD = d }
   }
@@ -89,6 +99,8 @@ export function crossesDanger (a: DangerPos, b: DangerPos, zones: readonly Dange
   const len2 = dx * dx + dz * dz
   for (const z of zones) {
     if (z.until <= now) continue
+    // a zone with a height band (a death in a cave) only matters for walks that start or end in that band
+    if (!inZoneHeight(z, a) && !inZoneHeight(z, b)) continue
     const inA = flat(z, a) <= z.radius
     if (inA && flat(z, b) >= flat(z, a)) continue
     // closest point of the segment to the zone centre
@@ -117,9 +129,9 @@ export class DangerMemory {
     return isInDanger(this.zones, s, t)!
   }
 
-  /** The zone `pos` is in, or null. */
-  isInDanger (pos: DangerPos, margin = 0): DangerZone | null {
-    return isInDanger(this.zones, pos, this.now(), margin)
+  /** The zone `pos` is in, or null (`kind`: only zones of that kind). */
+  isInDanger (pos: DangerPos, margin = 0, kind?: string): DangerZone | null {
+    return isInDanger(this.zones, pos, this.now(), margin, kind)
   }
 
   /** The points outside every zone. */

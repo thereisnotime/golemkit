@@ -507,6 +507,40 @@ export function pickNearby<T> (todo: T[], from: number, group: (c: T) => string,
   return best < 0 ? from : best
 }
 
+/**
+ * Columns of a plan closed in at door height (`y` and `y + 1`): planned walls (anything `isWall`
+ * says, a shut door included) ring them, so the bot gets to them only through the door. Found by
+ * a flood fill from outside the plan's footprint. Pure. The builder takes a door out to get in
+ * only when something still to build stands in one of these; a wall block or a torch outside
+ * doesn't need the door open (Pax's fortress lost its gate door on every wall repair).
+ */
+export function enclosedColumns (cells: readonly { x: number, y: number, z: number }[], isWall: (c: { x: number, y: number, z: number }) => boolean, y: number): Set<string> {
+  if (!cells.length) return new Set()
+  const walls = new Set(cells.filter(c => (c.y === y || c.y === y + 1) && isWall(c)).map(c => `${c.x},${c.z}`))
+  const xs = cells.map(c => c.x)
+  const zs = cells.map(c => c.z)
+  const x0 = Math.min(...xs) - 1
+  const x1 = Math.max(...xs) + 1
+  const z0 = Math.min(...zs) - 1
+  const z1 = Math.max(...zs) + 1
+  const out = new Set<string>()
+  const seen = new Set<string>([`${x0},${z0}`])
+  const q: [number, number][] = [[x0, z0]]
+  for (let i = 0; i < q.length; i++) {
+    const [x, z] = q[i]!
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const nx = x + dx
+      const nz = z + dz
+      const id = `${nx},${nz}`
+      if (nx < x0 || nx > x1 || nz < z0 || nz > z1 || seen.has(id) || walls.has(id)) continue
+      seen.add(id)
+      q.push([nx, nz])
+    }
+  }
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) { const id = `${x},${z}`; if (!seen.has(id) && !walls.has(id)) out.add(id) }
+  return out
+}
+
 // ------------------------------------------------------------------ resume / world diff
 
 export type CellState = 'done' | 'place' | 'dig' | 'blocked' | 'clear'

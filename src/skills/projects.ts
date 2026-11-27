@@ -11,13 +11,13 @@ import type { Bot } from 'mineflayer'
 import type { ActionContext, ActionResult, Agent } from '../core/index.ts'
 import {
   defineSkill, defineAction, z, ok, fail, checkAborted, fmtPos, needsSurvival, sleep, goals,
-  projectsSettings, normalizeState, projectQueue, nextStep, applyOp, noteSession, restingReason, fmtQueue, goalMentions,
+  projectsSettings, normalizeState, projectQueue, nextStep, applyOp, noteSession, restingReason, stuckReason, fmtQueue, goalMentions,
   PROJECT_OPS, type ProjectInfo, type ProjectState, type ProjectsSettings, type QueueEntry, type NextStep, type ProjectOp
 } from '../core/index.ts'
 import { GoalStore, type Goal } from '../llm/goals.ts'
-import { vec, gotoWithin } from './world.ts'
+import { vec, gotoWithin, isPlaceFace } from './world.ts'
 import { inventoryCounts } from './toolkit.ts'
-import { rotate, placeCells, bounds, resolveRoles, solidCells, isReplaceableName, FACINGS, type Blueprint, type Facing, type Pos, type WorldCell, type ResolvedRole } from './blueprint.ts'
+import { rotate, placeCells, bounds, resolveRoles, solidCells, isReplaceableName, isNaturalBlock, FACINGS, type Blueprint, type Facing, type Pos, type WorldCell, type ResolvedRole } from './blueprint.ts'
 import {
   blueprintStages, stageCells, surveyStage, fitAnchor, interiorOf, fitRow, fitSquare, billOfMaterials, fmtBom, chestTakes, sessionWants,
   projectWords, projectNamed, safeToWork, EXTRA_PROJECTS, type Stage, type Interior, type Column, type Fit, type AnchorCandidate, type ProjectDef
@@ -30,6 +30,7 @@ import { libraryDirs } from './blueprint-library.ts'
 import { getHome, getPlaces, setPlace } from './navigation.ts'
 import { lightUp, ownTorches } from './lighting.ts'
 import { tellOwners } from './pvp-actions.ts'
+import { checkBase, secureBase, type BaseCheck } from './baseSafety.ts'
 
 const STATE_KEY = 'projects.state'
 const SPOTS_KEY = 'projects.spots'
@@ -46,7 +47,7 @@ interface Spots {
 }
 
 /** Default working order: what keeps the base safe and usable first, the big looks last. */
-export const DEFAULT_ORDER = ['walls', 'farm_plot', 'floor', 'lighting', 'storage', 'workshop', 'walkway', 'towers']
+export const DEFAULT_ORDER = ['walls', 'integrity', 'farm_plot', 'floor', 'lighting', 'storage', 'workshop', 'walkway', 'towers']
 
 export const settingsOf = (agent: Pick<Agent, 'settings'>): ProjectsSettings => projectsSettings((agent.settings as { projects?: unknown }).projects)
 export const loadState = (agent: Pick<Agent, 'storage'>): ProjectState => normalizeState(agent.storage.get(STATE_KEY))
@@ -186,6 +187,8 @@ export interface Surveyed {
   origin?: Pos
   facing?: Facing
   note?: string
+  /** secure: the base safety check. */
+  safety?: BaseCheck
 }
 
 export interface BaseSurvey { base: Base, projects: Surveyed[], goal: Goal | null }
@@ -215,12 +218,21 @@ export function surveyBase (agent: Agent, bot: Bot, s = settingsOf(agent)): Base
   const out: Surveyed[] = []
 
   // the blueprint's stages
+  // an attachment (a ladder, a wall torch) needs its block: there now, or a planned one that can still go in
+  const solidPlanned = new Set(solidCells(base.cells).map(key))
+  const support = {
+    solidAt: (p: Pos) => isPlaceFace(bot.blockAt(vec(bot, p.x, p.y, p.z))),
+    willBuild: (p: Pos) => { if (!solidPlanned.has(key(p))) return false; const n = at(p); return n === undefined || isReplaceableName(n) || isNaturalBlock(n) || isOwn(p) }
+  }
   for (const st of base.stages) {
     const cells = stageCells(base.cells, st, base.stages)
-    const sv = surveyStage(cells, at, base.roles, { canDig: agent.canDig, own: isOwn, skipCovered: st.skipCovered, planned: p => planned.has(key(p)), exclude: st.name === 'floor' ? inPlot : undefined })
-    const skipped = new Set([...sv.covered, ...sv.blocked].map(key))
+    const sv = surveyStage(cells, at, base.roles, { canDig: agent.canDig, own: isOwn, skipCovered: st.skipCovered, planned: p => planned.has(key(p)), exclude: st.name === 'floor' ? inPlot : undefined, support })
+    const skipped = new Set([...sv.covered, ...sv.blocked, ...sv.unsupported.map(u => u.cell)].map(key))
     const left = sv.todo.length + sv.unknown.length
-    const notes = [sv.blocked.length ? `${sv.blocked.length} spots hold blocks I didn't place, left alone` : '', sv.covered.length ? `${sv.covered.length} under other builds, left alone` : '', sv.unknown.length ? `${sv.unknown.length} not loaded` : ''].filter(Boolean)
+    const u0 = sv.unsupported[0]
+    const notes = [sv.blocked.length ? `${sv.blocked.length} spots hold blocks I didn't place, left alone` : '', sv.covered.length ? `${sv.covered.length} under other builds, left alone` : '',
+      u0 ? `${sv.unsupported.length} can't go in, left alone: ${base.roles[u0.cell.role]?.item ?? u0.cell.role} at ${fmtPos(u0.cell)} hangs on ${fmtPos(u0.support)}, which holds ${at(u0.support) ?? 'nothing loaded'} and isn't mine to change` : '',
+      sv.unknown.length ? `${sv.unknown.length} not loaded` : ''].filter(Boolean)
     const after = [...st.after]
     if (st.name === 'floor' && !plot) after.push('farm_plot')
     out.push({
@@ -259,6 +271,15 @@ export function surveyBase (agent: Agent, bot: Bot, s = settingsOf(agent)): Base
       if (floorDone && floorDone.info.left === 0 && floorDone.info.total > 0) { out.push({ info: info(0, 1, { small: true }), def: { kind: 'plot', def }, note: 'the floor is stone already: no plot' }); continue }
       const sq = fitSquare(interior, freeCol, { max: 5, min: 3, margin: 1, avoid: door })
       out.push({ info: info(sq ? 1 : 1, 1, { small: true, ...(sq ? {} : { blocked: 'no free 3x3 inside the walls' }) }), def: { kind: 'plot', def }, ...(sq ? { fit: { ...sq, y: y0 } } : {}) })
+      continue
+    }
+    if (def.kind === 'secure') {
+      // base safety (baseSafety.ts): only once the base is settled; off with settings baseSafety.enabled
+      const c = base.fresh ? null : checkBase(agent, bot)
+      if (!c || typeof c === 'string') continue
+      const left = c.steps.length
+      const blocked = !left && c.unfixed.length ? `nothing I can do: ${c.unfixed[0]!.slice(0, 160)}` : undefined
+      out.push({ info: info(left + (blocked ? 1 : 0), Math.max(1, left), { small: true, ...(blocked ? { blocked } : {}) }), def: { kind: 'secure', def }, safety: c, note: c.lines.length ? c.lines.slice(0, 4).join('; ') : 'nothing open to mobs under or by the base' })
       continue
     }
     if (def.kind === 'light') {
@@ -331,7 +352,9 @@ export function planBase (agent: Agent, bot: Bot, now = Date.now()): BasePlan | 
   // a project that failed a few sessions in a row rests a while
   const infos = survey.projects.map(p => {
     const rest = restingReason(state.progress[p.info.name], now)
-    return rest && p.info.left > 0 ? { ...p.info, blocked: rest } : p.info
+    const stuck = p.info.left > 0 ? stuckReason(state.progress[p.info.name]) : null
+    const info = stuck ? { ...p.info, stuck } : p.info
+    return rest && p.info.left > 0 ? { ...info, blocked: rest } : info
   })
   const queue = projectQueue(infos, state, settings, now)
   const holds = goalHolds(survey.goal, now)
@@ -342,8 +365,19 @@ export function planBase (agent: Agent, bot: Bot, now = Date.now()): BasePlan | 
   const step: NextStep = holds
     ? { kind: 'none', why: `an LLM goal is on the building: ${survey.goal!.text.slice(0, 80)}` }
     : nextStep(queue, state, settings, { now, ownerOnline, night })
+  const sec = survey.projects.find(x => x.def.kind === 'secure')?.safety
+  lastPlans.set(agent, {
+    at: now,
+    next: step.kind === 'none' ? step.why : `${step.kind === 'ask' ? 'ask about' : 'work on'} ${step.entry.info.name}`,
+    stuck: Object.fromEntries(queue.filter(e => e.info.stuck && e.status !== 'done').map(e => [e.info.name, e.info.stuck!.slice(0, 160)])),
+    waiting: queue.filter(e => e.status === 'needs_ok' || e.status === 'asked' || e.status === 'blocked').map(e => `${e.info.name}: ${e.status.replace('_', ' ')} (${e.why.slice(0, 100)})`),
+    ...(sec ? { safety: sec.lines.length ? sec.lines.slice(0, 3) : ['ok'] } : {})
+  })
   return { survey, queue, step, state, settings, holds }
 }
+
+/** The last plan's short form for the status view (planBase runs every 20 s or so while idle). */
+const lastPlans = new WeakMap<object, { at: number, next: string, stuck: Record<string, string>, waiting: string[], safety?: string[] }>()
 
 // ------------------------------------------------------------------ materials, plan text
 
@@ -509,6 +543,8 @@ export async function workOn (ctx: Ctx, p: BasePlan, entry: QueueEntry, minutes:
     const c = { x: f.x0 + Math.floor(f.size / 2), y: f.y + 1, z: f.z0 + Math.floor(f.size / 2) }
     setPlace(agent, 'farm_plot', { ...c, ...(bot.game?.dimension ? { dimension: String(bot.game.dimension).replace('minecraft:', '') } : {}) })
     result = ok(`kept a ${f.size}x${f.size} plot inside the walls free for a farm (place farm_plot, ${fmtPos(c)}); the floor goes around it`)
+  } else if (kind === 'secure') {
+    result = sv.safety ? await secureBase(ctx, sv.safety, minutes) : fail('no base safety check')
   } else if (kind === 'light') {
     await enterBase(ctx, base)
     const y = (base.interior?.y ?? base.origin.y) + 1
@@ -732,15 +768,65 @@ function guardBase (agent: Agent, bot: Bot): () => void {
   }
 }
 
+const checkBaseAction = defineAction({
+  name: 'check_base',
+  description: 'Check the base for ways in for mobs: caves and holes under the floor, tunnels under the walls, a mine entrance next to the walls, dark spots mobs spawn on. ' +
+    'Says what it found and how it would fix each (cap, fill, seal, light). Changes nothing. Answers "pax is the base safe".',
+  params: z.object({}),
+  exclusive: false,
+  run ({ agent, bot }) {
+    if (!(bot as Bot)?.entity) return fail('not in the game')
+    const c = checkBase(agent, bot as Bot)
+    if (typeof c === 'string') return fail(c)
+    const head = c.steps.length || c.unfixed.length ? `${c.base.template} at ${fmtPos(c.base.origin)}: ${c.steps.length} fix${c.steps.length === 1 ? '' : 'es'} to make` : `${c.base.template} at ${fmtPos(c.base.origin)}: nothing open to mobs under or by it`
+    const lines = [head, ...c.lines, ...c.unfixed.map(u => `can't fix: ${u}`)]
+    return ok(lines.join('\n'), { lines, steps: c.steps.length, unfixed: c.unfixed })
+  }
+})
+
+const secureBaseAction = defineAction({
+  name: 'secure_base',
+  capabilities: ['move', 'place'],
+  description: 'Make the base mob-proof now: cap a mine entrance by the walls, seal holes and tunnels into the base, fill small cavities under it, light what stays open (settings baseSafety). ' +
+    'One bounded session; the base project "integrity" does the same between chores.',
+  params: z.object({ minutes: z.number().min(1).max(30).default(5).describe('session length') }),
+  longRunning: true,
+  async run (ctx, { minutes }) {
+    const bot = ctx.bot as Bot
+    if (!bot?.entity) return fail('not in the game')
+    const c = checkBase(ctx.agent, bot)
+    if (typeof c === 'string') return fail(c)
+    return secureBase(ctx, c, minutes)
+  }
+})
+
+/** Status lines: what the queue does next, what is stuck and why, what waits for an owner, the base's safety. No world reads. */
+function projectStatus (agent: Agent): string[] {
+  const plan = lastPlans.get(agent)
+  if (!plan || Date.now() - plan.at > 10 * 60_000) return []
+  return [
+    `next: ${plan.next}`.slice(0, 200),
+    ...Object.entries(plan.stuck).map(([n, why]) => `stuck: ${n}: ${why}`.slice(0, 200)),
+    ...plan.waiting.map(w => `waits: ${w}`.slice(0, 200)),
+    ...(plan.safety && plan.safety[0] !== 'ok' ? plan.safety.map(l => `unsafe: ${l}`.slice(0, 200)) : [])
+  ]
+}
+
 export const baseProjects = () => defineSkill({
   name: 'base_projects',
   capabilities: ['move', 'place'],
   description: 'Long-term base projects: improving and extending the fortress by itself.',
-  actions: [projectsAction, projectAction, planBaseAction, workOnBase],
+  actions: [projectsAction, projectAction, planBaseAction, workOnBase, checkBaseAction, secureBaseAction],
   setup (agent, bot) { return guardBase(agent, bot as Bot) },
+  status: projectStatus,
   observe (agent) {
     const st = loadState(agent)
     const last = Object.entries(st.progress).sort((a, b) => b[1].lastAt - a[1].lastAt)[0]
-    return last ? { baseProjects: { last: last[0], at: new Date(last[1].lastAt).toISOString(), result: last[1].last.slice(0, 120), paused: !!st.paused } } : {}
+    const plan = lastPlans.get(agent)
+    const extra = plan && Date.now() - plan.at < 10 * 60_000
+      ? { next: plan.next, ...(Object.keys(plan.stuck).length ? { stuck: plan.stuck } : {}), ...(plan.waiting.length ? { waiting: plan.waiting } : {}), ...(plan.safety ? { safety: plan.safety } : {}) }
+      : {}
+    if (!last && !Object.keys(extra).length) return {}
+    return { baseProjects: { ...(last ? { last: last[0], at: new Date(last[1].lastAt).toISOString(), result: last[1].last.slice(0, 120) } : {}), paused: !!st.paused, ...extra } }
   }
 })

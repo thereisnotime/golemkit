@@ -16,7 +16,7 @@ export const PROGRESS_DISTANCE = 16
 /** Failures that only mean someone else took the body, not that the task failed. */
 const NOT_A_FAILURE = /^(busy|preempted|replaced|stopped|died|cancelled|yield|suspended|switch|stop|aborted)\b/
 
-export type StatusAgent = Pick<Agent, 'on' | 'off' | 'adapter' | 'currentAction' | 'getAction' | 'owners' | 'whisper' | 'settings' | 'dataDir' | 'username' | 'log' | 'connected'>
+export type StatusAgent = Pick<Agent, 'on' | 'off' | 'adapter' | 'currentAction' | 'getAction' | 'owners' | 'whisper' | 'settings' | 'dataDir' | 'username' | 'log' | 'connected'> & Partial<Pick<Agent, 'definition'>>
 
 export type DeciderSource = () => DeciderSnapshot | null
 
@@ -205,6 +205,11 @@ export class StatusTracker {
         }
       }
     } catch {}
+    const notes: Record<string, string[]> = {}
+    for (const sk of this.agent.definition?.skills ?? []) {
+      if (!sk.status) continue
+      try { const ls = sk.status(this.agent as never); if (ls.length) notes[sk.name] = ls.slice(0, 8) } catch {}
+    }
     let rssMb: number | null = null
     try { rssMb = Math.round(process.memoryUsage.rss() / 1048576) } catch {}
     const s: Omit<BotStatus, 'summary'> = {
@@ -230,7 +235,8 @@ export class StatusTracker {
       alert: { count: this.alert.count, lastAt: this.alert.lastAt, nextAt: this.nextAlertAt },
       stuckAlertMs: o.stuckAlertMs,
       lastDisconnect: this.lastDisconnect,
-      rssMb
+      rssMb,
+      ...(Object.keys(notes).length ? { notes } : {})
     }
     return { ...s, summary: chatLine(s, now) }
   }

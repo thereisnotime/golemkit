@@ -17,6 +17,7 @@ import { ensureTool, equipFor, inventoryCounts, toolTier, bestToolIn, harvestPro
 /** Digging gives nothing (wrong tool, full inventory...): stop and say why instead of mining on. */
 export class NothingDropsError extends Error {}
 import { isNaturalBlock } from './blueprint.ts'
+import { digKeepOut, stepOutOfKeepOut } from './baseArea.ts'
 import { pickupNearby } from './pickup.ts'
 import { perMinute, makeRoom } from './efficiency.ts'
 import { craftItem } from './crafting.ts'
@@ -276,7 +277,8 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
   const t0 = Date.now()
   const at = lookFor(bot)
   const pickTier = () => toolTier(bestToolIn(Object.keys(inventoryCounts(bot)), 'pickaxe') ?? '', 'pickaxe')
-  const allowed = (p: P, name: string) => !agent.protectedAreas.isProtected(p) && (isNaturalBlock(name) || AIR.test(name))
+  // not the ground under its own base, not a recent death spot (baseArea.ts: settings baseSafety.keepOutDepth, deathSpots)
+  const allowed = (p: P, name: string) => !agent.protectedAreas.isProtected(p) && (isNaturalBlock(name) || AIR.test(name)) && (AIR.test(name) || !digKeepOut(agent, p))
   let broken = 0
   let retreat = ''
   let notReady = false
@@ -373,7 +375,15 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
       if (!inReach(bot, near)) { pathFails++; continue }
     }
 
-    // 2. staircase down to the stone layer, then a 3-wide strip along it
+    // 2. staircase down to the stone layer, then a 3-wide strip along it; not from inside the base:
+    // first out past the ground it keeps whole (settings baseSafety.keepOutDepth)
+    if (progress() < count) {
+      const out = stepOutOfKeepOut(agent, bot.entity.position.floored())
+      if (out) {
+        log.debug('mine: stepping out from over the base first', { to: `${out.x} ${out.z}` })
+        await gotoWithin(bot, new goals.GoalXZ(out.x, out.z), signal, 30_000).catch(e => { checkAborted(signal); log.debug('mine: could not step out', { error: (e as Error).message }) })
+      }
+    }
     let feet: P = bot.entity.position.floored()
     const startY = feet.y
     const minY = Math.max(startY - 20, typeof (bot.game as any)?.minY === 'number' ? (bot.game as any).minY + 6 : -58)

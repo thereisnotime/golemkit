@@ -17,7 +17,7 @@ import { platformFor } from './platforms/index.ts'
 import { fmtPos, itemName, gameModeNote, isHostile } from './helpers.ts'
 import { watchRefusedDigs } from './refusals.ts'
 import { holdStill, fidget } from './humanize.ts'
-import { inDanger } from './danger.ts'
+import { inDanger, deathStepExclusion } from './danger.ts'
 import { JournalCapture } from './journal-capture.ts'
 import { watchDeaths } from './deaths.ts'
 import { waterStepExclusion, trackOwnAir } from './air.ts'
@@ -127,6 +127,8 @@ export class MinecraftJavaAdapter implements GameAdapter {
       // under the frozen lake by its home on the way to its pantry (skills/airPlan.ts).
       ;(moves as { liquidCost?: number }).liquidCost = LIQUID_COST
       moves.exclusionAreasStep.push(waterStepExclusion(bot) as any)
+      // around the spot of a recent death, not back through it (settings.deathSpots)
+      moves.exclusionAreasStep.push(deathStepExclusion(agent as never) as any)
       bot.pathfinder.setMovements(moves)
       this.applyPathfinderSettings(bot)
       this.sessionCleanups.push(watchRefusedDigs(bot, (pos) => agent.markProtected(pos)))

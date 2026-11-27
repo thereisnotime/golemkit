@@ -163,6 +163,18 @@ can't change their own.
 | `projects.paused` | on/off | no base work for now; planning still works (owners: "pax pause building") |
 | `projects.sessionMinutes` | 1–60 | one work session at most (default 10) |
 | `projects.night` | on/off | also work at night on projects inside finished, lit walls (default on) |
+| `baseSafety.enabled` | on/off | [base safety](./base-safety): find caves, holes and mine entrances mobs can use under and by the base, and fix them (default on) |
+| `baseSafety.margin` | 0–16 | blocks around the footprint checked too (default 4) |
+| `baseSafety.depth` | 1–24 | blocks below the floor checked (default 8) |
+| `baseSafety.fillMax` | 0–2000 | cavities up to this many blocks are filled in whole (default 48; 0 = never) |
+| `baseSafety.sealMax` | 0–500 | at most this many openings of one cavity are sealed (default 24; 0 = never) |
+| `baseSafety.capWith` | trapdoor / slab / block / light / none | what goes on a mine entrance by or in the base (default trapdoor) |
+| `baseSafety.keepOutDepth` | 0–32 | stone and ore digging stays out of the ground under the base down to this depth (default 8; 0 = off) |
+| `baseSafety.mineClearance` | 0–32 | a new staircase mine starts at least this far from the walls (default 4) |
+| `baseSafety.minePlacement` | outside / inside / either | where a new mine may start (default outside) |
+| `deathSpots.enabled` | on/off | keep out of the spot of a recent death (default on) |
+| `deathSpots.minutes` | 0.5–240 | how long (default 10) |
+| `deathSpots.stepCost` | 0–50 | extra path cost per block inside a death spot (default 8; 0 = paths ignore it) |
 | `humanize.enabled` | on/off | player-like reaction and typing delays |
 | `humanize.typoRate` | 0–1 | chance of a typo per message |
 | `humanize.lowercase` | on/off | write chat in lower case |

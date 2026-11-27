@@ -92,6 +92,7 @@ export default withMermaid(defineConfig({
           { text: 'NPC brain', link: '/guide/npc-brain' },
           { text: 'Needs and idle modes', link: '/guide/needs-and-idle' },
           { text: 'Base projects', link: '/guide/base-projects' },
+          { text: 'Base safety', link: '/guide/base-safety' },
           { text: 'Self-improver', link: '/guide/self-improver' },
           { text: 'Scenes', link: '/guide/scenes' }
         ]

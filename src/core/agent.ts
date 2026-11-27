@@ -16,6 +16,8 @@ import { Storage } from './storage.ts'
 import { fmtPos } from './format.ts'
 import type { Fleet } from './fleet.ts'
 import { ProtectedAreas } from './protection.ts'
+import { dangerMemory } from './danger.ts'
+import { deathSpotsSettings, DEATH_ZONE_KIND } from './baseSafety.ts'
 import { resolveRetry, actionAttempts, backoffMs, isRetryableResult, type RetryConfig } from './retry.ts'
 import { TOGGLES, findToggle, parseToggleValue, getPath, expandPaths, deepMerge, type ToggleDef } from './toggles.ts'
 import { resolveHumanize, typingDelayMs, styleLine, between, type HumanizeOptions } from './humanize.ts'
@@ -783,6 +785,9 @@ export class Agent extends TypedEmitter<AgentEvents> {
         const p = adapter.self()?.position
         this.log.info('died', p ? { at: fmtPos(p) } : undefined)
         this.stopActions('died')
+        // keep out of the spot for a while: it respawns close by and its chores walked straight back (settings.deathSpots)
+        const ds = deathSpotsSettings((this.settings as { deathSpots?: unknown }).deathSpots)
+        if (p && ds.enabled) dangerMemory(this).remember({ x: p.x, y: p.y, z: p.z, kind: DEATH_ZONE_KIND, radius: ds.radius, yRange: ds.yRange, ttlMs: ds.minutes * 60_000 })
       })
       on('deathCause', (r) => {
         this.lastDeathReport = { ...r, at: Date.now() }

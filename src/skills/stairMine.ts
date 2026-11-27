@@ -20,6 +20,10 @@ import { supplyTorches } from './lighting.ts'
 import { getHome, sameDimension } from './navigation.ts'
 import { getFarms } from './food.ts'
 import { bestFood } from './survival.ts'
+import { settledBase, digKeepOut } from './baseArea.ts'
+import { takeCapsOff, placeCap, capItem, type PlacedCap } from './caps.ts'
+import { mineSpotProblem } from './baseSafetyPlan.ts'
+import { baseSafetySettings } from '../core/index.ts'
 import {
   stairMineSettings, stairMineReadiness, pickEntrance, mineTargetY, mineTripStep, branchEvery, sides, mineJunk,
   visibleOre, tunnelAir, nextMineName, pickMine, mineLit, mineSiteVerdict, stairPoints, relightSpots, ORE_FAMILIES, ENTRANCE_STEPS,
@@ -121,8 +125,9 @@ export function entranceCandidates (agent: Agent, bot: Bot, center: P, s: StairM
       for (let dy = 2; dy <= 12 && !roofed; dy++) { const b = at(add(pos, 0, dy, 0)); roofed = !!b && b.solid && !/leaves|_log$/.test(b.name) }
       const prot = agent.protectedAreas.isProtected(pos) || inSpawnProtection(pos, spawn, spawnR)
       const farm = farms.some(f => Math.max(Math.abs(f.x - pos.x), Math.abs(f.z - pos.z)) <= ((f.size ?? 9) - 1) / 2 + 3)
+      const base = baseSpotProblem(agent, pos)
       for (const dir of DIRS) {
-        out.push({ pos, dir, homeDist, protectedArea: prot, wet, roofed, farm, safeSteps: wet || prot || roofed || farm ? 0 : safeStepsFrom(agent, at, pos, dir) })
+        out.push({ pos, dir, homeDist, protectedArea: prot, wet, roofed, farm, ...(base ? { base } : {}), safeSteps: wet || prot || roofed || farm || base ? 0 : safeStepsFrom(agent, at, pos, dir) })
       }
     }
   }
@@ -130,7 +135,36 @@ export function entranceCandidates (agent: Agent, bot: Bot, center: P, s: StairM
 }
 
 function allowedFor (agent: Agent) {
-  return (p: P, name: string) => !agent.protectedAreas.isProtected(p) && (isNaturalBlock(name) || AIR.test(name))
+  // a mine started outside the walls keeps out of the ground under the base too (baseSafety.keepOutDepth)
+  const keepOut = baseSafetySettings(agent.settings.baseSafety).minePlacement === 'outside'
+  return (p: P, name: string) => !agent.protectedAreas.isProtected(p) && (isNaturalBlock(name) || AIR.test(name)) && (!keepOut || AIR.test(name) || digKeepOut(agent, p) !== 'under the base')
+}
+
+/** What is wrong with a mine entrance here for the bot's base (too close to the walls, inside when not allowed), or null. */
+export function baseSpotProblem (agent: Agent, p: { x: number, z: number }): string | null {
+  const s = baseSafetySettings(agent.settings.baseSafety)
+  if (!s.enabled) return null
+  const b = settledBase(agent)
+  return b ? mineSpotProblem(p, b.area, s.mineClearance, s.minePlacement) : null
+}
+
+/** Puts a mine's cap back after a trip (what is missing of it, with what it carries). */
+export async function putCapsBack (bot: Bot, cap: NonNullable<MineSite['cap']>, signal: AbortSignal): Promise<number> {
+  let n = 0
+  for (const c of cap.cells) {
+    const pick = capItem(bot, cap.kind as PlacedCap)
+    if (!pick) break
+    try { await placeCap(bot, c, pick.item, pick.kind, signal); n++ } catch (e) { checkAborted(signal) }
+  }
+  return n
+}
+
+/** A mine entrance inside the base, on its walls or within mineClearance of them: it needs a cap. Null when far enough out. */
+export function mineNearBase (agent: Agent, p: { x: number, z: number }): string | null {
+  const s = baseSafetySettings(agent.settings.baseSafety)
+  if (!s.enabled) return null
+  const b = settledBase(agent)
+  return b ? mineSpotProblem(p, b.area, s.mineClearance, 'outside') : null
 }
 
 /** How many steps down from `pos` going `dir` plan safely, in a world where the earlier steps are dug. */
@@ -517,6 +551,15 @@ export const digMineAction = defineAction({
   }),
   longRunning: true,
   async run (ctx, p) {
-    return digMine(ctx, { ore: p.ore, want: p.count, ...(p.max_minutes ? { maxMinutes: p.max_minutes } : {}), fresh: p.fresh })
+    // a capped mine (base safety, near the base): the cap comes off for the trip and goes back on after
+    const bot = ctx.bot as Bot
+    const capped = !p.fresh && bot?.entity ? knownMine(ctx.agent, bot) : null
+    const cap = capped?.cap
+    if (cap?.cells.length) await takeCapsOff(bot, cap.cells, ctx.signal).catch(e => { checkAborted(ctx.signal); ctx.log.debug('mine: could not take the cap off', { error: (e as Error).message }) })
+    try {
+      return await digMine(ctx, { ore: p.ore, want: p.count, ...(p.max_minutes ? { maxMinutes: p.max_minutes } : {}), fresh: p.fresh })
+    } finally {
+      if (cap?.cells.length && bot?.entity && !ctx.signal.aborted) await putCapsBack(bot, cap, ctx.signal).catch(e => { ctx.log.debug('mine: could not put the cap back', { error: (e as Error).message }) })
+    }
   }
 })

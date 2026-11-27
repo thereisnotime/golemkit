@@ -12,7 +12,7 @@ import { vec, digBlock, DigRefusedError, gotoWithin, isReplaceable, findItem } f
 import { equipFor, inventoryCounts, ensureTool } from './toolkit.ts'
 import {
   rotate, placeCells, bounds, facingToward, facingsToward, pickFacing, resolveRoles, materials, fmtMaterials, orderCells, diffCells,
-  cellState, chooseSite, isNaturalBlock, isSoftBlock, roleAccepts, solidCells, fillCells, pickTheme, renderBlueprint, pickNearby, FACINGS, WOODS,
+  cellState, chooseSite, isNaturalBlock, isSoftBlock, roleAccepts, solidCells, fillCells, pickTheme, renderBlueprint, pickNearby, enclosedColumns, FACINGS, WOODS,
   type Blueprint, type Column, type Facing, type Pos, type ResolvedRole, type WorldCell, type BlockState
 } from './blueprint.ts'
 import { checkCell, fixFor, familyOf, summarize, skipReason, finishDespiteUnreachable, underForeignRoof, distToBlock, UNREACHABLE, EYE, type QualityRow } from './blockstate.ts'
@@ -640,9 +640,13 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
     const ordered = orderCells([...clearing, ...diff.dig, ...diff.place], roles, solidAt, solidAt)
     const doors = ordered.filter(isDoor)
     const todo = ordered.filter(c => !isDoor(c))
-    // resuming with the door already in: take it out so the bot can get in and out, it goes back in at the end
-    if (todo.some(c => c.role !== 'air') && agent.canDig) {
-      for (const d of diff.done.filter(isDoor)) {
+    // resuming with the door already in: take it out so the bot can get in and out, it goes back in at
+    // the end; only when something still to build is closed in behind it (blueprint.enclosedColumns)
+    const doorsIn = diff.done.filter(isDoor)
+    const doorY = doorsIn.length ? Math.min(...doorsIn.map(d => d.y)) : 0
+    const closedIn = doorsIn.length ? enclosedColumns(cells, c => { const w = c as WorldCell; return w.role !== 'air' && roles[w.role]?.kind !== 'attachment' }, doorY) : new Set<string>()
+    if (todo.some(c => c.role !== 'air' && closedIn.has(`${c.x},${c.z}`)) && agent.canDig) {
+      for (const d of doorsIn) {
         const b = bot.blockAt(vec(bot, d.x, d.y, d.z))
         if (!b || !roleAccepts(roles[d.role]!, b.name)) continue
         await reachToDig(bot, b.position, signal, log, stands).catch(e => { checkAborted(signal) })
@@ -718,6 +722,8 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
       checkAborted(signal)
       const r = await placeCell(d, true).catch(e => { checkAborted(signal); noteFail(d, e); return 'failed' as const })
       if (r === 'done') { placed++; relaxed++ }
+      // still nothing to click (a ladder or wall torch whose wall isn't there): say so, instead of a bare "stopped"
+      else if (r === 'later') errors.push(`nothing to place ${roles[d.role]?.item ?? d.role} against at ${fmtPos(d)} (the block it hangs on is missing)`)
     }
 
     // 3. quality check: every block and its state; fix what's off, once

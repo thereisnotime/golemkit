@@ -3545,6 +3545,30 @@
       }
     },
     {
+      "name": "check_base",
+      "description": "Check the base for ways in for mobs: caves and holes under the floor, tunnels under the walls, a mine entrance next to the walls, dark spots mobs spawn on. Says what it found and how it would fix each (cap, fill, seal, light). Changes nothing. Answers \"pax is the base safe\".",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "secure_base",
+      "description": "Make the base mob-proof now: cap a mine entrance by the walls, seal holes and tunnels into the base, fill small cavities under it, light what stays open (settings baseSafety). One bounded session; the base project \"integrity\" does the same between chores. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "minutes": {
+            "default": 5,
+            "description": "session length",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 30
+          }
+        }
+      }
+    },
+    {
       "name": "mods",
       "description": "List the mods this server runs (with versions when known) and how many items/blocks/mobs each adds. Use it before explaining or teaching a mod, so you talk about what is actually installed.",
       "inputSchema": {
@@ -7159,6 +7183,30 @@
             "type": "number",
             "minimum": 1,
             "maximum": 60
+          }
+        }
+      }
+    },
+    {
+      "name": "check_base",
+      "description": "Check the base for ways in for mobs: caves and holes under the floor, tunnels under the walls, a mine entrance next to the walls, dark spots mobs spawn on. Says what it found and how it would fix each (cap, fill, seal, light). Changes nothing. Answers \"pax is the base safe\".",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "secure_base",
+      "description": "Make the base mob-proof now: cap a mine entrance by the walls, seal holes and tunnels into the base, fill small cavities under it, light what stays open (settings baseSafety). One bounded session; the base project \"integrity\" does the same between chores. (Long-running: starts in the background and keeps going until stopped or replaced.)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "minutes": {
+            "default": 5,
+            "description": "session length",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 30
           }
         }
       }

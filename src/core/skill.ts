@@ -16,6 +16,8 @@ export interface SkillDef {
   setup? (agent: Agent, bot: GameClient): void | (() => void)
   /** Adds JSON-friendly facts to Agent.observe() (used by LLM brains and debugging). */
   observe? (agent: Agent, bot: GameClient): Record<string, unknown>
+  /** Short lines for the status view (status.json `notes`, `golem status`): what this skill is stuck on, say. Cheap: no world scans. */
+  status? (agent: Agent): string[]
 }
 
 export function defineSkill (def: SkillDef): SkillDef {

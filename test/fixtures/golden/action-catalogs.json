@@ -2689,6 +2689,8 @@
       "project",
       "plan_base",
       "work_on_base",
+      "check_base",
+      "secure_base",
       "mods",
       "mod_items",
       "creative_get",
@@ -6498,6 +6500,36 @@
         "longRunning": true
       },
       {
+        "name": "check_base",
+        "description": "Check the base for ways in for mobs: caves and holes under the floor, tunnels under the walls, a mine entrance next to the walls, dark spots mobs spawn on. Says what it found and how it would fix each (cap, fill, seal, light). Changes nothing. Answers \"pax is the base safe\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "secure_base",
+        "description": "Make the base mob-proof now: cap a mine entrance by the walls, seal holes and tunnels into the base, fill small cavities under it, light what stays open (settings baseSafety). One bounded session; the base project \"integrity\" does the same between chores.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "minutes": {
+              "default": 5,
+              "description": "session length",
+              "type": "number",
+              "minimum": 1,
+              "maximum": 30
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
         "name": "mods",
         "description": "List the mods this server runs (with versions when known) and how many items/blocks/mobs each adds. Use it before explaining or teaching a mod, so you talk about what is actually installed.",
         "inputSchema": {
@@ -6583,7 +6615,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !projects !project !plan_base !work_on_base !mods !mod_items !creative_get !status (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !projects !project !plan_base !work_on_base !check_base !secure_base !mods !mod_items !creative_get !status (!help <command> for details)"
   },
   "variant:villager": {
     "actions": [
@@ -6702,6 +6734,8 @@
       "project",
       "plan_base",
       "work_on_base",
+      "check_base",
+      "secure_base",
       "status"
     ],
     "catalog": [
@@ -10248,6 +10282,36 @@
         "longRunning": true
       },
       {
+        "name": "check_base",
+        "description": "Check the base for ways in for mobs: caves and holes under the floor, tunnels under the walls, a mine entrance next to the walls, dark spots mobs spawn on. Says what it found and how it would fix each (cap, fill, seal, light). Changes nothing. Answers \"pax is the base safe\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "secure_base",
+        "description": "Make the base mob-proof now: cap a mine entrance by the walls, seal holes and tunnels into the base, fill small cavities under it, light what stays open (settings baseSafety). One bounded session; the base project \"integrity\" does the same between chores.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "minutes": {
+              "default": 5,
+              "description": "session length",
+              "type": "number",
+              "minimum": 1,
+              "maximum": 30
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
         "name": "status",
         "description": "Say what the bot is doing and why (or why it is idle or stuck), how long since it last made progress, health and food, and the last failure. Answers \"status\", \"what are you doing\", \"why are you idle\".",
         "inputSchema": {
@@ -10259,7 +10323,7 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !projects !project !plan_base !work_on_base !status (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !projects !project !plan_base !work_on_base !check_base !secure_base !status (!help <command> for details)"
   },
   "profile:apprentice": {
     "actions": [
@@ -12040,6 +12104,8 @@
       "project",
       "plan_base",
       "work_on_base",
+      "check_base",
+      "secure_base",
       "mods",
       "mod_items",
       "creative_get",
@@ -15849,6 +15915,36 @@
         "longRunning": true
       },
       {
+        "name": "check_base",
+        "description": "Check the base for ways in for mobs: caves and holes under the floor, tunnels under the walls, a mine entrance next to the walls, dark spots mobs spawn on. Says what it found and how it would fix each (cap, fill, seal, light). Changes nothing. Answers \"pax is the base safe\".",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {}
+        },
+        "exclusive": false,
+        "longRunning": false
+      },
+      {
+        "name": "secure_base",
+        "description": "Make the base mob-proof now: cap a mine entrance by the walls, seal holes and tunnels into the base, fill small cavities under it, light what stays open (settings baseSafety). One bounded session; the base project \"integrity\" does the same between chores.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "minutes": {
+              "default": 5,
+              "description": "session length",
+              "type": "number",
+              "minimum": 1,
+              "maximum": 30
+            }
+          }
+        },
+        "exclusive": true,
+        "longRunning": true
+      },
+      {
         "name": "mods",
         "description": "List the mods this server runs (with versions when known) and how many items/blocks/mobs each adds. Use it before explaining or teaching a mod, so you talk about what is actually installed.",
         "inputSchema": {
@@ -15934,6 +16030,6 @@
         "longRunning": false
       }
     ],
-    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !projects !project !plan_base !work_on_base !mods !mod_items !creative_get !status (!help <command> for details)"
+    "help": "commands: !pos !hp !stop !say !config_list !config_get !config_set !config_reset !come !follow !goto !goto_player !look_at !jump !attack !guard !hunt !gear_up !pvp !attack_player !spare_player !hunt_player !pvp_list !eat !sleep !wake !pillar !climb_out !bunker !inventory !drop !equip !collect !recall_events !last_death !history !goto_death !protect !feed_player !wander !set_home !go_home !remember_place !forget_place !places !goto_place !flee !prepare_trip !craft !smelt !deposit !withdraw !list_container !check_chests !where_stored !place_chest !harvest !plant !till !find_food !start_farm !tend_farm !gather_seeds !forage !breed !find_target !bring_item !fetch_drops !chop_tree !place_block !break_block !build !build_plan !build_road !connect_buildings !remove_road !road_list !blueprint_list !blueprint_search !blueprint_show !blueprint_pick !blueprint_import !blueprint_capture !blueprint_design !blueprint_delete !blueprint_rename !gather_materials !upgrade_tools !dig_mine !pickup_items !we_status !we_select !we_set !we_replace !we_walls !we_outline !we_hollow !we_copy !we_cut !we_paste !we_rotate !we_flip !we_undo !we_redo !we_schem_list !we_schem_load !we_schem_save !we_raw !we_build !place_bed !set_spawn !shear !light_up !recover_items !projects !project !plan_base !work_on_base !check_base !secure_base !mods !mod_items !creative_get !status (!help <command> for details)"
   }
 }

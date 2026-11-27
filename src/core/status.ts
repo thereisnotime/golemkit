@@ -132,6 +132,8 @@ export interface BotStatus {
   lastDisconnect: string | null
   /** Resident set size of the process, MB. */
   rssMb: number | null
+  /** Per skill, short lines it wants seen (SkillDef.status): base projects that are stuck, what they wait for. */
+  notes?: Record<string, string[]>
 }
 
 export interface AssessInput {
@@ -314,6 +316,7 @@ export function formatStatus (s: BotStatus, now: number): string[] {
   if (s.lastFailure) lines.push(`  failed    ${fmtDuration(s.updatedAt - s.lastFailure.at)} ago: ${s.lastFailure.what}: ${s.lastFailure.message}`)
   if (s.self) lines.push(`  self      hp ${s.self.health === null ? '?' : Math.round(s.self.health)} food ${s.self.food ?? '?'} at ${pos}`)
   if (s.alert.count) lines.push(`  alerts    ${s.alert.count} sent, last ${s.alert.lastAt ? fmtDuration(s.updatedAt - s.alert.lastAt) + ' ago' : '?'}`)
+  for (const [skill, ls] of Object.entries(s.notes ?? {})) for (const [i, l] of ls.entries()) lines.push(`  ${(i ? '' : skill).padEnd(9)} ${l}`)
   if (!s.connected && s.lastDisconnect) lines.push(`  offline   ${s.lastDisconnect}`)
   lines.push(`  process   pid ${s.pid}${s.rssMb !== null ? `, rss ${s.rssMb} MB` : ''}, up ${fmtDuration(s.updatedAt - s.startedAt)}`)
   return lines

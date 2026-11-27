@@ -42,6 +42,7 @@ split it into projects; the rest come after:
 | project | what | needs first |
 |---|---|---|
 | `walls` | foundation, walls, gate door and the gate torches | |
+| `integrity` | [base safety](./base-safety): caves and holes under the floor, tunnels under the walls and mine entrances next to them sealed, filled, capped or lit. Once the base is settled; off with `baseSafety.enabled` | |
 | `farm_plot` | keeps a 3x3 to 5x5 plot inside the walls free for a farm (place `farm_plot`); the floor goes around it. Bots without `start_farm` don't get it | walls |
 | `floor` | stone floor inside; columns under another build (a hut, a torch) are left alone | walls, farm_plot |
 | `lighting` | `light_up` over the whole base until no spot inside can spawn a mob; re-checked once a day | walls, floor |
@@ -96,6 +97,22 @@ other way out; the next survey puts it back. The chore is sticky, so picking up 
 Progress is the world itself plus `projects.state` in agent storage, so a session cut short by a
 reflex, a death, a disconnect or a restart picks up where it was. A project that got nothing done
 three sessions in a row rests for two hours. When one finishes, the owners online are told.
+
+When sessions get nothing done, the queue says why on the project's line (`stuck: 2 sessions
+without progress: ...`), and so does the status view (`golem status`, `status.json` `notes`), with
+what waits for an owner's ok. The walkway at Pax's fortress sat at 42 of 44 for ten sessions with
+a bare "stopped": two ladders had no wall block to hang on, so the builder deferred them and then
+gave up without a word. Now the builder says "nothing to place ladder against at ...", and the
+survey leaves such an attachment alone when the block it hangs on holds something the bot may not
+change (the line says which and where), so the stage can finish. A big project (more than
+`askAbove` blocks) waits for an owner's ok; with no owner online the reason says "no owner online
+to ask", which is why the towers never started there. Set `askAbove` higher, `onTimeout: build`, or
+say "pax approve towers".
+
+The gate door stays in for repairs that can be done from outside (a wall block, a gate torch).
+The builder used to take the door out whenever anything was still to place, so every wall repair
+dug the door (Pax's journal shows its spruce door broken some thirty times). It now takes it out
+only when something still to build is closed in behind it (`enclosedColumns` in blueprint.ts).
 
 ## Owner in the loop
 

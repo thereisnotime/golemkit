@@ -4,7 +4,7 @@ import type { Bot } from 'mineflayer'
 import type { Agent } from '../core/index.ts'
 import {
   defineSkill, defineAction, z, noParams, ok, fail, goals, fmtPos, nearestHostile,
-  checkAborted, travel, swimUp, oxygen
+  checkAborted, travel, swimUp, oxygen, dangerMemory, DEATH_ZONE_KIND
 } from '../core/index.ts'
 import { gotoWithin as walkWithin, GotoTimeoutError } from './world.ts'
 import { prepareTripAction } from './trip.ts'
@@ -189,6 +189,8 @@ const wander = defineAction({
       if (!spot) continue
       // water, or a spot well above or below it: a lake or a cliff, not a stroll
       if (Math.abs(spot.y - pos.y) > 4) continue
+      // not back into the spot it just died in (settings.deathSpots)
+      if (dangerMemory(agent).isInDanger(spot, 0, DEATH_ZONE_KIND)) continue
       if (++tries > 6) break
       const arrived = await gotoWithin(bot, new goals.GoalNear(spot.x, spot.y, spot.z, 1), signal, 12000)
         .catch(() => { checkAborted(signal); return false })
