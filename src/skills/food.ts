@@ -218,9 +218,10 @@ export function farmWorkFor (agent: Agent, bot: Bot, farm: Farm, o: { targetSize
   const inv = inventory(bot)
   const canTill = !!agent.canDig
   const canWater = canPlace(agent) && (!!inv.water_bucket || !!inv.bucket)
-  // a plot farm never grows past its plot; a dry one counts every cell as wet enough (crops keep dry farmland)
+  // a plot farm never grows past its plot; its water (if any) is beside it, not in the middle, so every
+  // cell counts as wet enough (crops keep dry farmland); only a plot with ice-made water in the middle has it there
   const plot = farm.kind === 'plot'
-  return planFarmWork(grid, { targetSize: plot ? farm.size : o.targetSize, seeds: seedCount(inv), seedReserve: plot ? 0 : o.seedReserve, canTill, canWater: canWater && farm.water !== 'none', dry: farm.water === 'none' })
+  return planFarmWork(grid, { targetSize: plot ? farm.size : o.targetSize, seeds: seedCount(inv), seedReserve: plot ? 0 : o.seedReserve, canTill, canWater: canWater && (!plot || farm.water === 'ice'), dry: plot ? farm.water !== 'ice' : farm.water === 'none' })
 }
 
 /** Ripe sweet berry bushes (age 2+) near a point, nearest first. */

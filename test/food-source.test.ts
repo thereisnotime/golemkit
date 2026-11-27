@@ -26,7 +26,7 @@ test('food sources: the first one that fits, with why the ones before it were sk
   const after = chooseFoodSource({ ...pax, badFarm: { ...pax.badFarm!, gaveUp: true, tries: 2 }, failed: { farm: { until: pax.now + 30 * 60_000, reason: 'no flat grass next to water' } } }, S)
   assert.equal(after.active, 'plot')
   assert.deepEqual(after.skipped.map(s => s.name), ['repair', 'farm'])
-  assert.match(foodSourceText(after), /food source: plot .*skipped repair: gave up on farm:1.*farm: failed 30m ago: no flat grass/)
+  assert.match(foodSourceText(after), /food source: plot .*skipped repair: gave up on farm:1 after 2 repairs.*farm: failed 30m ago: no flat grass/)
   // too few seeds for a field farm and no grass: skipped with the reason
   const few = chooseFoodSource(world({ plot: { known: true, used: false } }), S)
   assert.equal(few.active, 'plot')
@@ -149,6 +149,8 @@ test('farm plot: stone swapped for dirt only when allowed and with dirt; no seed
   assert.equal(planPlotFarm(pin({ cells: stone, swap: false })).till.length, 5)
   assert.match(planPlotFarm(pin({ cells: plot(() => ({ ground: 'swap' })), dirt: 0 })).reason, /no dirt/)
   assert.match(planPlotFarm(pin({ seeds: 0 })).reason, /no seeds/)
+  const lake = planPlotFarm(pin({ cells: plot((dx, dz) => dx === 1 && dz === 1 ? {} : { ground: 'blocked' }).map(c => c.dx === 0 && c.dz === 0 ? { ...c, ground: 'tillable' as const } : c), water: [{ dx: 2, dy: 0, dz: 0 }] }))
+  assert.match(lake.reason, /only 2 cells of the plot can hold a crop/, 'a plot mostly on lake ice is not worth it')
   assert.equal(planPlotFarm(pin({ cells: plot((dx, dz) => dx === 0 && dz === 0 ? { ground: 'blocked' } : {}) })).ok, false)
 })
 

@@ -66,7 +66,7 @@ export const FOOD_SOURCES: readonly FoodSourceDef[] = [
     assess (w) {
       if (!w.badFarm) return { ok: false, reason: 'no bad farm' }
       if (w.badFarmMode === 'off' || w.badFarmMode === 'relocate') return { ok: false, reason: `farming.badFarm is ${w.badFarmMode}` }
-      if (w.badFarm.gaveUp) return { ok: false, reason: `gave up on ${w.badFarm.name} after ${w.badFarm.tries} tries` }
+      if (w.badFarm.gaveUp) return { ok: false, reason: w.badFarm.tries ? `gave up on ${w.badFarm.name} after ${w.badFarm.tries} repairs` : `${w.badFarm.name} is not worth repairing` }
       if (!w.canDig && !w.canPlace) return { ok: false, reason: 'digging and placing are off' }
       return { ok: true, reason: `${w.badFarm.name} is bad (${w.badFarm.reason}): look at repairing it` }
     }

@@ -572,7 +572,8 @@ export async function plotFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sign
   try { ids = siteBook(agent).all().filter(r => r.kind === 'farm').map(r => r.id) } catch {}
   const name = nextFarmName([...getFarms(agent).map(f => f.name), ...ids])
   const dim = bot.game?.dimension
-  const land = cells.filter(x => !(x.dx === 0 && x.dz === 0 && plan.centre !== 'crop')).map(x => `${x.dx},${x.dz}`)
+  // site health judges only the cells that hold crops: a plot by a lake keeps its wet cells out
+  const land = [...new Set([...plan.till.map(([dx, dz]) => `${dx},${dz}`), ...cells.filter(x => x.above === 'crop').map(x => `${x.dx},${x.dz}`)])]
   const farm: Farm = { name, x: c.x, y: c.y, z: c.z, ...(dim ? { dim } : {}), size: spot.size, crop: cropName, created: Date.now(), tended: Date.now(), land, water: waterHow, kind: 'plot', ...(waterHow !== 'none' && plan.torches.length ? { keptOpen: 'torch' as const } : {}) }
   saveFarm(agent, farm)
   setPlace(agent, name, { x: c.x, y: c.y, z: c.z, ...(dim ? { dimension: dim } : {}) })

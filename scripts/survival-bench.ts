@@ -2,7 +2,7 @@
 // brain) left alone far from everything for N in-game days, and what happened to it measured.
 //   node scripts/survival-bench.ts [--days 1] [--scenario forest|ice] [--start x,z] [--kit none|stone|iron]
 //        [--repeats 1] [--profile pax] [--llm] [--tag run] [--terrain-note "text"] [--seed 1] [--spread 0]
-//        [--stuck 5] [--minutes M] [--force] [--bad-farm] [--plot] [--actions a,b,c]
+//        [--stuck 5] [--minutes M] [--force] [--bad-farm] [--plot] [--actions a,b,c] [--give "item n,..."]
 //   node scripts/survival-bench.ts --survey "x,z x,z ..."           read-only look at candidate starts
 //   node scripts/survival-bench.ts --compare <tagA> <tagB>     before/after table from results.jsonl
 //   node scripts/survival-bench.ts --summary [tag]              table of past runs
@@ -65,6 +65,8 @@ const STUCK = Number(opt('stuck', '5'))
 const BAD_FARM = flag('bad-farm')
 const PLOT = flag('plot')
 /** --actions a,b,c: run these actions one after the other (owner priority) at the start of the run, then measure as usual. */
+/** --give "wheat_seeds 3,torch 4": items on top of the kit (to start from what a real bot has). */
+const GIVE = opt('give', '').split(',').map(x => x.trim()).filter(Boolean)
 const ACTIONS = opt('actions', '').split(',').map(x => x.trim()).filter(Boolean)
 
 const BOT = process.env.SURVIVAL_BOT || 'SurviveTest'
@@ -409,7 +411,7 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
     await d.cmd(`/effect give ${BOT} minecraft:instant_health 1 10`)
     await d.cmd(`/effect give ${BOT} minecraft:saturation 2 10`)
     await d.cmd(`/spawnpoint ${BOT} ${start.x} ${start.y} ${start.z}`)
-    for (const k of KITS[KIT] ?? []) { const [item, n] = k.split(' '); await d.cmd(`/give ${BOT} minecraft:${item} ${n ?? 1}`) }
+    for (const k of [...(KITS[KIT] ?? []), ...GIVE]) { const [item, n] = k.split(' '); await d.cmd(`/give ${BOT} minecraft:${item} ${n ?? 1}`) }
     await d.cmd(`/gamemode spectator ${OWNER}`)
     await d.cmd(`/tp ${OWNER} ${start.x + 0.5} ${start.y + 40} ${start.z + 0.5}`)
     await pause(3000)

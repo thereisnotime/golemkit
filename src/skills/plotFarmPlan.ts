@@ -63,6 +63,8 @@ export interface PlotFarmInput {
   mode: PlotWaterMode
   /** May dig out stone or sand cells and put dirt in (farming.plotSwap). */
   swap: boolean
+  /** Fewer cells than this that can hold a crop: not worth a farm. Default 3. */
+  minCells?: number
 }
 
 export interface PlotFarmPlan {
@@ -139,6 +141,12 @@ export function planPlotFarm (p: PlotFarmInput): PlotFarmPlan {
   const usable = (c: PlotCell) => !(c.dx === 0 && c.dz === 0 && centreKind !== 'crop')
   const free = (c: PlotCell) => c.above === 'air' || c.above === 'plant' || c.above === 'snow'
   const cand = p.cells.filter(c => usable(c) && c.ground !== 'water' && c.ground !== 'blocked' && free(c)).sort(near)
+  const fit = cand.filter(c => c.ground !== 'swap' || p.swap).length + p.cells.filter(c => c.above === 'crop').length
+  const minCells = p.minCells ?? 3
+  if (fit < minCells && p.seeds > 0) {
+    const stone = cand.filter(c => c.ground === 'swap').length
+    return no(`only ${fit} cells of the plot can hold a crop (${minCells} needed): water, ice or blocks on the rest${stone && !p.swap ? `, ${stone} stone cells and farming.plotSwap is off` : ''}`)
+  }
   let dirt = p.dirt
   const swap: [number, number][] = []
   const till: [number, number][] = []
