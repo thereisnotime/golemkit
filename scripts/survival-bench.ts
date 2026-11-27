@@ -2,7 +2,7 @@
 // brain) left alone far from everything for N in-game days, and what happened to it measured.
 //   node scripts/survival-bench.ts [--days 1] [--scenario forest|ice] [--start x,z] [--kit none|stone|iron]
 //        [--repeats 1] [--profile pax] [--llm] [--tag run] [--terrain-note "text"] [--seed 1] [--spread 0]
-//        [--stuck 5] [--minutes M] [--force] [--bad-farm] [--plot]
+//        [--stuck 5] [--minutes M] [--force] [--bad-farm] [--plot] [--actions a,b,c]
 //   node scripts/survival-bench.ts --survey "x,z x,z ..."           read-only look at candidate starts
 //   node scripts/survival-bench.ts --compare <tagA> <tagB>     before/after table from results.jsonl
 //   node scripts/survival-bench.ts --summary [tag]              table of past runs
@@ -31,7 +31,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { Agent, defineVariant, serverFromEnv, fmtPos, type ActionResult, type BotDefinition } from '../src/core/index.ts'
+import { Agent, defineVariant, serverFromEnv, fmtPos, PRIORITY, type ActionResult, type BotDefinition } from '../src/core/index.ts'
 import { loadProfile } from '../src/core/profile.ts'
 import { standardSkills, extendedSkills, navigation, modsSkill, setHome } from '../src/skills/index.ts'
 import { isNaturalLeaves } from '../src/skills/woodcutting.ts'
@@ -64,6 +64,8 @@ const SPREAD = Number(opt('spread', '0'))
 const STUCK = Number(opt('stuck', '5'))
 const BAD_FARM = flag('bad-farm')
 const PLOT = flag('plot')
+/** --actions a,b,c: run these actions one after the other (owner priority) at the start of the run, then measure as usual. */
+const ACTIONS = opt('actions', '').split(',').map(x => x.trim()).filter(Boolean)
 
 const BOT = process.env.SURVIVAL_BOT || 'SurviveTest'
 const DIRECTOR = process.env.DIRECTOR || 'ClaudeTest'
@@ -509,6 +511,13 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
   log(`measuring for ${MINUTES} real min (${DAYS} in-game day${DAYS === 1 ? '' : 's'}); game time ${JSON.stringify(gameStart)}; kit ${KIT}; profile ${PROFILE}${LLM ? ' with LLM' : ''}`)
   runStart = Date.now()
   measuring = true
+  const actionsRun: { name: string, ok: boolean, message: string, s: number }[] = []
+  for (const name of ACTIONS) {
+    const t = Date.now()
+    const r = await agent.act(name, {}, { caller: { kind: 'system', name: 'survival-bench' }, priority: PRIORITY.player }).catch(e => ({ ok: false, message: (e as Error).message }))
+    actionsRun.push({ name, ok: r.ok, message: r.message.slice(0, 400), s: Math.round((Date.now() - t) / 1000) })
+    log(`--actions ${name}: ${r.ok ? 'ok' : 'FAIL'} (${Math.round((Date.now() - t) / 1000)}s): ${r.message}`)
+  }
   const until = runStart + MINUTES * 60_000
   let lastLog = 0
   let lastSeries = 0
@@ -602,7 +611,7 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
     distance: Math.round(pathLength(path)), maxFromStart: Math.round(Math.max(0, ...path.map(p => Math.hypot(p.x - start.x, p.z - start.z)))), minY,
     disconnects: kicks, maxLagS: Math.round(maxLagMs / 100) / 10,
     helpAsks: helpAsks.length, helpReasons: helpAsks.slice(0, 10),
-    badFarm: BAD_FARM, plot: PLOT, foodSource: agent.storage.get<{ text?: string } | undefined>('food.source', undefined)?.text ?? null, sites, searches, choresRun, farmsAtEnd, endItems, mines,
+    badFarm: BAD_FARM, plot: PLOT, ...(ACTIONS.length ? { actionsRun } : {}), foodSource: agent.storage.get<{ text?: string } | undefined>('food.source', undefined)?.text ?? null, sites, searches, choresRun, farmsAtEnd, endItems, mines,
     ownerHeard: heard.length,
     whispers: whispers.length, chatLines: chatOut.length - whispers.length, said: chatOut.slice(0, 20).map(m => (m.to ? `(w ${m.to}) ` : '') + m.message),
     playersNear: Object.fromEntries(Object.entries(playersNear).filter(([, dist]) => dist < 200)),
