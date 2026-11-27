@@ -34,10 +34,20 @@ export interface MiningSettings {
   retreatHostiles: number
   /** How close a hostile counts for retreatHostiles, in blocks. Default 8. */
   hostileRadius: number
+  /**
+   * Hostiles standing under open sky (on the surface above the mine) count for retreatHostiles
+   * too. Default false: at night the zombies walking over a mine entrance sent the first trip back
+   * up after 5 steps. One within hostileClose counts either way.
+   */
+  surfaceHostiles: boolean
+  /** A hostile this close (blocks) counts wherever it stands. Default 4. */
+  hostileClose: number
   /** Light the tunnel with torches (crafted from coal or charcoal and sticks when it has none). Default true. */
   torches: boolean
   /** A torch every this many tunnel steps. Default 8. */
   torchEvery: number
+  /** In a mine with no torch yet, the first one goes after this many steps (the stairs down from the entrance are dark at night). Default 4. */
+  firstTorchAt: number
 }
 
 export const MINING_DEFAULTS: MiningSettings = {
@@ -50,8 +60,11 @@ export const MINING_DEFAULTS: MiningSettings = {
   retreatBelow: 10,
   retreatHostiles: 2,
   hostileRadius: 8,
+  surfaceHostiles: false,
+  hostileClose: 4,
   torches: true,
-  torchEvery: 8
+  torchEvery: 8,
+  firstTorchAt: 4
 }
 
 const GEARS: MiningGear[] = ['none', 'shield_or_armour', 'armour']
@@ -172,10 +185,37 @@ export function caveHazard (at: BlockLook, dig: P[], stand: P, open: Set<string>
   return null
 }
 
-/** Time for a torch: every `every` steps, unless the spot is already lit (block light 8+). */
-export function torchDue (stepsSinceTorch: number, s: Pick<MiningSettings, 'torches' | 'torchEvery'>, blockLight?: number): boolean {
-  if (!s.torches || s.torchEvery <= 0 || stepsSinceTorch < s.torchEvery) return false
+/**
+ * Time for a torch: every `torchEvery` steps (the first one in a mine with none yet after
+ * `firstTorchAt`), unless the spot is already lit (block light 8+).
+ */
+export function torchDue (stepsSinceTorch: number, s: Pick<MiningSettings, 'torches' | 'torchEvery'> & { firstTorchAt?: number }, blockLight?: number, first = false): boolean {
+  const every = first && s.firstTorchAt && s.firstTorchAt > 0 ? Math.min(s.torchEvery, s.firstTorchAt) : s.torchEvery
+  if (!s.torches || s.torchEvery <= 0 || stepsSinceTorch < every) return false
   return blockLight === undefined || blockLight < 8
+}
+
+/** A hostile near the bot, as undergroundNow sees it. */
+export interface HostileSeen {
+  /** Distance in blocks. */
+  dist: number
+  /** Its height above (+) or below (-) the bot. */
+  dy: number
+  /** Standing under open sky (sky light 12+ where it stands): on the surface, not in the mine. */
+  open?: boolean
+}
+
+/** Sky light at or above this where a mob stands: it is under open sky. */
+export const OPEN_SKY_LIGHT = 12
+
+/**
+ * How many hostiles count for retreatHostiles: within hostileRadius and 8 blocks of height, and
+ * either down here (not under open sky) or within hostileClose. With surfaceHostiles every one
+ * in the radius counts. Pure.
+ */
+export function hostilesThatCount (list: readonly HostileSeen[], s: Pick<MiningSettings, 'hostileRadius' | 'surfaceHostiles' | 'hostileClose'>): number {
+  return list.filter(h => h.dist <= s.hostileRadius && Math.abs(h.dy) < 8 &&
+    (s.surfaceHostiles || !h.open || h.dist <= s.hostileClose)).length
 }
 
 /** Crafts of torches (4 each) possible from coal/charcoal and sticks or planks. */

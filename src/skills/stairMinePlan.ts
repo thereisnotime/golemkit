@@ -37,6 +37,9 @@ export interface StairMineSettings {
   /** At night, with no mine yet, start one near home when it carries torches or makes them (it lights
    * the stairs as it digs, so the next night it is a lit mine). Default true. */
   startAtNight: boolean
+  /** On the walk down a known mine, put torches on the dark stairs it passes (mining.torchEvery apart) when it has
+   * or can make them, so an unlit mine becomes a lit one night trips may use. Default true. */
+  relight: boolean
   /** Gear for its own mine (mining.gear is for caves and ore it walks to). Default none. */
   gear: MiningGear
   /** Health needed to go down. Default 14. */
@@ -60,6 +63,7 @@ export const STAIR_MINE_DEFAULTS: StairMineSettings = {
   cooldownMinutes: 20,
   atNight: true,
   startAtNight: true,
+  relight: true,
   gear: 'none',
   minHealth: 14,
   keepCobble: 64,
@@ -362,6 +366,34 @@ export function nightMineOk (o: { known: boolean, lit: boolean, torches: number,
 /** A surface search that turned back for the light (sunset): the mine near home doesn't need it. */
 export function turnedBackForLight (reason: unknown): boolean {
   return typeof reason === 'string' && /daylight|dark|night/i.test(reason)
+}
+
+/** The stair stands it remembers, in order down, with the stair step each one is: start (steps 1-3), then path (every 4th). */
+export function stairPoints (m: Pick<MineSite, 'start' | 'path'>): { p: P, steps: number }[] {
+  const out = (m.start ?? []).map((p, i) => ({ p, steps: i + 1 }))
+  m.path.forEach((p, i) => out.push({ p, steps: 4 * (i + 1) }))
+  return out
+}
+
+/**
+ * Where to put torches on the walk down a mine's stairs. Pure. `points` are the stair stands in
+ * order down with their step number and block light (undefined: unknown, not loaded). A stand
+ * already lit (8+) restarts the count; else a torch goes where the dark run since the last light
+ * reaches torchEvery steps (firstTorchAt for the first one in a mine with none). Returns indexes.
+ */
+export function relightSpots (points: readonly { steps: number, light?: number }[], o: { torchEvery: number, firstTorchAt?: number, torches: number }): number[] {
+  const out: number[] = []
+  if (o.torchEvery <= 0) return out
+  let last = 0
+  for (let i = 0; i < points.length; i++) {
+    const pt = points[i]!
+    if (pt.light === undefined) continue
+    if (pt.light >= 8) { last = pt.steps; continue }
+    const first = o.torches + out.length === 0
+    const every = first && o.firstTorchAt && o.firstTorchAt > 0 ? Math.min(o.torchEvery, o.firstTorchAt) : o.torchEvery
+    if (pt.steps - last >= every) { out.push(i); last = pt.steps }
+  }
+  return out
 }
 
 /** A mine counts as lit when the stairs have a torch about every mining.torchEvery steps. */

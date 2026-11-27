@@ -75,8 +75,11 @@ can't change their own.
 | `mining.retreatBelow` | 0–20 | underground: abandon the dig and climb out at or below this health; separate from `reflexes.retreatBelow` (default 10, 0 = never) |
 | `mining.retreatHostiles` | 0–20 | underground: climb out when this many hostiles are within `mining.hostileRadius` blocks (default 2, 0 = never) |
 | `mining.hostileRadius` | 2–32 | underground: how close a hostile counts for `mining.retreatHostiles`, in blocks (default 8) |
+| `mining.surfaceHostiles` | on/off | underground: hostiles standing under open sky (the surface over the mine) count for `mining.retreatHostiles` too (default off; one within `mining.hostileClose` counts either way) |
+| `mining.hostileClose` | 0–32 | underground: a hostile this close counts wherever it stands, in blocks (default 4) |
 | `mining.torches` | on/off | light tunnels, crafting torches from coal or charcoal and sticks (default on) |
 | `mining.torchEvery` | 1–64 | a torch every this many tunnel steps (default 8) |
+| `mining.firstTorchAt` | 0–64 | in a mine with no torch yet, the first one goes after this many steps (default 4, 0 = at `torchEvery`) |
 | `mine.enabled` | on/off | [the staircase mine](./progression#the-staircase-mine): dig one near home when the gear need finds no iron ore with an open face (default on) |
 | `mine.depthY` | -58–120 | the stairs go down to this y (default 16, iron depth) |
 | `mine.radius` | 4–128 | the entrance is within this many blocks of home (default 32) |
@@ -89,6 +92,7 @@ can't change their own.
 | `mine.cooldownMinutes` | 0–1440 | minutes between two trips down (default 20) |
 | `mine.atNight` | on/off | go down a lit mine at night too (default on) |
 | `mine.startAtNight` | on/off | at night, with no mine yet, start one near home when it has torches or can make them (default on) |
+| `mine.relight` | on/off | on the walk down a known mine, put torches on its dark stairs (`mining.torchEvery` apart) so an unlit mine becomes a lit one (default on) |
 | `mine.gear` | none / shield_or_armour / armour | gear needed for its own mine (default none; `mining.gear` is for caves) |
 | `mine.minHealth` | 0–20 | health needed to go down (default 14) |
 | `mine.keepCobble` | 0–2304 | cobblestone kept on a trip; more is dropped at the end of a branch (default 64) |
@@ -133,6 +137,8 @@ can't change their own.
 | `needs.search.cooldownMinutes` | 1–1440 | minutes between searches for one need (default 30) |
 | `needs.search.retryMinutes` | 0–1440 | a search taken over in its first minute doesn't count; minutes before it may run again (default 5) |
 | `needs.search.perDay` | 0–100 | searches per need a day at most (default 6) |
+| `needs.search.holdScore` | 0–79 | a running search keeps this score against other work: only work scoring it plus the switch margin (10) takes over (default 30, 0 = anything above the idle band ends it) |
+| `needs.search.resumes` | 0–20 | a search cut short because the body was taken (a reflex eating or fighting, a player) may start again at once this many times per `cooldownMinutes` (default 3) |
 | `needs.search.atNight` | on/off | also search at night (default off) |
 | `needs.<need>.enabled` | on/off | `safety`, `food`, `gear`, `supplies`, `rest`: on or off; reset = on when a behaviour serving it is armed |
 | `needs.<need>.threshold` | 0–1 | urgency from which the need boosts its behaviours and may search (default 0.5) |

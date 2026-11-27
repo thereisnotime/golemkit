@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { minecraftView } from './fake-attach.ts'
 import { NpcController } from '../src/brains/npc/controller.ts'
-import { NeedsLayer, planNeeds, searchDue, cutShort, pickChore, inHours, windowOk, type Behavior, type NeedsProvider, type NeedInput } from '../src/brains/npc/index.ts'
+import { NeedsLayer, planNeeds, searchDue, cutShort, endedBy, pickChore, inHours, windowOk, type Behavior, type NeedsProvider, type NeedInput } from '../src/brains/npc/index.ts'
 import { needsSettings, idleSettings, sitesSettings, noteSiteCheck, recheckDue, SiteBook, ok, createLogger, type ActionResult, type SiteRecord } from '../src/core/index.ts'
 import { parseProfile } from '../src/core/profile.ts'
 import { findToggle, parseToggleValue } from '../src/core/toggles.ts'
@@ -13,7 +13,7 @@ import { findToggle, parseToggleValue } from '../src/core/toggles.ts'
 test('needs settings: defaults, per-need overrides, booleans and off', () => {
   const d = needsSettings(undefined)
   assert.equal(d.enabled, true)
-  assert.deepEqual(d.search, { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, retryMinutes: 5, perDay: 6, atNight: false })
+  assert.deepEqual(d.search, { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, retryMinutes: 5, perDay: 6, holdScore: 30, resumes: 3, atNight: false })
   assert.deepEqual(d.need('gear'), { enabled: null, threshold: 0.5, boost: 15, search: true, radius: 160, minutes: 6 })
   const s = needsSettings({ boost: 20, search: { radius: 96 }, gear: { threshold: 0.3, minutes: 3 }, rest: false })
   assert.equal(s.need('gear').threshold, 0.3)
@@ -101,6 +101,30 @@ test('searchDue: a search cut short only waits retryMinutes and does not use up 
   // real searches still count
   const real = [6, 5, 4, 3, 2, 1].map(h => ({ need: 'gear', at: now - h * 3_600_000, message: 'nothing found' }))
   assert.equal(searchDue(real, 'gear', now, o), false)
+})
+
+test('searchDue: a search cut because the body was taken may start again at once, a few times per cooldown', () => {
+  const now = 10 * 86_400_000
+  const o = { cooldownMinutes: 30, perDay: 6, retryMinutes: 5, resumes: 3 }
+  const yielded = (minAgo: number) => ({ need: 'gear', at: now - minAgo * 60_000, cut: true, resume: true, message: 'cut short' })
+  assert.equal(searchDue([yielded(1)], 'gear', now, o), true, 'the eat reflex ended it a minute ago: back to it')
+  assert.equal(searchDue([yielded(9), yielded(6), yielded(1)], 'gear', now, o), true)
+  assert.equal(searchDue([yielded(12), yielded(9), yielded(6), yielded(1)], 'gear', now, o), false, 'the fourth in a cooldown waits retryMinutes')
+  assert.equal(searchDue([yielded(1)], 'gear', now, { ...o, resumes: 0 }), false, 'resumes 0: the old retry gap')
+  // taken over by other work: the retry gap as before
+  assert.equal(searchDue([{ need: 'gear', at: now - 60_000, cut: true, message: 'cut short' }], 'gear', now, o), false)
+})
+
+test('endedBy: the behaviour that replaced a search, or the caller that took the body', () => {
+  const ac = new AbortController()
+  ac.abort('replaced by pickup_items (pickup_items 41 > need:gear 30)')
+  assert.deepEqual(endedBy(new Error('aborted'), ac.signal), { by: 'pickup_items', why: 'pickup_items 41 > need:gear 30' })
+  const y = Object.assign(new Error('body taken'), { name: 'NpcYield', holder: 'reflex:reflexes', action: 'eat' })
+  assert.deepEqual(endedBy(y), { by: 'reflex:reflexes (eat)', why: 'the body was taken', resume: true })
+  const ac2 = new AbortController()
+  ac2.abort('yield to player:Robin (follow)')
+  assert.deepEqual(endedBy(new Error('x'), ac2.signal), { by: 'player:Robin (follow)', why: 'the body was taken', resume: true })
+  assert.equal(endedBy(new Error('boom')), null)
 })
 
 test('cutShort: taken over or thrown in the first minute', () => {
@@ -294,6 +318,98 @@ test('controller: a gear search taken over in its first seconds keeps its full r
   await c.tick(); await flush()
   assert.deepEqual(radii, [160, 160])
   ;(release as (() => void) | null)?.()
+  c.stop()
+})
+
+test('controller: a running search holds against passing work (holdScore), says what took over, and the status shows it', async () => {
+  const f = fake(['wander', 'deposit', 'find_target'])
+  const score = { v: 0 }
+  const tools: Behavior = { name: 'tools', score: () => 0, run: async () => 'ok' }
+  const drops: Behavior = { name: 'pickup_items', score: () => score.v, run: async () => 'ok' }
+  const prov = provider({ urgency: { v: 0.7 } })
+  let aborted = false
+  prov.needs[0]!.search!.run = async (ctx) => {
+    await new Promise<void>(res => { ctx.signal.addEventListener('abort', () => { aborted = true; res() }) })
+    ctx.signal.throwIfAborted()
+    return ok('done')
+  }
+  const layer = new NeedsLayer(f.agent, prov, { now: () => f.clock.t })
+  const c = new NpcController(f.agent, f.bot as any, { behaviors: [tools, drops], needs: layer, now: () => f.clock.t, autoHome: false })
+  f.settings.needs = { gear: { enabled: true } }
+  await c.tick(); await flush()
+  assert.equal(c.snapshot().behavior, 'need:gear')
+  // drops to pick up (22), a farm chore (30): below 30 + the switch margin, the search keeps going
+  for (const v of [22, 30, 39]) {
+    score.v = v
+    f.clock.t += 5000
+    await c.tick(); await flush()
+    assert.equal(c.snapshot().behavior, 'need:gear', `work at ${v} does not end it`)
+  }
+  assert.equal(aborted, false)
+  score.v = 45
+  f.clock.t += 5000
+  await c.tick(); await flush(); await flush()
+  assert.equal(aborted, true, 'work at 45 does')
+  const last = layer.searchHistory().at(-1)!
+  assert.equal(last.cut, true)
+  assert.equal(last.by, 'pickup_items')
+  assert.match(last.why ?? '', /pickup_items 45 > need:gear 30/)
+  const snap = c.snapshot()
+  assert.equal(snap.lastTakeover?.from, 'need:gear')
+  assert.equal(snap.lastTakeover?.by, 'pickup_items')
+  assert.equal(snap.lastSearch?.by, 'pickup_items')
+  c.stop()
+})
+
+test('controller: holdScore 0 gives the old rule (any work above the idle band ends a search)', async () => {
+  const f = fake(['wander', 'deposit', 'find_target'])
+  const score = { v: 0 }
+  const tools: Behavior = { name: 'tools', score: () => 0, run: async () => 'ok' }
+  const drops: Behavior = { name: 'pickup_items', score: () => score.v, run: async () => 'ok' }
+  const prov = provider({ urgency: { v: 0.7 } })
+  prov.needs[0]!.search!.run = async (ctx) => {
+    await new Promise<void>(res => { ctx.signal.addEventListener('abort', () => res()) })
+    ctx.signal.throwIfAborted()
+    return ok('done')
+  }
+  const layer = new NeedsLayer(f.agent, prov, { now: () => f.clock.t })
+  const c = new NpcController(f.agent, f.bot as any, { behaviors: [tools, drops], needs: layer, now: () => f.clock.t, autoHome: false })
+  f.settings.needs = { gear: { enabled: true }, search: { holdScore: 0 } }
+  await c.tick(); await flush()
+  score.v = 22
+  f.clock.t += 5000
+  await c.tick(); await flush(); await flush()
+  assert.equal(c.snapshot().lastTakeover?.by, 'pickup_items')
+  assert.equal(layer.searchHistory().at(-1)?.by, 'pickup_items')
+  c.stop()
+})
+
+test('controller: a search the eat reflex interrupts starts again after the back-off, not 5 minutes later', async () => {
+  const f = fake(['wander', 'deposit', 'find_target'])
+  const tools: Behavior = { name: 'tools', score: () => 0, run: async () => 'ok' }
+  const prov = provider({ urgency: { v: 0.7 } })
+  let runs = 0
+  prov.needs[0]!.search!.run = async (ctx) => {
+    runs++
+    if (runs === 1) {
+      // the reflex takes the body while the search walks
+      f.agent.currentAction = { name: 'eat', params: {}, caller: { kind: 'reflex', name: 'reflexes' }, priority: 90 }
+      return ctx.act('find_target', {})
+    }
+    return ok('found')
+  }
+  const layer = new NeedsLayer(f.agent, prov, { now: () => f.clock.t })
+  const c = new NpcController(f.agent, f.bot as any, { behaviors: [tools], needs: layer, now: () => f.clock.t, autoHome: false })
+  f.settings.needs = { gear: { enabled: true } }
+  await c.tick(); await flush(); await flush(); await flush()
+  const cut = layer.searchHistory().at(-1)!
+  assert.equal(cut.cut, true)
+  assert.equal(cut.resume, true)
+  assert.equal(cut.by, 'reflex:reflexes (eat)')
+  f.agent.currentAction = null
+  f.clock.t += 4000 // past the 3 s reflex back-off
+  await c.tick(); await flush(); await flush()
+  assert.equal(runs, 2, 'back to the search')
   c.stop()
 })
 

@@ -147,3 +147,26 @@ test('nextToolUpgrade with safe mining: no prospecting or deep ore when not read
   const noWood = nextToolUpgrade({ stone_pickaxe: 1, stone_axe: 1, stone_shovel: 1, stone_sword: 1, iron_ingot: 3 }, {}, S, { mining: { ready: false, shieldFirst: true } })!
   assert.equal((noWood as any).item, 'iron_pickaxe')
 })
+
+test('hostilesThatCount: the surface above the mine does not send it back up, one close by does', async () => {
+  const { hostilesThatCount } = await import('../src/skills/minePlan.ts')
+  const s = miningSettings({})
+  // night, 5 steps down: two zombies walking over the entrance, under open sky
+  const surface = [{ dist: 6, dy: 5, open: true }, { dist: 7, dy: 4, open: true }]
+  assert.equal(hostilesThatCount(surface, s), 0)
+  assert.equal(undergroundRetreat({ underground: true, health: 20, hostiles: hostilesThatCount(surface, s) }, s), null)
+  assert.equal(hostilesThatCount([...surface, { dist: 3, dy: 2, open: true }], s), 1, 'one within hostileClose counts')
+  assert.equal(hostilesThatCount([{ dist: 6, dy: -1, open: false }, { dist: 5, dy: 0 }], s), 2, 'down here (or sky unknown)')
+  assert.equal(hostilesThatCount(surface, miningSettings({ surfaceHostiles: true })), 2, 'surfaceHostiles: the old count')
+  assert.equal(hostilesThatCount([{ dist: 9, dy: 0 }, { dist: 3, dy: 9 }], s), 0, 'outside the radius or the height')
+})
+
+test('torchDue: the first torch in a mine with none goes after firstTorchAt', () => {
+  const s = miningSettings({})
+  assert.equal(s.firstTorchAt, 4)
+  assert.equal(torchDue(4, s, 0), false, 'not first: every 8')
+  assert.equal(torchDue(4, s, 0, true), true)
+  assert.equal(torchDue(3, s, 0, true), false)
+  assert.equal(torchDue(4, s, 12, true), false, 'already lit')
+  assert.equal(torchDue(4, miningSettings({ firstTorchAt: 0 }), 0, true), false, '0: at torchEvery')
+})

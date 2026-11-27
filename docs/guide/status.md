@@ -42,6 +42,7 @@ Pax (profile pax): STUCK
 | state | `working` (something runs or progress is recent), `busy` (a long-running order such as `follow` or `guard`, never stuck), `idle` (nothing wants to run), `stuck` (it wants to and has made no progress for `stuckAlertMs`), `offline` |
 | doing | the action holding the body: name, caller (`brain:npc`, `player:Robin`, `reflex:...`), priority and for how long |
 | per decision loop | each NPC controller (`npc`, `behaviors`, `self`): the running behaviour with the score that picked it, its priority and run time, or, when idle, why: suspended by a scene, body held by another caller, backing off, behaviours cooling down after failures (with the failure), a score waiting to start, or every score at 0. The top scores of the last tick |
+| search, taken over | under a decision loop with a [needs layer](./needs-and-idle#what-took-over): the newest need search (how long ago, how it ended, and what cut it short, e.g. `cut short after 12s by pickup_items (pickup_items 45 > need:gear 30)`), and the last running behaviour something took over (`DeciderSnapshot.lastSearch`, `.lastTakeover`) |
 | trying, why | what it is on (`chop_wood_loop: chop_tree` when a behaviour runs its own action) and why that, or why nothing runs |
 | blocker | for `stuck`: the failure since the last progress, else who holds the body or the back-off, else the idle reason |
 | need, goal | shown when the decision loop reports them (`DeciderSnapshot.need`, `.goal`) |

@@ -23,7 +23,8 @@ import { craftItem } from './crafting.ts'
 import { wornArmorPoints } from './gear.ts'
 import {
   miningSettings, miningReadiness, notReadyText, surfaceAbove, caveHazard, torchDue, torchCrafts,
-  undergroundRetreat, isUnderground, depthAllowed, targetDepth, type MiningSettings, type Kit, type Readiness
+  undergroundRetreat, isUnderground, depthAllowed, targetDepth, hostilesThatCount, OPEN_SKY_LIGHT,
+  type MiningSettings, type Kit, type Readiness, type HostileSeen
 } from './minePlan.ts'
 
 export interface P { x: number, y: number, z: number }
@@ -185,8 +186,13 @@ export function depthOk (bot: Bot, m: MiningState, p: P): boolean {
   return depthAllowed(targetDepth(m.surface, p, over), false, m.s)
 }
 
-/** Underground (real cover overhead, little sky light) and the hostiles close by, for undergroundRetreat. */
-export function undergroundNow (bot: Bot, radius: number): { underground: boolean, hostiles: number, air?: number } {
+/**
+ * Underground (real cover overhead, little sky light) and the hostiles that count, for
+ * undergroundRetreat. With the mining settings, hostiles under open sky (the surface above the
+ * mine) only count within hostileClose (hostilesThatCount); a bare radius counts every one.
+ */
+export function undergroundNow (bot: Bot, s: number | Pick<MiningSettings, 'hostileRadius' | 'surfaceHostiles' | 'hostileClose'>): { underground: boolean, hostiles: number, air?: number } {
+  const o = typeof s === 'number' ? { hostileRadius: s, surfaceHostiles: true, hostileClose: 0 } : s
   const feet = bot.entity.position.floored()
   let cover = 0
   for (let dy = 2; dy <= 24; dy++) {
@@ -196,7 +202,15 @@ export function undergroundNow (bot: Bot, radius: number): { underground: boolea
   }
   const head = bot.blockAt(feet.offset(0, 1, 0)) as any
   const me = bot.entity.position
-  const hostiles = Object.values(bot.entities).filter(e => e !== bot.entity && isHostile(e) && e.position.distanceTo(me) <= radius && Math.abs(e.position.y - me.y) < 8).length
+  const seen: HostileSeen[] = []
+  for (const e of Object.values(bot.entities)) {
+    if (e === bot.entity || !isHostile(e)) continue
+    const dist = e.position.distanceTo(me)
+    if (dist > o.hostileRadius) continue
+    const sky = (bot.blockAt(e.position.floored().offset(0, 1, 0)) as { skyLight?: number } | null)?.skyLight
+    seen.push({ dist, dy: e.position.y - me.y, ...(typeof sky === 'number' ? { open: sky >= OPEN_SKY_LIGHT } : {}) })
+  }
+  const hostiles = hostilesThatCount(seen, o)
   // air only counts with the head in water: the value is whatever metadata last said, and can be stale
   const air = /water|bubble_column/.test(head?.name ?? '') ? (bot as any).oxygenLevel : undefined
   return { underground: isUnderground(cover, typeof head?.skyLight === 'number' ? head.skyLight : undefined), hostiles, ...(typeof air === 'number' ? { air } : {}) }
@@ -386,7 +400,7 @@ export async function mineStone (ctx: Ctx, count: number, opts: MineOptions = {}
       if (bot.inventory.emptySlotCount() === 0) await makeRoom(bot, 2, new Set([item]))
       if (bot.inventory.emptySlotCount() === 0) { stopped = 'inventory full'; break }
       if (safety) {
-        const u = undergroundNow(bot, mine.s.hostileRadius)
+        const u = undergroundNow(bot, mine.s)
         const why = undergroundRetreat({ ...u, underground: u.underground || feet.y < mine.surface - 3, health: bot.health }, mine.s)
         if (why) { retreat = why; stopped = `abandoned the dig and headed back up: ${why}`; break }
       }

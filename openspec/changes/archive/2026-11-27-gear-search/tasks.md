@@ -1,0 +1,5 @@
+- [x] search hold score and resumable cuts, with controller tests
+- [x] takeover recorded on the search, logged, shown in the status
+- [x] surface hostiles, first torch, relighting a known mine, with planner tests
+- [x] recipe variant ranking and worn-tool gate, with tests
+- [x] settings, toggles, docs

@@ -167,6 +167,12 @@ export interface SearchRecord {
   ms?: number
   /** Cut short before it got going (taken over, aborted): not a real try, see searchDue. */
   cut?: boolean
+  /** What ended it early: the behaviour that took over ("pickup_items") or the caller that took the body ("reflex:reflexes (eat)"). */
+  by?: string
+  /** Why, as the controller saw it ("pickup_items 41 > need:gear 30"). */
+  why?: string
+  /** Cut short because the body was taken (a reflex, a player): it may start again at once, see searchDue. */
+  resume?: boolean
 }
 
 /** A search taken over within this long is cut short, not a real try. */
@@ -192,15 +198,37 @@ export function cutShort (r: { ok: boolean, message: string, data?: unknown } | 
  * retryMinutes and doesn't count. Pax lost its whole day of gear searches that way: six searches
  * taken over by farm and bed work after 3 to 17 s, then only the 48-block idle scout ran.
  */
-export function searchDue (history: readonly { need: string, at: number, cut?: boolean, message?: string }[], need: string, now: number, o: { cooldownMinutes: number, perDay: number, retryMinutes?: number }): boolean {
+export function searchDue (history: readonly { need: string, at: number, cut?: boolean, resume?: boolean, message?: string }[], need: string, now: number, o: { cooldownMinutes: number, perDay: number, retryMinutes?: number, resumes?: number }): boolean {
   const mine = history.filter(h => h.need === need)
   const isCut = (h: typeof mine[number]) => !!h.cut || (h.message === 'started' && now - h.at > STALE_START_MS)
   const real = mine.filter(h => !isCut(h))
   const lastReal = real.reduce((m, h) => Math.max(m, h.at), 0)
   if (lastReal && now - lastReal < o.cooldownMinutes * 60_000) return false
-  const lastCut = mine.filter(isCut).reduce((m, h) => Math.max(m, h.at), 0)
+  // cut because the body was taken for a moment (a reflex ate, a fight): back to it at once, a few
+  // times per cooldown; Pax's searches were ended by its eat reflex and then waited 5 minutes each
+  const resumes = o.resumes ?? 0
+  const resumed = mine.filter(h => h.cut && h.resume && now - h.at < o.cooldownMinutes * 60_000).length
+  const blocks = (h: typeof mine[number]) => isCut(h) && !(h.cut && h.resume && resumed <= resumes)
+  const lastCut = mine.filter(blocks).reduce((m, h) => Math.max(m, h.at), 0)
   if (lastCut && now - lastCut < (o.retryMinutes ?? 5) * 60_000) return false
   return real.filter(h => now - h.at < 86_400_000).length < o.perDay
+}
+
+/**
+ * What ended a search that threw instead of returning: the behaviour that replaced it (the
+ * controller aborts with "replaced by <name> (<why>)"), or the caller that took the body (an
+ * NpcYield, or "yield to <holder>"), which may resume. null when nothing says.
+ */
+export function endedBy (err: unknown, signal?: AbortSignal): Pick<SearchRecord, 'by' | 'why' | 'resume'> | null {
+  const y = err as { name?: string, holder?: string, action?: string } | null
+  if (y && y.name === 'NpcYield' && y.holder) return { by: y.action ? `${y.holder} (${y.action})` : y.holder, why: 'the body was taken', resume: true }
+  const reason = signal?.aborted ? String(signal.reason ?? '') : ''
+  let m = /^replaced by (\S+)(?: \((.*)\))?$/.exec(reason)
+  if (m) return { by: m[1]!, ...(m[2] ? { why: m[2] } : {}) }
+  m = /^yield to (.+)$/.exec(reason)
+  if (m) return { by: m[1]!, why: 'the body was taken', resume: true }
+  if (reason) return { by: reason }
+  return null
 }
 
 // ------------------------------------------------------------------ the layer
@@ -267,13 +295,21 @@ export class NeedsLayer {
           const at = this.now()
           this.recordSearch({ need: n.name, at, ok: false, message: 'started' })
           let r: ActionResult | null = null
+          let err: unknown = null
           try {
             r = await s.run(ctx, { radius: ns.radius, minutes: ns.minutes, atNight: st.search.atNight })
             return r
+          } catch (e) {
+            err = e
+            throw e
           } finally {
             const ms = this.now() - at
-            const cut = cutShort(r, ms)
-            this.recordSearch({ need: n.name, at, ok: !!r?.ok, message: r?.message ?? 'cut short', ms, ...(cut ? { cut } : {}) }, true)
+            const end = r ? null : endedBy(err, ctx.signal)
+            // the body taken (a reflex ate, a fight) is no real try however long it had run
+            const cut = cutShort(r, ms) || !!end?.resume
+            const rec: SearchRecord = { need: n.name, at, ok: !!r?.ok, message: r?.message ?? 'cut short', ms, ...(cut ? { cut } : {}), ...(end ?? {}) }
+            this.recordSearch(rec, true)
+            if (end) this.log?.info(`need:${n.name} search ${cut ? 'cut short' : 'ended'} after ${Math.round(ms / 1000)}s by ${end.by}${end.why ? ` (${end.why})` : ''}${cut ? (end.resume ? ', may start again at once' : `, again in ${st.search.retryMinutes} min`) : ''}`)
           }
         }
       })
@@ -322,6 +358,9 @@ export class NeedsLayer {
   /** Last searches, newest last (status, tests). */
   searchHistory (): SearchRecord[] { return this.searches() }
 
+  /** The newest search record (a running one says 'started'), for the status. */
+  lastSearch (): SearchRecord | null { return this.searches().at(-1) ?? null }
+
   private choresRun (): Record<string, number> { return this.agent.storage.get<Record<string, number>>(CHORES_KEY, {}) }
   private choresQuiet (): Record<string, number> { return this.agent.storage.get<Record<string, number>>(QUIET_KEY, {}) }
   private markQuiet (c: ChoreDef): void {
@@ -367,8 +406,13 @@ export class NeedsLayer {
     const runningNeed = running?.startsWith('need:') ? this.provider.needs.find(n => `need:${n.name}` === running) : undefined
     let committed = false
     try { committed = !!runningNeed?.search?.committed?.(ctx) } catch {}
+    const hold = Math.max(SEARCH_SCORE, st.search.holdScore)
     if (committed && running && !p.scores.some(x => x.score >= COMMITTED_SCORE)) {
       this.fallback = { behavior: running, reason: `finishing ${running} (committed: ${runningNeed!.search!.what})`, score: COMMITTED_SCORE }
+    } else if (runningNeed && running && !p.quiet && st.search.holdScore > 0) {
+      // a running search keeps its slot against passing work (drops to pick up, a farm chore, seeds):
+      // only work that beats the hold score by the switch margin takes over, and the controller says what
+      this.fallback = { behavior: running, reason: this.view.fallback?.behavior === running ? this.view.fallback.reason : `finishing ${running}`, score: hold }
     } else if (!p.quiet && running?.startsWith('idle:') && this.provider.chores.some(c => `idle:${c.name}` === running && c.sticky && MODE_RANK[idle.mode] >= MODE_RANK[c.mode])) {
       // a sticky chore (a base-project session) keeps the body for a passing behaviour
       const sticky = this.provider.chores.find(c => `idle:${c.name}` === running)!
@@ -378,7 +422,7 @@ export class NeedsLayer {
         // finish what it started
         const chore = running.startsWith('idle:') ? this.provider.chores.find(c => `idle:${c.name}` === running) : null
         if (running.startsWith('need:') || (chore && MODE_RANK[idle.mode] >= MODE_RANK[chore.mode])) {
-          this.fallback = { behavior: running, reason: this.view.fallback?.behavior === running ? this.view.fallback.reason : `finishing ${running}`, score: running.startsWith('need:') ? SEARCH_SCORE : CHORE_SCORES[chore!.mode] }
+          this.fallback = { behavior: running, reason: this.view.fallback?.behavior === running ? this.view.fallback.reason : `finishing ${running}`, score: running.startsWith('need:') ? hold : CHORE_SCORES[chore!.mode] }
         }
       } else if (p.search) {
         const n = this.provider.needs.find(x => x.name === p.search)!

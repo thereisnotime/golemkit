@@ -82,6 +82,10 @@ export interface DeciderSnapshot {
   reason?: string | null
   /** The loop's own idea of the last progress (items gained, distance toward a goal). */
   lastProgressAt?: number | null
+  /** The last running behaviour something else took over: by another behaviour or a caller that took the body. */
+  lastTakeover?: { from: string, by: string, why: string, at: number, ranMs: number } | null
+  /** The newest need search (a running one says 'started'): how it ended and what took over. */
+  lastSearch?: { need: string, at: number, ms: number | null, ok: boolean, message: string, cut: boolean, by: string | null, why: string | null } | null
 }
 
 export type StatusState = 'offline' | 'working' | 'busy' | 'idle' | 'stuck'
@@ -274,6 +278,15 @@ export function staleAfter (s: Pick<BotStatus, 'intervalMs'>): number {
   return Math.max(15_000, 3 * s.intervalMs)
 }
 
+/** One need search for the status: "gear 4m ago, cut short after 12s by pickup_items (pickup_items 41 > need:gear 30)". */
+export function searchLine (ls: NonNullable<DeciderSnapshot['lastSearch']>, now: number): string {
+  const when = `${ls.need} ${fmtDuration(now - ls.at)} ago`
+  if (ls.message === 'started' && ls.ms === null) return `${when}, running`
+  const took = ls.ms !== null ? ` after ${fmtDuration(ls.ms)}` : ''
+  const how = ls.ok ? `found it${took}: ${ls.message}` : ls.cut ? `cut short${took}` : `failed${took}: ${ls.message}`
+  return `${when}, ${how}${ls.by ? ` by ${ls.by}${ls.why ? ` (${ls.why})` : ''}` : ''}`
+}
+
 /** Several lines for the CLI. */
 export function formatStatus (s: BotStatus, now: number): string[] {
   const age = now - s.updatedAt
@@ -287,6 +300,10 @@ export function formatStatus (s: BotStatus, now: number): string[] {
     lines.push(`  ${d.name.padEnd(9)} ${what}`)
     const top = d.scores.filter(x => x.score > 0).slice(0, 5).map(x => `${x.name} ${Math.round(x.score)}`).join(', ')
     if (top) lines.push(`            scores: ${top}`)
+    const ls = d.lastSearch
+    if (ls) lines.push(`            search: ${searchLine(ls, s.updatedAt)}`)
+    const t = d.lastTakeover
+    if (t) lines.push(`            taken over: ${t.from} after ${fmtDuration(t.ranMs)} by ${t.by} (${t.why}), ${fmtDuration(s.updatedAt - t.at)} ago`)
   }
   if (s.trying) lines.push(`  trying    ${s.trying}`)
   lines.push(`  why       ${s.why}`)

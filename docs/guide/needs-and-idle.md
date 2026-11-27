@@ -96,6 +96,16 @@ better, digging is on and iron (tools, armour, a bucket, a shield) is what is mi
 3. home, and `upgrade_tools` with keep_tools_upgraded's target: smelt (furnace by home) and craft
    pickaxe, bucket, shield, armour, tools.
 
+A running search **holds** its slot: it keeps `needs.search.holdScore` (30) against other work, so
+only a behaviour scoring 40 or more (the hold plus the switch margin of 10) takes over: a full
+inventory (deposit_when_full 45), real hunger, a fight, danger, wood when there is none at all.
+Passing work doesn't: drops to pick up (22), a farm or seed chore (21 to 30), lighting (18), the
+storage check (14). Before, the search only ran while nothing scored above the idle band (15), so
+any of those ended it. Pax's gear search started every 5 minutes for a day and a half and was cut
+short after 5 to 78 seconds, dozens of times in a row, by collect_drops, the farm and seed chores and
+its eat reflex; the base project then took the slot until the next try. `holdScore: 0` gives the old
+rule.
+
 From the walk home before the mine to the crafting after it the search is **committed**
 (`NeedSearch.committed`): it keeps a score of 45 against ordinary work (chop_wood_loop 30 to 38,
 keep_tools_upgraded 28, which also leaves a running gear search alone so the first raw iron
@@ -120,10 +130,33 @@ What it found stays remembered as `found:iron` and is checked first next time. E
 at most once every `cooldownMinutes` (30) and `perDay` (6) times a day; the searches are kept in
 storage (`needs.searches`). A search that other work takes over in its first minute (farm work, a
 bed, a reflex), or that a restart left unfinished, is cut short: it doesn't count towards either
-limit and the search may run again after `retryMinutes` (5). Pax lost whole days of gear searches
+limit and the search may run again after `retryMinutes` (5). A search cut short because the body
+was taken (a reflex eating or fighting, a player's order) is no real try however long it ran: it
+starts again as soon as the controller's back-off ends, up to `resumes` (3) times per
+`cooldownMinutes`, then the retry gap applies. Pax lost whole days of gear searches
 before that rule: six 160-block searches were taken over after 3 to 17 seconds, used up the day's
 six, and the only thing left looking for iron was the `scout_nearby` chore, which looks within
 twice `idle.radius` (48 blocks).
+
+### What took over
+
+Whatever ends a search early is written down. The controller aborts a replaced behaviour with
+"replaced by `<behaviour>` (`<why>`)" and a yield with "yield to `<caller>` (`<action>`)"; the layer
+stores that on the search record (`by`, `why`, `resume` in `needs.searches`) and logs it at info:
+
+```
+need:gear taken over after 12s by pickup_items: pickup_items 45 > need:gear 30
+need:gear search cut short after 12s by pickup_items (pickup_items 45 > need:gear 30), again in 5 min
+need:gear search cut short after 31s by reflex:reflexes (eat) (the body was taken), may start again at once
+```
+
+`just status` shows the newest search and the last behaviour taken over under the decider:
+
+```
+  behaviors idle 20s: ...
+            search: gear 4m ago, cut short after 12s by pickup_items (pickup_items 45 > need:gear 30)
+            taken over: need:gear after 12s by pickup_items (pickup_items 45 > need:gear 30), 4m ago
+```
 
 ## Site health
 
@@ -278,7 +311,7 @@ settings:
 needs:
   enabled: true
   boost: 15                       # added at urgency 1
-  search: { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, retryMinutes: 5, perDay: 6, atNight: false }
+  search: { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, retryMinutes: 5, perDay: 6, holdScore: 30, resumes: 3, atNight: false }
   gear: { threshold: 0.5 }        # enabled (unset = automatic), threshold, boost, search, radius, minutes
   rest: false                     # a need switched off
 idle:

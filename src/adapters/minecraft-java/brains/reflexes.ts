@@ -215,7 +215,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         if (Date.now() - climbTriedAt < 15_000) return false
         const s = miningSettings(agent.settings.mining)
         if (!s.safe) return false
-        const u = undergroundNow(bot, s.hostileRadius)
+        const u = undergroundNow(bot, s)
         const why = undergroundRetreat({ ...u, health: bot.health }, s)
         if (!why) return false
         if (!arbitrate('climb_out')) return false

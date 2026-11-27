@@ -9,7 +9,7 @@ import { Blackboard, type BlackboardOptions } from './blackboard.ts'
 import { decide, failureCooldown, flipCooldown, isFlip, type Scored, type SelectOptions } from './select.ts'
 import { helpDesk, type HelpDesk } from './help.ts'
 import { NpcYield, type Behavior, type BehaviorContext, type NpcContext, type NpcHook } from './types.ts'
-import type { NeedsLayer } from './needs.ts'
+import type { NeedsLayer, SearchRecord } from './needs.ts'
 
 /** Internal no-op action the brain runs to cut its own in-flight action short. */
 export const INTERRUPT_ACTION = 'npc_interrupt'
@@ -111,6 +111,20 @@ interface Holder {
   /** "kind:name" */
   label: string
   priority: number
+  /** The action it runs. */
+  action?: string
+}
+
+/** A running behaviour that something else took over: another behaviour, or a caller that took the body. */
+export interface Takeover {
+  /** The behaviour that was running. */
+  from: string
+  /** What took over: a behaviour name, or "kind:name (action)" for another caller. */
+  by: string
+  why: string
+  at: number
+  /** How long `from` had run. */
+  ranMs: number
 }
 
 /** How long nothing may run before the controller logs why (and how often). */
@@ -233,7 +247,7 @@ export class NpcController {
     const cur = this.agent.currentAction
     if (!cur) return null
     if (cur.caller.kind === 'brain' && cur.caller.name === this.name) return null
-    return { label: `${cur.caller.kind}:${cur.caller.name}`, priority: cur.priority }
+    return { label: `${cur.caller.kind}:${cur.caller.name}`, priority: cur.priority, action: cur.name }
   }
 
   /** Who other than us holds the body at `priority` or above, as "kind:name". */
@@ -266,7 +280,10 @@ export class NpcController {
       this.yieldedTo = holder
     }
     if (this.running && this.running.priority <= level) {
-      this.abortRunning('yield', false)
+      const act = this.agent.currentAction
+      const by = act && `${act.caller.kind}:${act.caller.name}` === holder ? `${holder} (${act.name})` : holder
+      this.noteTakeover(this.running.behavior.name, by, 'the body was taken', now)
+      this.abortRunning(`yield to ${by}`, false)
       // a long-running action of ours that was preempted would be resumed by the agent later,
       // without a behaviour behind it; drop it, the behaviour starts it again after the back-off
       this.agent.cancelActions?.(i => i.caller.kind === 'brain' && i.caller.name === this.name && i.priority <= level, 'yield')
@@ -396,7 +413,8 @@ export class NpcController {
         case 'switch':
           this.log.debug(`switch ${d.from} -> ${d.name}: ${d.reason}`)
           if (!((this.lastScores.find(s => s.name === d.from)?.score ?? 0) > 0)) this.noteDropOut(now)
-          this.abortRunning('switch', true)
+          this.noteTakeover(d.from, d.name, d.reason, now)
+          this.abortRunning(`replaced by ${d.name} (${d.reason})`, true)
           this.reason = layer?.reasonFor(d.name) ?? d.reason
           this.start(d.name, d.score, now)
           break
@@ -410,6 +428,22 @@ export class NpcController {
       this.ticking = false
     }
   }
+
+  private takeover: Takeover | null = null
+
+  /** Remembers what took over a running behaviour (status: lastTakeover). */
+  private noteTakeover (from: string, by: string, why: string, now: number): void {
+    const r = this.running
+    if (!r || r.behavior.name !== from) return
+    this.takeover = { from, by, why, at: now, ranMs: now - r.startedAt }
+    // a need's search taken over is worth a line at info: it says why the need stays unmet
+    const msg = `${from} taken over after ${Math.round((now - r.startedAt) / 1000)}s by ${by}: ${why}`
+    if (from.startsWith('need:')) this.log.info(msg)
+    else this.log.debug(msg)
+  }
+
+  /** The last behaviour taken over and by what. */
+  lastTakeover (): Takeover | null { return this.takeover }
 
   private idleSince = 0
   private idleReportedAt = 0
@@ -456,7 +490,7 @@ export class NpcController {
       act: async (action, params = {}) => {
         checkAborted(signal)
         const holder = this.foreignHolder(priority)
-        if (holder) throw new NpcYield(holder.label, holder.priority)
+        if (holder) throw new NpcYield(holder.label, holder.priority, holder.action)
         // our own interrupt (or the last behaviour's action) may still hold the body at a higher
         // priority for a moment after a switch; wait for it instead of backing off from ourselves
         for (let i = 0; i < 20 && this.ownAbove(priority); i++) await sleep(50, signal)
@@ -465,7 +499,7 @@ export class NpcController {
         if (signal.aborted) throw new ActionAbortedError(String(signal.reason ?? 'aborted'))
         if (!res.ok) {
           const h = this.foreignHolder(priority)
-          if (h) throw new NpcYield(h.label, h.priority)
+          if (h) throw new NpcYield(h.label, h.priority, h.action)
           if (res.message.startsWith('busy') && !res.message.endsWith(`(brain ${this.name})`)) throw new NpcYield(parseBusy(res.message))
           if (FOREIGN_STOP.has(res.message)) throw new NpcYield('player:unknown')
         }
@@ -589,7 +623,9 @@ export class NpcController {
       reason: r ? this.reason : v?.idleWhy ? `idle (${v.idleMode}): ${v.idleWhy}` : null,
       lastProgressAt: this.lastProgressAt,
       idleMode: v?.idleMode ?? null,
-      chore: r?.behavior.name.startsWith('idle:') ? r.behavior.name.slice(5) : null
+      chore: r?.behavior.name.startsWith('idle:') ? r.behavior.name.slice(5) : null,
+      lastTakeover: this.takeover,
+      lastSearch: searchView(this.opts.needs?.lastSearch?.() ?? null)
     }
   }
 
@@ -617,6 +653,11 @@ export class NpcController {
 function drivesLine (d: { top: { name: string, urgency: number } | null, urgent: string[], idleMode: string }): string {
   const top = d.top ? `${d.top.name} ${d.top.urgency}${d.urgent.includes(d.top.name) ? ' (urgent)' : ''}` : 'none'
   return `top need: ${top}, idle mode ${d.idleMode}`
+}
+
+function searchView (r: SearchRecord | null): NpcSnapshot['lastSearch'] {
+  if (!r) return null
+  return { need: r.need, at: r.at, ms: r.ms ?? null, ok: r.ok, message: r.message, cut: !!r.cut, by: r.by ?? null, why: r.why ?? null }
 }
 
 function isResult (r: unknown): r is ActionResult {

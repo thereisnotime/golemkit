@@ -97,3 +97,23 @@ test('extended skills have unique, described actions', () => {
     assert.ok(names.has(n), `missing ${n}`)
   }
 })
+
+test('rankRecipes: the stone variant it holds, not the first listed (cobbled_deepslate)', async () => {
+  const { rankRecipes } = await import('../src/skills/crafting.ts')
+  // stone_sword in 1.21.1: cobbled_deepslate (9), blackstone (1228), cobblestone (35), each with a stick (848)
+  const variants = [9, 1228, 35].map(id => ({ id, delta: [{ id, count: -2 }, { id: 848, count: -1 }, { id: 823, count: 1 }] }))
+  const inv = (c: Record<number, number>) => (id: number) => c[id] ?? 0
+  assert.equal(rankRecipes(variants, inv({ 35: 5, 848: 2 }))[0]!.id, 35, 'it can make the cobblestone one')
+  assert.equal(rankRecipes(variants, inv({ 35: 1, 848: 2 }))[0]!.id, 35, 'one short of cobblestone beats two short of deepslate')
+  assert.equal(rankRecipes(variants, inv({ 1228: 2, 35: 1, 848: 1 }))[0]!.id, 1228, 'blackstone when that is what it holds')
+  assert.equal(rankRecipes(variants, inv({}))[0]!.id, 9, 'nothing held: the order it came in')
+})
+
+test('remakeable: a worn tool it can make again from what it carries', async () => {
+  const { remakeable } = await import('../src/skills/toolkit.ts')
+  assert.deepEqual(remakeable({ cobblestone: 2, stick: 1 }, 'stone_sword'), { ok: true, sticks: 0 })
+  assert.deepEqual(remakeable({ cobbled_deepslate: 3, oak_planks: 2 }, 'stone_pickaxe'), { ok: true, sticks: 2 })
+  assert.equal(remakeable({ stick: 4 }, 'stone_sword').ok, false, 'no stone of any kind')
+  assert.equal(remakeable({ iron_ingot: 1, stick: 2 }, 'iron_sword').ok, false)
+  assert.equal(remakeable({ cobblestone: 9 }, 'golden_sword').ok, false)
+})

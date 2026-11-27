@@ -165,6 +165,16 @@ test('formatStatus prints a block, and says NOT RUNNING for a stale file', () =>
   assert.equal(fmtDuration(185 * MIN), '3h 5m')
 })
 
+test('formatStatus shows the last need search and what took over', () => {
+  const d = decider({
+    lastSearch: { need: 'gear', at: NOW - 4 * MIN, ms: 12_000, ok: false, message: 'cut short', cut: true, by: 'pickup_items', why: 'pickup_items 41 > need:gear 30' },
+    lastTakeover: { from: 'need:gear', by: 'pickup_items', why: 'pickup_items 41 > need:gear 30', at: NOW - 4 * MIN + 12_000, ranMs: 12_000 }
+  })
+  const lines = formatStatus(status({ deciders: [d] }), NOW + 1000)
+  assert.ok(lines.some(l => /search: gear 4m ago, cut short after 12s by pickup_items \(pickup_items 41 > need:gear 30\)/.test(l)), lines.join('\n'))
+  assert.ok(lines.some(l => /taken over: need:gear after 12s by pickup_items/.test(l)), lines.join('\n'))
+})
+
 // ------------------------------------------------------------------ tracker with a fake agent
 
 function fakeAgent (dir: string) {

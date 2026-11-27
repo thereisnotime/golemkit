@@ -34,6 +34,20 @@ export function missingFor (delta: DeltaEntry[], have: (id: number) => number): 
   return delta.filter(d => d.count < 0 && have(d.id) < -d.count).map(d => ({ id: d.id, need: -d.count - have(d.id) }))
 }
 
+/**
+ * Orders a recipe's variants (stone tools from cobblestone, cobbled deepslate or blackstone; planks
+ * of any wood) for what it holds. Pure. The ones it can run come first, most runs first; then the
+ * fewest items short; ties go to the variant whose inputs it holds most of, so "need 1 cobblestone"
+ * beats "need 2 cobbled_deepslate" for a bot with one cobblestone. Stable otherwise.
+ */
+export function rankRecipes<T extends { delta: DeltaEntry[] }> (recipes: readonly T[], have: (id: number) => number): T[] {
+  const short = (r: T) => missingFor(r.delta, have).reduce((n, x) => n + x.need, 0)
+  const held = (r: T) => r.delta.filter(d => d.count < 0).reduce((n, d) => n + Math.min(have(d.id), -d.count), 0)
+  return recipes.map((r, i) => ({ r, i, runs: maxCrafts(r.delta, have), short: short(r), held: held(r) }))
+    .sort((a, b) => b.runs - a.runs || a.short - b.short || b.held - a.held || a.i - b.i)
+    .map(x => x.r)
+}
+
 /** Items smelted per fuel item (vanilla burn times / 200 ticks). */
 export function fuelValue (name: string): number {
   if (name === 'coal' || name === 'charcoal') return 8
@@ -214,9 +228,8 @@ export async function craftItem (bot: Bot, signal: AbortSignal, item: string, co
   if (!recipes.length) {
     recipes = bot.recipesFor(def.id, null, 1, true)
     if (!recipes.length) {
-      const total = (m: { need: number }[]) => m.reduce((n, x) => n + x.need, 0)
-      const best = all.map(r => missingFor(r.delta, have)).sort((a, b) => total(a) - total(b))[0]
-      return fail(`missing ingredients for ${item}: need ${names(bot, best)}`)
+      const best = rankRecipes(all, have)[0]!
+      return fail(`missing ingredients for ${item}: need ${names(bot, missingFor(best.delta, have))}`)
     }
     const got = await getTable(bot, signal)
     if (typeof got === 'string') return fail(got)
@@ -226,6 +239,8 @@ export async function craftItem (bot: Bot, signal: AbortSignal, item: string, co
     await reachBlock(bot, table.position, signal)
   }
 
+  // the variant it can make most of (cobblestone, not the cobbled_deepslate listed first)
+  recipes = rankRecipes(recipes, have)
   // A full inventory makes mineflayer toss the crafted item (or the cursor stack) on the ground.
   const inputs = new Set(recipes[0].delta.filter(d => d.count < 0).map(d => bot.registry.items[d.id]?.name ?? ''))
   const thrown = await makeRoom(bot, 2, new Set([item, ...inputs]))
@@ -236,11 +251,11 @@ export async function craftItem (bot: Bot, signal: AbortSignal, item: string, co
     checkAborted(signal)
     // re-check every run: a recipe may use up one plank type while another still works
     const pool = table ? bot.recipesFor(def.id, null, 1, table) : bot.recipesFor(def.id, null, 1, null)
-    const recipe = pool.map(r => ({ r, n: maxCrafts(r.delta, have) })).sort((a, b) => b.n - a.n)[0]
-    if (!recipe || recipe.n <= 0) break
+    const recipe = rankRecipes(pool, have)[0]
+    if (!recipe || maxCrafts(recipe.delta, have) <= 0) break
     // one run per call: batching runs races the server's slot updates and the inventory
     // model drifts (seen live on NeoForge), so craft once and let the slots settle
-    await bot.craft(recipe.r, 1, table ?? undefined)
+    await bot.craft(recipe, 1, table ?? undefined)
     await sleep(SETTLE_MS, signal)
     runs--
   }

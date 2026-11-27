@@ -6,7 +6,7 @@ import { z, needsSurvival, itemName } from '../../../core/index.ts'
 import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import { nextToolUpgrade, senseNearby, heldTier, miningGate, chestWants, type Nearby } from '../../../skills/progression.ts'
 import { miningState } from '../../../skills/mining.ts'
-import { inventoryCounts, toolTier, usablePlankUnits, type ToolKind } from '../../../skills/toolkit.ts'
+import { inventoryCounts, toolTier, usablePlankUnits, remakeable, type ToolKind } from '../../../skills/toolkit.ts'
 import { heldCounts } from '../../../skills/gear.ts'
 
 /** Blackboard need set while upgrade_tools is stuck for wood; chop_wood_loop scores higher for it. */
@@ -89,10 +89,11 @@ export const keepToolsUpgraded = defineBehavior({
     let bucketFirst = false
     const want = (bot: Bot, now: number) => {
       if (!bot.entity || !needsSurvival(bot)) return null
-      const worn = wornTools(bot, o.minDurability)
-      if (worn.length) return { worn: worn[0]! }
       // worn armour and the offhand shield count (they are not in inventory.items())
       const inv = heldCounts(bot)
+      // a worn tool it can make again from what it carries; one it can't waits for the upgrade path (materials)
+      const worn = wornTools(bot, o.minDurability).find(n => remakeable(inv, n).ok)
+      if (worn) return { worn }
       const step = nextToolUpgrade(inv, nearby(bot, now), bot.game?.gameMode, { upTo: o.upTo, armour: o.armour, bucket: o.bucket, shield: o.shield, bucketFirst, mining: miningGate(miningState(bot, agent.settings), o.safeMining) })
       // nothing it can do from here, or only gathering: its chests may have what the step needs
       if ((!step || step.do === 'gather') && bot.game?.gameMode !== 'creative' && fromChests(bot, now, inv)) return { step: step ?? null, chest: true }
@@ -127,7 +128,11 @@ export const keepToolsUpgraded = defineBehavior({
       async run (ctx) {
         const w = want(ctx.bot, ctx.now)
         if (!w) return { ok: true, message: 'tools are fine' }
-        if ('worn' in w) return ctx.act('craft', { item: w.worn, count: 1 })
+        if ('worn' in w && w.worn) {
+          const r = remakeable(inventoryCounts(ctx.bot), w.worn)
+          if (r.ok && r.sticks > 0) await ctx.act('craft', { item: 'stick', count: 4 })
+          return ctx.act('craft', { item: w.worn, count: 1 })
+        }
         sensed = null // look again after the work
         const r = await ctx.act('upgrade_tools', { up_to: o.upTo, armour: o.armour, bucket: o.bucket || bucketFirst, shield: o.shield, safe: o.safeMining })
         lastNeed = (r.data as { need?: string } | undefined)?.need

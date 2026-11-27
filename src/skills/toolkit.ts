@@ -144,6 +144,21 @@ export function craftableTiers (inv: Record<string, number>, kind: ToolKind, nee
   return out
 }
 
+/**
+ * Whether a worn tool ("stone_sword") can be made again from what it carries: the head material
+ * (any of the stone variants for stone) and its sticks, or planks for them. Pure. A craft that
+ * can't work only fails and backs keep_tools_upgraded off (Pax kept trying a stone sword with no
+ * cobblestone, "need 2 cobbled_deepslate", while its upgrades waited).
+ */
+export function remakeable (inv: Record<string, number>, name: string): { ok: true, sticks: number } | { ok: false, why: string } {
+  const m = /^([a-z]+)_(axe|pickaxe|shovel|sword|hoe)$/.exec(name)
+  if (!m || !(m[1]! in HEAD)) return { ok: false, why: `${name} is not a tool it makes` }
+  const tier = m[1] as Exclude<Tier, 'netherite'>
+  const kind = m[2] as ToolKind
+  if (!craftableTiers(inv, kind).includes(tier)) return { ok: false, why: `not enough to make a ${name}` }
+  return { ok: true, sticks: Math.max(0, TOOL_SHAPE[kind].sticks - (inv.stick ?? 0)) }
+}
+
 export function inventoryCounts (bot: Bot): Record<string, number> {
   const inv: Record<string, number> = {}
   for (const i of bot.inventory.items()) inv[itemName(i)] = (inv[itemName(i)] ?? 0) + i.count

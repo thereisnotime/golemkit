@@ -154,7 +154,10 @@ pickaxe, which closes the gap.
 - every step checks health and hostiles: underground at `retreatBelow` (10) health or with
   `retreatHostiles` (2) hostiles within `hostileRadius` (8, the `mining.hostileRadius` toggle), it abandons the dig, skips the drop
   sweep and walks back up the staircase it came down. Running out of air (6 of 20 or less)
-  counts too.
+  counts too. A hostile standing under open sky (sky light 12 or more where it stands) is on the
+  surface, not in the tunnel, and only counts within `hostileClose` (4) blocks; `surfaceHostiles: true`
+  counts them all again. Pax's first mine trip went down at night and turned back after 5 stair
+  steps for "2 hostiles close underground": two zombies walking over the entrance, 5 blocks above it.
 
 **Collecting** (`collect`, and the ore trips in `upgrade_tools`) runs the same check before
 every block: losing underground, it stops and runs `climb_out`. A live test bot that was ready
@@ -221,7 +224,8 @@ flowchart TD
   each vein (`mine.ores`: iron, coal, copper, diamond; each needs its pickaxe tier), unless the ore
   touches lava or water or would open a cave.
 - **On the way:** a torch every `mining.torchEvery` (8) steps where it is dark (crafted from the coal
-  it mines), eating at food 15 (so the eat reflex doesn't take the body), a broken pickaxe re-made
+  it mines); in a mine with no torch yet the first goes after `mining.firstTorchAt` (4) steps, because
+  a trip that turns back early otherwise leaves the stairs dark and the mine never counts as lit; eating at food 15 (so the eat reflex doesn't take the body), a broken pickaxe re-made
   from cobblestone, a spare stone pickaxe made before it goes down. Junk (dirt, granite, diorite,
   andesite, tuff, gravel, cobblestone over `mine.keepCobble`) is dropped at the end of a branch,
   where the walk back doesn't pick it up again.
@@ -242,6 +246,12 @@ flowchart TD
 - Before every trip down, at home, `dig_mine` makes torches up to 16 the way `light_up` does
   (coal, else charcoal from logs in the furnace), so a first mine doesn't start dark. A known mine that isn't lit still waits for
   the day.
+- **Relighting** (`mine.relight`, on): on the walk down a known mine, `dig_mine` stops at the dark
+  stair stands it remembers (the first 3 steps and every 4th) where a torch is due (`relightSpots`
+  in `stairMinePlan.ts`: the first after `mining.firstTorchAt` steps, then every `mining.torchEvery`,
+  lit stands restart the count) and puts one on the step above. Pax's mine:1 (5 steps, 0 torches,
+  16 torches made for that trip but none placed before it turned back) becomes lit on the next
+  day trip, and night trips may use it from then on.
 - A surface search for iron that turns back at sunset goes on to the mine (when night trips may go)
   instead of home: the mine is near home and underground, so the light doesn't matter there.
 

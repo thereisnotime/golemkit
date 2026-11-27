@@ -19,6 +19,8 @@ export const SearchSettingsSchema = z.object({
   cooldownMinutes: z.number().min(1).max(1440).optional().describe('wait this long before searching for the same need again (default 30)'),
   retryMinutes: z.number().min(0).max(1440).optional().describe('a search taken over by other work in its first minute is not counted; it may run again after this many minutes (default 5)'),
   perDay: z.number().int().min(0).max(100).optional().describe('searches per need per real day at most (default 6, 0 = never)'),
+  holdScore: z.number().min(0).max(79).optional().describe('a running search keeps this score against other work, so only one scoring holdScore + the switch margin (10) takes over; 0 = any work above the idle band ends it (default 30)'),
+  resumes: z.number().int().min(0).max(20).optional().describe('a search cut short because the body was taken (a reflex eating or fighting, a player order) may start again at once this many times in cooldownMinutes before retryMinutes applies (default 3)'),
   atNight: z.boolean().optional().describe('also search at night (default off: mobs)')
 }).strict()
 
@@ -70,7 +72,7 @@ export const SitesSettingsSchema = z.object({
   tell: z.boolean().optional().describe('whisper the owners online when a site goes bad or is fine again (default on)')
 }).strict()
 
-export interface SearchSettings { enabled: boolean, radius: number, minutes: number, cooldownMinutes: number, retryMinutes: number, perDay: number, atNight: boolean }
+export interface SearchSettings { enabled: boolean, radius: number, minutes: number, cooldownMinutes: number, retryMinutes: number, perDay: number, holdScore: number, resumes: number, atNight: boolean }
 
 export interface NeedSetting {
   /** true/false when set; null = automatic (on when a serving behaviour is in the set). */
@@ -90,7 +92,7 @@ export interface NeedsSettings {
   need (name: string): NeedSetting
 }
 
-export const SEARCH_DEFAULTS: SearchSettings = { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, retryMinutes: 5, perDay: 6, atNight: false }
+export const SEARCH_DEFAULTS: SearchSettings = { enabled: true, radius: 160, minutes: 6, cooldownMinutes: 30, retryMinutes: 5, perDay: 6, holdScore: 30, resumes: 3, atNight: false }
 export const NEED_THRESHOLD = 0.5
 export const NEED_BOOST = 15
 
@@ -109,6 +111,8 @@ export function needsSettings (raw: unknown): NeedsSettings {
     cooldownMinutes: num(s.cooldownMinutes, SEARCH_DEFAULTS.cooldownMinutes, 1, 1440),
     retryMinutes: num(s.retryMinutes, SEARCH_DEFAULTS.retryMinutes, 0, 1440),
     perDay: num(s.perDay, SEARCH_DEFAULTS.perDay, 0, 100),
+    holdScore: num(s.holdScore, SEARCH_DEFAULTS.holdScore, 0, 79),
+    resumes: num(s.resumes, SEARCH_DEFAULTS.resumes, 0, 20),
     atNight: bool(s.atNight, SEARCH_DEFAULTS.atNight)
   }
   const boost = num(o.boost, NEED_BOOST, 0, 60)

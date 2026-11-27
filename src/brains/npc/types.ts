@@ -80,10 +80,13 @@ export class NpcYield extends Error {
   readonly holder: string
   /** Priority of the holder, when known. */
   readonly priority: number | undefined
-  constructor (holder: string, priority?: number) {
-    super(`body taken by ${holder}`)
+  /** The holder's action, when known ("eat"), for the logs and status. */
+  readonly action: string | undefined
+  constructor (holder: string, priority?: number, action?: string) {
+    super(`body taken by ${holder}${action ? ` (${action})` : ''}`)
     this.name = 'NpcYield'
     this.holder = holder
     this.priority = priority
+    this.action = action
   }
 }

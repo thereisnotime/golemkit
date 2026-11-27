@@ -74,7 +74,7 @@ export async function collectBlocks ({ bot, agent, signal, log }: Pick<ActionCon
     checkAborted(signal)
     // safe mining: losing underground (health, hostiles, air) ends the job and the bot climbs out
     if (mining.s.safe) {
-      const why = undergroundRetreat({ ...undergroundNow(bot, mining.s.hostileRadius), health: bot.health }, mining.s)
+      const why = undergroundRetreat({ ...undergroundNow(bot, mining.s), health: bot.health }, mining.s)
       if (why) { retreat = why; break }
     }
     const found = bot.findBlocks({ matching: matchIds, maxDistance: 48, count: 256 })

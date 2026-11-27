@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   stairMineSettings, stairMineReadiness, entranceProblem, pickEntrance, mineTargetY, mineTripStep, branchEvery, sides, mineJunk,
-  visibleOre, tunnelAir, oreWanted, nextMineName, pickMine, mineLit, mineTripDue, mineSiteVerdict, STAIR_MINE_DEFAULTS,
+  visibleOre, tunnelAir, oreWanted, nextMineName, pickMine, mineLit, mineTripDue, mineSiteVerdict, stairPoints, relightSpots, STAIR_MINE_DEFAULTS,
   type EntranceCandidate, type MineSite, type TripState, type BlockLook, type P
 } from '../src/skills/stairMinePlan.ts'
 import { miningSettings } from '../src/skills/minePlan.ts'
@@ -142,4 +142,22 @@ test('the mine as a site: name, which one, lit, due, verdict', () => {
   assert.equal((mineSiteVerdict({ steps: ['air', 'water', 'air', 'air'] }) as { fault: string }).fault, 'flooded')
   assert.equal((mineSiteVerdict({ steps: ['lava', 'air'] }) as { fault: string }).fault, 'unsafe')
   assert.equal((mineSiteVerdict({ steps: ['solid', 'solid', 'solid', 'air'] }) as { fault: string }).fault, 'gone')
+})
+
+test('relightSpots: torches on the dark stairs of a known mine, so it counts as lit', () => {
+  // Pax's mine:1: 5 stair steps, no torch, start = steps 1-3, path = step 4
+  const m = { start: [{ x: 569, y: 67, z: -46 }, { x: 570, y: 66, z: -46 }, { x: 571, y: 65, z: -46 }], path: [{ x: 572, y: 64, z: -46 }] }
+  const pts = stairPoints(m)
+  assert.deepEqual(pts.map(p => p.steps), [1, 2, 3, 4])
+  const dark = pts.map(p => ({ steps: p.steps, light: 0 }))
+  const spots = relightSpots(dark, { torchEvery: 8, firstTorchAt: 4, torches: 0 })
+  assert.deepEqual(spots, [3])
+  assert.equal(mineLit({ torches: spots.length, stairSteps: 5 }, 8), true)
+  assert.equal(mineLit({ torches: 0, stairSteps: 5 }, 8), false)
+  // a long staircase: every 8 steps after the first; lit stands and unloaded ones are skipped
+  const long = [1, 2, 3, 4, 8, 12, 16, 20, 24, 28, 32].map(steps => ({ steps, light: steps === 16 ? 14 : 0 }))
+  assert.deepEqual(relightSpots(long, { torchEvery: 8, firstTorchAt: 4, torches: 0 }).map(i => long[i]!.steps), [4, 12, 24, 32])
+  assert.deepEqual(relightSpots(long, { torchEvery: 8, firstTorchAt: 4, torches: 2 }).map(i => long[i]!.steps), [8, 24, 32], 'it has torches: every 8')
+  assert.deepEqual(relightSpots([{ steps: 4 }, { steps: 8 }], { torchEvery: 8, torches: 0 }), [], 'not loaded: nothing')
+  assert.equal(STAIR_MINE_DEFAULTS.relight, true)
 })

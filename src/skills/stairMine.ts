@@ -15,14 +15,14 @@ import { pickupNearby } from './pickup.ts'
 import { craftItem, spawnProtectionOf } from './crafting.ts'
 import { inSpawnProtection } from './stationPlan.ts'
 import { planStep, digHazard, kitOf, lookFor, placeTorch, undergroundNow, DIRS } from './mining.ts'
-import { miningSettings, undergroundRetreat, torchDue, caveHazard, torchCrafts } from './minePlan.ts'
+import { miningSettings, undergroundRetreat, torchDue, caveHazard, torchCrafts, type MiningSettings } from './minePlan.ts'
 import { supplyTorches } from './lighting.ts'
 import { getHome, sameDimension } from './navigation.ts'
 import { getFarms } from './food.ts'
 import { bestFood } from './survival.ts'
 import {
   stairMineSettings, stairMineReadiness, pickEntrance, mineTargetY, mineTripStep, branchEvery, sides, mineJunk,
-  visibleOre, tunnelAir, nextMineName, pickMine, mineLit, mineSiteVerdict, ORE_FAMILIES, ENTRANCE_STEPS,
+  visibleOre, tunnelAir, nextMineName, pickMine, mineLit, mineSiteVerdict, stairPoints, relightSpots, ORE_FAMILIES, ENTRANCE_STEPS,
   type StairMineSettings, type EntranceCandidate, type MineSite, type MinePhase, type Dir, type P, type BlockLook
 } from './stairMinePlan.ts'
 
@@ -150,6 +150,32 @@ function safeStepsFrom (agent: Agent, at: BlockLook, pos: P, dir: Dir): number {
 
 // ------------------------------------------------------------------ the trip
 
+/**
+ * Walks down a known mine's stairs stand by stand where relightSpots says a torch is due and puts
+ * one on the step above each (the stairs go up behind the bot). Returns the torches placed; the
+ * caller saves the mine. Stops at the first stand it can't reach or when it runs out of torches.
+ */
+async function relightStairs (bot: Bot, signal: AbortSignal, mine: MineSite, ms: MiningSettings, canTorch: () => boolean, goTo: (p: P) => Promise<void>): Promise<number> {
+  const pts = stairPoints(mine)
+  const looks = pts.map(x => {
+    const light = (bot.blockAt(vec(bot, x.p.x, x.p.y, x.p.z)) as { light?: number } | null)?.light
+    return { steps: x.steps, ...(typeof light === 'number' ? { light } : {}) }
+  })
+  const back = { x: -mine.dir.x, z: -mine.dir.z }
+  const order = [back, ...DIRS.filter(d => d.x !== back.x || d.z !== back.z)]
+  let lit = 0
+  for (const i of relightSpots(looks, { torchEvery: ms.torchEvery, firstTorchAt: ms.firstTorchAt, torches: mine.torches })) {
+    checkAborted(signal)
+    if (!canTorch()) break
+    const p = pts[i]!.p
+    try { await goTo(p) } catch { checkAborted(signal); break }
+    for (const d of order) {
+      if (await placeTorch(bot, signal, add(p, d.x, 1, d.z))) { lit++; mine.torches++; break }
+    }
+  }
+  return lit
+}
+
 export interface DigMineOptions {
   /** Ore family it came for (stops once `want` of its drop are in). Default iron. */
   ore?: string
@@ -233,8 +259,16 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
   let phase: MinePhase = 'down'
   let dir: Dir = mine.dir
   let mainDir: Dir = mine.faceDir ?? mine.dir
-  const resumeAt = mine.face ?? mine.bottom ?? mine.path.at(-1)
+  // torches: carried, or coal (mined on the way) and sticks to make them; checked each time, not latched
+  const canTorch = () => bot.inventory.items().some(i => i.name === 'torch') || torchCrafts(inventoryCounts(bot)) >= 1
+  const resumeAt = mine.face ?? mine.bottom ?? mine.path.at(-1) ?? mine.start?.at(-1)
   if (resumeAt) {
+    // dark stairs on the way down get their torches first, so an unlit mine becomes a lit one
+    // (night trips only go down a lit mine; Pax's first mine stopped after 5 steps with none)
+    if (s.relight && ms.torches && canTorch()) {
+      const lit = await relightStairs(bot, signal, mine, ms, canTorch, (p) => goTo(p, 0, 20_000))
+      if (lit) { saveMine(agent, mine); notes.push(`lit the stairs of ${mine.id}: ${lit} torch${lit === 1 ? '' : 'es'}`) }
+    }
     // the stairs are there: walk down them (waypoints when the long path fails)
     let there = false
     try { await goTo(resumeAt, 1, 90_000); there = true } catch (e) { checkAborted(signal) }
@@ -258,8 +292,6 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
   const trail: P[] = [feet] // stands on this trip, for the walk back when the path fails
   let broken = 0
   let sinceTorch = 0
-  // torches: carried, or coal (mined on the way) and sticks to make them; checked each time, not latched
-  const canTorch = () => bot.inventory.items().some(i => i.name === 'torch') || torchCrafts(inventoryCounts(bot)) >= 1
   let branchesThisTrip = 0
   let mainSinceBranch = 0
   let stopped = ''
@@ -354,7 +386,7 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
     tunnel.add(key(feet)); tunnel.add(key(add(feet, 0, 1, 0)))
     trail.push(feet)
     sinceTorch++
-    if (ms.torches && canTorch() && torchDue(sinceTorch, ms, (bot.blockAt(vec(bot, feet.x, feet.y, feet.z)) as { light?: number } | null)?.light)) {
+    if (ms.torches && canTorch() && torchDue(sinceTorch, ms, (bot.blockAt(vec(bot, feet.x, feet.y, feet.z)) as { light?: number } | null)?.light, mine.torches === 0)) {
       if (await placeTorch(bot, signal, prev)) { sinceTorch = 0; mine.torches++ }
     }
     await mineOre()
@@ -369,7 +401,7 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
       await eatIfHungry()
       await keepPickaxe()
       await room(false)
-      const u = undergroundNow(bot, ms.hostileRadius)
+      const u = undergroundNow(bot, ms)
       const retreatWhy = undergroundRetreat({ ...u, underground: u.underground || feet.y < mine.entrance.y - 3, health: bot.health }, ms)
       const kitNow = kitOf(bot)
       const next = mineTripStep({ phase, y: feet.y, targetY, elapsedMs: Date.now() - t0, freeSlots: bot.inventory.emptySlotCount(), food: kitNow.food, pickaxe: pickTier() >= 2, want, got: got(), branches: branchesThisTrip, retreat: retreatWhy }, s)
@@ -406,7 +438,7 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
             let len = 0
             for (; len < s.branchLength; len++) {
               checkAborted(signal)
-              const st = mineTripStep({ phase: 'branch', y: feet.y, targetY, elapsedMs: Date.now() - t0, freeSlots: bot.inventory.emptySlotCount(), food: kitOf(bot).food, pickaxe: pickTier() >= 2, want, got: got(), branches: branchesThisTrip, retreat: (() => { const v = undergroundNow(bot, ms.hostileRadius); return undergroundRetreat({ ...v, underground: true, health: bot.health }, ms) })() }, s)
+              const st = mineTripStep({ phase: 'branch', y: feet.y, targetY, elapsedMs: Date.now() - t0, freeSlots: bot.inventory.emptySlotCount(), food: kitOf(bot).food, pickaxe: pickTier() >= 2, want, got: got(), branches: branchesThisTrip, retreat: (() => { const v = undergroundNow(bot, ms); return undergroundRetreat({ ...v, underground: true, health: bot.health }, ms) })() }, s)
               if ('back' in st) break
               await eatIfHungry()
               await keepPickaxe()
