@@ -423,7 +423,7 @@ once without (`combat.dodge.enabled`, set live and reset at the end), and every 
 carries the layer's leaps, arrows dodged and projectile hits taken.
 
 The bench never changes the time by default (`--time keep`): the server is shared, so it leaves
-the clock alone. `--wait-day` waits up to 10 minutes for the server's own day before each phase,
+the clock alone. `--wait-day` waits up to 15 minutes before each phase until the server's own day has enough left for it,
 so natural night spawns don't mix into a duel; `--time day` or `--time night` still set it on a
 private server. `--clutch N` does N drops from `--clutch-height` (22) blocks with a water
 bucket, then N stands on a fire block, and removes the water and fire afterwards.

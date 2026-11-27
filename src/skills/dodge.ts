@@ -5,10 +5,10 @@
 // fight, flee or heal stays with fight.ts / tactics.ts.
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
-import { sleep, checkAborted, isHostile, FLYING } from '../core/index.ts'
+import { sleep, checkAborted, isHostile, FLYING, createLogger } from '../core/index.ts'
 import { isRangedMob } from './weapons.ts'
 import {
-  planDodge, landingProblem, cellOf, unit, yawOf, advanceProjectile, meleeCooldownMs, PROJECTILE_PHYSICS, BOW_USERS, TICK_MS,
+  planDodge, DODGE_TECHNIQUES, landingProblem, cellOf, unit, yawOf, advanceProjectile, meleeCooldownMs, PROJECTILE_PHYSICS, BOW_USERS, TICK_MS,
   type DodgeSettings, type DodgeView, type DodgeIntent, type ProjectileView, type ArcherView, type AttackerView, type V2, type Cell
 } from './dodgePlan.ts'
 
@@ -152,7 +152,9 @@ export interface DodgeLayer {
    * One tick: a leap (done before it returns, 'leapt'), 'back' (step back this tick), 'hold'
    * (don't back off: every close melee mob is recharging) or null (move as usual).
    */
-  tick: (target: Entity | null, signal: AbortSignal) => Promise<'leapt' | 'back' | 'hold' | null>
+  tick: (target: Entity | null, signal: AbortSignal, opts?: { rangedOnly?: boolean }) => Promise<'leapt' | 'back' | 'hold' | null>
+  /** Whether an arrow or draw leap is due now (cheap enough for a walk's stop check): stop walking, then call tick. */
+  wants: () => boolean
   /** Sprint-jumps away from a lit creeper. False when no direction is safe (walk instead). */
   creeperLeap: (creeper: Entity, signal: AbortSignal, lit: () => boolean) => Promise<boolean>
   /** Counters since this layer was made. */
@@ -163,6 +165,8 @@ export interface DodgeLayer {
 /** The dodge layer for one fight. All calls are no-ops when settings.enabled is off. */
 export function dodgeLayer (bot: Bot, s: DodgeSettings, rnd: () => number = Math.random): DodgeLayer {
   const w = watchOf(bot)
+  const log = createLogger(`${bot.username}/dodge`)
+  const rangedTechniques = DODGE_TECHNIQUES.filter(t => t.ranged)
   const base = { ...w.stats }
   let stepping = false
   const judge = () => {
@@ -268,10 +272,14 @@ export function dodgeLayer (bot: Bot, s: DodgeSettings, rnd: () => number = Math
       for (const k of Object.keys(out) as (keyof DodgeStats)[]) out[k] -= base[k]
       return out
     },
-    async tick (target, signal) {
+    wants () {
+      if (!s.enabled || !bot.entity || !bot.entity.onGround || Date.now() - w.lastLeap < s.minGapMs) return false
+      return planDodge(view(), s, rangedTechniques)?.kind === 'leap'
+    },
+    async tick (target, signal, opts = {}) {
       judge()
       if (!s.enabled || !bot.entity) return null
-      const i = planDodge(view(), s)
+      const i = planDodge(view(), s, opts.rangedOnly ? rangedTechniques : DODGE_TECHNIQUES)
       if (i?.kind !== 'back') stepping = false
       if (!i) return null
       if (i.kind === 'hold') return 'hold'
@@ -282,6 +290,7 @@ export function dodgeLayer (bot: Bot, s: DodgeSettings, rnd: () => number = Math
       }
       checkAborted(signal)
       record(i)
+      log.info(`dodge: leap ${i.side === 0 ? 'left' : i.side === 1 ? 'right' : 'away'} (${i.technique}: ${i.reason})`)
       await leap(i.dir, target, signal)
       return 'leapt'
     },
@@ -313,6 +322,7 @@ export function dodgeLayer (bot: Bot, s: DodgeSettings, rnd: () => number = Math
         for (const c of ['forward', 'sprint', 'jump'] as const) bot.setControlState(c, false)
       }
       if (!hops) return false
+      log.info(`dodge: sprint-jumped away from a lit creeper (${hops} hops, ${creeper.position.distanceTo(bot.entity.position).toFixed(1)} blocks off)`)
       w.stats.dodges++
       w.stats.creeperLeaps++
       w.lastLeap = Date.now()

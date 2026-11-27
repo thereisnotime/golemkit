@@ -336,6 +336,12 @@ wins, and a new technique is one more entry in the list:
   enough and leaping along the axis that clears the box soonest if not. The sprint for a W-tap is
   skipped while it does.
 
+Draws and arrows also work outside the melee loop. Against archers without a bow or shield the
+bot spends most of the time in `ranged_defense`, walking to cover or backing out of range, and
+that is where the first bench showed it getting shot. Those walks now stop when an arrow or draw
+leap is due (checked every 150 ms), the bot leaps, and `ranged_defense` decides again from where
+it landed.
+
 Which side to leap to is never fixed. Of the sides that are safe and clear in time it picks the
 one with fewer mobs where it lands, and between equal sides it picks at random. It also avoids
 going the same way three times running, so an archer can't learn the pattern and the bot doesn't

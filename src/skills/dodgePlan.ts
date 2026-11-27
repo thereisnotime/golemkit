@@ -503,6 +503,8 @@ export interface DodgeTechnique {
   /** Name, and the settings key that turns it on and off. */
   name: string
   key: keyof DodgeSettings
+  /** Works away from melee too (while walking to cover or backing out of range). */
+  ranged?: boolean
   plan: (v: DodgeView, s: DodgeSettings) => DodgeIntent | null
 }
 
@@ -515,6 +517,7 @@ function sidesOf (d: V2): [V2, V2] {
 const arrows: DodgeTechnique = {
   name: 'arrows',
   key: 'arrows',
+  ranged: true,
   plan (v, s) {
     let best: { h: ProjectileHit, p: ProjectileView } | null = null
     for (const p of v.projectiles) {
@@ -542,6 +545,7 @@ const arrows: DodgeTechnique = {
 const draws: DodgeTechnique = {
   name: 'draws',
   key: 'draws',
+  ranged: true,
   plan (v, s) {
     for (const a of v.archers) {
       if (a.dist > s.drawRange) continue

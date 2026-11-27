@@ -25,7 +25,7 @@
 // the tester), follow (follow_owner only), none (the bot is offline: the baseline). The phase
 // order flips on every repeat. A tester death is counted, the mobs alive are killed and the
 // tester is reset on the spot. --time keep (default) leaves the server's time alone (shared servers:
-// no /time set); --wait-day then waits up to 10 min for the server's daytime before every phase, so
+// no /time set); --wait-day then waits up to 15 min for enough of the server's day for a phase, so
 // natural night spawns don't mix in; --time day or night sets it before every phase.
 // Zombies and skeletons wear leather helmets so they don't burn, and spiders don't pick targets in daylight.
 // --scout only checks the spot (flat, dry, solid) and Robin's distance; --cleanup only kills the
@@ -68,7 +68,7 @@ const TESTER_FOOD = Number(opt('tester-food', '8'))
 const INTERVAL_S = Number(opt('interval', '30'))
 const CAP = Number(opt('cap', '8'))
 const TIME = opt('time', 'keep') as 'keep' | 'day' | 'night'
-/** With --time keep: wait (up to 10 min) for the server's own daytime before each phase. */
+/** With --time keep: wait (up to 15 min) for enough of the server's own day before each phase. */
 const WAIT_DAY = flag('wait-day')
 const PHANTOMS = flag('phantoms')
 const WAVES = opt('waves', 'mixed') as 'mixed' | 'ranged'
@@ -240,9 +240,10 @@ async function main (): Promise<void> {
     return null
   }
   // daytime by the server's clock (mobs spawn from about 12500 to 23500); never sets it
-  const night = () => { const t = (dir.bot as any).time?.timeOfDay ?? 0; return t > 12300 && t < 23600 }
+  // night, or too little day left for a whole phase (MINUTES plus a minute for the reset, 1200 ticks a minute)
+  const night = () => { const t = (dir.bot as any).time?.timeOfDay ?? 0; return t > 12300 - (MINUTES + 1) * 1200 && t < 23600 }
   const waitForDay = async () => {
-    const until = Date.now() + 10 * 60_000
+    const until = Date.now() + 15 * 60_000
     if (night()) log(`night (time ${(dir.bot as any).time?.timeOfDay}): waiting for the day`)
     while (night() && Date.now() < until) await pause(5000)
   }

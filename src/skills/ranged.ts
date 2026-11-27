@@ -25,6 +25,8 @@ import type { Block } from 'prismarine-block'
 import { isFiller, pillarUp } from './survival.ts'
 import { placeAt, isReplaceable, digBlock } from './world.ts'
 import { equipFor, toolKindFor, bestToolIn } from './toolkit.ts'
+import { dodgeLayer } from './dodge.ts'
+import { DODGE_DEFAULTS } from './dodgePlan.ts'
 import {
   isShooter, incoming, patrolCount, rangedResponse, activeShooters, findCover, cappedRetreat, canEatUnderFire, shooterRange,
   hideMs, stillHiding, leaveCover, planWall, heavyFire, shieldWhileFleeing, gearOf, ILLAGERS, PROJECTILES, RETREAT_CAP, FLEE_CAP,
@@ -469,6 +471,10 @@ export const rangedDefense = defineAction({
   internal: true,
   async run ({ bot, agent, signal, log }, p) {
     const flags = weaponFlags(agent)
+    // arrow and draw leaps while walking to cover or backing off (combat.dodge.*); fightTarget has its own
+    const dodge = dodgeLayer(bot, flags.dodge ?? DODGE_DEFAULTS)
+    let dodgeDue = false
+    const dodgeStop = () => { dodgeDue = dodge.wants(); return dodgeDue }
     const w = watchOf(bot)
     const until = Date.now() + p.maxSeconds * 1000
     // the retreat cap counts from where this spell of shooting started (a run that ended a minute ago counts as the same)
@@ -621,7 +627,9 @@ export const rangedDefense = defineAction({
 
         if (d.act === 'cover' && cover) {
           const goal = new goals.GoalBlock(Math.floor(cover.x), cover.y, Math.floor(cover.z))
-          const got = await walk(bot, goal, signal, 8000, () => bot.health <= 0)
+          dodgeDue = false
+          const got = await walk(bot, goal, signal, 8000, () => bot.health <= 0 || dodgeStop())
+          if (dodgeDue) { await dodge.tick(target, signal, { rangedOnly: true }); continue }
           if (!got) { hideUntil = Date.now() + hideMs(bot.health); continue }
           await holdCover(`${Math.floor(cover.x)},${cover.y},${Math.floor(cover.z)}`)
           continue
@@ -681,13 +689,16 @@ export const rangedDefense = defineAction({
         const mv = (bot.pathfinder as any).movements
         if (mv) mv.allowSprinting = true
         let block = false
+        dodgeDue = false
         await walk(bot, goal, signal, 10_000, () => {
+          if (dodgeStop()) return true
           const n = rangedSituation(bot)
           if (!n.active.length && !n.incoming) return true
           // a shield: a moment's block against an arrow on its way (it faces one way, so only when few shoot or it is hurt)
           block = shieldWhileFleeing({ shield, incoming: Date.now() - w.incomingAt < 400, sinceBlockMs: Date.now() - lastBlock, health: bot.health, shooters: n.active.length })
           return block
         })
+        if (dodgeDue) await dodge.tick(rangedSituation(bot).active[0]?.e ?? null, signal, { rangedOnly: true })
         if (block) {
           lastBlock = Date.now()
           const near = rangedSituation(bot).active[0]?.e
@@ -703,7 +714,7 @@ export const rangedDefense = defineAction({
       bot.pathfinder.setGoal(null)
       try { bot.deactivateItem() } catch {}
     }
-    const what = [kills ? `killed ${kills}` : '', ...done.map(a => a === 'shoot' ? 'shot back' : a === 'shield_close' ? 'closed in behind the shield' : a === 'charge' ? 'charged' : a === 'cover' ? 'took cover' : a === 'build' ? `built cover (${built} blocks)` : a === 'dig_in' ? `dug in${dug > 1 ? ` ${dug}x` : ''}` : 'backed out of range'), blocked ? `blocked ${blocked}x with the shield` : '', ate ? `ate ${ate}x` : ''].filter(Boolean)
+    const what = [kills ? `killed ${kills}` : '', ...done.map(a => a === 'shoot' ? 'shot back' : a === 'shield_close' ? 'closed in behind the shield' : a === 'charge' ? 'charged' : a === 'cover' ? 'took cover' : a === 'build' ? `built cover (${built} blocks)` : a === 'dig_in' ? `dug in${dug > 1 ? ` ${dug}x` : ''}` : 'backed out of range'), blocked ? `blocked ${blocked}x with the shield` : '', ate ? `ate ${ate}x` : '', dodge.delta().dodges ? `dodged ${dodge.delta().dodges}x` : ''].filter(Boolean)
     if (!what.length) return ok('nothing shooting at me')
     return ok(what.join(', '))
   }
