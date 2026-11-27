@@ -149,6 +149,18 @@ can't change their own.
 | `idle.chores.<chore>` | on/off | one idle chore on or off (`!config_set idle.chores.scout_nearby off`) |
 | `farming.iceWater` | on/off | cold ground: break ice on a frozen shore for a new farm's water when there is no open water or bucket ([cold ground](./needs-and-idle#farming-on-cold-ground); default on) |
 | `farming.protectWater` | auto / cover / torch / off | keep a farm's water from freezing in a cold biome: a cheap block over it, else a torch next to it (default auto) |
+| `farming.badFarm` | auto / repair / relocate / off | a farm marked bad: repair a small job where it is, else move (auto); never move; always move; leave it ([food sources](./food-sources#bad-farms-repair-or-move); default auto) |
+| `farming.repairMaxBlocks` | 0–80 | most flooded cells it fills with dirt in one repair (default 16) |
+| `farming.repairTries` | 0–20 | repairs per bad farm before it gives up on it (default 2) |
+| `farming.ownBuilds` | on/off | its own torches, walls, covers, farms and base are not somebody's build near a farm site (default on) |
+| `farming.ownBaseRadius` | 0–64 | blocks around its base's anchor that count as its own (default 12) |
+| `farming.plot` | on/off | use the farm plot its base keeps inside the walls ([farm plot](./food-sources#the-base-s-farm-plot); default on) |
+| `farming.plotWater` | auto / water / dry | the plot's water: in reach or carried ice, else dry (auto); only with water; never (default auto) |
+| `farming.plotSwap` | on/off | dig out stone cells of the plot and put dirt in (default on) |
+| `food.sources` | list | [food sources](./food-sources) in order: repair, farm, plot, animals, fish, forage (`!config_set food.sources plot,fish`) |
+| `food.stock` | 0–256 | animals, fishing and foraging run below this many food items, carried plus chests (default 12) |
+| `food.retryMinutes` | 0–1440 | a failed food source is skipped this long (default 60) |
+| `food.minSeeds` | 1–64 | seeds to start a field farm without grass near (default 8) |
 | `sites.enabled` | on/off | [site health](./needs-and-idle#site-health): check the farm, bed, chests and home and mark bad ones (default on) |
 | `sites.failures` | 1–20 | unreachable or no-work checks in a row before a site is bad (default 3) |
 | `sites.checkMinutes` | 0.5–240 | one site checked at most this often (default 5) |

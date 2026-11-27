@@ -29,6 +29,8 @@ export interface FarmWorkOptions {
   canTill?: boolean
   /** Can put water back (a water bucket, or a bucket and a source near). Default false. */
   canWater?: boolean
+  /** A farm without water (a dry plot): every cell may be tilled, nothing to put back. Default false. */
+  dry?: boolean
 }
 
 export interface FarmWork {
@@ -78,9 +80,9 @@ export function planFarmWork (g: FarmGrid, o: FarmWorkOptions): FarmWork {
   const waters = cells.filter(c => c.v === 'water')
   const centerWet = g.cells[key(0, 0)] === 'water'
   // the centre counts as water when it can be put back
-  const water = !centerWet && o.canWater && g.cells[key(0, 0)] !== undefined ? { ...g.center } : null
+  const water = !o.dry && !centerWet && o.canWater && g.cells[key(0, 0)] !== undefined ? { ...g.center } : null
   const wetFrom = [...waters.map(c => [c.dx, c.dz] as const), ...(water ? [[0, 0] as const] : [])]
-  const wet = (dx: number, dz: number) => wetFrom.some(([wx, wz]) => cheb(dx - wx, dz - wz) <= HYDRATION)
+  const wet = (dx: number, dz: number) => !!o.dry || wetFrom.some(([wx, wz]) => cheb(dx - wx, dz - wz) <= HYDRATION)
   const isLand = (v: FarmCell) => v === 'ripe' || v === 'growing' || v === 'bare'
   const land = cells.filter(c => isLand(c.v))
   const h = land.reduce((m, c) => Math.max(m, cheb(c.dx, c.dz)), 0)
@@ -111,7 +113,7 @@ export function planFarmWork (g: FarmGrid, o: FarmWorkOptions): FarmWork {
   if (extend.length) parts.push(`grow by ${extend.length} towards ${target}x${target}`)
   let reason = parts.length ? parts.join(', ') : 'nothing to do'
   if (!parts.length && all > 0) reason = `${all} cells waiting for seeds (have ${o.seeds}, keeping ${reserve})`
-  if (!centerWet && !water) reason += '; the water is gone and there is no bucket'
+  if (!o.dry && !centerWet && !water) reason += '; the water is gone and there is no bucket'
   return { plant, retill, extend, water, size, target, farmland: land.length, seedsWanted, reason }
 }
 

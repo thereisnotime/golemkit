@@ -93,7 +93,8 @@ const shore = (land: FarmSiteCell, lake: FarmSiteCell, centre: FarmSiteCell = 'w
 const landKeys = Object.keys(shore('tillable', 'ice')).filter(k => Number(k.split(',')[0]) < 0)
 
 test('a shore farm is judged on its own land: the lake beside it is not a flood, a frozen centre is', () => {
-  assert.equal(farmSiteVerdict(shore('farmland', 'ice')).ok, false, 'without the land list every shore farm looked flooded')
+  assert.equal(farmSiteVerdict(shore('farmland', 'ice')).ok, true, 'without the land list a shore farm is judged on the dry field left (36 farmland)')
+  assert.equal(farmSiteVerdict(shore('water', 'ice')).ok, false, 'without the land list and no dry field: flooded')
   assert.equal(farmSiteVerdict(shore('farmland', 'ice'), landKeys).ok, true)
   const frozen = farmSiteVerdict(shore('farmland', 'ice', 'ice'), landKeys)
   assert.equal(frozen.ok, false)

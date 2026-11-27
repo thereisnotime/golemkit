@@ -1,0 +1,9 @@
+- [x] foodSourcePlan.ts: registry, chooser, settings, failure memory
+- [x] farmRepairPlan.ts: repair, restore, relocate or leave
+- [x] plotFarmPlan.ts: water, cells, swaps and torches for the base plot (1.21.1 rules)
+- [x] farmSiteVerdict: older farms judged on the dry field
+- [x] ownWorkTest and siteAt: own builds are not somebody's build; the reason names the block
+- [x] foodSources.ts: sensing, runFoodSource, repair_farm, plot_farm, fish, food_sources
+- [x] farm_setup runs the chosen source; site health onBad says what comes next
+- [x] toggles, config reference, live config, guide page
+- [x] unit tests (test/food-source.test.ts), goldens

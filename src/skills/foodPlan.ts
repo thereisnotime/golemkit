@@ -211,6 +211,36 @@ export interface SiteCandidate {
   around: CellKind[]
   /** Distance from where the farm should be (home, a place, the bot). */
   distance: number
+  /** The first placed block that made it 'build' ("oak_planks at 1 2 3"), for the reason text. */
+  buildNote?: string
+}
+
+/** The bot's own work, which never counts as somebody's build near a farm site (farming.ownBuilds). */
+export interface OwnWork {
+  /** Blocks it placed for builds ("x,y,z", build.own). */
+  blocks?: readonly string[]
+  /** Torches it put up (lighting.torches). */
+  torches?: readonly Pos[]
+  /** Structures it finished (build.placements boxes). */
+  boxes?: readonly { min: Pos, max: Pos }[]
+  /** Its farms, healthy or bad: the farmland, fences, torches and covers in and around them. */
+  farms?: readonly { x: number, z: number, size?: number }[]
+  /** Its base (base projects' anchor) and how far around it counts as its own. */
+  base?: { x: number, z: number, radius: number } | null
+}
+
+/** A test for "this block is the bot's own work". Pure. */
+export function ownWorkTest (o: OwnWork): (p: Pos) => boolean {
+  const blocks = new Set(o.blocks ?? [])
+  const torches = new Set((o.torches ?? []).map(t => `${t.x},${t.y},${t.z}`))
+  return (p: Pos) => {
+    const k = `${p.x},${p.y},${p.z}`
+    if (blocks.has(k) || torches.has(k)) return true
+    if ((o.boxes ?? []).some(b => p.x >= b.min.x - 1 && p.x <= b.max.x + 1 && p.z >= b.min.z - 1 && p.z <= b.max.z + 1 && p.y >= b.min.y - 1 && p.y <= b.max.y + 4)) return true
+    // a farm's square plus its fence ring and the torches on it
+    if ((o.farms ?? []).some(f => Math.max(Math.abs(p.x - f.x), Math.abs(p.z - f.z)) <= ((f.size ?? 9) - 1) / 2 + 2)) return true
+    return !!o.base && Math.max(Math.abs(p.x - o.base.x), Math.abs(p.z - o.base.z)) <= o.base.radius
+  }
 }
 
 export interface SiteRules {
@@ -241,7 +271,7 @@ export function siteProblem (c: SiteCandidate, rules: Partial<SiteRules> = {}): 
   const r: SiteRules = { minTillable: 8, allowFarmland: false, ...rules }
   const kinds = Object.values(c.cells)
   if (kinds.includes('protected') || c.around.includes('protected')) return 'protected'
-  if (kinds.includes('build') || c.around.includes('build')) return 'somebody\'s build'
+  if (kinds.includes('build') || c.around.includes('build')) return `somebody's build${c.buildNote ? ` (${c.buildNote})` : ''}`
   if (kinds.includes('hazard') || c.around.includes('hazard')) return 'lava, powder snow or ice close'
   if (!r.allowFarmland && (kinds.includes('farmland') || c.around.includes('farmland'))) return 'a field there'
   const till = Object.entries(c.cells).filter(([k, v]) => k !== '0,0' && v === 'tillable').length
@@ -256,6 +286,8 @@ export function siteProblems (cands: readonly SiteCandidate[], rules: Partial<Si
     let why = siteProblem(c, rules)
     if (!why) continue
     if (/tillable cells/.test(why)) why = `under ${rules.minTillable ?? 8} tillable cells`
+    if (why.startsWith('somebody\'s build') && n.has('somebody\'s build')) why = 'somebody\'s build'
+    else if (why.startsWith('somebody\'s build') && [...n.keys()].some(k => k.startsWith('somebody\'s build'))) why = [...n.keys()].find(k => k.startsWith('somebody\'s build'))!
     n.set(why, (n.get(why) ?? 0) + 1)
   }
   return [...n].sort((a, b) => b[1] - a[1]).slice(0, top).map(([w, k]) => `${k} ${w}`).join(', ')

@@ -10,8 +10,10 @@ import { getFarms, nearestFarm, ownFarmRipe, saveFarm, animalsAround, type Farm 
 import { breadToBake, breedPlan, seedCount, BREED_FOOD } from '../../../skills/foodPlan.ts'
 import { isHungry } from './keepFed.ts'
 import { tripRun } from './trip.ts'
+import { foodSourceChoice, runFoodSource, foodSettings } from '../../../skills/foodSources.ts'
+import { foodSourceText, type FoodSourceChoice } from '../../../skills/foodSourcePlan.ts'
 
-export type FarmTask = 'setup' | 'tend' | 'bake' | 'breed'
+export type FarmTask = 'setup' | 'source' | 'tend' | 'bake' | 'breed'
 
 export interface FarmState {
   night: boolean
@@ -30,6 +32,8 @@ export interface FarmState {
   bake: number
   /** A breeding pair and food for them are at hand. */
   canBreed: boolean
+  /** The food source registry's choice (foodSourcePlan.ts); without it the old start_farm rule applies. */
+  source?: Pick<FoodSourceChoice, 'active' | 'run' | 'kind'>
 }
 
 export interface FarmTaskOptions {
@@ -43,8 +47,10 @@ export interface FarmTaskOptions {
 /** What farm_setup should do now, or null. Never at night, never while hungry (keep_fed's job). */
 export function nextFarmTask (s: FarmState, o: FarmTaskOptions): FarmTask | null {
   if (s.night || s.hungry) return null
-  if (!s.hasFarm) return s.canSetUp ? 'setup' : null
+  if (!s.hasFarm) return s.source ? (s.source.active && s.source.run ? 'source' : null) : (s.canSetUp ? 'setup' : null)
   if (o.tend && s.farmDistance !== null && s.farmDistance <= o.tendRange && (s.ripe >= o.minRipe || s.due)) return 'tend'
+  // a source before its farm in food.sources (repair a bad farm, a field farm while it only has the plot, fishing while stock is low)
+  if (s.source?.active && s.source.run) return 'source'
   if (o.bake && s.bake > 0) return 'bake'
   if (o.breed && s.canBreed) return 'breed'
   return null
@@ -64,7 +70,8 @@ const options = z.object({
   breed: z.boolean().default(true).describe('breed animals it has food for (cows/sheep: wheat, pigs: carrots, chickens: seeds)'),
   keepWheat: z.number().int().min(0).max(64).default(4).describe('wheat to keep for breeding instead of baking'),
   maxHerd: z.number().int().min(2).max(64).default(12).describe('stop breeding a kind at this many adults'),
-  spawnClearance: z.number().min(0).max(256).default(48).describe('never farm within this distance of the world spawn')
+  spawnClearance: z.number().min(0).max(256).default(48).describe('never farm within this distance of the world spawn'),
+  sources: z.boolean().default(true).describe('pick the food source from settings food.sources (repair, farm, plot, animals, fish, forage); off = only start_farm')
 })
 
 type O = z.infer<typeof options>
@@ -104,7 +111,8 @@ export function senseFarm (agent: Agent, bot: Bot, o: O): FarmState {
     ripe,
     due: !!farm && !visible && Date.now() - (farm.tended ?? farm.created) >= o.tendMinutes * 60_000,
     bake: agent.getAction('craft') ? breadToBake(items.wheat ?? 0, o.breed ? o.keepWheat : 0) : 0,
-    canBreed
+    canBreed,
+    ...(o.sources && foodSettings(agent).sources.length ? { source: foodSourceChoice(agent, bot) } : {})
   }
 }
 
@@ -129,7 +137,8 @@ export const farmSetup = defineBehavior({
       score ({ bot }) {
         if (!bot.entity || !needsSurvival(bot)) return 0 // creative: food doesn't matter
         switch (nextFarmTask(senseFarm(agent, bot, o), opts)) {
-          case 'setup': return 30
+          case 'setup':
+          case 'source': return 30
           case 'tend': return 28
           case 'bake': return 24
           case 'breed': return 22
@@ -139,6 +148,11 @@ export const farmSetup = defineBehavior({
       async run (ctx) {
         const task = nextFarmTask(senseFarm(agent, ctx.bot, o), opts)
         switch (task) {
+          case 'source': {
+            const choice = foodSourceChoice(agent, ctx.bot)
+            const r = await runFoodSource(ctx, choice, { ...(o.place ? { place: o.place } : {}), size: o.size, radius: o.radius, fence: o.fence, light: o.light, spawnClearance: o.spawnClearance })
+            return { ...r, message: `${r.message} [${foodSourceText(choice)}]` }
+          }
           case 'setup':
             return ctx.act('start_farm', {
               ...(o.place ? { place: o.place } : {}),
@@ -167,8 +181,10 @@ export const farmSetup = defineBehavior({
           }
           case 'breed':
             return ctx.act('breed', { maxHerd: o.maxHerd })
-          default:
-            return { ok: false, message: getFarms(agent).length ? 'nothing to do on the farm' : 'no farm and no seeds or grass to start one' }
+          default: {
+            const src = o.sources && foodSettings(agent).sources.length ? ` [${foodSourceText(foodSourceChoice(agent, ctx.bot))}]` : ''
+            return { ok: false, message: `${getFarms(agent).length ? 'nothing to do on the farm' : 'no farm and no seeds or grass to start one'}${src}` }
+          }
         }
       }
     }

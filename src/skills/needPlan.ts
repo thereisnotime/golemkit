@@ -92,6 +92,9 @@ export type FarmSiteCell = 'farmland' | 'tillable' | 'water' | 'ice' | 'other'
  * farmland and nothing it could till. Otherwise ok, also with nothing ripe (a growing farm
  * has no work and is fine).
  */
+/** A farm with fewer dry cells (farmland or tillable) than this is not worth keeping. */
+export const MIN_DRY_CELLS = 8
+
 export function farmSiteVerdict (cells: Record<string, FarmSiteCell>, land?: readonly string[]): SiteVerdict {
   const centreIce = cells['0,0'] === 'ice'
   // a shore farm: only the cells that were land when it was made count (the lake side was
@@ -105,11 +108,16 @@ export function farmSiteVerdict (cells: Record<string, FarmSiteCell>, land?: rea
   const farmland = entries.filter(([, v]) => v === 'farmland').length
   const tillable = entries.filter(([, v]) => v === 'tillable').length
   if (keys && centreIce) return { ok: false, fault: 'flooded', reason: `the water froze (${farmland} farmland left dry)` }
-  if (wet * 2 >= n || (centreIce && wet * 4 >= n)) {
+  // an older farm without the land list: the lake beside a shore farm can't be told from a flood,
+  // so half the square wet only counts while too little dry field is left to be worth keeping
+  // (Pax's farm:1 went bad on "46 of 80 cells" with 34 dry cells still there)
+  const dryLeft = farmland + tillable
+  const flooded = keys ? wet * 2 >= n : wet * 2 >= n && dryLeft < MIN_DRY_CELLS
+  if (flooded || (centreIce && wet * 4 >= n)) {
     return { ok: false, fault: 'flooded', reason: `${wet} of ${n} cells are ${ice ? (ice === wet ? 'ice' : 'water or ice') : 'water'}${centreIce ? ', the water froze' : ''}` }
   }
   if (!farmland && !tillable) return { ok: false, fault: 'no_work', reason: `no farmland and nothing to till (${n} cells)` }
-  return { ok: true, note: `${farmland} farmland, ${tillable} tillable` }
+  return { ok: true, note: `${farmland} farmland, ${tillable} tillable${!keys && wet * 2 >= n ? `, ${wet} wet cells (a lake beside it, judged on the dry field)` : ''}` }
 }
 
 /** The next free farm name: farm:N past every name in use (live farms and bad site records). */

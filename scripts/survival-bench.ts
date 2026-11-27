@@ -2,7 +2,7 @@
 // brain) left alone far from everything for N in-game days, and what happened to it measured.
 //   node scripts/survival-bench.ts [--days 1] [--scenario forest|ice] [--start x,z] [--kit none|stone|iron]
 //        [--repeats 1] [--profile pax] [--llm] [--tag run] [--terrain-note "text"] [--seed 1] [--spread 0]
-//        [--stuck 5] [--minutes M] [--force] [--bad-farm]
+//        [--stuck 5] [--minutes M] [--force] [--bad-farm] [--plot]
 //   node scripts/survival-bench.ts --survey "x,z x,z ..."           read-only look at candidate starts
 //   node scripts/survival-bench.ts --compare <tagA> <tagB>     before/after table from results.jsonl
 //   node scripts/survival-bench.ts --summary [tag]              table of past runs
@@ -25,7 +25,8 @@
 // spots and at those blocks, clears the bot, puts its spawnpoint back to world spawn and disconnects.
 // --bad-farm seeds the bot's memory with a farm (farm:1) on the ground under the start, so the ice
 // scenario starts with a farm that is frozen over: site health should mark it bad and the bot should
-// start a new one elsewhere (needs-and-idle). --kit stone with no ore in sight measures the gear search.
+// start a new one elsewhere (needs-and-idle). --plot seeds a base farm plot (3x3 around the start, as
+// the farm_plot base project would), so the plot food source has something to work with. --kit stone with no ore in sight measures the gear search.
 // One JSON line per run goes to data/survival-bench/results.jsonl, a table to stdout.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -62,6 +63,7 @@ const SEED = Number(opt('seed', '1'))
 const SPREAD = Number(opt('spread', '0'))
 const STUCK = Number(opt('stuck', '5'))
 const BAD_FARM = flag('bad-farm')
+const PLOT = flag('plot')
 
 const BOT = process.env.SURVIVAL_BOT || 'SurviveTest'
 const DIRECTOR = process.env.DIRECTOR || 'ClaudeTest'
@@ -434,6 +436,10 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
     agent.storage.set('farms', [{ name: 'farm:1', x: start.x, y: start.y - 1, z: start.z, size: 9, crop: 'wheat', created: Date.now() - 86_400_000, tended: Date.now() - 3_600_000 }])
     log(`seeded farm:1 at ${start.x} ${start.y - 1} ${start.z} (--bad-farm)`)
   }
+  if (PLOT) {
+    agent.storage.set('projects.spots', { farm_plot: { x0: start.x - 1, z0: start.z - 1, size: 3, y: start.y - 1 } })
+    log(`seeded a 3x3 farm plot around ${start.x} ${start.y - 1} ${start.z} (--plot)`)
+  }
 
   const vitalsS: VitalSample[] = []
   const path: PosSample[] = []
@@ -596,7 +602,7 @@ async function runOnce (rep: number): Promise<Record<string, unknown>> {
     distance: Math.round(pathLength(path)), maxFromStart: Math.round(Math.max(0, ...path.map(p => Math.hypot(p.x - start.x, p.z - start.z)))), minY,
     disconnects: kicks, maxLagS: Math.round(maxLagMs / 100) / 10,
     helpAsks: helpAsks.length, helpReasons: helpAsks.slice(0, 10),
-    badFarm: BAD_FARM, sites, searches, choresRun, farmsAtEnd, endItems, mines,
+    badFarm: BAD_FARM, plot: PLOT, foodSource: agent.storage.get<{ text?: string } | undefined>('food.source', undefined)?.text ?? null, sites, searches, choresRun, farmsAtEnd, endItems, mines,
     ownerHeard: heard.length,
     whispers: whispers.length, chatLines: chatOut.length - whispers.length, said: chatOut.slice(0, 20).map(m => (m.to ? `(w ${m.to}) ` : '') + m.message),
     playersNear: Object.fromEntries(Object.entries(playersNear).filter(([, dist]) => dist < 200)),

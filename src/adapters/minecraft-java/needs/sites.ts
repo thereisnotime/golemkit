@@ -5,17 +5,16 @@ import type { Bot } from 'mineflayer'
 import type { Agent, SiteRef, SiteVerdict } from '../../../core/index.ts'
 import type { SiteProbe, NpcContext } from '../../../brains/npc/index.ts'
 import { getFarms, saveFarm, type Farm } from '../../../skills/food.ts'
-import { TILLABLE } from '../../../skills/farming.ts'
 import { getHome, setPlace } from '../../../skills/navigation.ts'
 import { getSpawn, spawnBedState } from '../../../skills/bed.ts'
 import { ownChests, configuredChests } from '../../../skills/containers.ts'
 import { vec } from '../../../skills/world.ts'
 import { farmSiteVerdict, type FarmSiteCell } from '../../../skills/needPlan.ts'
 import { mineSiteProbe } from './mine.ts'
+import { readFarmCells } from '../../../skills/foodSources.ts'
+import { farmRepairSettings } from '../../../skills/farmRepairPlan.ts'
 
 const bot = (ctx: NpcContext) => ctx.bot as Bot
-const ICE = /^(ice|packed_ice|blue_ice|frosted_ice)$/
-const PLANT = /^(short_grass|grass|tall_grass|fern|large_fern|dandelion|poppy|.*_tulip|snow|wheat|carrots|potatoes|beetroots)$/
 /** Sites further than this are not checked: too far to be loaded and seen properly. */
 const CHECK_RANGE = 64
 
@@ -24,22 +23,7 @@ const dimOk = (b: Bot, dim?: string) => !dim || !b.game?.dimension || dim === b.
 
 /** The cells of a farm square as the site check sees them; null when not loaded. */
 export function farmCells (b: Bot, f: { x: number, y: number, z: number, size: number }): Record<string, FarmSiteCell> | null {
-  const h = (Math.max(3, Math.min(9, f.size)) - 1) / 2
-  const out: Record<string, FarmSiteCell> = {}
-  for (let dx = -h; dx <= h; dx++) {
-    for (let dz = -h; dz <= h; dz++) {
-      const g = b.blockAt(vec(b, f.x + dx, f.y, f.z + dz))
-      const a = b.blockAt(vec(b, f.x + dx, f.y + 1, f.z + dz))
-      if (!g || !a) return null
-      let k: FarmSiteCell = 'other'
-      if (ICE.test(a.name) || ICE.test(g.name)) k = 'ice'
-      else if (a.name === 'water' || g.name === 'water') k = 'water'
-      else if (g.name === 'farmland') k = 'farmland'
-      else if (TILLABLE.includes(g.name) && (a.name === 'air' || PLANT.test(a.name))) k = 'tillable'
-      out[`${dx},${dz}`] = k
-    }
-  }
-  return out
+  return readFarmCells(b, f)?.cells ?? null
 }
 
 function farmRef (f: Farm): SiteRef {
@@ -61,10 +45,14 @@ export function minecraftSites (agent: Agent): SiteProbe[] {
     },
     onBad (ctx, rec, replace) {
       if (!replace) return 'left on my list (sites.replace is off)'
-      // drop it: keep_fed and farm_setup see no farm and start a new one near home, away from this spot
+      // drop it from the farms it tends; farm_setup's food sources then repair it (repair_farm) or
+      // start a new one elsewhere, as farming.badFarm says
       agent.storage.set('farms', getFarms(agent).filter(f => f.name !== rec.id))
       setPlace(agent, rec.id, null)
-      return 'dropped it, a new farm goes near home'
+      const mode = farmRepairSettings((agent.settings as { farming?: unknown }).farming).badFarm
+      if (mode === 'off') return 'left it for the owners (farming.badFarm off)'
+      if (mode === 'relocate') return 'dropped it, a new farm goes near home'
+      return mode === 'repair' ? 'I will try to repair it' : 'I will repair it if that is a small job, else a new farm goes near home'
     },
     onRecovered (ctx, rec) {
       const f = rec.data as unknown as Farm | undefined

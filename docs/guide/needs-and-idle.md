@@ -20,9 +20,9 @@ the one mechanism that replaced them:
   scouting trips.
 
 It runs inside the [NPC controller](./npc-brain.md) that also runs [armed behaviours](./behaviors.md),
-so it works with any profile that uses the behaviours brain. Nothing new holds the body: the
+so it works with any [profile](/guide/profiles) that uses the [behaviours brain](/guide/behaviors). Nothing new holds the body: the
 search and the chores are ordinary behaviours (`need:gear`, `idle:tidy_storage`), with the same
-failure back-off, back-off from players and LLMs, action lock and [help desk](./behaviors#asking-for-help).
+failure back-off, back-off from players and LLMs, [action lock](/concepts/architecture#the-action-lock-and-priorities) and [help desk](./behaviors#asking-for-help).
 
 ## How it fits the controller
 
@@ -83,7 +83,7 @@ better, digging is on and iron (tools, armour, a bucket, a shield) is what is mi
 1. by day, a [trip](./behaviors#trips): food from the pantry, a weapon, enough health; turned back when
    food or daylight runs short, and `find_target iron exposed=true go=true` within
    `needs.search.radius` (160) blocks and `minutes` (6): what it sees, then `found:iron` from
-   memory, then a spiral scout on the surface that skips protected areas, danger zones and water.
+   memory, then a spiral scout on the surface that skips [protected areas](/concepts/world#protected-areas), danger zones and water.
    Only ore with an open face within `mining.safeDepth` (8) of the surface counts (a cliff, a
    shallow cave), so it is ore it may mine. Found: `upgrade_tools` there under the
    [safe-mining](./progression#safe-mining) rules, then home. Skipped once its mine reached depth;
@@ -185,7 +185,10 @@ Its name skips the names bad farms still have.
 A farm remembers which cells of its square were land when it was made (`land` in the farm record).
 The flood check counts only those cells, so a shore farm with the lake on one side is not
 "flooded" from its first check, which is what happened to Pax's farm:1. A frozen centre still makes
-it bad ("the water froze"). Older farms without the record are judged on the whole square.
+it bad ("the water froze"). Older farms without the record are judged on the dry field left: half
+the square wet counts only when fewer than 8 dry cells remain (Pax's farm:1 had 34 left and was a
+false alarm). What happens to a bad farm next (repaired where it is, or a new one elsewhere) is
+`farming.badFarm`, see [Food sources](./food-sources#bad-farms-repair-or-move).
 
 ## Farming on cold ground
 
@@ -227,8 +230,8 @@ from (`water: natural | ice | bucket`) and what keeps it open (`keptOpen: cover 
 checked by site health like any farm: if the cover is broken and the water freezes, the farm is
 marked bad and a new one is made.
 
-Not done yet: an indoor farm inside the fortress. Crops grow under torchlight, and water under a
-roof never freezes, but the site rules still want sky light, and indoors it needs a bucket.
+The farm plot its base keeps free inside the walls is a farm too now (`plot_farm`): water in reach
+or carried ice, else a dry plot under torchlight, see [Food sources](./food-sources#the-base-s-farm-plot).
 
 ## Idle modes
 

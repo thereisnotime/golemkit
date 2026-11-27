@@ -23,9 +23,10 @@ import { takeItemsFromOwnChests, chestView, chestTotals } from './containers.ts'
 import { nearBadSite, nextFarmName, FREEZE_TEMPERATURE } from './needPlan.ts'
 import { planColdWater, waterFreezes, coverItem, sideCell, iceSourceOk, farmingSettings, type FarmingSettings, type IceCandidate } from './coldFarmPlan.ts'
 import { siteBook } from '../core/sites.ts'
+import { foodSourceActions, lastFoodSourceText } from './foodSources.ts'
 import {
   seedStopReason, seedLimits, scoutWaypoints, scoutStopReason, nextWaypoint, sectorsText, compass, sectorOf, mergeSpot, markSpotEmpty, rankSpots, dryWaypoint,
-  chooseFarmSite, siteProblems, plotLayout, pickFarmSeed, seedCount, breedPlan, BREED_FOOD, DEFAULT_SCOUT_LIMITS,
+  chooseFarmSite, siteProblems, plotLayout, pickFarmSeed, seedCount, breedPlan, BREED_FOOD, DEFAULT_SCOUT_LIMITS, ownWorkTest,
   type FoodSpot, type FoodSpotKind, type CellKind, type SiteCandidate, type Pos, type Waypoint
 } from './foodPlan.ts'
 
@@ -44,8 +45,10 @@ export interface Farm extends Pos {
   tended?: number
   /** Cells ("dx,dz" from the water) that were land when it was made: site health judges only these. */
   land?: string[]
-  /** Where its water came from: a lake or pond, ice it broke, or a bucket. */
-  water?: 'natural' | 'ice' | 'bucket'
+  /** Where its water came from: a lake or pond, ice it broke, a bucket, or none (a dry plot). */
+  water?: 'natural' | 'ice' | 'bucket' | 'none'
+  /** field: a farm by water it picked; plot: the base's reserved farm plot (plot_farm). Default field. */
+  kind?: 'field' | 'plot'
   /** What keeps its water from freezing in a cold biome. */
   keptOpen?: 'cover' | 'torch'
 }
@@ -215,7 +218,9 @@ export function farmWorkFor (agent: Agent, bot: Bot, farm: Farm, o: { targetSize
   const inv = inventory(bot)
   const canTill = !!agent.canDig
   const canWater = canPlace(agent) && (!!inv.water_bucket || !!inv.bucket)
-  return planFarmWork(grid, { targetSize: o.targetSize, seeds: seedCount(inv), seedReserve: o.seedReserve, canTill, canWater })
+  // a plot farm never grows past its plot; a dry one counts every cell as wet enough (crops keep dry farmland)
+  const plot = farm.kind === 'plot'
+  return planFarmWork(grid, { targetSize: plot ? farm.size : o.targetSize, seeds: seedCount(inv), seedReserve: plot ? 0 : o.seedReserve, canTill, canWater: canWater && farm.water !== 'none', dry: farm.water === 'none' })
 }
 
 /** Ripe sweet berry bushes (age 2+) near a point, nearest first. */
@@ -334,7 +339,7 @@ export function topY (bot: Bot, x: number, z: number): number | null {
   return null
 }
 
-const inventory = (bot: Bot): Record<string, number> => {
+export const inventory = (bot: Bot): Record<string, number> => {
   const out: Record<string, number> = {}
   for (const i of bot.inventory.items()) out[itemName(i)] = (out[itemName(i)] ?? 0) + i.count
   return out
@@ -564,13 +569,13 @@ const PLANTS = /^(short_grass|grass|tall_grass|fern|large_fern|dandelion|poppy|.
 const BUILD = /(_planks|cobblestone|stone_bricks|bricks|glass|_fence|_wall|door|torch|lantern|_bed$|chest|barrel|crafting_table|furnace|_slab|_stairs|wool|carpet|concrete|terracotta|rail|ladder|sign|hay_block|composter|bell|scaffolding|farmland)/
 /** Near a plot these rule it out: lava burns, ice means the water freezes there. */
 const HAZARD = /^(lava|ice|packed_ice|blue_ice|frosted_ice|powder_snow|magma_block|fire)$/
-const ICE = /^(ice|packed_ice|blue_ice|frosted_ice)$/
+export const ICE = /^(ice|packed_ice|blue_ice|frosted_ice)$/
 /** A one-block layer over the ground it may dig off to till under it: grass or dirt, or a snow block on snowy ground. */
 const isBank = (name: string) => TILLABLE.includes(name) || name === 'snow_block'
 const FENCES = /^(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|bamboo|crimson|warped)_fence$/
 
 /** What a plot cell is (ground at y, the block above at y+1). */
-function cellKind (agent: Agent, bot: Bot, x: number, y: number, z: number, clearance: number, iceAsWater = false): CellKind {
+export function cellKind (agent: Agent, bot: Bot, x: number, y: number, z: number, clearance: number, iceAsWater = false, own?: (p: Pos) => boolean): CellKind {
   if (offLimits(agent, bot, { x, y, z }, clearance)) return 'protected'
   const g = bot.blockAt(vec(bot, x, y, z))
   const a = bot.blockAt(vec(bot, x, y + 1, z))
@@ -579,7 +584,8 @@ function cellKind (agent: Agent, bot: Bot, x: number, y: number, z: number, clea
   // a frozen shore: the lake side is water under the ice (it hydrates once one block is open)
   if (iceAsWater && ICE.test(g.name)) return 'water'
   if (g.name === 'farmland') return 'farmland'
-  if (BUILD.test(g.name) || BUILD.test(a.name)) return 'build'
+  // its own blocks (a cover, a torch, its walls) are no crop ground, but nobody else's build either
+  if (BUILD.test(g.name) || BUILD.test(a.name)) return own && (BUILD.test(g.name) ? own({ x, y, z }) : true) && (!BUILD.test(a.name) || own({ x, y: y + 1, z })) ? 'other' : 'build'
   if (TILLABLE.includes(g.name) && (a.name === 'air' || PLANTS.test(a.name))) return 'tillable'
   // a bank one block above the water: dig the top layer off and till the dirt under it
   // (farmland is only kept wet by water at its own height or one above)
@@ -600,16 +606,27 @@ function farmSiteIds (agent: Agent): string[] {
 }
 
 /** Water here freezes: a cold biome (snowy plains, frozen rivers, mountain tops). */
-function freezes (bot: Bot, p: { x: number, y: number, z: number }): boolean {
+export function freezes (bot: Bot, p: { x: number, y: number, z: number }): boolean {
   const t = (bot.blockAt?.(vec(bot, p.x, p.y, p.z)) as { biome?: { temperature?: number } } | null)?.biome?.temperature
   return typeof t === 'number' && t < FREEZE_TEMPERATURE
 }
 
 /** A candidate plot around a water block: plot cells plus a 3-block ring checked for builds/fields. */
-export function siteAt (agent: Agent, bot: Bot, water: Vec3, size: number, from: { x: number, z: number }, clearance: number, o: { iceAsWater?: boolean } = {}): SiteCandidate {
+export function siteAt (agent: Agent, bot: Bot, water: Vec3, size: number, from: { x: number, z: number }, clearance: number, o: { iceAsWater?: boolean, own?: (p: Pos) => boolean } = {}): SiteCandidate {
   const h = (size - 1) / 2
+  const own = o.own ?? ownWork(agent)
   const cells: Record<string, CellKind> = {}
-  for (let dx = -h; dx <= h; dx++) for (let dz = -h; dz <= h; dz++) cells[`${dx},${dz}`] = cellKind(agent, bot, water.x + dx, water.y, water.z + dz, clearance, !!o.iceAsWater)
+  let buildNote: string | undefined
+  for (let dx = -h; dx <= h; dx++) {
+    for (let dz = -h; dz <= h; dz++) {
+      const k = cellKind(agent, bot, water.x + dx, water.y, water.z + dz, clearance, !!o.iceAsWater, own)
+      cells[`${dx},${dz}`] = k
+      if (k === 'build' && !buildNote) {
+        const b = [0, 1].map(dy => bot.blockAt(vec(bot, water.x + dx, water.y + dy, water.z + dz))).find(b => b && BUILD.test(b.name))
+        if (b) buildNote = `${b.name} at ${fmtPos(b.position)}`
+      }
+    }
+  }
   // crops need light: a cell under a roof (little sky light) stays dark at night and mobs spawn on it.
   // Only when the chunk has light data at all (some servers send none: everything reads 0).
   const sky: Record<string, number> = {}
@@ -630,12 +647,43 @@ export function siteAt (agent: Agent, bot: Bot, water: Vec3, size: number, from:
       if ((dx + dz) % 2) continue // every other block is plenty to spot a wall or a field
       for (let dy = -1; dy <= 2; dy++) {
         const b = bot.blockAt(vec(bot, water.x + dx, water.y + dy, water.z + dz))
-        if (b && BUILD.test(b.name)) { around.push(b.name === 'farmland' ? 'farmland' : 'build'); break }
+        if (b && BUILD.test(b.name)) {
+          // its own torches, walls, covers and farms are not somebody else's
+          if (own && own({ x: water.x + dx, y: water.y + dy, z: water.z + dz })) continue
+          around.push(b.name === 'farmland' ? 'farmland' : 'build')
+          if (b.name !== 'farmland' && !buildNote) buildNote = `${b.name} at ${fmtPos(b.position)}`
+          break
+        }
         if (b && HAZARD.test(b.name) && !(o.iceAsWater && ICE.test(b.name))) { around.push('hazard'); break }
       }
     }
   }
-  return { water: { x: water.x, y: water.y, z: water.z }, cells, around, distance: Math.hypot(water.x - from.x, water.z - from.z) }
+  return { water: { x: water.x, y: water.y, z: water.z }, cells, around, distance: Math.hypot(water.x - from.x, water.z - from.z), ...(buildNote ? { buildNote } : {}) }
+}
+
+/**
+ * The bot's own work near farm sites (build.own, its torches, finished builds, its farms, its
+ * base), or undefined with farming.ownBuilds off. Read straight from storage: lighting.ts and
+ * construction.ts import this file.
+ */
+export function ownWork (agent: Agent): ((p: Pos) => boolean) | undefined {
+  const st = store(agent)
+  if (!st) return undefined
+  const f = (agent.settings as { farming?: unknown } | undefined)?.farming
+  const o = f && typeof f === 'object' ? f as Record<string, unknown> : {}
+  if (f === false || o.ownBuilds === false) return undefined
+  const radius = typeof o.ownBaseRadius === 'number' ? o.ownBaseRadius : 12
+  const spots = st.get<{ anchor?: { origin?: Pos } } | undefined>('projects.spots', undefined)
+  const origin = spots?.anchor?.origin
+  let bad: { x: number, z: number, size?: number }[] = []
+  try { bad = siteBook(agent).all().filter(r => r.kind === 'farm' && r.pos).map(r => ({ x: r.pos!.x, z: r.pos!.z, size: typeof r.data?.size === 'number' ? r.data.size : 9 })) } catch {}
+  return ownWorkTest({
+    blocks: st.get<string[] | undefined>('build.own', undefined) ?? [],
+    torches: st.get<Pos[] | undefined>('lighting.torches', undefined) ?? [],
+    boxes: (st.get<{ box?: { min: Pos, max: Pos } }[] | undefined>('build.placements', undefined) ?? []).flatMap(p => p.box ? [p.box] : []),
+    farms: [...getFarms(agent), ...bad],
+    base: origin && radius > 0 ? { x: origin.x, z: origin.z, radius } : null
+  })
 }
 
 const GRASS = ['short_grass', 'grass', 'tall_grass', 'fern', 'large_fern']
@@ -770,7 +818,7 @@ export async function breakPlantsFor (ctx: Pick<ActionContext, 'bot' | 'agent' |
 }
 
 /** Gets a hoe: one in the inventory, crafted from what's there, or crafted after chopping a couple of logs. */
-async function getHoe (ctx: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>, clearance = 48): Promise<ActionResult> {
+export async function getHoe (ctx: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>, clearance = 48): Promise<ActionResult> {
   const { bot, signal } = ctx
   let r = await ensureTool(bot, signal, 'hoe')
   if (r.ok) return r
@@ -786,7 +834,7 @@ async function getHoe (ctx: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'lo
 }
 
 /** Puts water from a bucket into the block at `hole` (which must be air with a solid floor). */
-async function pourWater (bot: Bot, hole: Vec3, signal: AbortSignal): Promise<boolean> {
+export async function pourWater (bot: Bot, hole: Vec3, signal: AbortSignal): Promise<boolean> {
   const bucket = findItem(bot, 'water_bucket')
   if (!bucket) return false
   await reachBlock(bot, hole, signal)
@@ -798,7 +846,7 @@ async function pourWater (bot: Bot, hole: Vec3, signal: AbortSignal): Promise<bo
 }
 
 /** Fills an empty bucket from a water source. */
-async function fillBucket (bot: Bot, water: Vec3, signal: AbortSignal): Promise<boolean> {
+export async function fillBucket (bot: Bot, water: Vec3, signal: AbortSignal): Promise<boolean> {
   const bucket = findItem(bot, 'bucket')
   if (!bucket) return false
   await reachBlock(bot, water, signal)
@@ -810,7 +858,7 @@ async function fillBucket (bot: Bot, water: Vec3, signal: AbortSignal): Promise<
 }
 
 /** Tills one ground block (breaking a plant on top first). */
-async function tillAt (bot: Bot, pos: Vec3, signal: AbortSignal): Promise<boolean> {
+export async function tillAt (bot: Bot, pos: Vec3, signal: AbortSignal): Promise<boolean> {
   // lower a one-block bank first: plant on top, then the grass/dirt itself
   const top = bot.blockAt(pos.offset(0, 2, 0))
   if (top && top.name !== 'air' && PLANTS.test(top.name) && isBank(bot.blockAt(pos.offset(0, 1, 0))?.name ?? '')) {
@@ -839,7 +887,7 @@ async function tillAt (bot: Bot, pos: Vec3, signal: AbortSignal): Promise<boolea
   return bot.blockAt(pos)?.name === 'farmland'
 }
 
-const canPlace = (agent: Agent) => (agent.settings as { canPlace?: boolean } | undefined)?.canPlace !== false
+export const canPlace = (agent: Agent) => (agent.settings as { canPlace?: boolean } | undefined)?.canPlace !== false
 
 // ------------------------------------------------------------------ water in the cold (coldFarmPlan.ts)
 
@@ -887,7 +935,7 @@ export function farmingOptions (agent: Agent): FarmingSettings {
 }
 
 /** Torches it carries, or could make now from coal/charcoal and a stick or planks. */
-function torchesAvailable (bot: Bot): number {
+export function torchesAvailable (bot: Bot): number {
   const t = countItem(bot, 'torch')
   if (t) return t
   const fuel = countItem(bot, 'coal') + countItem(bot, 'charcoal')
@@ -896,7 +944,7 @@ function torchesAvailable (bot: Bot): number {
 }
 
 /** Holds a tool without Silk Touch (ice broken with it makes no water), or nothing. */
-async function holdNoSilk (bot: Bot): Promise<void> {
+export async function holdNoSilk (bot: Bot): Promise<void> {
   const silk = (i: any) => ((i?.enchants ?? []) as { name: string }[]).some(e => e.name === 'silk_touch')
   const pick = bot.inventory.items().find(i => itemName(i).endsWith('_pickaxe') && !silk(i))
   if (pick) { await bot.equip(pick, 'hand'); return }
@@ -1653,10 +1701,11 @@ export const food = () => defineSkill({
   name: 'food',
   capabilities: ['move', 'eat'],
   description: 'Food self-sufficiency: scouting for animals and village farms, starting, tending and growing a farm of its own, gathering seeds, foraging berries, kelp and apples, breeding animals.',
-  actions: [findFood, startFarmAction, tendFarm, gatherSeeds, forage, breed],
+  actions: [findFood, startFarmAction, tendFarm, gatherSeeds, forage, breed, ...foodSourceActions],
   observe: (agent) => {
-    const farms = getFarms(agent).map(f => `${f.name} ${f.crop} at ${fmtPos(f)}`)
+    const farms = getFarms(agent).map(f => `${f.name} ${f.kind === 'plot' ? 'plot ' : ''}${f.crop} at ${fmtPos(f)}`)
     const spots = getFoodSpots(agent).filter(s => s.kind !== 'water').length
-    return farms.length || spots ? { farms, foodSpots: spots } : {}
+    const source = lastFoodSourceText(agent)
+    return farms.length || spots || source ? { farms, foodSpots: spots, ...(source ? { foodSource: source } : {}) } : {}
   }
 })
