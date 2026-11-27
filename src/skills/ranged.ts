@@ -15,7 +15,8 @@
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
 import { defineAction, z, ok, fail, goals, isHostile, sleep, checkAborted, dangerMemory, fmtPos, type Agent } from '../core/index.ts'
-import { fightTarget, lineOfSight, eatNow, fightFood } from './fight.ts'
+import { fightTarget, lineOfSight, eatNow, fightFood, meleeNear } from './fight.ts'
+import { escapeFight } from './escape.ts'
 import { combatRefusal } from './combat.ts'
 import { weaponFlags, hasRanged, readyShield, bestMeleeDamage, blockWithShield } from './weapons.ts'
 import { getHome, sameDimension } from './navigation.ts'
@@ -469,7 +470,9 @@ export const rangedDefense = defineAction({
     maxSeconds: z.number().min(5).max(120).default(45).describe('give up after this long')
   }),
   internal: true,
-  async run ({ bot, agent, signal, log }, p) {
+  async run (ctx, p) {
+    const { bot, agent, signal, log } = ctx
+    let escapes = 0
     const flags = weaponFlags(agent)
     // arrow and draw leaps while walking to cover or backing off (combat.dodge.*); fightTarget has its own
     const dodge = dodgeLayer(bot, flags.dodge ?? DODGE_DEFAULTS)
@@ -620,6 +623,14 @@ export const rangedDefense = defineAction({
             // the only one there: its zone goes with it
             if (!rangedSituation(bot).active.length) dangerMemory(agent).clearNear(target.position, 8, target.name)
             continue
+          }
+          // losing with melee mobs on it too (zombies while it charged a skeleton): cover won't help, leave by an escape route
+          const rs = flags.retreat
+          if ((r.end === 'heal' || r.end === 'outnumbered') && rs?.enabled && escapes < rs.maxEscapes && meleeNear(bot, 4) > 0) {
+            escapes++
+            const e = await escapeFight(ctx, r.reason ?? r.end, rs)
+            log.info(`ranged: ${e.note}`)
+            if (e.ok) continue
           }
           if (r.end === 'heal' || r.end === 'outnumbered' || r.end === 'gave_up') hideUntil = Date.now() + hideMs(bot.health)
           continue

@@ -77,10 +77,11 @@ const pillar = defineAction({
     const block = item ?? fillerBlock(bot)
     if (!block || !findItem(bot, block)) return fail(item ? `no ${item}` : 'no dirt, cobblestone or planks to pillar with')
     if (agent.protectedAreas.isProtected(bot.entity.position)) return fail('can\'t build here (protected area)')
-    const placed = await pillarUp(bot, signal, block, height)
+    let why = ''
+    const placed = await pillarUp(bot, signal, block, height, w => { why = w })
     return placed
       ? ok(`pillared up ${placed} block${placed === 1 ? '' : 's'} with ${block}, at ${fmtPos(bot.entity.position)}`)
-      : fail('could not build a pillar here')
+      : fail(`could not build a pillar here${why ? ` (${why})` : ''}`)
   }
 })
 

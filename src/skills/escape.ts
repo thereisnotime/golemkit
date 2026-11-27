@@ -6,7 +6,7 @@ import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
 import type { ActionContext } from '../core/index.ts'
 import { fmtPos, sleep, checkAborted } from '../core/index.ts'
-import { fightTarget, eatNow, fightFood, eyeReach } from './fight.ts'
+import { fightTarget, eatNow, fightFood, eyeReach, safeStep, clearMoves } from './fight.ts'
 import { fillerBlock, bestFood, roofAbove } from './survival.ts'
 import { getHome, homeOffset, sameDimension } from './navigation.ts'
 import { weaponFlags } from './weapons.ts'
@@ -56,6 +56,51 @@ export function escapeInputs (ctx: ActionContext, s: RetreatSettings): EscapeInp
   }
 }
 
+/**
+ * Sprints straight away from the melee mobs around (their centre), steering up to 90 degrees off
+ * that line around drops, water and walls (fight.safeStep), jumping when stuck. Seen live: the
+ * pathfinder's back-off (GoalInvert) re-planned under every hit and two zombies kept up with it.
+ * Stops when the nearest melee mob is `distance` blocks off or after `ms`. Returns that distance.
+ */
+export async function sprintAway (bot: Bot, signal: AbortSignal, distance: number, ms: number): Promise<number> {
+  const until = Date.now() + ms
+  let last = bot.entity.position.clone()
+  let stuckSince = 0
+  const nearest = () => Math.min(Infinity, ...threatsAround(bot, 24).filter(t => !t.ranged && !t.flying).map(t => t.dist))
+  try {
+    while (Date.now() < until) {
+      checkAborted(signal)
+      const melee = threatsAround(bot, 16).filter(t => !t.ranged && !t.flying)
+      if (!melee.length || nearest() >= distance) break
+      const me = bot.entity.position
+      const cx = melee.reduce((a, t) => a + t.pos.x, 0) / melee.length - me.x
+      const cz = melee.reduce((a, t) => a + t.pos.z, 0) / melee.length - me.z
+      const away = Math.atan2(cx, cz) // facing (-cx, -cz): yaw = atan2(-vx, -vz)
+      let picked = false
+      for (const off of [0, 0.5, -0.5, 1, -1, 1.57, -1.57]) {
+        await bot.look(away + off, 0, true).catch(() => {})
+        if (safeStep(bot, 'forward') && safeStep(bot, 'forward', 2)) { picked = true; break }
+      }
+      bot.setControlState('forward', picked)
+      bot.setControlState('sprint', picked)
+      const moved = Math.hypot(me.x - last.x, me.z - last.z)
+      last = me.clone()
+      if (moved < 0.1 && picked) { if (!stuckSince) stuckSince = Date.now() } else stuckSince = 0
+      bot.setControlState('jump', !!stuckSince && Date.now() - stuckSince > 150)
+      await sleep(100, signal)
+    }
+  } finally { clearMoves(bot) }
+  return nearest()
+}
+
+/** A melee mob within 3 blocks: sprint off a few blocks before pillaring or digging, or its hits knock the bot off its spot. */
+async function breakContact (bot: Bot, signal: AbortSignal): Promise<void> {
+  if (!threatsAround(bot, 4).some(t => !t.ranged && !t.flying && t.dist <= 3)) return
+  await sprintAway(bot, signal, 7, 2500)
+  const settle = Date.now() + 400
+  while (!bot.entity.onGround && Date.now() < settle) await sleep(50, signal)
+}
+
 const mobInReach = (bot: Bot) => threatsAround(bot, 5).some(t => !t.ranged && t.dist <= 3.5)
 
 /** Shuts open wooden doors within 4 blocks that the bot isn't standing in (mobs then stay out). */
@@ -87,6 +132,7 @@ export const ROUTE_RUNNERS: Record<RouteId, Runner> = {
   },
   async pillar (ctx, s) {
     const { bot, signal } = ctx
+    await breakContact(bot, signal)
     const r = await runInline(ctx, 'pillar', { height: s.pillarHeight }).catch(e => ({ ok: false, message: (e as Error).message }))
     if (!r?.ok) return { ok: false, where: r?.message ?? 'no pillar action' }
     const where = `a ${s.pillarHeight}-block pillar at ${fmtPos(bot.entity.position)}`
@@ -105,12 +151,15 @@ export const ROUTE_RUNNERS: Record<RouteId, Runner> = {
     return { ok: true, where, recovered: true }
   },
   async bunker (ctx, s) {
+    await breakContact(ctx.bot, ctx.signal)
     const r = await runInline(ctx, 'bunker', { depth: 3, maxMinutes: Math.max(0.5, Math.min(15, s.healSeconds / 60)), untilDay: false }).catch(e => ({ ok: false, message: (e as Error).message }))
     return r?.ok ? { ok: true, where: `a bunker: ${r.message}` } : { ok: false, where: r?.message ?? 'no bunker action' }
   },
   async sprint (ctx, s) {
-    const r = await runInline(ctx, 'retreat', { distance: s.sprintDistance }).catch(e => ({ ok: false, message: (e as Error).message }))
-    return r?.ok ? { ok: true, where: `${s.sprintDistance} blocks off, at ${fmtPos(ctx.bot.entity.position)}` } : { ok: false, where: r?.message ?? 'no retreat action' }
+    const d = await sprintAway(ctx.bot, ctx.signal, s.sprintDistance, 12_000)
+    const where = `${Math.round(d === Infinity ? s.sprintDistance : d)} blocks from them, at ${fmtPos(ctx.bot.entity.position)}`
+    // not clear of them, but well ahead: still an escape (they lose track or it outpaces them)
+    return d >= Math.min(12, s.sprintDistance) ? { ok: true, where } : { ok: false, where: `couldn't get away (${where})` }
   }
 }
 
