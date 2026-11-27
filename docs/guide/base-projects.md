@@ -80,10 +80,9 @@ A session (`work_on_base`, at most `sessionMinutes`) works the first ready proje
 
 1. the bill of materials for what is still missing, against what it carries and what its chests
    hold (container memory);
-2. takes the accepted items out of its own chests (logs too, when wood is short);
-3. gathers the rest with `gather_materials` for at most `gatherMinutes`, at most `carry` items a
-   session (the rest is for the next session);
-4. builds only the stage's cells, then surveys again and records progress.
+2. gets it from the [material sources](#where-materials-come-from) in order (its chests first)
+   for at most `gatherMinutes`, at most `carry` items a session (the rest is for the next session);
+3. builds only the stage's cells, then surveys again and records progress.
 
 Once the base is settled, its blocks (walls, floor, towers, the rows) cost the pathfinder a lot to
 dig through, so it takes any other way first: in the first live run the bot tunnelled out through
@@ -113,6 +112,47 @@ The gate door stays in for repairs that can be done from outside (a wall block, 
 The builder used to take the door out whenever anything was still to place, so every wall repair
 dug the door (Pax's journal shows its spruce door broken some thirty times). It now takes it out
 only when something still to build is closed in behind it (`enclosedColumns` in blueprint.ts).
+
+## Where materials come from
+
+A build (`build gather=true`, the LLM's way), a base project session and `gather_materials` all
+get what is short from the same short list of sources, tried in the order of
+`materials.sources`, one at a time, each planned again from what it carries and what its chests
+hold after the last one (`src/skills/materialSourcePlan.ts`, pure; `materialSources.ts` runs it):
+
+| source | what | skipped when |
+|---|---|---|
+| `chests` | the items themselves, out of its own and configured chests (container memory; chests it never looked into are tried too) | none of it in its chests |
+| `substitutes` | other blocks every blueprint role that wants the item accepts: andesite or cobbled deepslate for a cobblestone floor, any planks for planks | the roles allow nothing else, or none of it in its chests; substitutes it carries already count |
+| `craft` | ladders, doors, torches, stairs, the stone family... from what it has, its chests' wood first, then trees | nothing short that it can make |
+| `nearby` | digging and chopping close by (`gather_materials`, which mines stone out past the [keep-out](./base-safety#keep-out-for-digging)) | nothing short that is dug, digging off |
+| `mine` | a trip down its own [staircase mine](./progression#the-staircase-mine) for cobblestone: the stairs and tunnel are stone, the cobblestone is kept, the trip ends when it has enough or after `mineMinutes` | not cobblestone, mine settings off, no stone pickaxe, not ready to go down (food, health) |
+| `far` | stone dug `farDistance` blocks past the base and its keep-out, on the dry side nearest the bot (water and ice spots are passed over), at most `farTries` spots | not cobblestone, no base or home to dig away from |
+
+A source that gave nothing of an item (the strip mine by home turned at water four times) is
+skipped for that item for `retryMinutes`, so the next session goes straight to the next source.
+Leave a source out of the list to turn it off.
+
+Each run says which sources it used, what each gave, and why the others were skipped, in the
+session's result (`stuck:` lines quote it), in `golem status` (`materials:` note) and in
+`pax projects` / `pax plan fortress`, which also show the plan for the next project:
+
+```
+  floor: materials: using chests (my chests hold 9 cobblestone); skipped substitutes: none in my chests ...
+last materials: chests gave 9 cobblestone; skipped nearby (gave no cobblestone 4 min ago: every way on is unsafe ...) (2 min ago)
+```
+
+Why: Pax's fortress at the edge of a frozen lake stood at 629 of 648 with a hole in its floor. The
+build asked for 9 cobblestone, gathered by strip-mining next to home, which the base keep-out sends
+out past the walls, where every way on was water; it gave up after 21 s with 0 cobblestone,
+while two of its chests held 666 cobblestone and its own mine was 16 blocks away. The LLM's
+`build gather=true` never looked in the chests at all; only base project sessions did.
+
+The floor hole itself was not on the floor stage's list either: a floor cell with a block on top
+that isn't part of the plan is left alone (`skipCovered`, for the old hut on the floor), and that
+covered an empty cell under something as well. Now only a cell that holds a block is left alone;
+an empty one is always counted. Holes in the floor surface the stages don't cover (a farm plot
+that lost its dirt, a cell under a planned block) are found by [base safety](./base-safety#holes-in-the-floor).
 
 ## Owner in the loop
 
@@ -183,6 +223,16 @@ Profile key `projects:` (or `settings.projects`), live toggles `projects.*`:
 | `base` | found | `{ x, y, z, facing }` origin (layer 0, centre) and gate side |
 | `order`, `skip` | | preferred order; projects never to do |
 
+Where the materials come from is its own profile key, `materials:` (live toggles `materials.*`):
+
+| key | default | |
+|---|---|---|
+| `sources` | `[chests, substitutes, craft, nearby, mine, far]` | the sources, in this order; leave one out to turn it off |
+| `retryMinutes` | 30 | a source that gave nothing of an item is skipped for it this long (0 = always try) |
+| `mineMinutes` | 6 | longest mine trip for build blocks |
+| `farDistance` | 32 | far: blocks past the base and its keep-out to start digging |
+| `farTries` | 3 | far: spots tried, nearest first |
+
 The chore is `base_project` in idle mode `active` (`idle.chores.base_project: false` turns just
 the chore off); it runs when nothing else scores, like the other chores. See
 [Needs and idle modes](./needs-and-idle).
@@ -209,4 +259,5 @@ closed base costs one to four wall blocks a trip, repaired by the next session; 
 did not trigger reliably (the build reached the inside cells anyway); a bot that dug a mining pit
 under its home got stuck in it for a whole run (gathering, not the projects); the gate door went
 missing twice and was put back by the next walls session. Unit tests: `test/projects.test.ts` (queue), `test/base-plan.test.ts` (stages,
-survey, fitting, materials), `test/base-projects.test.ts` (Pax's fortress on a fake world).
+survey, fitting, materials), `test/base-projects.test.ts` (Pax's fortress on a fake world),
+`test/material-source-plan.test.ts` (the material sources).

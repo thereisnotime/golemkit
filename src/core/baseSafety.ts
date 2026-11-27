@@ -26,7 +26,11 @@ export const BaseSafetySettingsSchema = z.object({
   capWith: z.enum(CAP_KINDS).optional().describe('a mine entrance near or inside the base gets: trapdoor | slab | block (filler) over its opening, light (torches only) or none (default trapdoor; a block when it has no trapdoor and can\'t make one)'),
   keepOutDepth: z.number().int().min(0).max(32).optional().describe('digging for stone or ore stays out of the ground under the base and its margin down to this many blocks (default 8; 0 = off)'),
   mineClearance: z.number().int().min(0).max(32).optional().describe('a staircase mine starts at least this many blocks from the base walls (default 4)'),
-  minePlacement: z.enum(MINE_PLACEMENTS).optional().describe('where a new mine may start: outside the walls (default), inside (it gets a cap) or either')
+  minePlacement: z.enum(MINE_PLACEMENTS).optional().describe('where a new mine may start: inside the walls under a hatch (default), outside the walls, or either (inside first)'),
+  mineHatch: z.boolean().optional().describe('a mine inside the walls: shut the hatch behind it on the way down and on the way up, so the base stays closed while it is down there (default on)'),
+  mineKeepClear: z.number().int().min(0).max(8).optional().describe('a mine inside the walls starts at least this many blocks from the gate (default 2)'),
+  retireCloseMines: z.boolean().optional().describe('a known mine outside the walls and within mineClearance of them is capped and no longer used; a new one is started (default on)'),
+  floorHoles: z.boolean().optional().describe('also find holes in the floor surface inside the walls (open to the sky, so not a cavity) and fill them; dirt in a farm plot (default on)')
 }).strict()
 
 export interface BaseSafetySettings {
@@ -41,11 +45,15 @@ export interface BaseSafetySettings {
   keepOutDepth: number
   mineClearance: number
   minePlacement: MinePlacement
+  mineHatch: boolean
+  mineKeepClear: number
+  retireCloseMines: boolean
+  floorHoles: boolean
 }
 
 export const BASE_SAFETY_DEFAULTS: BaseSafetySettings = {
   enabled: true, margin: 4, depth: 8, techniques: [...SAFETY_TECHNIQUES], fillMax: 48, sealMax: 24, lightSpacing: 7,
-  capWith: 'trapdoor', keepOutDepth: 8, mineClearance: 4, minePlacement: 'outside'
+  capWith: 'trapdoor', keepOutDepth: 8, mineClearance: 4, minePlacement: 'inside', mineHatch: true, mineKeepClear: 2, retireCloseMines: true, floorHoles: true
 }
 
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {}
@@ -70,7 +78,11 @@ export function baseSafetySettings (raw: unknown): BaseSafetySettings {
     capWith: oneOf(o.capWith, CAP_KINDS, d.capWith),
     keepOutDepth: num(o.keepOutDepth, d.keepOutDepth, 0, 32),
     mineClearance: num(o.mineClearance, d.mineClearance, 0, 32),
-    minePlacement: oneOf(o.minePlacement, MINE_PLACEMENTS, d.minePlacement)
+    minePlacement: oneOf(o.minePlacement, MINE_PLACEMENTS, d.minePlacement),
+    mineHatch: typeof o.mineHatch === 'boolean' ? o.mineHatch : d.mineHatch,
+    mineKeepClear: num(o.mineKeepClear, d.mineKeepClear, 0, 8),
+    retireCloseMines: typeof o.retireCloseMines === 'boolean' ? o.retireCloseMines : d.retireCloseMines,
+    floorHoles: typeof o.floorHoles === 'boolean' ? o.floorHoles : d.floorHoles
   }
 }
 

@@ -227,7 +227,17 @@ can't change their own.
 | `baseSafety.capWith` | trapdoor / slab / block / light / none | what goes on a mine entrance by or in the base (default trapdoor) |
 | `baseSafety.keepOutDepth` | 0–32 | stone and ore digging stays out of the ground under the base down to this depth (default 8; 0 = off) |
 | `baseSafety.mineClearance` | 0–32 | a new staircase mine starts at least this far from the walls (default 4) |
-| `baseSafety.minePlacement` | outside / inside / either | where a new mine may start (default outside) |
+| `baseSafety.minePlacement` | inside / outside / either | where a new mine may start: inside the walls under a hatch (default), outside them, or either (inside first) |
+| `baseSafety.mineHatch` | on/off | a trapdoor hatch over an inside mine's stairs, opened for a trip and closed after (default on) |
+| `baseSafety.mineKeepClear` | 0–8 | an inside mine starts at least this far from the gate (default 2) |
+| `baseSafety.retireCloseMines` | on/off | an old mine just outside the walls is capped and retired (default on) |
+| `baseSafety.floorHoles` | on/off | fill holes in the floor surface inside the walls, dirt in a farm plot (default on) |
+| `baseSafety.floorHoles` | on/off | also fill holes in the floor surface inside the walls; dirt in a farm plot (default on) |
+| `materials.sources` | list of chests / substitutes / craft / nearby / mine / far | [where build and repair materials come from](./base-projects#where-materials-come-from), in this order; leave one out to turn it off (default all six in that order) |
+| `materials.retryMinutes` | 0–1440 | a source that gave nothing of an item is skipped for it this long (default 30; 0 = always retry) |
+| `materials.mineMinutes` | 1–60 | longest trip down its own mine for build blocks (default 6) |
+| `materials.farDistance` | 8–160 | far: blocks past the base and its keep-out where it starts digging for stone (default 32) |
+| `materials.farTries` | 1–8 | far: spots tried, nearest first (default 3) |
 | `deathSpots.enabled` | on/off | keep out of the spot of a recent death (default on) |
 | `deathSpots.minutes` | 0.5–240 | how long (default 10) |
 | `deathSpots.stepCost` | 0–50 | extra path cost per block inside a death spot (default 8; 0 = paths ignore it) |

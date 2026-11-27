@@ -18,7 +18,7 @@ import { settledBase, type SettledBase } from './baseArea.ts'
 import { getMines, saveMine } from './stairMine.ts'
 import { capItem, placeCap, type PlacedCap } from './caps.ts'
 import {
-  scanBase, planFixes, mineFindings, planMineCaps, mineCells, describeCavity,
+  scanBase, planFixes, mineFindings, planMineCaps, mineCells, describeCavity, planHoleFills, describeHole,
   type Look, type MineRef, type FixStep, type CavityFix, type MineFinding, type ScanResult
 } from './baseSafetyPlan.ts'
 
@@ -63,14 +63,19 @@ export function checkBase (agent: Agent, bot: Bot): BaseCheck | string {
   if (!base) return 'no settled base yet (base projects settle it when work starts, or set settings projects.base)'
   const look = lookFor(bot)
   const refs = mineRefs(agent, bot)
-  const scan = scanBase(base.area, look, { margin: settings.margin, depth: settings.depth }, refs)
+  // a farm plot inside the walls is soil: a hole there is filled with dirt
+  const plot = agent.storage.get<{ farm_plot?: { x0: number, z0: number, size: number } }>('projects.spots', {})?.farm_plot
+  const area = plot ? { ...base.area, soil: (x: number, z: number) => x >= plot.x0 && x < plot.x0 + plot.size && z >= plot.z0 && z < plot.z0 + plot.size } : base.area
+  const scan = scanBase(area, look, { margin: settings.margin, depth: settings.depth, floorHoles: settings.floorHoles }, refs)
   const fixes = planFixes(scan.threats, settings, refs)
   const mines = mineFindings(refs, base.area, look, settings.mineClearance)
   const caps = planMineCaps(mines, settings)
-  const steps = [...caps.steps, ...fixes.flatMap(f => f.steps)].sort((a, b) => (ORDER[a.technique] ?? 9) - (ORDER[b.technique] ?? 9))
+  const holeSteps = planHoleFills(scan.holes)
+  const steps = [...caps.steps, ...holeSteps, ...fixes.flatMap(f => f.steps)].sort((a, b) => (ORDER[a.technique] ?? 9) - (ORDER[b.technique] ?? 9))
   const unfixed = [...caps.unfixed, ...fixes.filter(f => f.unfixed).map(f => `${describeCavity(f.cavity)}: ${f.unfixed}`)]
   const lines = [
     ...mines.filter(f => !f.capped).map(f => `mine ${f.mine.id} at ${fmtPos(f.mine.entrance)}: entrance ${f.problem}${f.caps.length ? `, ${f.caps.length} open block${f.caps.length === 1 ? '' : 's'} to cap` : ''}`),
+    ...scan.holes.map(h => `${describeHole(h)}: fill ${h.deep ? Math.min(3, h.cells.length) : h.cells.length}`),
     ...fixes.map(f => `${describeCavity(f.cavity)}${f.steps.length ? `: ${stepText(f.steps)}` : ''}${f.unfixed ? `; ${f.unfixed}` : ''}`)
   ]
   if (scan.unknown > 0) lines.push(`${scan.unknown} blocks not loaded (not judged)`)
@@ -96,10 +101,16 @@ function stepText (steps: readonly FixStep[]): string {
 
 type Ctx = Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>
 
-/** Gets filler (its chests first, then crafts nothing: cobblestone and dirt are what it digs anyway). */
-async function supplyFiller (ctx: Ctx, need: number): Promise<number> {
+/** Dirt for a hole in a farm plot; stone for the top of a hole in the floor. */
+const SOIL = ['dirt', 'coarse_dirt', 'rooted_dirt', 'grass_block']
+const FLOOR_STONE = ['cobblestone', 'cobbled_deepslate', 'stone', 'andesite', 'stone_bricks', 'mossy_cobblestone']
+
+/** Gets filler (its chests first, then crafts nothing: cobblestone and dirt are what it digs anyway); dirt for `soil` of them. */
+async function supplyFiller (ctx: Ctx, need: number, soil = 0): Promise<number> {
   const bot = ctx.bot as Bot
   const have = () => Object.entries(inventoryCounts(bot)).filter(([k]) => isFiller(k)).reduce((a, [, v]) => a + v, 0)
+  const dirt = () => SOIL.reduce((a, n) => a + (inventoryCounts(bot)[n] ?? 0), 0)
+  if (soil > dirt()) await takeItemsFromOwnChests({ bot, agent: ctx.agent as Agent, signal: ctx.signal }, { dirt: soil - dirt() }, 64).catch(e => { checkAborted(ctx.signal) })
   if (have() >= need) return have()
   await takeItemsFromOwnChests({ bot, agent: ctx.agent as Agent, signal: ctx.signal }, { cobblestone: need - have() }, 64).catch(e => { checkAborted(ctx.signal) })
   return have()
@@ -124,12 +135,12 @@ export async function secureBase (ctx: Ctx, check: BaseCheck, minutes: number): 
   const bot = ctx.bot as Bot
   const { agent, signal, log } = ctx
   const until = Date.now() + minutes * 60_000
-  if (!check.steps.length) return check.unfixed.length ? fail(`nothing I can do: ${check.unfixed.join('; ')}`) : ok('the base is mob-proof: no open cavity, hole or mine entrance by it')
+  if (!check.steps.length) return check.unfixed.length ? fail(`nothing I can do: ${check.unfixed.join('; ')}`) : ok('the base is mob-proof: no open cavity, hole in the floor or mine entrance by it')
   const fills = check.steps.filter(s => s.action === 'fill').length
   const torches = check.steps.filter(s => s.action === 'torch').length
   const caps = check.steps.filter(s => s.action === 'cap')
   const notes: string[] = []
-  if (fills) await supplyFiller(ctx, fills)
+  if (fills) await supplyFiller(ctx, fills, check.steps.filter(s => s.action === 'fill' && s.soil).length)
   if (caps.some(s => s.cap === 'trapdoor')) await supplyTrapdoors(ctx, caps.filter(s => s.cap === 'trapdoor').length)
   if (torches) {
     const t = await supplyTorches(bot, signal, log, Math.min(torches, 16)).catch(e => { checkAborted(signal); return 0 })
@@ -143,7 +154,8 @@ export async function secureBase (ctx: Ctx, check: BaseCheck, minutes: number): 
     if (Date.now() > until) { notes.push(`session over after ${minutes} min`); break }
     try {
       if (s.action === 'fill') {
-        const f = fillerBlock(bot)
+        const carried = (names: readonly string[]) => names.find(n => bot.inventory.items().some(i => i.name === n))
+        const f = (s.soil && carried(SOIL)) || (s.floor && carried(FLOOR_STONE)) || fillerBlock(bot)
         if (!f) { failed.push('out of filler blocks'); break }
         await placeBlockState(bot, f, vec(bot, s.pos.x, s.pos.y, s.pos.z), undefined, signal, { canDig: false })
       } else if (s.action === 'torch') {
@@ -168,9 +180,15 @@ export async function secureBase (ctx: Ctx, check: BaseCheck, minutes: number): 
     }
   }
   // the mine remembers its cap, so its trips take it off and put it back
+  const bs = baseSafetySettings((agent.settings as { baseSafety?: unknown }).baseSafety)
   for (const [id, c] of capped) {
     const m = getMines(agent as Agent).find(x => x.id === id)
-    if (m) saveMine(agent as Agent, { ...m, cap: { cells: [...(m.cap?.cells ?? []), ...c.cells].filter((p, i, a) => a.findIndex(q => q.x === p.x && q.y === p.y && q.z === p.z) === i), kind: c.kind, at: Date.now() } })
+    if (!m) continue
+    const cap = { cells: [...(m.cap?.cells ?? []), ...c.cells].filter((p, i, a) => a.findIndex(q => q.x === p.x && q.y === p.y && q.z === p.z) === i), kind: c.kind, at: Date.now() }
+    // an outside mine hugging the walls is closed for good when its own mine belongs inside (baseSafety.retireCloseMines)
+    const retire = bs.retireCloseMines && !m.inside && !m.retired && bs.minePlacement !== 'outside'
+    saveMine(agent as Agent, { ...m, cap, ...(retire ? { retired: { at: Date.now(), why: 'outside the walls and too close to them: capped, a new mine goes inside the base' } } : {}) })
+    if (retire) notes.push(`retired ${id} (capped; the next mine goes inside the base)`)
   }
   const did = Object.entries(done).map(([t, n]) => `${t} ${n}`).join(', ')
   const after = checkBase(agent as Agent, bot)

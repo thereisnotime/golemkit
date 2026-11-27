@@ -19,12 +19,13 @@ import { vec, gotoWithin, isPlaceFace } from './world.ts'
 import { inventoryCounts } from './toolkit.ts'
 import { rotate, placeCells, bounds, resolveRoles, solidCells, isReplaceableName, isNaturalBlock, FACINGS, type Blueprint, type Facing, type Pos, type WorldCell, type ResolvedRole } from './blueprint.ts'
 import {
-  blueprintStages, stageCells, surveyStage, fitAnchor, interiorOf, fitRow, fitSquare, billOfMaterials, fmtBom, chestTakes, sessionWants,
+  blueprintStages, stageCells, surveyStage, fitAnchor, interiorOf, fitRow, fitSquare, billOfMaterials, fmtBom, sessionWants,
   projectWords, projectNamed, safeToWork, EXTRA_PROJECTS, type Stage, type Interior, type Column, type Fit, type AnchorCandidate, type ProjectDef
 } from './basePlan.ts'
 import { buildStructure, ownBlocks, getPlacements, planSite } from './construction.ts'
-import { gatherMaterials, wantsForRoles, countWant } from './materials.ts'
-import { chestView, chestTotals, takeItemsFromOwnChests, takeWoodFromOwnChests } from './containers.ts'
+import { wantsForRoles, countWant } from './materials.ts'
+import { gatherFromSources, previewSources, fmtSourcePlan, lastSourceRun, fmtSourceRun } from './materialSources.ts'
+import { chestView, chestTotals } from './containers.ts'
 import { loadLibrary } from './blueprint-library.ts'
 import { libraryDirs } from './blueprint-library.ts'
 import { getHome, getPlaces, setPlace } from './navigation.ts'
@@ -391,6 +392,18 @@ function bomOf (agent: Agent, bot: Bot, p: Surveyed): ReturnType<typeof billOfMa
   return billOfMaterials(p.todo, p.roles, inventoryCounts(bot), storedTotals(agent, bot))
 }
 
+/** Where a project's materials would come from now ("materials: using chests (...); skipped ..."), or '' when nothing is short. */
+function sourcesLine (agent: Agent, bot: Bot, sv: Surveyed): string {
+  if (!sv.todo?.length || !sv.roles || !needsSurvival(bot)) return ''
+  const w = wantsForRoles(sv.todo, sv.roles)
+  if (!Object.keys(w.required).length) return ''
+  try {
+    const plan = previewSources(agent, bot, w.required, w.accepts)
+    if (!plan.steps.length && !Object.keys(plan.short).length) return ''
+    return `materials: ${fmtSourcePlan(plan)}`.slice(0, 300)
+  } catch { return '' }
+}
+
 export function planLines (agent: Agent, bot: Bot, p: BasePlan, detail: boolean): string[] {
   const b = p.survey.base
   const paused = p.state.paused ? `, paused by ${p.state.paused.by}` : p.settings.paused ? ', paused' : ''
@@ -399,10 +412,17 @@ export function planLines (agent: Agent, bot: Bot, p: BasePlan, detail: boolean)
   if (detail) {
     for (const s of p.survey.projects) {
       const bom = s.info.left > 0 ? fmtBom(bomOf(agent, bot, s)) : ''
-      const text = [s.note, bom].filter(Boolean).join('; ')
+      const src = s.info.left > 0 ? sourcesLine(agent, bot, s) : ''
+      const text = [s.note, bom, src].filter(Boolean).join('; ')
       if (text) lines.push(`  ${s.info.name}: ${text}`)
     }
   }
+  // where the next project's materials would come from, and the last run's sources
+  const nextSv = p.step.kind === 'work' ? p.survey.projects.find(x => x.info.name === (p.step as { entry: QueueEntry }).entry.info.name) : undefined
+  const nextSrc = !detail && nextSv ? sourcesLine(agent, bot, nextSv) : ''
+  if (nextSrc) lines.push(`  ${nextSv!.info.name}: ${nextSrc}`)
+  const last = lastSourceRun(agent)
+  if (last) lines.push(`last ${fmtSourceRun(last)} (${Math.round((Date.now() - last.at) / 60_000)} min ago)`.slice(0, 300))
   if (p.holds) lines.push(`an LLM goal about building is active, the projects wait: ${p.survey.goal!.text.slice(0, 100)}`)
   else if (p.survey.goal && p.survey.projects.some(x => x.info.requestedBy)) lines.push(`from the paused goal "${p.survey.goal.text.slice(0, 80)}": ${p.survey.projects.filter(x => x.info.requestedBy).map(x => x.info.name).join(', ')} count as asked for by ${p.survey.goal.owner ?? 'an owner'}`)
   lines.push(`next: ${p.step.kind === 'none' ? p.step.why : `${p.step.kind === 'ask' ? 'ask about' : 'work on'} ${p.step.entry.info.name}`}`)
@@ -424,7 +444,6 @@ export function askOwners (agent: Agent, bot: Bot, p: BasePlan, entry: QueueEntr
   return text
 }
 
-const WOODY = /^(planks|log|door|trapdoor|ladder|chest|crafting_table|fence|fence_gate|stick)$|_(planks|log|door|fence)$/
 
 type Ctx = Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log' | 'player'>
 
@@ -447,28 +466,19 @@ async function withTime<T> (ctx: Ctx, ms: number, fn: (c: Ctx) => Promise<T>): P
   }
 }
 
-/** Takes from its chests, then gathers (bounded), what this session's part of the project needs. */
+/**
+ * Gets this session's part of what the project needs from the material sources in order
+ * (settings.materials.sources: its chests, substitutes the stage's roles take, crafting, digging
+ * close by, its own mine, stone further out), bounded by gatherMinutes and carry.
+ */
 async function supply (ctx: Ctx, sv: Surveyed, s: ProjectsSettings, notes: string[]): Promise<void> {
-  const { bot, agent } = ctx as { bot: Bot, agent: Agent }
+  const { bot } = ctx as { bot: Bot, agent: Agent }
   if (!sv.todo?.length || !sv.roles || !needsSurvival(bot)) return
-  const stored = storedTotals(agent, bot)
-  const bom = billOfMaterials(sv.todo, sv.roles, inventoryCounts(bot), stored)
-  const takes = chestTakes(bom, sv.roles, stored, s.carry)
-  if (Object.keys(takes).length) {
-    const t = await takeItemsFromOwnChests({ bot, agent, signal: ctx.signal }, takes, 64).catch(e => { checkAborted(ctx.signal); return { took: {}, units: 0, notes: [(e as Error).message] } })
-    if (t.units) notes.push(`took ${Object.entries(t.took).map(([k, v]) => `${v} ${k}`).join(', ')} from my chests`)
-  }
   const wants = wantsForRoles(sv.todo, sv.roles)
   const req = sessionWants(wants.required, s.carry)
-  const short = () => Object.entries(req).filter(([k, n]) => countWant(k, inventoryCounts(bot)) < n)
-  if (!short().length) return
-  if (short().some(([k]) => WOODY.test(k)) && countWant('log', inventoryCounts(bot)) < 4) {
-    const w = await takeWoodFromOwnChests({ bot, agent, signal: ctx.signal }, 32).catch(e => { checkAborted(ctx.signal); return { took: {}, units: 0, notes: [(e as Error).message] } })
-    if (w.units) notes.push(`took ${Object.entries(w.took).map(([k, v]) => `${v} ${k}`).join(', ')} for wood`)
-  }
-  if (!short().length || !agent.canDig) return
-  const g = await withTime(ctx, s.gatherMinutes * 60_000, c => gatherMaterials(c, req, { optional: sessionWants(wants.optional, 32), fallbacks: wants.fallbacks }))
-  notes.push(g.timedOut ? `gathered for ${s.gatherMinutes} min` : `gathered: ${g.value?.message.slice(0, 160)}`)
+  if (!Object.entries(req).some(([k, n]) => countWant(k, inventoryCounts(bot)) < n)) return
+  const g = await gatherFromSources(ctx, req, { optional: sessionWants(wants.optional, 32), fallbacks: wants.fallbacks, accepts: wants.accepts, minutes: s.gatherMinutes })
+  notes.push(g.message.slice(0, 240))
 }
 
 /** The gate: the door's lower half, the spot in front of it outside and the first spot inside. */

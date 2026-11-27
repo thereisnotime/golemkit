@@ -333,6 +333,10 @@ another one.
 
 ## Gathering
 
+Builds, base project sessions and `gather_materials` take what they need from a list of
+[material sources](./base-projects#where-materials-come-from) in order: its chests, substitutes
+the blueprint accepts, crafting, digging close by, its own staircase mine, stone further out.
+
 **Wood.** `chop_tree` cuts the trunk from the ground, then climbs what is out of reach: it
 stands where the bottom log was, cuts everything in reach, pillars one block (dirt, cobblestone
 or one of the logs) and repeats, and digs the pillar again on the way down. After a short wait

@@ -218,6 +218,65 @@ export interface EntranceCandidate {
 /** How many of the first steps down must plan safely for an entrance. */
 export const ENTRANCE_STEPS = 4
 
+// ------------------------------------------------------------------ a mine inside the base
+
+/** Stair steps whose digging cuts through the ground level (the floor): where the hatch goes. */
+export const HATCH_STEPS = 3
+
+/** The blocks the first `steps` stair steps dig (feet, head and the one above for each step). Pure. */
+export function stairDigCells (entrance: P, dir: Dir, steps = HATCH_STEPS): P[] {
+  const out: P[] = []
+  for (let i = 1; i <= steps; i++) {
+    const feet = { x: entrance.x + dir.x * i, y: entrance.y - i, z: entrance.z + dir.z * i }
+    out.push(feet, { ...feet, y: feet.y + 1 }, { ...feet, y: feet.y + 2 })
+  }
+  return out
+}
+
+/** Where the hatch over a mine's stairs goes: the ground-level block (one below the entrance feet) of each of the first HATCH_STEPS stair columns. Pure. */
+export function hatchCells (entrance: P, dir: Dir): P[] {
+  const out: P[] = []
+  for (let i = 1; i <= HATCH_STEPS; i++) out.push({ x: entrance.x + dir.x * i, y: entrance.y - 1, z: entrance.z + dir.z * i })
+  return out
+}
+
+export interface InsideSpotInput {
+  /** Columns inside the walls (the floor). */
+  cols: readonly { x: number, z: number }[]
+  /** A column that may hold the entrance or the hatch (nothing on it, not kept for something else). */
+  free: (c: { x: number, z: number }) => boolean
+  /** Spots to keep `keepClear` blocks away from (the gate). */
+  avoid?: readonly { x: number, z: number }[]
+  keepClear?: number
+}
+
+/**
+ * Spots for a staircase mine inside the base: the column the bot stands on to start and the
+ * HATCH_STEPS columns its stairs cut through the floor, in a straight line, all inside, all free,
+ * none within keepClear of the gate. Along a wall first (the hatch doesn't cut the yard in two),
+ * then furthest from the gate. Pure.
+ */
+export function insideEntrances (i: InsideSpotInput): { pos: { x: number, z: number }, dir: Dir, alongWall: boolean }[] {
+  const inside = new Set(i.cols.map(c => `${c.x},${c.z}`))
+  const isIn = (x: number, z: number) => inside.has(`${x},${z}`)
+  const clear = i.keepClear ?? 2
+  const nearGate = (c: { x: number, z: number }) => (i.avoid ?? []).some(a => Math.abs(a.x - c.x) + Math.abs(a.z - c.z) <= clear)
+  const gateDist = (c: { x: number, z: number }) => Math.min(99, ...(i.avoid ?? []).map(a => Math.abs(a.x - c.x) + Math.abs(a.z - c.z)))
+  const DIRS4: Dir[] = [{ x: 1, z: 0 }, { x: -1, z: 0 }, { x: 0, z: 1 }, { x: 0, z: -1 }]
+  const out: { pos: { x: number, z: number }, dir: Dir, alongWall: boolean, score: number }[] = []
+  for (const c of i.cols) {
+    for (const d of DIRS4) {
+      const line = [0, 1, 2, 3].map(k => ({ x: c.x + d.x * k, z: c.z + d.z * k })).slice(0, HATCH_STEPS + 1)
+      if (!line.every(q => isIn(q.x, q.z) && i.free(q) && !nearGate(q))) continue
+      // a wall on the same side of every hatch column
+      const sides: Dir[] = [{ x: d.z, z: -d.x }, { x: -d.z, z: d.x }]
+      const alongWall = sides.some(sd => line.slice(1).every(q => !isIn(q.x + sd.x, q.z + sd.z)))
+      out.push({ pos: c, dir: d, alongWall, score: (alongWall ? 100 : 0) + Math.min(...line.map(gateDist)) })
+    }
+  }
+  return out.sort((a, b) => b.score - a.score).map(({ pos, dir, alongWall }) => ({ pos, dir, alongWall }))
+}
+
 /** Why a candidate is no good, or null. Pure. */
 export function entranceProblem (c: EntranceCandidate, s: Pick<StairMineSettings, 'radius' | 'minFromHome'>): string | null {
   if (c.homeDist > s.radius) return `more than ${s.radius} blocks from home`
@@ -352,6 +411,10 @@ export interface MineSite {
   got: Record<string, number>
   /** A cap over the stairs where they cut the ground (base safety, near the base): taken off for a trip, put back after. */
   cap?: { cells: P[], kind: string, at: number }
+  /** Inside the base walls: its hatch is closed behind the bot on the way down and up (baseSafety.mineHatch). */
+  inside?: boolean
+  /** No more trips: too close to the base walls outside them (capped by base safety); when and why. */
+  retired?: { at: number, why: string }
 }
 
 /** Torches (carried, or 4 per coal and stick it could craft) it needs before it starts a mine at night. */
@@ -415,7 +478,7 @@ export function nextMineName (names: readonly string[]): string {
 
 /** Which remembered mine to use: same dimension, entrance within `radius` of home, not bad; the most worked first. Pure. */
 export function pickMine (mines: readonly MineSite[], home: P | null, radius: number, dim: string | undefined, bad: (id: string) => boolean): MineSite | null {
-  const ok = mines.filter(m => !bad(m.id) && (!m.dim || !dim || m.dim === dim) &&
+  const ok = mines.filter(m => !m.retired && !bad(m.id) && (!m.dim || !dim || m.dim === dim) &&
     (!home || Math.hypot(m.entrance.x - home.x, m.entrance.z - home.z) <= radius + 8))
   return ok.sort((a, b) => (b.bottom ? 1 : 0) - (a.bottom ? 1 : 0) || b.mainSteps - a.mainSteps || b.lastAt - a.lastAt)[0] ?? null
 }

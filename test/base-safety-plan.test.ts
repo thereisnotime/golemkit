@@ -2,7 +2,7 @@
 // which of them are threats, the fix techniques and where a mine may start.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { scanBase, planFixes, torchSpots, fillOrder, mineSpotProblem, describeCavity, whereOf, mineFindings, planMineCaps, mineCells, type BaseArea, type Cell, type Pos } from '../src/skills/baseSafetyPlan.ts'
+import { scanBase, planHoleFills, describeHole, planFixes, torchSpots, fillOrder, mineSpotProblem, describeCavity, whereOf, mineFindings, planMineCaps, mineCells, type BaseArea, type Cell, type Pos } from '../src/skills/baseSafetyPlan.ts'
 import { BASE_SAFETY_DEFAULTS, baseSafetySettings, deathSpotsSettings } from '../src/core/baseSafety.ts'
 
 // a 9x9 base (walls on the ring, inside 1..7) with its floor at y 10 on solid stone; open sky above
@@ -179,4 +179,41 @@ test('base safety settings: defaults, wrong values and false', () => {
   assert.equal(t.capWith, 'slab')
   assert.equal(deathSpotsSettings(false).enabled, false)
   assert.equal(deathSpotsSettings({ minutes: 3 }).minutes, 3)
+})
+
+test('base safety: a hole in the floor open to the sky is found and filled bottom up, the top in stone', () => {
+  // a 2-deep hole in the floor at 3,3: lit, so no cavity, but a hole all the same
+  const r = scanBase(AREA, world([{ x: 3, y: 10, z: 3 }, { x: 3, y: 9, z: 3 }]), O)
+  assert.equal(r.threats.length, 0)
+  assert.equal(r.holes.length, 1)
+  assert.deepEqual(r.holes[0]!.cells, [{ x: 3, y: 9, z: 3 }, { x: 3, y: 10, z: 3 }])
+  const steps = planHoleFills(r.holes)
+  assert.deepEqual(steps.map(s => s.pos.y), [9, 10])
+  assert.equal(steps[1]!.floor, true)
+  assert.equal(steps[0]!.floor, undefined)
+  assert.match(describeHole(r.holes[0]!), /hole in the floor at 3 10 3: 2 blocks deep/)
+  // under the walls or outside is not a floor hole; off with floorHoles false
+  assert.equal(scanBase(AREA, world([{ x: 0, y: 10, z: 3 }]), O).holes.length, 0)
+  assert.equal(scanBase(AREA, world([{ x: 3, y: 10, z: 3 }]), { ...O, floorHoles: false }).holes.length, 0)
+})
+
+test('base safety: floor holes in a farm plot get dirt; water and a mine entrance inside are no holes', () => {
+  const soil = { ...AREA, soil: (x: number, z: number) => x >= 5 && x <= 6 && z >= 5 && z <= 6 }
+  const r = scanBase(soil, world([{ x: 5, y: 10, z: 5 }]), O)
+  assert.equal(r.holes[0]!.soil, true)
+  assert.equal(planHoleFills(r.holes)[0]!.soil, true)
+  const wet = (p: Pos): Cell => (p.x === 4 && p.z === 4 && p.y === 10 ? { name: 'water', solid: false, sky: 15 } : world()(p))
+  assert.equal(scanBase(AREA, wet, O).holes.length, 0)
+  const mine = { id: 'mine:1', entrance: { x: 2, y: 11, z: 2 }, cells: [{ x: 2, y: 10, z: 2 }] }
+  assert.equal(scanBase(AREA, world([{ x: 2, y: 10, z: 2 }]), O, [mine]).holes.length, 0)
+})
+
+test('base safety: a hole down into a tunnel is filled down its lit column, the dark tunnel still a threat', () => {
+  const holes = [...tunnel(2, 6, 4), ...shaft(4, 4, 8)]
+  const r = scanBase(AREA, world(holes), O)
+  assert.ok(r.threats.length > 0)
+  const h = r.holes.find(x => x.x === 4 && x.z === 4)!
+  assert.equal(h.deep, false)
+  // the sky-lit column goes down through the tunnel to its floor
+  assert.deepEqual(h.cells.map(c => c.y), [6, 7, 8, 9, 10])
 })

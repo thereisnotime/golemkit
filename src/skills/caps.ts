@@ -55,6 +55,13 @@ export async function takeCapsOff (bot: Bot, cells: readonly Pos[], signal: Abor
     checkAborted(signal)
     const b = bot.blockAt(vec(bot, p.x, p.y, p.z))
     if (!b || !isCapBlock(b.name, b.boundingBox === 'block')) continue
+    // a wooden trapdoor is a hatch: opened, not broken (iron ones need redstone, those are dug)
+    if (/_trapdoor$/.test(b.name) && !/^iron_/.test(b.name)) {
+      try {
+        if ((b.getProperties() as { open?: unknown }).open !== true) { await reachToDig(bot, b.position, signal); await bot.activateBlock(b); n++ }
+      } catch (e) { checkAborted(signal) }
+      continue
+    }
     try {
       await reachToDig(bot, b.position, signal)
       await equipFor(bot, b)

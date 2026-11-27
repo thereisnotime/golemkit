@@ -13,6 +13,8 @@ import { planBase, planLines, gateOf } from '../src/skills/projects.ts'
 import { loadBlueprints, rotate, placeCells } from '../src/skills/blueprint.ts'
 import { fakeBot, WORLDS } from './fake-world.ts'
 import { attachFakeBot } from './fake-attach.ts'
+import { addOwnChest, opened } from '../src/skills/containers.ts'
+import { previewSources } from '../src/skills/materialSources.ts'
 
 const SERVER = { host: 'golden.invalid', port: 25565, auth: 'offline' as const, version: '1.21.1' }
 const tmp = mkdtempSync(join(tmpdir(), 'golemkit-projects-'))
@@ -112,4 +114,28 @@ test('the project action: owners only; pause stops the work', async () => {
   const r = await agent.act('plan_base', {}, { caller: { kind: 'player', name: 'pe4ka' }, priority: 50, player: 'pe4ka' })
   assert.ok(r.ok)
   assert.match(r.message, /paused by pe4ka/)
+})
+
+test('materials: the plan takes cobblestone from its chest first, digging only for the rest', () => {
+  const { agent, bot } = paxAgent()
+  // a chest inside the walls it looked into: plenty of cobblestone
+  const chest = { x: 557, y: 68, z: -44 }
+  const blockAt0 = bot.blockAt
+  bot.blockAt = (p: Vec3) => (Math.floor(p.x) === chest.x && Math.floor(p.y) === chest.y && Math.floor(p.z) === chest.z
+    ? { name: 'chest', position: new Vec3(chest.x, chest.y, chest.z), getProperties: () => ({}) }
+    : blockAt0(p))
+  addOwnChest(agent, chest)
+  opened(agent, bot, bot.blockAt(new Vec3(chest.x, chest.y, chest.z)), [{ name: 'cobblestone', count: 64 }, { name: 'cobblestone', count: 64 }] as never)
+  const p = planBase(agent, bot)
+  assert.ok(typeof p !== 'string')
+  if (typeof p === 'string') return
+  const lines = planLines(agent, bot, p, true)
+  const floor = lines.find(l => /^ {2}floor: /.test(l))!
+  // it carries 40 of the 139: the other 99 from the chest, nothing dug
+  assert.match(floor, /materials: using chests \(my chests hold 99 cobblestone\)/)
+  assert.doesNotMatch(floor, /nearby \(|mine \(/)
+  // more than the chest holds: the rest is dug close by first, its mine and stone further out only if that falls short
+  const plan = previewSources(agent, bot, { cobblestone: 200 })
+  assert.deepEqual(plan.steps.map(s => [s.source, s.items.cobblestone]), [['chests', 128], ['nearby', 32]])
+  assert.match(plan.skipped.find(s => s.source === 'far')?.why ?? '', /only if nearby falls short|no stone pickaxe/)
 })

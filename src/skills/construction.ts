@@ -7,7 +7,7 @@
 // blocks that are already right.
 import type { Bot } from 'mineflayer'
 import type { ActionContext, ActionResult, Agent } from '../core/index.ts'
-import { defineSkill, defineAction, z, ok, fail, checkAborted, sleep, fmtPos, goals, travel } from '../core/index.ts'
+import { defineSkill, defineAction, z, ok, fail, checkAborted, sleep, fmtPos, goals, travel, materialSourcesSettings } from '../core/index.ts'
 import { vec, digBlock, DigRefusedError, gotoWithin, isReplaceable, findItem } from './world.ts'
 import { equipFor, inventoryCounts, ensureTool } from './toolkit.ts'
 import {
@@ -17,7 +17,9 @@ import {
 } from './blueprint.ts'
 import { checkCell, fixFor, familyOf, summarize, skipReason, finishDespiteUnreachable, underForeignRoof, distToBlock, UNREACHABLE, EYE, type QualityRow } from './blockstate.ts'
 import { placeBlockState, toggleBlock, reachToDig, newStandMemory, NotPlaceableYet, PLACE_REACH, type StandMemory } from './placement.ts'
-import { gatherMaterials, wantsForRoles, type RoleWants } from './materials.ts'
+import { wantsForRoles, type RoleWants } from './materials.ts'
+import { gatherFromSources } from './materialSources.ts'
+import { takeItemsFromOwnChests } from './containers.ts'
 import { isCreative, takeFromCreative } from './creative.ts'
 import { libraryDirs, loadLibrary } from './blueprint-library.ts'
 import { chooseMethod, creativeSettings, cellBlocks, planCommands, runCommands, handPause, BUILD_METHODS, type BuildMethod } from './creative-build.ts'
@@ -498,7 +500,7 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
   if ((params.gather || isCreative(bot)) && rows.some(r => r.missing)) {
     const want = wantsForRoles([...diff.place, ...diff.dig], roles)
     log.info('gathering materials before building', { need: fmtMaterials(rows) })
-    const g = await gatherMaterials(ctx, want.required, { optional: want.optional, fallbacks: want.fallbacks, theme })
+    const g = await gatherFromSources(ctx, want.required, { optional: want.optional, fallbacks: want.fallbacks, accepts: want.accepts, ...(theme ? { theme } : {}) })
     gatherNote = leftOut + methodNote + (isCreative(bot) ? `${g.message}; ` : `gathered first (${g.message}); `)
     log.info('materials gathered', { ok: g.ok, result: g.message })
     checkAborted(signal)
@@ -626,6 +628,12 @@ export async function buildStructure (ctx: BuildCtx, params: BuildParams): Promi
   try {
     // 1. site preparation: fill dips under the floor (clutter in the footprint is dug as cells come up)
     if (planned.fills.length) {
+      // dirt for the dips out of its chests first (material source chests): without filler they stay open under the floor
+      const open = planned.fills.filter(f => isReplaceable(at(f))).length
+      const filler = FILL_ITEMS.reduce((n, i) => n + (inventoryCounts(bot)[i] ?? 0), 0)
+      if (!creative && open > filler && materialSourcesSettings((agent.settings as { materials?: unknown }).materials).sources.includes('chests')) {
+        await takeItemsFromOwnChests({ bot, agent: agent as Agent, signal }, { dirt: open - filler }, 64).catch(e => { checkAborted(signal); log.debug('site prep: no dirt from chests', { error: (e as Error).message }) })
+      }
       prep = await prepareGround(ctx, planned.fills, stands)
       if (prep.filled || prep.short) log.info('site prepared', { filled: prep.filled, short: prep.short })
     }

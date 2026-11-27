@@ -36,6 +36,8 @@ export interface BaseArea {
   floorY: number
   /** Columns inside the walls. */
   inside: (x: number, z: number) => boolean
+  /** Columns kept for soil (a farm plot): an empty one is a hole too, filled with dirt. */
+  soil?: (x: number, z: number) => boolean
 }
 
 export interface ScanOptions {
@@ -47,7 +49,12 @@ export interface ScanOptions {
   above?: number
   /** Sky light below this is underground. Default 4. */
   skyDark?: number
+  /** Also report holes in the floor surface inside the walls. Default true. */
+  floorHoles?: boolean
 }
+
+/** Blocks at floor level that are meant to be open and are no hole: a farm's water. */
+const MEANT_OPEN = /^(water|lava|bubble_column)$/
 
 /** A mine the bot dug (stairMine.ts): its entrance and the blocks it dug (stairs, tunnel), as far as known. */
 export interface MineRef { id: string, entrance: Pos, cells: Pos[] }
@@ -72,8 +79,22 @@ export interface Cavity {
   mines: string[]
 }
 
+/** A hole in the floor surface inside the walls: open to the sky, so not a cavity, but a gap in the floor all the same. */
+export interface FloorHole {
+  x: number
+  z: number
+  /** Open blocks to fill, bottom up, ending with the floor block. */
+  cells: Pos[]
+  /** In a column kept for soil (a farm plot): filled with dirt, not stone. */
+  soil: boolean
+  /** It goes deeper than the scan looks: only the top of it is filled. */
+  deep: boolean
+}
+
 export interface ScanResult {
   cavities: Cavity[]
+  /** Holes in the floor surface inside the walls (not part of a cavity). */
+  holes: FloorHole[]
   /** The ones that matter: an opening, and spawn spots or a way into the base. */
   threats: Cavity[]
   /** Blocks not loaded (the scan can't tell). */
@@ -167,7 +188,47 @@ export function scanBase (area: BaseArea, look: Look, o: ScanOptions, mines: rea
     }
   }
   const threats = cavities.filter(c => c.openings.length > 0 && (c.spawnable.length > 0 || c.openings.some(p => p.where !== 'near')))
-  return { cavities, threats, unknown, box }
+  // holes in the floor surface: an open floor block inside the walls that the sky reaches. It
+  // isn't dark, so it isn't a cavity, but it is a hole in the floor (a mob can stand in it, the
+  // bot and its owner fall in), and the floor stage may not see it (a farm plot, a cell under a hut)
+  const holes: FloorHole[] = []
+  if (o.floorHoles !== false) {
+    const y = area.floorY
+    // a mine's stairs inside the walls are capped, not filled
+    const mineCols = new Set(mines.flatMap(m => [m.entrance, ...m.cells]).map(p => `${p.x},${p.z}`))
+    for (let x = area.min.x; x <= area.max.x; x++) {
+      for (let z = area.min.z; z <= area.max.z; z++) {
+        if (!area.inside(x, z) || mineCols.has(`${x},${z}`)) continue
+        const top = at({ x, y, z })
+        if (!top || top.solid || MEANT_OPEN.test(top.name) || seen.has(k({ x, y, z }))) continue
+        const cells: Pos[] = []
+        let deep = true
+        for (let yy = y; yy >= y - o.depth; yy--) {
+          const c = at({ x, y: yy, z })
+          if (!c) break
+          if (c.solid || seen.has(k({ x, y: yy, z }))) { deep = false; break }
+          cells.push({ x, y: yy, z })
+        }
+        holes.push({ x, z, cells: cells.reverse(), soil: !!area.soil?.(x, z), deep })
+      }
+    }
+  }
+  return { cavities, threats, holes, unknown, box }
+}
+
+/** The steps for the floor holes: fill each, bottom up (a deep one only its top 3). Pure. */
+export function planHoleFills (holes: readonly FloorHole[]): FixStep[] {
+  return holes.flatMap(h => {
+    const cells = h.deep ? h.cells.slice(-3) : h.cells
+    // the floor block itself in stone (dirt in a farm plot), what is under it with any filler
+    return cells.map((pos, i) => ({ technique: 'seal' as const, action: 'fill' as const, pos, ...(h.soil ? { soil: true } : i === cells.length - 1 ? { floor: true } : {}) }))
+  })
+}
+
+/** One line per hole for chat and status. Pure. */
+export function describeHole (h: FloorHole): string {
+  const top = h.cells.at(-1) ?? { x: h.x, y: 0, z: h.z }
+  return `hole in the floor at ${top.x} ${top.y} ${top.z}: ${h.cells.length}${h.deep ? '+' : ''} block${h.cells.length === 1 ? '' : 's'} deep${h.soil ? ' (farm plot: dirt)' : ''}`
 }
 
 // ------------------------------------------------------------------ fixes
@@ -180,6 +241,10 @@ export interface FixStep {
   /** cap: what goes there. */
   cap?: Exclude<CapKind, 'light' | 'none'>
   mine?: string
+  /** fill with dirt (a farm plot), not stone. */
+  soil?: boolean
+  /** fill with a stone block if it has one: the top of a hole in the floor. */
+  floor?: boolean
 }
 
 export interface FixOptions {

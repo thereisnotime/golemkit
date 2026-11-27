@@ -69,6 +69,22 @@ test('survey: old plank walls count, dirt is dug, a hut on the floor and someone
   assert.equal(surveyStage(floor, () => undefined, roles, { canDig: true }).unknown.length, floor.length)
 })
 
+test('survey: a hole in the floor counts even under a build or a torch on top (only a block in the cell is left alone)', () => {
+  const { cells, roles, stages } = world()
+  const floor = stageCells(cells, stages[1]!, stages)
+  const blocks = new Map<string, string>()
+  for (const c of floor) blocks.set(key(c), 'cobblestone')
+  const hole = floor[30]!
+  blocks.delete(key(hole))
+  blocks.set(key({ ...hole, y: hole.y + 1 }), 'chest') // something stands over the gap
+  const at = (p: Pos) => blocks.get(key(p)) ?? 'air'
+  const planned = new Set(cells.map(key))
+  const fs = surveyStage(floor, at, roles, { canDig: true, skipCovered: true, planned: p => planned.has(key(p)) })
+  assert.equal(fs.covered.length, 0)
+  assert.deepEqual(fs.todo.map(key), [key(hole)])
+  assert.equal(fs.done.length, fs.total - 1)
+})
+
 test('anchor: fits the fortress one block below the old origin, and picks the gate side', () => {
   const { cells, roles, stages } = world(fortress, ORIGIN, 'north')
   const standing = new Set(solidCells(stageCells(cells, stages[0]!, stages)).filter(c => roles[c.role]!.kind === 'block' && c.y > ORIGIN.y).map(key))

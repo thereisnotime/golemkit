@@ -39,6 +39,16 @@ column by column, so they don't look dark, but an entrance inside the base, on i
 `mineClearance` of them is a way under the walls. Its fix is a cap over the stairs where they cut
 through the ground.
 
+### Holes in the floor
+
+A hole in the floor open to the sky is no cavity (it isn't dark), but the owner still sees a hole
+and falls in. With `floorHoles` on (default) the scan also lists every open block at floor level
+in a column inside the walls, down to the first solid block (at most `depth`): a farm's water, a
+known mine's stairs (they get a cap) and cells that are part of a cavity (sealed with it) are
+left out. The fix fills each hole from the bottom up, the floor block itself in stone when it
+carries some; in the farm plot base projects keep inside the walls, with dirt. These steps come
+first in the `integrity` project, with the seals.
+
 ## Fixes
 
 The techniques run in the order of `techniques` (default `cap, fill, seal, light`); each one takes
@@ -71,10 +81,34 @@ base footprint and its margin down to `keepOutDepth` below the floor, and blocks
 spot. When the bot needs a staircase down to stone from inside the base, it first walks out past
 the keep-out. Builds and the fixes above don't ask the keep-out.
 
-A new staircase mine starts at least `mineClearance` blocks from the walls (`minePlacement:
-outside`), or inside the walls (`inside`, and it gets a cap), or either. Its stairs don't dig
-through the keep-out. A known mine that is too close and not capped is marked `unsafe` by its
-site check, so the next trip digs a new one at a better spot while the old one gets its cap.
+## Its own mine, inside the walls
+
+The keep-out is for stray tunnels: Pax dug 129 blocks of cave under its own floor fetching stone,
+and skeletons spawned in it. A player doesn't stop digging under the base for that; they put a
+shaft inside it with a hatch and go down there. So does the bot (`minePlacement: inside`, the
+default):
+
+- The entrance is a straight line of free floor columns inside the walls: the spot it starts from
+  and the `HATCH_STEPS` (3) columns its stairs cut through the floor. Along a wall first (the hatch
+  doesn't cut the yard in two), at least `mineKeepClear` (2) from the gate, never on the farm plot,
+  the workshop or the storage row (`insideEntrances` in stairMinePlan.ts).
+- Its stairs may dig the base's own floor there, and only there: blocks the bot placed or cells of
+  the base blueprint. Everywhere else the keep-out holds.
+- `mineHatch` (on): a trapdoor on each floor cell the stairs cut (`hatchCells`), put on after the
+  first trip. It makes two from 6 planks (or 2 logs) when it has none. A wooden trapdoor is opened
+  for a trip and closed after it, not broken and replaced. The site check and the floor stage leave
+  the hatch and the shaft alone.
+- `retireCloseMines` (on): an old mine outside the walls and within `mineClearance` of them is
+  capped by the integrity check and retired (no more trips); the next trip starts the inside one.
+- `minePlacement: outside` keeps the old rule (at least `mineClearance` from the walls, no digging
+  through the keep-out); `either` tries inside first. With no settled base yet it starts near home.
+
+| setting | default | what it does |
+|---|---|---|
+| `baseSafety.minePlacement` | `inside` | inside under a hatch, `outside`, or `either` |
+| `baseSafety.mineHatch` | on | trapdoor hatch over an inside mine's stairs |
+| `baseSafety.mineKeepClear` | 2 | an inside mine keeps this far from the gate |
+| `baseSafety.retireCloseMines` | on | cap and retire an outside mine hugging the walls |
 
 ## Death spots
 
@@ -106,6 +140,7 @@ Profile key `baseSafety:` (or `false`), live with `config_set baseSafety.*`:
 | `keepOutDepth` | 8 | no stone digging under the base down to this depth; 0 = off |
 | `mineClearance` | 4 | a new mine starts at least this far from the walls |
 | `minePlacement` | outside | outside, inside or either |
+| `floorHoles` | on | also fill holes in the floor surface inside the walls (dirt in a farm plot) |
 
 Profile key `deathSpots:` (or `false`): `enabled` (on), `minutes` (10), `radius` (6), `yRange` (4),
 `stepCost` (8).

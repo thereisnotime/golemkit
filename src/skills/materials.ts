@@ -22,6 +22,7 @@ import { remainingWants } from './construction.ts'
 import { autoUpgrade, gatherStone, pickBuildMaterial } from './progression.ts'
 import { makeRoom } from './efficiency.ts'
 import { isCreative, takeFromCreative } from './creative.ts'
+import { gatherFromSources, lastSourceRun, fmtSourceRun } from './materialSources.ts'
 
 /**
  * What one craft costs and makes. `table`: needs a crafting table (3x3 grid). Non-wood inputs:
@@ -325,6 +326,8 @@ export interface RoleWants {
   optional: Record<string, number>
   /** For optional items that may be unobtainable: what to get instead ({ glass_pane: { fence: 7 } }). */
   fallbacks: Record<string, Record<string, number>>
+  /** Per key, the patterns of every role that wants it: another block matching all of them can stand in (andesite for a cobblestone floor). */
+  accepts: Record<string, RegExp[]>
 }
 
 /** Shopping list for blueprint cells still to place (required and optional parts, and fallbacks). */
@@ -332,10 +335,12 @@ export function wantsForRoles (cells: { role: string, passive?: boolean }[], rol
   const required: Record<string, number> = {}
   const optional: Record<string, number> = {}
   const fallbacks: Record<string, Record<string, number>> = {}
+  const accepts: Record<string, RegExp[]> = {}
   for (const row of materials(cells, roles, {})) {
     const r = roles[row.role]!
     if (r.gather === false) continue
     const key = wantKeyFor(r)
+    if (!row.optional) (accepts[key] ??= []).push(r.strict ? new RegExp(`^${r.item}$`) : r.accept)
     const into = row.optional ? optional : required
     into[key] = (into[key] ?? 0) + row.need
     const fb = r.fallbacks?.[0]
@@ -344,7 +349,7 @@ export function wantsForRoles (cells: { role: string, passive?: boolean }[], rol
       f[fallbackKey(fb.item)] = (f[fallbackKey(fb.item)] ?? 0) + row.need
     }
   }
-  return { required, optional, fallbacks }
+  return { required, optional, fallbacks, accepts }
 }
 
 export interface GatherOptions {
@@ -756,6 +761,7 @@ const gatherAction = defineAction({
     let wants: Record<string, number> = { ...items }
     let optional: Record<string, number> = {}
     let fallbacks: Record<string, Record<string, number>> = {}
+    let accepts: Record<string, RegExp[]> | undefined
     let note = ''
     if (template && !material) {
       // No material named: pick the cheaper one here (cobblestone with few trees, planks without a pickaxe).
@@ -769,10 +775,11 @@ const gatherAction = defineAction({
       wants = { ...w.required, ...wants }
       optional = w.optional
       fallbacks = w.fallbacks
+      accepts = w.accepts
       note = [note, w.note].filter(Boolean).join('; ')
     }
     if (!Object.keys(wants).length && !Object.keys(optional).length) return template ? ok(`nothing to gather: ${note || `the ${template} is complete`}`) : fail('nothing to gather: give items or a template')
-    const r = await gatherMaterials(ctx, wants, { radius, optional, fallbacks, theme })
+    const r = await gatherFromSources(ctx, wants, { radius, optional, fallbacks, theme, ...(accepts ? { accepts } : {}) })
     return note ? { ...r, message: `${r.message} (${note})` } : r
   }
 })
@@ -781,5 +788,7 @@ export const materialsSkill = () => defineSkill({
   name: 'materials',
   capabilities: ['move', 'dig', 'craft'],
   description: 'Gathering and crafting everything a job needs.',
-  actions: [gatherAction]
+  actions: [gatherAction],
+  // where the last build or repair got its materials from, and why other sources were skipped
+  status: agent => { const r = lastSourceRun(agent, 30 * 60_000); return r ? [fmtSourceRun(r).slice(0, 200)] : [] }
 })

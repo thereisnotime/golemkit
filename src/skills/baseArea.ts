@@ -16,6 +16,10 @@ export interface SettledBase {
   facing: Facing
   cells: WorldCell[]
   area: BaseArea
+  /** Columns inside the walls (the floor). */
+  interior: { x: number, z: number }[]
+  /** The gate: the door's columns. */
+  door: { x: number, z: number }[]
 }
 
 type AgentLike = Pick<Agent, 'storage' | 'settings'>
@@ -51,6 +55,8 @@ export function settledBase (agent: AgentLike, now = Date.now()): SettledBase | 
         const inside = new Set((interior?.cols ?? []).map(c => `${c.x},${c.z}`))
         base = {
           template: a.template, origin: a.origin, facing, cells,
+          interior: interior?.cols ?? [],
+          door: cells.filter(c => /door/.test(c.role) || turned.roles[c.role]?.kind === 'door').map(c => ({ x: c.x, z: c.z })),
           area: { min: { x: box.min.x, z: box.min.z }, max: { x: box.max.x, z: box.max.z }, floorY: interior?.y ?? a.origin.y, inside: (x, z) => inside.has(`${x},${z}`) }
         }
       }

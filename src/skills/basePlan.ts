@@ -90,8 +90,9 @@ export interface SurveyOptions {
 /**
  * What a stage still needs at its spot. Pure. Uses the build's own cell check (a block the role
  * accepts counts, natural blocks and the bot's own may be dug, anything else is someone's build
- * and is left alone). With skipCovered a cell is left alone when the block above it is not
- * natural, not air and not planned (the old hut stands on the floor, a torch sits on it).
+ * and is left alone). With skipCovered a cell holding a block is left alone when the block above
+ * it is not natural, not air and not planned (the old hut stands on the floor, a torch sits on
+ * it); an empty cell (a hole in the floor) is always counted, whatever is above it.
  */
 export function surveyStage<T extends WorldCell> (cells: readonly T[], blockAt: (p: Pos) => string | undefined, roles: Record<string, ResolvedRole>, o: SurveyOptions): StageSurvey<T> {
   const out: StageSurvey<T> = { total: 0, done: [], todo: [], blocked: [], covered: [], unknown: [], unsupported: [] }
@@ -102,7 +103,8 @@ export function surveyStage<T extends WorldCell> (cells: readonly T[], blockAt: 
     if (here === undefined) { out.unknown.push(c); continue }
     const r = roles[c.role]
     if (r && roleAccepts(r, here)) { out.done.push(c); continue }
-    if (o.skipCovered) {
+    // an empty cell under a build is a hole all the same: covered only matters for a block that would be replaced
+    if (o.skipCovered && !isReplaceableName(here)) {
       const up = { x: c.x, y: c.y + 1, z: c.z }
       const above = blockAt(up)
       if (above && !isReplaceableName(above) && !isNaturalBlock(above) && !o.planned?.(up)) { out.covered.push(c); continue }

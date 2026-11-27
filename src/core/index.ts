@@ -72,3 +72,7 @@ export {
   BaseSafetySettingsSchema, DeathSpotsSettingsSchema, baseSafetySettings, deathSpotsSettings,
   type SafetyTechnique, type CapKind, type MinePlacement, type BaseSafetySettings, type DeathSpotsSettings
 } from './baseSafety.ts'
+export {
+  MATERIAL_SOURCES, MATERIAL_SOURCES_DEFAULTS, MaterialSourcesSettingsSchema, materialSourcesSettings,
+  type MaterialSource, type MaterialSourcesSettings
+} from './materialSources.ts'
