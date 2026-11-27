@@ -5,6 +5,6 @@
 - [x] fight.ts calls retreatCheck instead of the fixed rule; defend escapes, re-anchors at home, comes back
 - [x] Reflex timer starts defend when the risk rule says leave
 - [x] Status event line; toggles; docs (world.md, live-config.md, config.md)
-- [x] guard-bench: keep time by default, mixed duel, retreat on/off, escape counts
+- [x] guard-bench: retreat on/off, retreat-below, escape counts (keep time and mixed duel come from combat-dodge)
 - [x] Unit tests (test/retreat-plan.test.ts)
 - [x] Bench old vs new

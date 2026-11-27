@@ -381,6 +381,10 @@ const defend = defineAction({
         notes.push(e.note)
         if (e.ok) {
           if (e.anchorHere) origin = reanchor(bot)
+          else if (e.comeBack && bot.health >= rs.returnAbove && bot.entity.position.distanceTo(origin) > maxChase / 2) {
+            // sprinted or dug in away from it: walk back first, or the chase limit (maxChase - drift) stops the next fight at once
+            try { await gotoTimed(bot, new goals.GoalNear(origin.x, origin.y, origin.z, 3), signal, 15_000) } catch { checkAborted(signal) }
+          }
           if (!e.comeBack) break
           if (bot.health >= rs.returnAbove) clearLeaving(bot)
           choked = false

@@ -62,10 +62,3 @@ Every escape SHALL be logged with why it left, the routes it could use and why t
 #### Scenario: Pillar escape
 - **WHEN** the bot pillars away from two zombies at 11 health
 - **THEN** the log and status read like "left the fight (health 11 would not survive 2 zombie for 2 s (about 12 damage)), escaped to a 2-block pillar at x y z; healed to 16"
-
-### Requirement: Bench keeps the time
-guard-bench SHALL NOT change the server's time unless `--time day` or `--time night` is given (`--time keep` is the default).
-
-#### Scenario: Default duel
-- **WHEN** guard-bench runs `--duel zombie` without `--time`
-- **THEN** it sends no `/time set`

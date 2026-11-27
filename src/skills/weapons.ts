@@ -78,7 +78,7 @@ export function weaponFlags (agent: Agent): WeaponFlags {
     sweep: c.sweep ?? true,
     shieldMelee: c.shieldMelee ?? true,
     goldenApple: c.goldenApple ?? true,
-    dodge: dodgeSettings((c as { dodge?: unknown }).dodge)
+    dodge: dodgeSettings((c as { dodge?: unknown }).dodge),
     retreat: retreatSettings((agent.settings as { retreat?: unknown }).retreat)
   }
 }

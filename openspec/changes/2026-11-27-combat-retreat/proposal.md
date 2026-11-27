@@ -17,5 +17,5 @@ against two zombies is one exchange from dying, and it then backed off at walkin
   sprint away), each with a pure check; then eat, heal and come back when healthy.
 - The log, the `defend` result and the status (`event`) say why it left and where it went.
 - `settings.retreat` with a toggle per key; `retreat.enabled: false` is the old behaviour.
-- guard-bench: `--time keep` is the default (no `/time set` on the shared server), `--duel mixed`,
-  `--retreat on|off`, `--retreat-below`, escapes counted per duel.
+- guard-bench (on top of combat-dodge's `--time keep` and `--duel mixed`): `--retreat on|off`,
+  `--retreat-below`, escapes counted per duel.
