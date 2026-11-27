@@ -130,6 +130,8 @@ export interface BotStatus {
   alert: { count: number, lastAt: number | null, nextAt: number | null }
   stuckAlertMs: number
   lastDisconnect: string | null
+  /** The last notable thing the bot did on its own (left a fight and where it went), from noteEvent(). Optional: older files lack it. */
+  lastEvent?: { what: string, at: number } | null
   /** Resident set size of the process, MB. */
   rssMb: number | null
   /** Per skill, short lines it wants seen (SkillDef.status): base projects that are stuck, what they wait for. */
@@ -314,6 +316,7 @@ export function formatStatus (s: BotStatus, now: number): string[] {
   if (s.goal) lines.push(`  goal      ${s.goal}`)
   lines.push(`  progress  ${s.progress.at ? `${fmtDuration(s.updatedAt - s.progress.at)} ago${s.progress.what ? ` (${s.progress.what})` : ''}` : 'none yet'}; stuck alert after ${fmtDuration(s.stuckAlertMs)}`)
   if (s.lastFailure) lines.push(`  failed    ${fmtDuration(s.updatedAt - s.lastFailure.at)} ago: ${s.lastFailure.what}: ${s.lastFailure.message}`)
+  if (s.lastEvent) lines.push(`  event     ${fmtDuration(s.updatedAt - s.lastEvent.at)} ago: ${s.lastEvent.what}`)
   if (s.self) lines.push(`  self      hp ${s.self.health === null ? '?' : Math.round(s.self.health)} food ${s.self.food ?? '?'} at ${pos}`)
   if (s.alert.count) lines.push(`  alerts    ${s.alert.count} sent, last ${s.alert.lastAt ? fmtDuration(s.updatedAt - s.alert.lastAt) + ' ago' : '?'}`)
   for (const [skill, ls] of Object.entries(s.notes ?? {})) for (const [i, l] of ls.entries()) lines.push(`  ${(i ? '' : skill).padEnd(9)} ${l}`)

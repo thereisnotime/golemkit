@@ -36,6 +36,7 @@ export class StatusTracker {
   private alert: AlertState = { count: 0, lastAt: null }
   private nextAlertAt: number | null = null
   private lastDisconnect: string | null = null
+  private lastEvent: { what: string, at: number } | null = null
   private readonly subs: [string, (...a: any[]) => void][] = []
   readonly file: string
 
@@ -62,6 +63,11 @@ export class StatusTracker {
     this.progressAt = this.now()
     this.progressWhat = what
     this.anchor = this.position()
+  }
+
+  /** Something worth showing that isn't progress or a failure (the bot left a fight, and where it went). */
+  noteEvent (what: string): void {
+    this.lastEvent = { what, at: this.now() }
   }
 
   /** Subscribes to the agent's events and starts the sample timer. */
@@ -235,6 +241,7 @@ export class StatusTracker {
       alert: { count: this.alert.count, lastAt: this.alert.lastAt, nextAt: this.nextAlertAt },
       stuckAlertMs: o.stuckAlertMs,
       lastDisconnect: this.lastDisconnect,
+      lastEvent: this.lastEvent,
       rssMb,
       ...(Object.keys(notes).length ? { notes } : {})
     }

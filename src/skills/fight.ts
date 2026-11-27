@@ -4,16 +4,17 @@
 //   -> swing on the weapon's real cooldown, jump for a crit, sprint into the first hit
 //   -> keep spacing and strafe between swings, step back after a hit
 //   -> stop when it dies, escapes, the chase gets too long or too dangerous, or the bot should
-//      disengage (outnumbered, or to eat at <= 4 health); the caller decides what to do next.
+//      disengage (outnumbered, or losing: retreat.ts); the caller decides what to do next.
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
 import { goals, FLYING, isHostile, sleep, checkAborted } from '../core/index.ts'
 import { equipForTarget, hasRanged, shootAt, readyShield, isRangedMob, meleeDamage, DEFAULT_MAX_CHASE, type WeaponFlags } from './weapons.ts'
-import { attackCooldownMs, swingDecision, spacing, chaseRefusal, outnumbered, shouldDisengageToHeal, shouldEatInLull, creeperMove, MELEE_REACH } from './tactics.ts'
+import { attackCooldownMs, swingDecision, spacing, chaseRefusal, outnumbered, shouldEatInLull, creeperMove, MELEE_REACH } from './tactics.ts'
 import { hitStyle, sweepWorth, wantKnockback, shieldAgainstMelee, creeperEscape, goldenAppleNow, rangedUseless, SPRINT_LEAD_MS, CREEPER_FUSE_MS, LEAP_GAIN, type HitStyle } from './techniques.ts'
 import { dodgeLayer } from './dodge.ts'
 import { DODGE_DEFAULTS } from './dodgePlan.ts'
 import { bestFood } from './survival.ts'
+import { retreatCheck } from './retreat.ts'
 
 export type FightEnd = 'killed' | 'escaped' | 'timeout' | 'gave_up' | 'heal' | 'outnumbered' | 'retarget'
 export interface FightResult {
@@ -300,9 +301,8 @@ export async function fightTarget (bot: Bot, target: Entity, signal: AbortSignal
           lastSwing = Date.now()
           continue
         }
-        if (shouldDisengageToHeal({ enabled: flags.disengageToHeal ?? true, health: bot.health, food: bot.food, hasFood: !!bestFood(bot), hasGoldenApple: apple })) {
-          return finish('heal', `health ${Math.ceil(bot.health)}`)
-        }
+        const leave = retreatCheck(bot, flags.retreat, flags.disengageToHeal ?? true) // retreat.ts: risk-based, or the old 4-health rule
+        if (leave) return finish('heal', leave)
         if (outnumbered({ health: bot.health, meleeNear: meleeNear(bot) })) return finish('outnumbered', `${meleeNear(bot)} mobs close at health ${Math.ceil(bot.health)}`)
         // another creeper fusing close while we fight this one: deal with the lit one first
         if (target.name === 'creeper' && !creeperFuseLit(target)) {

@@ -211,13 +211,15 @@ flowchart TB
   with before its fuse. With a bow and arrows it shoots a creeper from 5+ blocks (not when a
   bodyguard's player is in the line); otherwise it hits once and steps back. A lit fuse within 5
   blocks sends it 7 blocks away until the fizzle (`creeperMove` in `tactics.ts`).
-- **Outnumbered** (3+ melee mobs within 6, health under half): pillar 2 blocks (zombies can't
-  reach feet that high, the bot still reaches their heads) and fight from the top; without
-  blocks, go home if it is within 48 blocks, else back off.
+- **Outnumbered** (3+ melee mobs within 6, health under half): it leaves by an escape route, see
+  [Leaving fights](#leaving-fights). With `retreat.enabled` off: pillar 2 blocks and fight from
+  the top; without blocks, go home if it is within 48 blocks, else back off.
 - **Sustain**: in a lull (nothing within 4 blocks) it eats when hunger blocks regeneration
   (food < 18), or a golden apple when health ≤ 10. With `combat.disengageToHeal` (default on)
-  and health ≤ 4 it backs off ~10 blocks, eats (or, with a full hunger bar, waits a few seconds
-  for natural regeneration) and re-engages, even with `retreatBelow: 0`. Standing ground doesn't mean dying.
+  it leaves a fight it is losing ([Leaving fights](#leaving-fights)), even with
+  `retreatBelow: 0`. Standing ground doesn't mean dying. With `retreat.enabled` off the old rule
+  applies: at health ≤ 4 it backs off ~10 blocks, eats (or waits for natural regeneration) and
+  re-engages.
 - **Gear** (`combat.autoArmor`, default on): the reflexes run `gear_up` whenever the inventory
   holds better armour than what is worn (armour points, toughness, Protection; nearly broken
   pieces don't count), and put a totem (health ≤ 10 or no shield) or a shield in the offhand.
@@ -228,6 +230,57 @@ flowchart TB
 - **Night**: `stay_safe` heads home at night with higher priority when the bot has no armour,
   weapon or food; without a home it digs in with `bunker` until morning (needs digging, not
   under a roof already).
+
+### Leaving fights
+
+Pax fought to the death: 62 of its 126 deaths were in `defend`, the median health before the
+last hit was 1.7, and it had no armour and a stone sword. The old rule left at 4 health, which
+against two zombies (3 damage each, a hit a second) is one exchange from dying, and it backed
+off at walking pace before eating. `settings.retreat` (`src/skills/retreatPlan.ts`, pure and
+tested; glue in `retreat.ts` and `escape.ts`) replaces it with three decisions.
+
+**When to leave.** Every fight tick it estimates what the threats will do over the next
+`retreat.hits` attack cycles (default 2, one second each): for each hostile within 12 blocks (16
+for archers with a line of sight) it takes the mob's damage per hit and cooldown from a table,
+the time it needs to walk into reach, the bot's armour points, toughness and protection (the
+vanilla formula), a share of hits blocked by a shield (`shieldBlocks`, 0.4) and the server's
+difficulty. It leaves when health is at or below that estimate, or at `retreat.floor` (4)
+whatever the estimate says. Two zombies on an unarmoured bot come to 12 damage, so it leaves at
+12 instead of 4; one zombie, 6; full iron armour against two zombies, about 5.5. Once leaving it
+keeps leaving until health is `hysteresis` (4) above the estimate, so it doesn't step in and out
+at the edge. Creepers are left to the creeper rules (their blast would make every creeper a
+retreat).
+
+**Where to go.** The escape routes are a list, tried in the order of `retreat.routes` (default
+`home, pillar, bunker, sprint`); leave one out to turn it off. Each has its own check:
+
+| route | does | not when |
+|---|---|---|
+| `home` | `go_home`, then shuts open wooden doors next to it (`closeDoors`) | no home, home further than `homeRadius` (40), the way home runs through the mobs, a mob that outruns it (vindicator, ravager, wolf...) |
+| `pillar` | pillars `pillarHeight` (2) blocks: zombie reach ends below its feet and it still hits their heads; fights from the top, eats, waits to heal | no blocks, may not place, protected area, in water, no room above, an archer (it would be shot off), spiders, endermen, slimes or flyers |
+| `bunker` | the `bunker` action: dig down 3, seal the hole, wait for the mobs to leave | may not dig, protected area, in water, already under a roof, nothing to seal with |
+| `sprint` | `retreat` 24 blocks (`sprintDistance`) | a mob that outruns it |
+
+After the route it eats (when hungry and it has food) and waits until health is `returnAbove`
+(16), at most `healSeconds` (60). With `comeBack` on it then fights the mobs that are still around:
+after going home the fight is anchored at home (it doesn't walk back out after mobs it left
+behind), after the other routes where it left. A mob right on it ends the wait and it fights.
+`maxEscapes` (2) per `defend` run stops it from running in circles; after that, or when no route
+works, it falls back to backing off to eat and then fights where it stands. Shooters stay with
+`ranged_defense`, which hides behind cover, builds a wall or digs in when a fight ends this way.
+
+**Whether to fight in the open at all.** Before `defend` takes on the first mob it counts what is
+against it: no armour (under `minArmour` points), night, and `outnumberedAt` (2) or more melee
+mobs within 8 blocks. With `avoidFactors` (2) of them it doesn't fight in the open: it goes home
+(same checks as the home route) or fights from a 1-wide gap such as a doorway (`avoidRoutes`,
+default `home, chokepoint`), and only fights where it stands when neither works. It always fights
+when an owner within 16 blocks has a hostile on them, or when every mob close outruns it. A
+bolder profile sets `avoidFactors: 3` or `avoidOpen: false`.
+
+The log says why it left and where it went (`retreat: left the fight (health 11 would not
+survive 2 zombie for 2 s (about 12 damage)), escaped to a 2-block pillar at 1250 65 445; healed
+to 16`), the `defend` result carries the same line, and the status shows it as `event`
+(`just status`).
 
 ### Skilled-player techniques
 
@@ -628,7 +681,7 @@ flowchart TB
   R -- no --> DF["defend: fight it"]
   T(["every 2 s"]) --> LR{"health ≤ retreatBelow,<br/>hostile within 6?"}
   LR -- yes --> RT
-  LR -- no --> LOW{"health ≤ 4, mob close,<br/>food<br/>(disengageToHeal)?"}
+  LR -- no --> LOW{"losing, mob close<br/>(retreat estimate;<br/>disengageToHeal)?"}
   LOW -- yes --> DF
   LOW -- no --> PRE{"hostile within 4,<br/>or creeper within 7?"}
   PRE -- yes --> DF
@@ -775,9 +828,9 @@ but `water_bucket` interrupts it; `travel`'s low-air stop uses the same code.
 `rangedDefense` can also be set in the variant, `reflexes({ rangedDefense: false })`; the profile
 and `!config_set reflexes.rangedDefense` override it.
 
-Pax uses `retreatBelow: 0` and `waterFightAbove: 0`: it always fights back. It still backs off
-briefly to eat at 4 health or less when it has food (`combat.disengageToHeal`), see
-[Fighting](#fighting).
+Pax uses `retreatBelow: 0` and `waterFightAbove: 0`: it always fights back. It still leaves a
+fight it is losing (`combat.disengageToHeal` and `settings.retreat`), see
+[Leaving fights](#leaving-fights).
 
 In a profile the `combat` values go under `settings:` (a top-level `combat:` key is ignored with a
 warning).
@@ -792,7 +845,7 @@ settings:
     shield: true
     crits: true           # jump-crits, sprint into the first hit
     strafe: true          # spacing and strafing between swings
-    disengageToHeal: true # back off to eat at <= 4 health when there is food
+    disengageToHeal: true # leave a losing fight (settings.retreat; the old 4-health rule when retreat is off)
     autoArmor: true       # wear the best armour, shield/totem in the offhand
     maxChase: 16          # give up a chase this far from where the fight started
     pvp: "off"            # defend | revenge | targets | all (see PvP)

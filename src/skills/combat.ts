@@ -19,6 +19,9 @@ import { waterBucket } from './clutch.ts'
 import { defendPlayer, notePlayerHit, installGazeGuard } from './defense.ts'
 import { PVP_ACTION_DEFS, installPvp } from './pvp-actions.ts'
 import { escorting } from './bodyguard.ts'
+import { runInline, escapeFight, escapeInputs, ROUTE_RUNNERS } from './escape.ts'
+import { retreatOf, threatsAround, clearLeaving, noteRetreat } from './retreat.ts'
+import { engageDecision, planEscape, ESCAPE_ROUTES, OUTRUN_US, type RetreatSettings } from './retreatPlan.ts'
 const WEAPONS = ['netherite_sword', 'diamond_sword', 'iron_sword', 'stone_sword', 'golden_sword', 'wooden_sword',
   'netherite_axe', 'diamond_axe', 'iron_axe', 'stone_axe']
 
@@ -169,15 +172,6 @@ async function backOff (bot: Bot, mob: Entity, signal: AbortSignal, dist: number
   } finally { bot.pathfinder.setGoal(null) }
 }
 
-/** Runs another action's body inline (agent.act from inside an action would preempt this one). */
-async function runInline (ctx: ActionContext, name: string, params: Record<string, unknown>): Promise<{ ok: boolean, message: string } | null> {
-  const def = ctx.agent.getAction(name)
-  if (!def) return null
-  const r = await def.run(ctx, def.params.parse(params))
-  if (r === undefined) return { ok: true, message: 'done' }
-  return typeof r === 'string' ? { ok: true, message: r } : r
-}
-
 /**
  * Outnumbered (3+ melee mobs close, under half health): a 2-block pillar puts us above zombie
  * reach while we can still hit their heads; otherwise home if it is close, otherwise back off.
@@ -222,6 +216,12 @@ function fightAnchor (bot: Bot): any {
   anchors.set(bot, { pos, until: Date.now() + 20_000 })
   return pos
 }
+/** Moves the fight's anchor to where the bot is now (home after it went home). */
+function reanchor (bot: Bot): any {
+  const pos = bot.entity.position.clone()
+  anchors.set(bot, { pos, until: Date.now() + 20_000 })
+  return pos
+}
 function touchAnchor (bot: Bot): void {
   const a = anchors.get(bot)
   if (a) a.until = Date.now() + 20_000
@@ -242,13 +242,14 @@ function standable (bot: Bot, p: any): boolean {
  * (techniques.findChokepoint) within 6 blocks and fight from it without strafing, so they reach
  * the bot one at a time. Null when it doesn't apply or there is no such gap.
  */
-async function holdChokepoint (ctx: ActionContext, flags: WeaponFlags): Promise<string | null> {
+async function holdChokepoint (ctx: ActionContext, flags: WeaponFlags, force = false): Promise<string | null> {
   const { bot, agent, signal } = ctx
   const enabled = ((agent.settings.combat ?? {}) as { chokepoints?: boolean }).chokepoints !== false
-  if (!wantChokepoint({ enabled, meleeNear: meleeNear(bot, 8), health: bot.health })) return null
+  // force: retreat.avoidOpen sends it to a gap against fewer mobs too (no armour at night, say)
+  if (!(force ? enabled : wantChokepoint({ enabled, meleeNear: meleeNear(bot, 8), health: bot.health }))) return null
   const me = bot.entity.position.floored()
   const mobs = threats(bot, 12).filter(e => !FLYING.has(e.name ?? '') && !isRangedMob(e.name) && e.name !== 'creeper')
-  if (mobs.length < 3) return null
+  if (mobs.length < (force ? 1 : 3)) return null
   const toward = { x: mobs.reduce((a, e) => a + e.position.x, 0) / mobs.length - me.x, z: mobs.reduce((a, e) => a + e.position.z, 0) / mobs.length - me.z }
   const spot = findChokepoint((dx, dz) => standable(bot, me.offset(dx, 0, dz)), toward, 6)
   if (!spot) return null
@@ -274,6 +275,57 @@ async function holdChokepoint (ctx: ActionContext, flags: WeaponFlags): Promise<
   return `held a chokepoint (${kills} killed there)`
 }
 
+const isNight = (bot: Bot) => { const t = bot.time.timeOfDay; return t >= 12_500 && t <= 23_500 }
+
+/** An owner within 16 blocks with a hostile within 6 of them. */
+function ownerThreatened (ctx: ActionContext): boolean {
+  const { bot, agent } = ctx
+  for (const name of agent.owners) {
+    const p = playerEntity(bot, name)
+    if (!p || p.position.distanceTo(bot.entity.position) > 16) continue
+    if (bot.nearestEntity(e => isHostile(e) && e.position.distanceTo(p.position) <= 6)) return true
+  }
+  return false
+}
+
+/**
+ * retreat.avoidOpen: poorly placed for a fight in the open (engageDecision: no armour, night,
+ * outnumbered): go home or fight from a chokepoint instead (retreat.avoidRoutes, in order).
+ * Null when it takes the fight where it stands.
+ */
+async function avoidOpenFight (ctx: ActionContext, s: RetreatSettings, flags: WeaponFlags): Promise<{ note: string, home: boolean } | null> {
+  const { bot, log } = ctx
+  const close = threatsAround(bot, 8).filter(t => !t.ranged && !t.flying && t.name !== 'creeper')
+  const d = engageDecision({
+    armour: wornArmorPoints(bot), night: isNight(bot), meleeNear: close.length, ownerThreatened: ownerThreatened(ctx),
+    allFaster: close.length > 0 && close.every(t => OUTRUN_US.has(t.name)), settings: s
+  })
+  if (d.fight) return null
+  for (const id of s.avoidRoutes) {
+    if (id === 'home') {
+      const plan = planEscape(escapeInputs(ctx, s), ['home'], ESCAPE_ROUTES)
+      if (!plan.usable.length) { log.debug(`retreat: not fighting in the open (${d.why}), home: ${plan.skipped[0]?.why}`); continue }
+      const r = await ROUTE_RUNNERS.home(ctx, s)
+      if (r.ok) {
+        const note = `didn't fight in the open (${d.why}), went ${r.where}`
+        log.info(`retreat: ${note}`)
+        ctx.agent.status?.noteEvent?.(note)
+        noteRetreat(bot, { at: Date.now(), why: `avoid: ${d.why}`, route: 'home', ok: true, detail: note })
+        return { note, home: true }
+      }
+    } else if (id === 'chokepoint') {
+      const held = await holdChokepoint(ctx, flags, true)
+      if (held) {
+        const note = `didn't fight in the open (${d.why}), ${held}`
+        log.info(`retreat: ${note}`)
+        noteRetreat(bot, { at: Date.now(), why: `avoid: ${d.why}`, route: 'chokepoint', ok: true, detail: note })
+        return { note, home: false }
+      }
+    }
+  }
+  return null
+}
+
 const defend = defineAction({
   name: 'defend',
   description: 'Fight back against the hostile mobs around, most dangerous first (used by reflexes).',
@@ -282,8 +334,11 @@ const defend = defineAction({
   async run (ctx) {
     const { bot, agent, signal } = ctx
     const flags = weaponFlags(agent)
+    const rs = retreatOf(agent)
     const maxChase = flags.maxChase ?? 16
-    const origin = fightAnchor(bot)
+    let origin = fightAnchor(bot)
+    let escapes = 0
+    let avoided = !rs.enabled
     const skip = new Set<number>()
     const killed: string[] = []
     const notes: string[] = []
@@ -297,6 +352,16 @@ const defend = defineAction({
       checkAborted(signal)
       const mob = threats(bot, 24).find(e => !skip.has(e.id) && e.position.distanceTo(origin) <= maxChase + 12)
       if (!mob) break
+      if (!avoided) {
+        avoided = true
+        const a = await avoidOpenFight(ctx, rs, flags)
+        if (a) {
+          notes.push(a.note)
+          if (a.home) { origin = reanchor(bot); continue }
+          choked = true
+          continue
+        }
+      }
       if (!choked) {
         const held = await holdChokepoint(ctx, flags)
         if (held) { choked = true; notes.push(held); continue }
@@ -309,6 +374,20 @@ const defend = defineAction({
       for (const k of Object.keys(extra) as (keyof typeof extra)[]) extra[k] += r[k] ?? 0
       if (bot.health <= 0) return fail(`died fighting ${mob.name}`)
       if (r.killed) { killed.push(mob.name ?? 'mob'); continue }
+      if ((r.end === 'heal' || r.end === 'outnumbered') && rs.enabled && escapes < rs.maxEscapes) {
+        // losing (retreat.ts): leave by the first route that works, heal, maybe come back
+        escapes++
+        const e = await escapeFight(ctx, r.reason ?? r.end, rs)
+        notes.push(e.note)
+        if (e.ok) {
+          if (e.anchorHere) origin = reanchor(bot)
+          if (!e.comeBack) break
+          if (bot.health >= rs.returnAbove) clearLeaving(bot)
+          choked = false
+          continue
+        }
+        // nowhere to go: the old back-off-and-eat below, then fight where it stands
+      }
       if (r.end === 'heal' && heals < 3) {
         // standing ground doesn't mean dying: step back, eat (or let regeneration work), come back
         heals++

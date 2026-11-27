@@ -40,7 +40,7 @@ can't change their own.
 | `combat.shield` | on/off | raise a shield against ranged mobs between swings (default on) |
 | `combat.crits` | on/off | jump and hit while falling for critical hits (×1.5), sprint into the first hit for knockback (default on) |
 | `combat.strafe` | on/off | keep spacing and circle melee mobs between swings, step back after a hit (default on) |
-| `combat.disengageToHeal` | on/off | at 4 health or less with food, back off briefly to eat and fight on; works with `retreatBelow 0` (default on) |
+| `combat.disengageToHeal` | on/off | leave a losing fight (the `retreat.*` rule; with `retreat.enabled` off: at 4 health or less with food, back off briefly to eat) and fight on; works with `retreatBelow 0` (default on) |
 | `combat.autoArmor` | on/off | wear the best armour in the inventory, shield or totem in the offhand (default on) |
 | `combat.maxChase` | 2–64 | stop chasing a mob this many blocks from where the fight started (default 16) |
 | `combat.sprintReset` | on/off | W-tap: sprint into ground hits for knockback when a crit isn't possible or knockback is worth more (default on) |
@@ -82,6 +82,25 @@ can't change their own.
 | `combat.pvpMinOdds` | 0–10 | gear check: odds needed to start a `targets`/`all` fight (default 0.7; 1 = even) |
 | `combat.pvpTactics` | on/off | the PvP fight loop (axe vs shields, shield timing, spacing, bow, totem and apples, ledges); off = the mob loop (default on) |
 | `combat.huntMinutes` | 1–120 | `hunt_player` gives up after this many minutes (default 10) |
+| `retreat.enabled` | on/off | [leaving fights in time](/concepts/world#leaving-fights): leave when health would not survive the next few hits and escape by a route; off = the old rule, back off to eat at 4 health (default on) |
+| `retreat.hits` | 0.5–10 | look-ahead of the estimate: what every threat in reach lands in this many 1 s attack cycles (default 2) |
+| `retreat.floor` | 0–20 | always leave at or below this health (default 4, 0 = no floor) |
+| `retreat.hysteresis` | 0–20 | once leaving, keep leaving until health is this much above the estimate (default 4) |
+| `retreat.shieldBlocks` | 0–1 | share of hits a shield in the offhand is counted as blocking (default 0.4) |
+| `retreat.returnAbove` | 1–20 | come back to the fight after escaping only at this health (default 16) |
+| `retreat.healSeconds` | 0–600 | longest wait to heal after an escape (default 60) |
+| `retreat.comeBack` | on/off | after healing, fight the mobs still around: at home after going home, where it left otherwise (default on) |
+| `retreat.maxEscapes` | 0–10 | escapes per `defend` run before it fights where it stands (default 2) |
+| `retreat.routes` | list | escape routes in the order tried: `home`, `pillar`, `bunker`, `sprint`; leave one out to turn it off (default all four in that order) |
+| `retreat.homeRadius` | 0–256 | escape home only when home is this close (default 40) |
+| `retreat.closeDoors` | on/off | shut open wooden doors next to it once home (default on) |
+| `retreat.pillarHeight` | 1–4 | pillar height for the pillar route (default 2: above zombie reach, still able to hit down) |
+| `retreat.sprintDistance` | 6–48 | how far the sprint route runs (default 24) |
+| `retreat.avoidOpen` | on/off | poorly placed for a fight: go home or fight from a chokepoint instead of in the open, unless an owner is in trouble (default on) |
+| `retreat.avoidFactors` | 1–3 | how many of no armour, night and outnumbered make `avoidOpen` apply (default 2; 3 = only all three, a bolder profile) |
+| `retreat.minArmour` | 0–20 | armour points below this count as no armour (default 1) |
+| `retreat.outnumberedAt` | 2–10 | this many melee mobs within 8 blocks count as outnumbered (default 2) |
+| `retreat.avoidRoutes` | list | where `avoidOpen` goes, in order: `home`, `chokepoint` (default both) |
 | `mining.safe` | on/off | [safe mining](./progression#safe-mining): readiness before going deeper than `mining.safeDepth`, no caves, torches, climb out when losing underground (default on) |
 | `mining.safeDepth` | 0–64 | blocks below the surface it may dig or go for ore without being ready (default 8) |
 | `mining.needWeapon` | on/off | a sword or axe is part of being ready (default on) |

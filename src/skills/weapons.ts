@@ -13,6 +13,7 @@ import type { Entity } from 'prismarine-entity'
 import type { Agent } from '../core/index.ts'
 import { aimArrow } from './tactics.ts'
 import { dodgeSettings, type DodgeSettings } from './dodgePlan.ts'
+import { retreatSettings, type RetreatSettings } from './retreatPlan.ts'
 
 /** Vanilla 1.21 attack damage and attacks per second. */
 const MELEE: Record<string, { damage: number, speed: number }> = {
@@ -57,6 +58,8 @@ export interface WeaponFlags {
   goldenApple?: boolean
   /** combat.dodge.* (dodgePlan.ts); missing = the defaults (on). */
   dodge?: DodgeSettings
+  /** settings.retreat (retreatPlan.ts); missing = the old fixed 4-health rule. */
+  retreat?: RetreatSettings
 }
 
 export const DEFAULT_MAX_CHASE = 16
@@ -76,6 +79,7 @@ export function weaponFlags (agent: Agent): WeaponFlags {
     shieldMelee: c.shieldMelee ?? true,
     goldenApple: c.goldenApple ?? true,
     dodge: dodgeSettings((c as { dodge?: unknown }).dodge)
+    retreat: retreatSettings((agent.settings as { retreat?: unknown }).retreat)
   }
 }
 

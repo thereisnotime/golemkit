@@ -1,0 +1,10 @@
+- [x] retreatPlan.ts: settings schema, mob damage table, armour, incomingDamage, retreatDecision with floor and hysteresis
+- [x] engageDecision (no armour / night / outnumbered, owner threatened, mobs that outrun the bot)
+- [x] Escape routes registry (home, pillar, bunker, sprint), planEscape, homeThroughThreats, recoverStep
+- [x] retreat.ts glue (threats, armour, difficulty, leaving memory, history) and escape.ts executors
+- [x] fight.ts calls retreatCheck instead of the fixed rule; defend escapes, re-anchors at home, comes back
+- [x] Reflex timer starts defend when the risk rule says leave
+- [x] Status event line; toggles; docs (world.md, live-config.md, config.md)
+- [x] guard-bench: keep time by default, mixed duel, retreat on/off, escape counts
+- [x] Unit tests (test/retreat-plan.test.ts)
+- [x] Bench old vs new

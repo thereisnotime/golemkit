@@ -4,7 +4,7 @@
 //        [--seed 1] [--sword stone|iron] [--armour] [--tester-food 8] [--interval 30] [--cap 8]
 //        [--time keep|day|night] [--wait-day] [--phantoms] [--waves mixed|ranged] [--bow] [--blocks 0] [--no-intercept] [--no-pull] [--variants a,b]
 //        [--tag run] [--scout] [--cleanup] [--force]
-//        [--duel zombie,skeleton,creeper,vindicator,mixed] [--duel-count 2] [--dodge on,off] [--clutch 5] [--clutch-height 22]
+//        [--duel zombie,skeleton,creeper,vindicator,mixed] [--duel-count 2] [--dodge on,off] [--retreat on|off] [--retreat-below 8] [--clutch 5] [--clutch-height 22]
 //        [--no-shield] [--bread 16]
 // DIRECTOR (default ClaudeTest, an op) runs everything with commands: before every phase it
 // kills leftover tagged mobs, fills explosion holes in the arena floor, resets both
@@ -38,6 +38,9 @@
 // keeps a zombie, a skeleton and a creeper (in turn, --duel-count in all) alive at once. --dodge on,off
 // plays every duel once per dodge setting (combat.dodge.enabled, set live, reset at the end; order
 // flipped on every repeat) and counts the dodge layer's leaps, arrows dodged and projectile hits.
+// --retreat off turns settings.retreat off (the old 4-health rule) to compare with the risk-based
+// retreat; --retreat-below sets reflexes.retreatBelow (0 = stand ground, like Pax). Each duel row
+// counts the escapes (retreatHistory) and the routes they took.
 // --clutch N tests the water bucket reflex alone: N drops from --clutch-height (default 22, 19 damage without water) blocks
 // above the arena floor with a water bucket, then N stands on a fire block; counts health lost and
 // what the water_bucket action reported. Water and fire left in the arena are removed afterwards.
@@ -45,6 +48,7 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import { Agent, defineVariant, serverFromEnv, PRIORITY, fmtPos, type ActionResult } from '../src/core/index.ts'
 import { standardSkills, extendedSkills, navigation, pickup } from '../src/skills/index.ts'
 import { dodgeStats, type DodgeStats } from '../src/skills/dodge.ts'
+import { retreatHistory } from '../src/skills/retreat.ts'
 import { reflexes, behaviorsBrain } from '../src/brains/index.ts'
 /** The player test bots keep away from (the real owner): MC_OWNER in .env. */
 const AVOID = process.env.MC_OWNER || 'Robin'
@@ -89,6 +93,10 @@ const DODGE = opt('dodge', 'on').split(',').map(x => x.trim()).filter(x => x ===
 /** The mixed duel: these, in turn. */
 const MIXED = ['zombie', 'skeleton', 'creeper']
 const CLUTCH = Number(opt('clutch', '0'))
+/** settings.retreat.enabled: --retreat off is the old fixed 4-health rule, to compare with the risk-based retreat. */
+const RETREAT = opt('retreat', 'on') !== 'off'
+/** reflexes.retreatBelow for the bot (0 = stand ground, like Pax); unset = the variant's 8. */
+const RETREAT_BELOW = argv.includes('--retreat-below') ? Number(opt('retreat-below', '8')) : null
 const CLUTCH_HEIGHT = Number(opt('clutch-height', '22'))
 
 type Phase = 'guard' | 'follow' | 'none'
@@ -303,7 +311,8 @@ async function main (): Promise<void> {
   await cmd(`/tp ${DIRECTOR} ${X + 24.5} ${(park?.y ?? G) + 1} ${Z + 0.5}`)
 
   // ---- bot and tester ----
-  const newBot = () => new Agent(botVariant, server, { username: BOT, dataDir: `${DATA}/agents`, canDig: true, owners: [TESTER] })
+  const botSettings = { retreat: { enabled: RETREAT }, ...(RETREAT_BELOW !== null ? { reflexes: { retreatBelow: RETREAT_BELOW } } : {}) }
+  const newBot = () => new Agent(botVariant, server, { username: BOT, dataDir: `${DATA}/agents`, canDig: true, owners: [TESTER], settings: botSettings })
   let bot = newBot()
   const tester = new Agent(testerVariant, server, { username: TESTER, dataDir: `${DATA}/agents`, canDig: true })
   let st = fresh()
@@ -584,12 +593,17 @@ async function main (): Promise<void> {
         measuring = false
         const kills = kinds.reduce((n, k) => n + (st.kills[k] ?? 0), 0)
         const dz = dodgeDelta()
+        // escapes made during this duel (retreat.ts history; a new Agent after a disconnect starts its own)
+        const escapes = live(bot) ? retreatHistory(bot.bot).filter(e => e.at >= start) : []
+        const routes: Record<string, number> = {}
+        for (const e of escapes) routes[e.route ?? 'none'] = (routes[e.route ?? 'none'] ?? 0) + 1
+        for (const e of escapes) log(`ESCAPE ${e.ok ? 'ok' : 'failed'} ${e.route ?? '-'}: ${e.detail}`)
         const result = {
           tag: RUN_TAG, mode: 'duel', mob, dodge, time: TIME, count: DUEL_COUNT, repeat: rep + 1, at: new Date().toISOString(), spot: [X, G + 1, Z],
           minutes: MINUTES, seed: SEED, sword: SWORD, armour: ARMOUR, bow: BOW, shield: SHIELD, blocks: BLOCKS, summoned: st.summoned,
           kills, killsPerMin: Math.round(kills / MINUTES * 10) / 10, botDeaths: st.botDeaths, botHits: st.botHits,
           botDamage: Math.round(st.botDamage), damagePerKill: kills ? Math.round(st.botDamage / kills * 10) / 10 : null,
-          explosions: st.explosions, explosionsNearBot: st.explosionsNear,
+          explosions: st.explosions, explosionsNearBot: st.explosionsNear, retreat: RETREAT, retreatBelow: RETREAT_BELOW, escapes: escapes.length, routes,
           dodges: dz.dodges, arrowDodges: dz.arrowDodges, arrowsDodged: dz.arrowsDodged, arrowHits: dz.arrowHits, meleeSteps: dz.meleeSteps, creeperLeaps: dz.creeperLeaps
         }
         log(`RESULT ${JSON.stringify(result)}`)
@@ -836,14 +850,14 @@ export function printSummary (results: any[]): void {
 
 export function printDuelSummary (results: any[]): void {
   const row = (cells: (string | number)[]) => cells.map((c, i) => String(c).padStart(i === 0 ? 15 : 9)).join(' ')
-  console.log('\n' + row(['duel', 'run', 'summoned', 'kills', 'kills/min', 'deaths', 'damage', 'dmg/kill', 'booms@6', 'dodges', 'arr.dodged', 'arr.hits']))
+  console.log('\n' + row(['duel', 'run', 'summoned', 'kills', 'kills/min', 'deaths', 'damage', 'dmg/kill', 'booms@6', 'dodges', 'arr.dodged', 'arr.hits', 'escapes']))
   const label = (r: any) => r.dodge ? `${r.mob} dodge:${r.dodge}` : r.mob
   for (const l of [...new Set(results.map(label))]) {
     const rs = results.filter(r => label(r) === l)
-    for (const r of rs) console.log(row([l, r.repeat, r.summoned, r.kills, r.killsPerMin, r.botDeaths, r.botDamage, r.damagePerKill ?? '-', r.explosionsNearBot, r.dodges ?? '-', r.arrowsDodged ?? '-', r.arrowHits ?? '-']))
+    for (const r of rs) console.log(row([l, r.repeat, r.summoned, r.kills, r.killsPerMin, r.botDeaths, r.botDamage, r.damagePerKill ?? '-', r.explosionsNearBot, r.dodges ?? '-', r.arrowsDodged ?? '-', r.arrowHits ?? '-', `${r.escapes ?? 0} ${Object.entries(r.routes ?? {}).map(([k, v]) => `${k}:${v}`).join(',')}`]))
     const sum = (k: string) => rs.reduce((a, r) => a + (r[k] ?? 0), 0)
     const minutes = sum('minutes')
-    console.log(row([l, 'total', sum('summoned'), sum('kills'), (sum('kills') / minutes).toFixed(1), sum('botDeaths'), sum('botDamage'), sum('kills') ? (sum('botDamage') / sum('kills')).toFixed(1) : '-', sum('explosionsNearBot'), sum('dodges'), sum('arrowsDodged'), sum('arrowHits')]))
+    console.log(row([l, 'total', sum('summoned'), sum('kills'), (sum('kills') / minutes).toFixed(1), sum('botDeaths'), sum('botDamage'), sum('kills') ? (sum('botDamage') / sum('kills')).toFixed(1) : '-', sum('explosionsNearBot'), sum('dodges'), sum('arrowsDodged'), sum('arrowHits'), sum('escapes')]))
   }
 }
 

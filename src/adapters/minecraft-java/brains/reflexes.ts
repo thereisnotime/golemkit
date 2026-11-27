@@ -13,6 +13,7 @@ import { bestFood, isClimbingOut, keepClimbing } from '../../../skills/survival.
 import { isRangedMob } from '../../../skills/weapons.ts'
 import { threats } from '../../../skills/combat.ts'
 import { fightFood } from '../../../skills/fight.ts'
+import { retreatOf, retreatCheck } from '../../../skills/retreat.ts'
 import { gearPlan, hasGearUpgrade } from '../../../skills/gear.ts'
 import { escorting } from '../../../skills/bodyguard.ts'
 import { rangedSituation, onRangedAlarm, noteUnexplainedHit } from '../../../skills/ranged.ts'
@@ -340,9 +341,11 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
           void reflex('retreat')
           return
         }
-        // retreatBelow 0 means stand ground, not die: at <= 4 health with food, defend backs off to eat (combat.disengageToHeal)
-        if (selfDefense && mob && !climbing && bot.health <= 4 && combatCfg().disengageToHeal !== false && fightFood(bot) &&
-            agent.currentAction?.name !== 'defend' && agent.getAction('defend')) {
+        // retreatBelow 0 means stand ground, not die: when losing (settings.retreat, the risk rule; off: <= 4 health
+        // with food) defend leaves the fight by an escape route, or backs off to eat (combat.disengageToHeal)
+        const rs = retreatOf(agent)
+        const losing = () => rs.enabled ? !!retreatCheck(bot, rs, combatCfg().disengageToHeal !== false) : bot.health <= 4 && combatCfg().disengageToHeal !== false && !!fightFood(bot)
+        if (selfDefense && mob && !climbing && agent.currentAction?.name !== 'defend' && agent.getAction('defend') && losing()) {
           void reflex('defend')
           return
         }
