@@ -152,3 +152,27 @@ wrong call is easy to see.
 
 `farm_setup`'s option `sources: false` goes back to the old rule (only `start_farm`).
 All of them are [live toggles](./live-config).
+
+## Live results
+
+Runs on mc02 (2026-11-27) with the survival bench's test bot, never Pax, 1300+ blocks from the
+fortress. `--plot` seeds a 3x3 base plot around the start, `--give` adds items, `--actions` runs
+actions in order before the usual measuring.
+
+- `--scenario ice --bad-farm --plot --minutes 15`, twice: farm:1 (seeded on the lake) went bad on
+  the first check and the whisper said "I will repair it if that is a small job". farm_setup never
+  got a turn: the first run chopped wood for 4 minutes and then spent 10 in the air reflex in the
+  lake, the second started at night. Same as the earlier `needs-ice` and `prog-ice` runs (no farm
+  at the end in any of them), so the ice start says little about food sources until the air
+  reflex and night trouble there are fixed.
+- `--scenario ice --bad-farm --plot --actions food_sources,repair_farm,...`: the choice was
+  repair; `repair_farm` said "the water in the middle is gone and I have no bucket; only 0 cells
+  would be field again: a new farm elsewhere" (right: the seeded farm is lake ice). With 0 seeds
+  and no grass showing through the snow, every other source was skipped with its reason.
+- Same with `--give "wheat_seeds 3,torch 4,wooden_hoe 1,dirt 4"`: `plot_farm` planted 1 cell of a
+  plot that was mostly lake ice, and site health marked it flooded at once. Fixed after the run: a
+  plot farm is judged on its crop cells only, its water is not expected in the middle, and a plot
+  with fewer than 3 cells that can hold a crop is refused.
+- `--scenario forest --plot --give ...`: "started farm:1 on the farm plot: planted 3 wheat; no
+  water: a dry plot ..., 1 torch for light". The farm was still on its list and healthy at the end.
+  `food_sources` then said `farm` (grass near, so a field farm is tried as well).
