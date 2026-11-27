@@ -289,6 +289,24 @@ survive 2 zombie for 2 s (about 12 damage)), escaped to a 2-block pillar at 1250
 to 16`), the `defend` result carries the same line, and the status shows it as `event`
 (`just status`).
 
+**Live bench** (guard-bench `--duel`, stone sword, no shield, no armour, 16 cobblestone,
+`--retreat-below 0` like Pax, 2 minutes per duel, one round each, server time kept; mobs
+spawning naturally at night joined some runs, so the numbers are noisy):
+
+| duel | old rule (deaths / damage / kills) | risk retreat (deaths / damage / kills, escapes) |
+|---|---|---|
+| 3 zombies | 2 / 82 / 15 | 1 / 82 / 14 (pillar 1, sprint 1); 1 / 66 / 14 (sprint 3) |
+| zombie, skeleton, creeper (3) | 0 / 32 / 0 (8 mobs came) | 2 / 95 / 3 before the ranged fix; 1 / 75 / 6 after |
+| 2 skeletons | 2 / 85 / 6 | 0 / 36 / 4; 1 / 64 / 2 (drowned after a fall into water) |
+
+What the runs taught: the first version's pillar and bunker failed under every hit and the
+pathfinder back-off couldn't shake two zombies, so the sprint is steered by hand and contact is
+broken before pillaring; digging in under a crowd never worked, so bunker went last; a phantom
+overhead blocked every sprint until flyers stopped counting as mobs that outrun the bot; and in
+mixed fights `ranged_defense` kept building cover with a zombie on the bot. The sample is too
+small to claim fewer deaths; the escapes themselves now work (sprint 16+ blocks clear, pillar up,
+healed to 18-20 before coming back).
+
 ### Skilled-player techniques
 
 What strong players do in the 1.9+ combat system, and what the bot does with it. The mechanics,
