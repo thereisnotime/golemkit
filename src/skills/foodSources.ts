@@ -38,6 +38,7 @@ const BAD_FOOD = new Set(['rotten_flesh', 'spider_eye', 'poisonous_potato', 'puf
 const PLANT = /^(short_grass|grass|tall_grass|fern|large_fern|dandelion|poppy|.*_tulip|snow)$/
 const CROP_ABOVE = /^(wheat|carrots|potatoes|beetroots)$/
 /** Ground on the plot that may be dug out and replaced with dirt. */
+const AIR_OR_ICE = /^(air|cave_air|ice|packed_ice|blue_ice|frosted_ice|powder_snow)$/
 const SWAPPABLE = /^(stone|cobblestone|andesite|diorite|granite|tuff|deepslate|cobbled_deepslate|gravel|sand|red_sand|snow_block|clay|mud|podzol|mycelium|moss_block|polished_andesite|polished_diorite|polished_granite|stone_bricks|smooth_stone)$/
 
 export function foodSettings (agent: Agent): FoodSourceSettings {
@@ -398,6 +399,8 @@ function plotGround (agent: Agent, bot: Bot, name: string, pos: Vec3, clearance:
   if (name === 'water') return 'water'
   if (TILLABLE.includes(name)) return 'tillable'
   if (SWAPPABLE.test(name)) return 'swap'
+  // a hole (air) gets dirt put in; ice and packed snow are dug out for dirt like stone
+  if (AIR_OR_ICE.test(name)) return 'swap'
   return 'blocked'
 }
 
@@ -461,7 +464,7 @@ export async function plotFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sign
         if (!g || !a) return null
         const sky = (a as { skyLight?: number }).skyLight
         const light = (a as { light?: number }).light
-        out.push({ dx, dz, ground: plotGround(agent, bot, g.name, gp, p.spawnClearance), above: plotAbove(a.name), sky: typeof sky === 'number' ? sky : null, block: typeof light === 'number' ? light : null })
+        out.push({ dx, dz, ground: plotGround(agent, bot, g.name, gp, p.spawnClearance), name: g.name, above: plotAbove(a.name), sky: typeof sky === 'number' ? sky : null, block: typeof light === 'number' ? light : null })
       }
     }
     return out
@@ -513,9 +516,9 @@ export async function plotFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sign
     checkAborted(signal)
     const g = bot.blockAt(at(dx, dz))
     if (!g || !findItem(bot, 'dirt')) break
-    try { await reachBlock(bot, g.position, signal, 3, 15_000); await equipFor(bot, g).catch(() => {}); await digBlock(bot, g, signal); await placeAt(bot, 'dirt', at(dx, dz), signal) } catch (e) { checkAborted(signal) }
+    try { await reachBlock(bot, g.position, signal, 3, 15_000); if (!/air$/.test(g.name)) { await equipFor(bot, g).catch(() => {}); await digBlock(bot, g, signal) } await placeAt(bot, 'dirt', at(dx, dz), signal) } catch (e) { checkAborted(signal) }
   }
-  if (plan.swap.length) steps.push(`swapped ${plan.swap.length} stone cells for dirt`)
+  if (plan.swap.length) steps.push(`swapped ${plan.swap.length} stone, ice or empty cells for dirt`)
   // water from carried ice: a hole in the middle, the ice in it, broken without Silk Touch
   let waterHow: Farm['water'] = plan.water === 'near' ? 'natural' : plan.water === 'ice' ? 'ice' : 'none'
   if (plan.water === 'ice') {

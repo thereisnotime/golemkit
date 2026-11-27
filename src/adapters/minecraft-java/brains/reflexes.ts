@@ -335,6 +335,8 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
       // don't stop sleep; with no bed to use, fight them before the dive instead of after the hit ----
       const REST_KEY = 'rest.lastAt'
       const noteRest = () => { try { agent.storage.set(REST_KEY, Date.now()) } catch {} }
+      // the reflexes, recovery, journal and death report each listen for death: more than Node's default 10
+      if (bot.getMaxListeners() < 20) bot.setMaxListeners(20)
       bot.on('sleep', noteRest)
       bot.on('death', noteRest) // dying resets the phantom timer too
       let bedFailedAt: number | null = null

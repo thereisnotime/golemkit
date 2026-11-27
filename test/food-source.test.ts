@@ -151,7 +151,8 @@ test('farm plot: stone swapped for dirt only when allowed and with dirt; no seed
   assert.match(planPlotFarm(pin({ seeds: 0 })).reason, /no seeds/)
   const lake = planPlotFarm(pin({ cells: plot((dx, dz) => dx === 1 && dz === 1 ? {} : { ground: 'blocked' }).map(c => c.dx === 0 && c.dz === 0 ? { ...c, ground: 'tillable' as const } : c), water: [{ dx: 2, dy: 0, dz: 0 }] }))
   assert.match(lake.reason, /only 2 cells of the plot can hold a crop/, 'a plot mostly on lake ice is not worth it')
-  assert.equal(planPlotFarm(pin({ cells: plot((dx, dz) => dx === 0 && dz === 0 ? { ground: 'blocked' } : {}) })).ok, false)
+  // a centre it must not touch no longer refuses the plot: the other cells are the farm
+  assert.equal(planPlotFarm(pin({ cells: plot((dx, dz) => dx === 0 && dz === 0 ? { ground: 'blocked' } : {}) })).ok, true)
 })
 
 test('a dry plot farm is tended without water', () => {
@@ -214,4 +215,12 @@ test('sensing the food sources on a (fake) bot does not throw, and farm_setup se
   const s = senseFarm(agent, bot, { sources: true } as never)
   assert.equal(s.source?.active, 'plot')
   assert.equal(s.source?.run, true)
+})
+
+test('plot: a blocked centre gets the dry torch, the reason names what is in the way', () => {
+  const p = planPlotFarm(pin({ cells: plot((dx, dz) => dx === 0 && dz === 0 ? { ground: 'blocked', name: 'chest' } : {}) }))
+  assert.equal(p.ok, true, p.reason)
+  assert.ok(p.till.length >= 3)
+  const lake = planPlotFarm(pin({ cells: plot((dx, dz) => dx === 1 && dz === 1 ? {} : { ground: 'blocked', name: 'spruce_planks' }) }))
+  assert.match(lake.reason, /spruce_planks it must not touch/)
 })

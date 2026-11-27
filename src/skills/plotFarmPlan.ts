@@ -37,6 +37,8 @@ export interface PlotCell {
   /** Light at the crop's block (one above the ground), or null when the server sends none. */
   sky: number | null
   block: number | null
+  /** The ground block's name, for reasons. */
+  name?: string
 }
 
 export type PlotWaterMode = 'auto' | 'water' | 'dry'
@@ -123,7 +125,9 @@ export function planPlotFarm (p: PlotFarmInput): PlotFarmPlan {
   const no = (reason: string): PlotFarmPlan => ({ ok: false, water: 'none', centre: 'crop', till: [], swap: [], torches: [], minLight: null, growth: 'dry', reason })
   const centre = p.cells.find(c => c.dx === 0 && c.dz === 0)
   if (!centre) return no('the plot is not loaded')
-  if (centre.ground === 'blocked') return no('something I must not touch is in the middle of the plot')
+  // a centre it must not touch can't hold water or a crop, but a dry plot's torch still goes on it,
+  // and with water in reach the other cells are the farm (Pax's plot was refused for days over this)
+  const centreBlocked = centre.ground === 'blocked'
 
   // water
   let water: PlotFarmPlan['water'] = 'none'
@@ -131,7 +135,7 @@ export function planPlotFarm (p: PlotFarmInput): PlotFarmPlan {
   if (p.mode !== 'dry') {
     if (centre.ground === 'water') { water = 'near'; wetFrom.push({ dx: 0, dy: 0, dz: 0 }) }
     else if (p.cells.filter(c => c.ground !== 'water').every(c => hydrated(c, wetFrom)) && wetFrom.length) water = 'near'
-    else if (p.iceItems > 0 && p.plainBreak) { water = 'ice'; wetFrom.push({ dx: 0, dy: 0, dz: 0 }) }
+    else if (p.iceItems > 0 && p.plainBreak && !centreBlocked) { water = 'ice'; wetFrom.push({ dx: 0, dy: 0, dz: 0 }) }
   }
   if (water === 'none' && p.mode === 'water') return no('no water in reach of the plot and no ice to make some (ice only travels with Silk Touch), and farming.plotWater is water')
   const centreKind: PlotFarmPlan['centre'] = water === 'ice' || centre.ground === 'water' ? 'water' : water === 'none' ? 'torch' : 'crop'
@@ -145,7 +149,9 @@ export function planPlotFarm (p: PlotFarmInput): PlotFarmPlan {
   const minCells = p.minCells ?? 3
   if (fit < minCells && p.seeds > 0) {
     const stone = cand.filter(c => c.ground === 'swap').length
-    return no(`only ${fit} cells of the plot can hold a crop (${minCells} needed): water, ice or blocks on the rest${stone && !p.swap ? `, ${stone} stone cells and farming.plotSwap is off` : ''}`)
+    const blocked = p.cells.filter(c => c.ground === 'blocked').map(c => c.name).filter(Boolean)
+    const what = blocked.length ? ` (${[...new Set(blocked)].join(', ')} it must not touch)` : ''
+    return no(`only ${fit} cells of the plot can hold a crop (${minCells} needed): water, ice or blocks on the rest${what}${stone && !p.swap ? `, ${stone} stone cells and farming.plotSwap is off` : ''}`)
   }
   let dirt = p.dirt
   const swap: [number, number][] = []

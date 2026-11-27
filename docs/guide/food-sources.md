@@ -99,6 +99,12 @@ possible, in Minecraft 1.21.1:
 | Water freezes in a cold biome only as the top block under the sky with block light below 10 | inside a roofed base it never freezes; inside open walls a torch one step outside the plot gives it 10 or 11 |
 | Snow never settles on farmland or crops | snow on the plot is cleared once, before tilling |
 
+What it does with each cell: grass and dirt are tilled; stone, gravel, sand, the base's floor, ice
+and empty cells (a hole) get dirt (`farming.plotSwap`). A cell it must not touch (a chest, a
+protected block) is left out, and a refusal names the block. In the middle that no longer refuses
+the whole plot: the other eight cells are the farm, and a dry plot's torch goes on the middle
+block. Pax's plot was refused for days with "something I must not touch is in the middle".
+
 So `plot_farm`, with `farming.plotWater`:
 
 - `auto` (default): water in reach of the whole plot if there is any, else carried ice, else a dry
