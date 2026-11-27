@@ -22,7 +22,10 @@ swing again, and walks away from a lit creeper.
   harmful blocks, drops deeper than `maxDrop`). The side is picked at random between equal sides,
   never three times the same way, fewer mobs first.
 - Creeper leap: `creeperMove` returns `leap` instead of `back_off` when the layer has it, and the
-  bot sprint-jumps away; `creeperEscape` takes the faster gain into account.
+  bot sprint-jumps away; `creeperEscape` takes the faster gain into account. Off by default:
+  in the bench it cost kills without saving health.
+- `ranged_defense` walks to cover and out of range stop for an arrow or draw leap.
+- Leaps don't count towards `maxChase` in `fightTarget`.
 - Settings `settings.combat.dodge` (`false` or an object), all live as `combat.dodge.*`.
 - Fight results and `defend` report `dodges` and `arrowsDodged`.
 - `guard-bench`: `--time keep` (new default, never sets the time), `--wait-day`, `--dodge on,off`

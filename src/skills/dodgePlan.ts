@@ -35,7 +35,8 @@ export interface DodgeSettings {
   arrows: boolean
   /** Track melee mobs' attack cooldowns: stand in while they recharge, get out before they swing. Default true. */
   meleeTiming: boolean
-  /** Sprint-jump away from a lit creeper instead of walking. Default true. */
+  /** Sprint-jump away from a lit creeper instead of walking. Default false: in the duels it cost kills (the creeper
+   * follows, lights again, and the bot spends the round leaping) without saving health; see docs/concepts/world.md#dodging. */
   creeperLeap: boolean
   /** Round trip to the server, ms: what the bot sees is this old, and its moves land this late. Default 75. */
   latencyMs: number
@@ -66,7 +67,7 @@ export const DODGE_DEFAULTS: DodgeSettings = {
   draws: true,
   arrows: true,
   meleeTiming: true,
-  creeperLeap: true,
+  creeperLeap: false,
   latencyMs: 75,
   drawRange: 10,
   arrowMargin: 0.15,

@@ -56,7 +56,7 @@ can't change their own.
 | `combat.dodge.draws` | on/off | leap sideways just before a skeleton within `drawRange` lets go of its drawn bow, and while a pillager holds a charged crossbow (default on) |
 | `combat.dodge.arrows` | on/off | leap out of the path of an arrow or other projectile in flight that would hit (default on) |
 | `combat.dodge.meleeTiming` | on/off | track each melee mob's attack cooldown: stay in while it recharges, be out of reach before it swings (default on) |
-| `combat.dodge.creeperLeap` | on/off | sprint-jump away from a lit creeper instead of walking (default on) |
+| `combat.dodge.creeperLeap` | on/off | sprint-jump away from a lit creeper instead of walking (default off: in the duels it cost kills without saving health) |
 | `combat.dodge.latencyMs` | 0–500 | round trip the dodges allow for, ms (default 75) |
 | `combat.dodge.drawRange` | 0–32 | react to the draw within this many blocks, to the arrow beyond (default 10) |
 | `combat.dodge.arrowMargin` | 0–1 | extra room around the hitbox when judging a projectile, blocks (default 0.15) |

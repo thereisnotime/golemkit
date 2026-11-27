@@ -58,7 +58,7 @@ Each fight result SHALL carry `dodges` (leaps of every kind) and `arrowsDodged` 
 ## MODIFIED Requirements
 
 ### Requirement: Creeper that can't be outrun
-When a creeper's fuse is lit and backing off for the rest of the fuse (gaining about 2 blocks per second walking, 3.5 sprint-jumping with `combat.dodge.creeperLeap`) does not get the bot 7 blocks away, the bot SHALL face it with a raised shield while backing off, if it has a shield and `combat.shieldMelee` is on; otherwise it runs. With `combat.dodge.creeperLeap` on it SHALL run by sprint-jumping away until the fuse is out or the creeper is 7.2 blocks off (at most `combat.dodge.creeperLeapMs`), steering round unsafe ground, and walk off with the pathfinder only when no direction is safe. A creeper lighting its fuse within 5 blocks while the bot fights another creeper SHALL become the target.
+When a creeper's fuse is lit and backing off for the rest of the fuse (gaining about 2 blocks per second walking, 3.5 sprint-jumping with `combat.dodge.creeperLeap`) does not get the bot 7 blocks away, the bot SHALL face it with a raised shield while backing off, if it has a shield and `combat.shieldMelee` is on; otherwise it runs. With `combat.dodge.creeperLeap` on (default off) it SHALL run by sprint-jumping away until the fuse is out or the creeper is 7.2 blocks off (at most `combat.dodge.creeperLeapMs`), steering round unsafe ground, and walk off with the pathfinder only when no direction is safe. A creeper lighting its fuse within 5 blocks while the bot fights another creeper SHALL become the target.
 
 #### Scenario: Lit fuse at 3 blocks
 - **WHEN** a creeper 3 blocks away lights its fuse and the bot has a shield, with creeperLeap off

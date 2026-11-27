@@ -49,7 +49,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'combat.dodge.draws', description: 'leap sideways just before a close skeleton lets go of its drawn bow, and while a pillager holds a charged crossbow', schema: bool },
   { key: 'combat.dodge.arrows', description: 'leap out of the path of an arrow or other projectile in flight that would hit (ballistic check against the hitbox)', schema: bool },
   { key: 'combat.dodge.meleeTiming', description: "track each melee mob's attack cooldown: stand in and hit while it recharges, be out of its reach before its next swing", schema: bool },
-  { key: 'combat.dodge.creeperLeap', description: 'sprint-jump away from a lit creeper instead of walking', schema: bool },
+  { key: 'combat.dodge.creeperLeap', description: 'sprint-jump away from a lit creeper instead of walking (default off: in the bench it cost kills without saving health)', schema: bool },
   { key: 'combat.dodge.latencyMs', description: 'round trip to the server the dodges allow for, ms (default 75)', schema: z.number().min(0).max(500) },
   { key: 'combat.dodge.drawRange', description: 'react to the bow draw within this many blocks, to the arrow beyond it (default 10)', schema: z.number().min(0).max(32) },
   { key: 'combat.dodge.arrowMargin', description: 'extra room around the hitbox when judging whether a projectile hits, blocks (default 0.15)', schema: unit },

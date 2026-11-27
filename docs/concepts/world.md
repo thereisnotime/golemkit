@@ -347,7 +347,7 @@ one with fewer mobs where it lands, and between equal sides it picks at random. 
 going the same way three times running, so an archer can't learn the pattern and the bot doesn't
 drift off in one direction.
 
-- **Creeper leap** (`combat.dodge.creeperLeap`): where `tactics.creeperMove` says to back off from
+- **Creeper leap** (`combat.dodge.creeperLeap`, off by default, see the bench below): where `tactics.creeperMove` says to back off from
   a lit fuse, it now says `leap`. The bot sprint-jumps away instead of walking, but only as far as
   the fuse needs: it stops once the fuse is out or the creeper is 7.2 blocks off (a fuse stops
   at 7), or after `creeperLeapMs`. The first bench leapt a fixed time, ended up 8 to 9 blocks
@@ -360,6 +360,33 @@ The fight result counts `dodges` (leaps of every kind) and `arrowsDodged` (arrow
 with no projectile hit in the next 1.2 s); `defend` reports them next to the other technique
 counters. `just guard-bench --duel ... --dodge on,off` measures the layer against the old
 movement.
+
+Bench, 27 Nov 2026 on mc02: stone sword, no shield, no armour, two mobs at a time, 2-minute
+rounds, the server's own daytime (`--wait-day`), dodge on and off in the same session. The
+rounds are short and the server lagged (one round had a timeout kick), so read these as a
+direction, not a measurement:
+
+| duel | dodge | kills | deaths | health lost | per kill | arrow hits | arrows dodged |
+|---|---|---|---|---|---|---|---|
+| skeleton (2 rounds) | on | 5 | 0 | 36 | 7.2 | 7 | 12 |
+| skeleton (2 rounds) | off | 4 | 2 | 107 | 26.8 | 23 | 0 |
+| zombie | on | 16 | 1 | 44 | 2.8 | 0 | 0 |
+| zombie | off | 17 | 0 | 45 | 2.6 | 0 | 0 |
+| creeper (2 rounds, leap on) | on | 4 | 0 | 26 | 6.5 | 0 | 0 |
+| creeper (2 rounds) | off | 17 | 0 | 15 | 0.9 | 0 | 0 |
+| mixed (2 rounds) | on | 4 | 3 | 112 | 28 | 5 | 9 |
+| mixed (2 rounds) | off | 3 | 0 | 48 | 16 | 7 | 1 (a fight left over from the round before; fixed) |
+
+Against skeletons it is clearly better: about a third of the arrow hits and a quarter of the
+health lost per kill, no deaths. Most of that came after the dodges were wired into
+`ranged_defense` too; before that the first round showed 16 arrow hits for 7 leaps, because a
+poorly geared bot spends most of a skeleton fight walking to cover or backing off. Melee timing
+did nothing measurable against zombies: the bot still jumps for crits inside a zombie's reach,
+and most hits land while it is in the air, where a leap can't start. The creeper leap cost kills
+without saving health (the creeper follows, lights again, and the bot spends the round leaping),
+so it ships off. The mixed duel is inconclusive: the deaths with dodge on were a skeleton charge
+with a zombie on its back and a creeper that blew up while the bot ate, neither a dodge, but the
+sample is too small to say the layer is not to blame.
 
 ### PvP
 
