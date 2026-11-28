@@ -10,6 +10,10 @@ import { getFarms } from '../../../skills/food.ts'
 import { inventoryCounts } from '../../../skills/toolkit.ts'
 import { lightCheckDue } from '../../../skills/lightPlan.ts'
 import { isDay, flatDist, hostilesNear, type Point } from './util.ts'
+import { baseAnchored } from '../../../core/baseAnchored.ts'
+
+// the lit-up cells are around home
+baseAnchored({ keys: ['lighting.checked'] })
 
 const CHECKED_KEY = 'lighting.checked'
 

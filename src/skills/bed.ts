@@ -19,6 +19,10 @@ import {
   sleepAskStep, noteSleepMessage, askText, SLEEP_ASK_DEFAULTS, DEFAULT_ASK_TEXT, DEFAULT_REMIND_TEXT,
   type SpawnRecord, type BedMessage, type CellAt, type Facing, type Pos, type SleepAskState, type SleepPlayer
 } from './bedPlan.ts'
+import { baseAnchored } from '../core/baseAnchored.ts'
+
+// the spawn bed it keeps is at home
+baseAnchored({ keys: ['spawnBed'] })
 
 export const SPAWN_KEY = 'spawnBed'
 export const OWN_BEDS_KEY = 'spawnBed.own'

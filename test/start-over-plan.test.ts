@@ -212,7 +212,7 @@ test('leaving the old base: anchored state dropped, world knowledge kept', async
     foodSpots: [{ kind: 'animals', x: 586, z: -64 }, { kind: 'animals', x: 1500, z: 900 }],
     foodLadder: { searches: [{ radius: 48 }], paused: { farm: 1 } }
   }
-  const r = abandonedState(k => store[k], { x: 560, y: 67, z: -43, dim: 'overworld' })
+  const r = abandonedState(k => store[k], { x: 560, y: 67, z: -43, dim: 'overworld' }, 256, { keys: ['projects.spots', 'farms'], places: ['farm:*', 'fortress'] })
   assert.ok(r.del.includes('home') && r.del.includes('projects.spots') && r.del.includes('farms'))
   assert.deepEqual(Object.keys(r.set.places as object).sort(), ['found:iron', 'old_base'])
   assert.deepEqual((r.set.places as Record<string, unknown>).old_base, { x: 560, y: 67, z: -43, dimension: 'overworld' })
@@ -375,4 +375,22 @@ test('step results: look, leg, leave, day, bunker, settle', async () => {
   assert.equal(settleNext(st({ settleFails: 5 }), 500, S).do, 'here')
   assert.equal(settleNext(st({}), 30, S).do, 'here')
   assert.equal(settleNext(st({}), 30, { settleTries: 5, settleNear: 10 }).do, 'retry')
+})
+
+test('base-anchored keys and places come from the modules that own them', async () => {
+  const { abandonedState } = await import('../src/skills/startOverPlan.ts')
+  const { baseAnchored, baseAnchoredKeys, baseAnchoredPlaces } = await import('../src/core/baseAnchored.ts')
+  // loading the skills registers what each keeps around its base
+  await import('../src/skills/index.ts')
+  await import('../src/adapters/minecraft-java/behaviors/index.ts')
+  for (const k of ['projects.spots', 'projects.state', 'farms', 'build.active', 'spawnBed', 'spawnBed.searches', 'woodcutting.searches', 'food.source', 'food.sources.failed', 'lighting.checked']) {
+    assert.ok(baseAnchoredKeys().includes(k), k)
+  }
+  for (const p of ['farm:*', 'farm_plot', 'furnace']) assert.ok(baseAnchoredPlaces().includes(p), p)
+  // a new module adds its own; the drop lists are plain arguments
+  baseAnchored({ keys: ['kiln.state'], places: ['kiln'] })
+  const store: Record<string, unknown> = { places: { kiln: { x: 5000, y: 64, z: 0 }, 'found:iron': { x: 3000, y: 40, z: 0 } } }
+  const r = abandonedState(k => store[k], { x: 0, y: 64, z: 0 }, 256, { keys: baseAnchoredKeys(), places: baseAnchoredPlaces() })
+  assert.ok(r.del.includes('kiln.state'))
+  assert.deepEqual(Object.keys(r.set.places as object).sort(), ['found:iron', 'old_base'])
 })

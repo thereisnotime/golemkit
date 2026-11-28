@@ -18,6 +18,10 @@ import type { SearchRecord } from '../../../skills/foodPlan.ts'
 import { WOOD_NEED } from './tools.ts'
 import { isDay, flatDist } from './util.ts'
 import { tripRun } from './trip.ts'
+import { baseAnchored } from '../../../core/baseAnchored.ts'
+
+// bed searches remember only a radius around home
+baseAnchored({ keys: ['spawnBed.searches'] })
 
 const SEARCHES_KEY = 'spawnBed.searches'
 

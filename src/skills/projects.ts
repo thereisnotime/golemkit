@@ -36,6 +36,10 @@ import { getMines } from './stairMine.ts'
 import { hatchCells } from './stairMinePlan.ts'
 import { mineCells } from './baseSafetyPlan.ts'
 import { plotFarmSettings } from './plotFarmPlan.ts'
+import { baseAnchored } from '../core/baseAnchored.ts'
+
+// base projects: the anchor, progress, the farm plot and the places that hint at the base
+baseAnchored({ keys: ['projects.spots', 'projects.state'], places: ['farm_plot', 'fortress', 'base'] })
 
 const STATE_KEY = 'projects.state'
 const SPOTS_KEY = 'projects.spots'

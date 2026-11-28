@@ -23,6 +23,7 @@ import { actionTrip, isTurnBack } from './trip.ts'
 import { digMineAction } from './stairMine.ts'
 import { getPlaces, setPlace, getHome, sameDimension } from './navigation.ts'
 import { gotoWithin, vec } from './world.ts'
+import { baseAnchored } from '../core/baseAnchored.ts'
 
 export type UpTo = 'stone' | 'iron' | 'diamond'
 const TIER_RANK: Record<string, number> = { none: 0, wooden: 1, stone: 2, iron: 3, diamond: 4, netherite: 5 }
@@ -394,6 +395,8 @@ export async function runUpgradeStep (ctx: Ctx, s: UpgradeStep, safe = true): Pr
 
 /** The place name of the furnace it put down (navigation places), used again for smelting. */
 export const FURNACE_PLACE = 'furnace'
+// its furnace is at the base
+baseAnchored({ places: [FURNACE_PLACE] })
 const FURNACE_NEAR = 32
 const FURNACE_WALK = 128
 

@@ -80,3 +80,4 @@ export {
   MATERIAL_SOURCES, MATERIAL_SOURCES_DEFAULTS, MaterialSourcesSettingsSchema, materialSourcesSettings,
   type MaterialSource, type MaterialSourcesSettings
 } from './materialSources.ts'
+export { baseAnchored, baseAnchoredKeys, baseAnchoredPlaces } from './baseAnchored.ts'

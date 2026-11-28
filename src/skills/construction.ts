@@ -23,6 +23,10 @@ import { takeItemsFromOwnChests } from './containers.ts'
 import { isCreative, takeFromCreative } from './creative.ts'
 import { libraryDirs, loadLibrary } from './blueprint-library.ts'
 import { chooseMethod, creativeSettings, cellBlocks, planCommands, runCommands, handPause, BUILD_METHODS, type BuildMethod } from './creative-build.ts'
+import { baseAnchored } from '../core/baseAnchored.ts'
+
+// the build in progress is at the base
+baseAnchored({ keys: ['build.active'] })
 
 const ACTIVE_KEY = 'build.active'
 /** Positions of blocks this bot placed for builds, so it never mistakes its own work for a player's. */

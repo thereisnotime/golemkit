@@ -36,6 +36,10 @@ import {
   chooseFoodSource, foodSourceSettings, foodSourceText, noteSourceRun,
   type FoodSourceWorld, type FoodSourceChoice, type FoodSourceName, type FoodSourceSettings
 } from './foodSourcePlan.ts'
+import { baseAnchored } from '../core/baseAnchored.ts'
+
+// the food source in use and the ones that failed are near home
+baseAnchored({ keys: ['food.source', 'food.sources.failed'] })
 
 const FAILED_KEY = 'food.sources.failed'
 const CHOICE_KEY = 'food.source'

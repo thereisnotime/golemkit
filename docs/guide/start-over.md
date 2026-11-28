@@ -53,10 +53,18 @@ it was.
    `startOver.take` puts items first and `startOver.leave` keeps items out. Both take exact names,
    `prefix*` or `*suffix`.
 2. **Leave.** Home and everything tied to the old base is dropped from storage:
-   - the base-project anchor and progress (`projects.spots`, `projects.state`);
-   - farms and farm site records;
-   - places, remembered containers, food spots and its beds within 256 blocks of the old base;
-   - the ring searches (they only remember a radius around home).
+   - the storage keys modules registered as base-anchored (`baseAnchored` in
+     `src/core/baseAnchored.ts`): the base-project anchor and progress, farms, the spawn bed, the
+     ring searches (they only remember a radius around home), plus `dropKeys`;
+   - places with a registered base name (`farm:*`, `farm_plot`, `furnace`, `fortress`, `base`,
+     plus `dropPlaces`) wherever they are;
+   - farm and home site records;
+   - places, remembered containers, food spots and its beds within `oldBaseRadius` (256) blocks
+     of the old base.
+
+   A module that keeps state around its base registers it when it loads, for example
+   `baseAnchored({ keys: ['kiln.state'], places: ['kiln'] })`, and start_over drops it without
+   knowing the module.
 
    Base safety, integrity, fortress repair and the plot farm all hang off the base anchor, so they
    stop. The old base stays as the place `old_base`, for reference only. Torches, its own blocks,

@@ -695,14 +695,8 @@ export function atOldBase (places: Record<string, unknown> | undefined, p: XZ, r
   return near(places?.old_base, p, radius)
 }
 
-/** Storage keys that tie behaviours to the old base and are dropped outright when it leaves. */
-export const ABANDON_KEYS = [
-  'projects.spots', 'projects.state', 'farms', 'build.active', 'spawnBed', 'spawnBed.searches', 'woodcutting.searches',
-  'food.sources.failed', 'food.source', 'lighting.checked'
-] as const
-
-/** Place names that mean the old base wherever they are. */
-const BASE_PLACE = /^(farm:\d+|farm_plot|furnace|fortress|base|home)$/
+/** What to drop outright on leaving: storage keys, and place names (exact, prefix*, *suffix) that mean the old base wherever they are. */
+export interface BaseDrop { keys: readonly string[], places: readonly string[] }
 
 /** Within `radius` blocks of the old base (flat distance), for things that carry a position. */
 function near (p: unknown, origin: XZ, radius: number): boolean {
@@ -715,18 +709,20 @@ function near (p: unknown, origin: XZ, radius: number): boolean {
 
 /**
  * What storage looks like after leaving the old base: home gone (it is set again where it
- * settles), the base anchor, project progress, farms and the ring searches dropped (those
- * remember only a radius around home), places, site records, remembered containers, food spots
+ * settles), the base-anchored keys in `drop` (registered by their modules: the base anchor,
+ * project progress, farms, ring searches that remember only a radius around home) dropped, the
+ * places named in `drop` and any within `radius`, site records, remembered containers, food spots
  * and its beds near the old base dropped, and the old base kept as the place `old_base`. Torches,
  * own blocks, mines, trees and chests it placed stay: they are filtered by distance from home.
  * Returns the keys to set and the keys to delete. Pure.
  */
-export function abandonedState (get: (key: string) => unknown, origin: Pos & { dim?: string }, radius = START_OVER_DEFAULTS.oldBaseRadius): { set: Record<string, unknown>, del: string[] } {
+export function abandonedState (get: (key: string) => unknown, origin: Pos & { dim?: string }, radius = START_OVER_DEFAULTS.oldBaseRadius, drop: BaseDrop = { keys: [], places: [] }): { set: Record<string, unknown>, del: string[] } {
   const set: Record<string, unknown> = {}
-  const del: string[] = ['home', ...ABANDON_KEYS]
+  const del: string[] = [...new Set(['home', ...drop.keys])]
   const places: Record<string, unknown> = {}
   for (const [name, p] of Object.entries(obj(get('places')))) {
-    if (BASE_PLACE.test(name) || near(p, origin, radius)) continue
+    if (name === 'old_base') { places[name] = p; continue }
+    if (drop.places.some(pat => nameMatches(pat, name)) || near(p, origin, radius)) continue
     places[name] = p
   }
   // a second start-over keeps the first old base (the one pinned chests and the owner know)

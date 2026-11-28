@@ -13,6 +13,10 @@ import {
   nextTreeStep, mergeTreeSpot, markTreeSpotEmpty, recordTreeSearch, treeRetryInMs, spotKey, DEFAULT_TREE_RINGS,
   type TreeSpot, type SearchRecord
 } from './treePlan.ts'
+import { baseAnchored } from '../core/baseAnchored.ts'
+
+// ring searches remember only a radius around home
+baseAnchored({ keys: ['woodcutting.searches'] })
 
 /** Wood type of a natural log ("oak" for oak_log), or null for anything else (stripped logs included). */
 export function woodType (name: string): string | null {

@@ -11,7 +11,7 @@
 import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
 import {
-  defineSkill, defineAction, z, ok, fail, fmtPos, travel, checkAborted, itemName, surfaceY,
+  defineSkill, defineAction, z, ok, fail, fmtPos, travel, checkAborted, itemName, surfaceY, baseAnchoredKeys, baseAnchoredPlaces,
   type Agent, type ActionResult
 } from '../core/index.ts'
 import {
@@ -83,7 +83,9 @@ export function beginStartOver (agent: Agent, bot: Bot, by: string, direction?: 
 
 /** Drops the old base from storage (abandonedState) and keeps it as the place old_base. */
 export function abandonOldBase (agent: Agent, origin: StartOverState['origin']): string[] {
-  const r = abandonedState(k => agent.storage.get(k), origin, startOverConfig(agent).oldBaseRadius)
+  const s = startOverConfig(agent)
+  const drop = { keys: [...baseAnchoredKeys(), ...s.dropKeys], places: [...baseAnchoredPlaces(), ...s.dropPlaces] }
+  const r = abandonedState(k => agent.storage.get(k), origin, s.oldBaseRadius, drop)
   for (const k of r.del) agent.storage.delete(k)
   for (const [k, v] of Object.entries(r.set)) agent.storage.set(k, v)
   agent.storage.set(HOME_AWAY_KEY, 'starting over')

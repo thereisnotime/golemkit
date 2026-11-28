@@ -30,6 +30,10 @@ import {
   chooseFarmSite, siteProblems, plotLayout, pickFarmSeed, seedCount, breedPlan, BREED_FOOD, DEFAULT_SCOUT_LIMITS, ownWorkTest,
   type FoodSpot, type FoodSpotKind, type CellKind, type SiteCandidate, type Pos, type Waypoint
 } from './foodPlan.ts'
+import { baseAnchored } from '../core/baseAnchored.ts'
+
+// its farms are around home
+baseAnchored({ keys: ['farms'], places: ['farm:*'] })
 
 // ------------------------------------------------------------------ memory
 
