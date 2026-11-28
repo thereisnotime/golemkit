@@ -200,3 +200,12 @@ test('chests pinned at the old base no longer count', async () => {
   store.delete('places')
   assert.equal(configuredChests(agent).length, 2)
 })
+
+test('state machine: snow look after look turns the heading', () => {
+  const t = startOverStep(st({ snowyLooks: 3 }), day({ x: 600, z: 0 }), S)
+  assert.equal(t.do, 'turn')
+  if (t.do === 'turn') assert.equal(t.heading, 90)
+  assert.equal(startOverStep(st({ snowyLooks: 2 }), day({ x: 600, z: 0 }), S).do, 'look')
+  assert.equal(startOverStep(st({ snowyLooks: 3, turns: 2 }), day({ x: 600, z: 0 }), S).do, 'look', 'no turns left')
+  assert.equal(startOverStep(st({ snowyLooks: 5 }), day({ x: 600, z: 0 }), startOverSettings({ snowTurnAfter: 0 })).do, 'look')
+})

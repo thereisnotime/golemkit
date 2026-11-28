@@ -79,7 +79,8 @@ it was.
 
    The place must not be a snowy or frozen biome (unless `allowSnow`), a protected area, or next to
    somebody's build (more than `maxBuildBlocks` blocks of planks, glass, doors, farmland...). The
-   first place that passes is the one.
+   first place that passes is the one. After `snowTurnAfter` (3) snowy places in a row, the main
+   heading turns 90 degrees. North of Pax's fortress was frozen land with polar bears.
 5. **Range.** At `maxDistance` (1500) without a good place, it settles at the best place it looked
    at, if that place had at least some grass and trees and wasn't snowy, protected or built on.
    Otherwise it turns 90 degrees and tries that way for the same length, up to `maxTurns` times.
@@ -114,6 +115,7 @@ back to its default on its own when its value is bad.
 | `maxBuildBlocks` | 6 | somebody's build nearby rules a place out |
 | `allowSnow` | off | snowy biomes are fine |
 | `maxTurns` | 2 | 90-degree turns before making do |
+| `snowTurnAfter` | 3 | snowy looks in a row before turning 90 degrees |
 
 ## Notes
 

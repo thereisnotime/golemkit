@@ -50,6 +50,8 @@ export interface StartOverSettings {
   legMinutes: number
   /** Times the heading turns 90 degrees after reaching maxDistance without a site, before giving up. */
   maxTurns: number
+  /** Snowy places looked at in a row after which the heading turns 90 degrees (0: never). */
+  snowTurnAfter: number
 }
 
 export const START_OVER_DEFAULTS: StartOverSettings = {
@@ -70,7 +72,8 @@ export const START_OVER_DEFAULTS: StartOverSettings = {
   maxBuildBlocks: 6,
   allowSnow: false,
   legMinutes: 4,
-  maxTurns: 2
+  maxTurns: 2,
+  snowTurnAfter: 3
 }
 
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {}
@@ -116,7 +119,8 @@ export function startOverSettings (raw: unknown): StartOverSettings {
     maxBuildBlocks: int(o.maxBuildBlocks, d.maxBuildBlocks, 0, 1000),
     allowSnow: bool(o.allowSnow, d.allowSnow),
     legMinutes: num(o.legMinutes, d.legMinutes, 0.5, 30),
-    maxTurns: int(o.maxTurns, d.maxTurns, 0, 3)
+    maxTurns: int(o.maxTurns, d.maxTurns, 0, 3),
+    snowTurnAfter: int(o.snowTurnAfter, d.snowTurnAfter, 0, 20)
   }
 }
 
@@ -406,6 +410,8 @@ export interface StartOverState {
   turns?: number
   /** Legs walked since the last turn. */
   legsSinceTurn?: number
+  /** Snowy places looked at in a row (snowTurnAfter). */
+  snowyLooks?: number
   /** Furthest from the origin so far. */
   farthest?: number
   /** The best place looked at so far (a fallback when the range runs out). */
@@ -466,6 +472,9 @@ export function startOverStep (st: StartOverState | null | undefined, f: StepFac
   if (f.daylightMs < DUSK_MS) return { do: 'wait', why: 'dusk: digging in once it is dark' }
   const dist = Math.hypot(f.pos.x - st.origin.x, f.pos.z - st.origin.z)
   if (dist >= s.minDistance && !f.avoided) {
+    if (s.snowTurnAfter > 0 && (st.snowyLooks ?? 0) >= s.snowTurnAfter && (st.turns ?? 0) < s.maxTurns) {
+      return { do: 'turn', heading: (st.heading ?? 0) + 90, why: `snow for ${st.snowyLooks} looks in a row that way` }
+    }
     if (f.site === undefined) return { do: 'look' }
     if (f.site) {
       const v = siteVerdict(f.site, s)

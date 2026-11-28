@@ -1,0 +1,2 @@
+- [x] snowyLooks in the state, the turn rule in startOverStep, tests
+- [x] Toggle, docs

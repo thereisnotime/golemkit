@@ -267,6 +267,7 @@ can't change their own.
 | `startOver.maxBuildBlocks` | 0–1000 | blocks of somebody's build nearby that rule a place out (default 6) |
 | `startOver.allowSnow` | on/off | snowy and frozen biomes are fine (default off) |
 | `startOver.maxTurns` | 0–3 | times it turns 90 degrees after maxDistance without a good place before making do (default 2) |
+| `startOver.snowTurnAfter` | 0–20 | snowy places looked at in a row after which it turns 90 degrees (0 = never; default 3) |
 | `respawn.enabled` | on/off | respawn by itself when dead, also when it logs in dead (default on) |
 | `respawn.retrySeconds` | 1–120 | ask to respawn again this often while still dead (default 5) |
 | `respawn.maxTries` | 1–50 | reconnect after this many asks without coming back (default 6) |

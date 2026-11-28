@@ -51,3 +51,10 @@ Chests listed in settings.storage.chests within 256 blocks of the place `old_bas
 #### Scenario: old pantry
 - **WHEN** the profile pins a pantry at the old base and the bot has started over
 - **THEN** keep_fed, trips and deposits ignore that pantry
+
+### Requirement: Turn away from snow
+After `startOver.snowTurnAfter` snowy places looked at in a row, the start-over SHALL turn its main heading 90 degrees while turns are left.
+
+#### Scenario: frozen north
+- **WHEN** three looks in a row heading north are snowy
+- **THEN** the next legs head east

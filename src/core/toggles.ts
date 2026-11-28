@@ -294,6 +294,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'startOver.maxBuildBlocks', description: 'blocks of somebody\'s build nearby that rule a place out (default 6)', schema: z.number().int().min(0).max(1000) },
   { key: 'startOver.allowSnow', description: 'snowy and frozen biomes are fine (default off)', schema: bool },
   { key: 'startOver.maxTurns', description: 'times it turns 90 degrees after maxDistance without a good place before making do (default 2)', schema: z.number().int().min(0).max(3) },
+  { key: 'startOver.snowTurnAfter', description: 'snowy places looked at in a row after which it turns 90 degrees (0 = never; default 3)', schema: z.number().int().min(0).max(20) },
   { key: 'respawn.enabled', description: 'respawn by itself when dead, also when it logs in dead (default on)', schema: bool },
   { key: 'respawn.retrySeconds', description: 'ask to respawn again this often while still dead (default 5)', schema: z.number().min(1).max(120) },
   { key: 'respawn.maxTries', description: 'reconnect after this many respawn asks without coming back (default 6)', schema: z.number().int().min(1).max(50) },

@@ -126,7 +126,7 @@ export const startOverBehavior = defineBehavior({
             const f = lookAround(agent, bot)
             looked = { x: here.x, z: here.z, facts: f }
             const v = siteVerdict(f, s)
-            st = { ...st, best: betterBest(st.best, here, v, fallbackOk(f, s)) }
+            st = { ...st, best: betterBest(st.best, here, v, fallbackOk(f, s)), snowyLooks: f.snowy ? (st.snowyLooks ?? 0) + 1 : 0 }
             save(st)
             noteStartOver(agent, bot, 'look', `${fmtPos(here)} ${Math.round(Math.hypot(here.x - st.origin.x, here.z - st.origin.z))} from the old base: ${v.ok ? 'good' : 'no'}: ${factsText(f)}`, { facts: f, ok: v.ok, score: v.score })
             return { ok: true, message: v.why }
@@ -146,7 +146,7 @@ export const startOverBehavior = defineBehavior({
             return r
           }
           case 'turn': {
-            st = { ...st, heading: step.heading, turns: (st.turns ?? 0) + 1, legsSinceTurn: 0, fails: 0 }
+            st = { ...st, heading: step.heading, turns: (st.turns ?? 0) + 1, legsSinceTurn: 0, fails: 0, snowyLooks: 0 }
             save(st)
             noteStartOver(agent, bot, 'turn', `${step.why}: turning ${angleCompass(step.heading)}`)
             return { ok: true, message: step.why }
