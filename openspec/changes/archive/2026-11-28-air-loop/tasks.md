@@ -1,0 +1,2 @@
+- [x] noteAirRun planner + tests
+- [x] air action digs out on a loop; toggles and docs

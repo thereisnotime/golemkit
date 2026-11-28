@@ -95,7 +95,7 @@ test('air: unknown blocks above (unloaded) do not count as air', () => {
 
 test('air trigger: threshold, earlier at low health, off, head out of water', () => {
   const s = airSettings(undefined)
-  assert.deepEqual(s, { enabled: true, below: 10, shoreRadius: 48 })
+  assert.deepEqual(s, { enabled: true, below: 10, shoreRadius: 48, loopRuns: 3, loopMinutes: 3, loopRadius: 8 })
   assert.equal(airSettings({ airShoreRadius: 80 }).shoreRadius, 80)
   assert.equal(airSettings({ airShoreRadius: 500 }).shoreRadius, 48, 'out of range: default')
   assert.equal(airTrigger({ settings: s, headInWater: true, oxygen: 11, health: 20 }), null)
@@ -135,4 +135,20 @@ test('arbiter: air goes first and nothing but water_bucket interrupts it', () =>
   assert.equal(mayReplace(s({ current: 'air', next: 'defend', sinceStartMs: 60_000, healthDrop: 10, meleeDist: 1 })), 'air: getting air first')
   assert.equal(mayReplace(s({ current: 'air', next: 'water_bucket' })), null)
   assert.equal(mayReplace(s({ current: 'air', next: 'air' })), 'already running')
+})
+
+test('air loop: 3 runs in one spot within 3 minutes is a loop; spread out or slow is not', async () => {
+  const { noteAirRun, airSettings } = await import('../src/skills/airPlan.ts')
+  const s = airSettings(undefined)
+  let h: any[] = []
+  const run = (t: number, x = 0) => { const r = noteAirRun(h, { at: t * 1000, x, y: 60, z: 0 }, s); h = r.history; return r.loop }
+  assert.equal(run(0), false)
+  assert.equal(run(12), false)
+  assert.equal(run(24), true, 'third run 24 s in, same pocket')
+  h = []
+  assert.equal(run(0), false); assert.equal(run(100), false); assert.equal(run(400), false, 'minutes apart')
+  h = []
+  assert.equal(run(0, 0), false); assert.equal(run(10, 30), false); assert.equal(run(20, 60), false, 'swimming across a lake')
+  assert.equal(noteAirRun([], { at: 0, x: 0, y: 0, z: 0 }, { ...s, loopRuns: 0 }).loop, false)
+  assert.equal(airSettings({ airLoopRuns: 99 }).loopRuns, 3, 'bad value falls back')
 })

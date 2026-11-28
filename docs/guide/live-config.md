@@ -36,6 +36,9 @@ can't change their own.
 | `reflexes.air` | on/off | when drowning, stop and get air: swim up, break ice or a roof above, or swim to an opening, then to dry land (default on; [air](/concepts/world#air)) |
 | `reflexes.airBelow` | 0–20 | go for air at or below this much air of 20, 3 earlier at 12 health or less and 6 earlier at 6 or less (default 10) |
 | `reflexes.airShoreRadius` | 12–128 | after getting air, look for dry land this far out, blocks (default 48) |
+| `reflexes.airLoopRuns` | 0–20 | air runs in the same spot that count as a loop; then it digs out to the sky instead of breathing in the pocket again (default 3, 0 = never) |
+| `reflexes.airLoopMinutes` | 0.5–30 | window for `airLoopRuns`, minutes (default 3) |
+| `reflexes.airLoopRadius` | 1–64 | blocks within which air runs count as the same spot (default 8) |
 | `combat.adaptiveWeapon` | on/off | best weapon per target (damage × speed, enchantments, one-hit finishers, axe vs shields; default on) |
 | `combat.ranged` | on/off | bow/crossbow for flyers and targets out of reach, if it has arrows (default on) |
 | `combat.shield` | on/off | raise a shield against ranged mobs between swings (default on) |

@@ -7,12 +7,15 @@
 import type { Bot } from 'mineflayer'
 import { Vec3 } from 'vec3'
 import { defineAction, z, ok, fail, getAir, headInWater, oxygen, fmtPos, climbOntoLedge, airCells, sleep, checkAborted } from '../core/index.ts'
-import { boxedIn, shaftExit, airSettings, type V } from './airPlan.ts'
+import { boxedIn, shaftExit, airSettings, noteAirRun, type V, type AirRun } from './airPlan.ts'
 import { reachDryLand } from './navigation.ts'
-import { fillerBlock, pillarUp } from './survival.ts'
+import { fillerBlock, pillarUp, climbOutNow } from './survival.ts'
 
 /** On the way out, back for air below this (of 20). */
 const LOW_ON_THE_WAY = 12
+
+/** Recent air runs per bot, for loop detection (airPlan.noteAirRun). */
+const runs = new WeakMap<object, AirRun[]>()
 
 export const air = defineAction({
   name: 'air',
@@ -22,16 +25,28 @@ export const air = defineAction({
     land: z.boolean().default(true).describe('get out of the water afterwards')
   }),
   internal: true,
-  async run ({ agent, bot, signal, log }, { land }) {
+  async run (ctx, { land }) {
+    const { agent, bot, signal, log } = ctx
     // the action's logger: the plan of every re-plan goes to the debug log
     const opts = { canDig: agent.canDig, isProtected: (p: V) => agent.protectedAreas.isProtected(p), log: (m: string) => log.debug(m) }
     const notes: string[] = []
+    const st = airSettings(agent.settings.reflexes as Parameters<typeof airSettings>[0])
+    const here = bot.entity.position
+    const noted = noteAirRun(runs.get(bot) ?? [], { at: Date.now(), x: here.x, y: here.y, z: here.z }, st)
+    runs.set(bot, noted.history)
     for (let round = 0; round < 4; round++) {
       const r = await getAir(bot, signal, opts)
       notes.push(r.summary)
       agent.log.info(r.summary)
       if (!r.ok) return fail(`${notes.join('; ')} at ${fmtPos(bot.entity.position)}`)
       if (!land) break
+      // the same spot again and again: getting air here leads back under, dig out to the sky
+      if (noted.loop && agent.canDig) {
+        const out = await climbOutNow(ctx, 48).catch(e => { checkAborted(signal); return fail((e as Error).message) })
+        agent.log.info(`air: ${st.loopRuns}+ air runs here in ${st.loopMinutes} min, digging out to the sky: ${out.message}`)
+        if (out.ok) { notes.push('dug out to the sky (kept coming back for air here)'); runs.set(bot, []); break }
+        notes.push(`couldn't dig out: ${out.message}`)
+      }
       // onto the edge right beside it (a hole in the ice)
       if (await climbOntoLedge(bot, signal)) { notes.push('climbed out'); break }
       // a flooded shaft with the rim out of reach: build or dig a way up, back for air when low
@@ -48,7 +63,7 @@ export const air = defineAction({
       let dry = false
       try {
         // out to reflexes.airShoreRadius: in the middle of a lake 12 blocks found nothing and it bobbed up and down for minutes
-        dry = await reachDryLand(bot, AbortSignal.any([signal, low.signal]), airSettings(agent.settings.reflexes as Parameters<typeof airSettings>[0]).shoreRadius)
+        dry = await reachDryLand(bot, AbortSignal.any([signal, low.signal]), st.shoreRadius)
       } catch (e) {
         if (signal.aborted || !low.signal.aborted) throw e
       } finally {

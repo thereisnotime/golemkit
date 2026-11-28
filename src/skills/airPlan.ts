@@ -157,6 +157,10 @@ export interface AirSettings {
   below: number
   /** Out of the water: look for dry land this far out, blocks (the middle of a lake). */
   shoreRadius: number
+  /** Air runs within loopMinutes and loopRadius blocks that count as a loop (0: never). */
+  loopRuns: number
+  loopMinutes: number
+  loopRadius: number
 }
 
 export const AIR_BELOW = 10
@@ -165,10 +169,36 @@ export const AIR_SHORE_RADIUS = 48
 /** Air counts as back at this (of 20). */
 export const AIR_DONE = 18
 
-export function airSettings (r: { air?: boolean, airBelow?: number, airShoreRadius?: number } | undefined): AirSettings {
+export const AIR_LOOP = { runs: 3, minutes: 3, radius: 8 }
+
+export function airSettings (r: { air?: boolean, airBelow?: number, airShoreRadius?: number, airLoopRuns?: number, airLoopMinutes?: number, airLoopRadius?: number } | undefined): AirSettings {
   const below = typeof r?.airBelow === 'number' && r.airBelow >= 0 && r.airBelow <= 20 ? r.airBelow : AIR_BELOW
   const shore = typeof r?.airShoreRadius === 'number' && r.airShoreRadius >= 12 && r.airShoreRadius <= 128 ? Math.round(r.airShoreRadius) : AIR_SHORE_RADIUS
-  return { enabled: r?.air !== false, below, shoreRadius: shore }
+  const num = (v: unknown, lo: number, hi: number, d: number) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : d
+  return {
+    enabled: r?.air !== false,
+    below,
+    shoreRadius: shore,
+    loopRuns: Math.round(num(r?.airLoopRuns, 0, 20, AIR_LOOP.runs)),
+    loopMinutes: num(r?.airLoopMinutes, 0.5, 30, AIR_LOOP.minutes),
+    loopRadius: num(r?.airLoopRadius, 1, 64, AIR_LOOP.radius)
+  }
+}
+
+export interface AirRun { at: number, x: number, y: number, z: number }
+
+/**
+ * Notes one air run and says whether it is a loop: loopRuns runs (this one included) within
+ * loopMinutes and loopRadius blocks. A loop means getting air where it is keeps leading back
+ * under (a flooded pocket under a roof: breathe in the pocket, sink, again every 12 s for half
+ * an hour), so the caller should dig out to the sky instead. Returns the pruned history. Pure.
+ */
+export function noteAirRun (history: readonly AirRun[], run: AirRun, s: Pick<AirSettings, 'loopRuns' | 'loopMinutes' | 'loopRadius'>): { history: AirRun[], loop: boolean } {
+  const keep = history.filter(h => run.at - h.at <= s.loopMinutes * 60_000)
+  const next = [...keep, run].slice(-32)
+  if (s.loopRuns <= 0) return { history: next, loop: false }
+  const near = next.filter(h => Math.hypot(h.x - run.x, h.y - run.y, h.z - run.z) <= s.loopRadius)
+  return { history: next, loop: near.length >= s.loopRuns }
 }
 
 /** The threshold to use: earlier the lower the health (drowning does 2 a second). */

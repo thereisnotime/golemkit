@@ -251,7 +251,7 @@ export const climbOut = defineAction({
   }
 })
 
-async function climbOutNow (ctx: ActionContext, maxBlocks: number): Promise<ActionResult> {
+export async function climbOutNow (ctx: ActionContext, maxBlocks: number): Promise<ActionResult> {
   const { bot, agent, signal } = ctx
   const startY = Math.floor(bot.entity.position.y)
   let fails = 0
