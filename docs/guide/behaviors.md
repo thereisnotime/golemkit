@@ -771,7 +771,7 @@ flowchart TB
   only after a trip to a known food place (3b), when there is one. An empty 120 search also covers the 48 ring, a
   wider search skips the rings a smaller one walked (`minRadius`), and an empty ring is
   remembered for `ringMemoryMinutes` (default 180: every scout costs food, and a snowy forest with no animals stays that way for hours) in `agent.storage` key `foodLadder`, so a
-  restart doesn't rescan it. A search cut short by night or mobs is not remembered as empty.
+  restart doesn't rescan it. A search cut short by night or mobs is not remembered as empty. A trip step the trip check refuses before leaving (`not ready for a trip: health 1/20`) rests 3 minutes instead of being asked again every 20 seconds.
   Within one run it moves on to the next ring right away.
   **Gear and hunger:** rings wider than `riskyRingsFrom` (default 48) are trips far from home.
   With a gear score (the [ranged safety](#ranged-safety) score: armour, shield, weapon, bow,

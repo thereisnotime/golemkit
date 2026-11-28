@@ -1,7 +1,7 @@
 // The rod plan and the starving rules of the food ladder: rod plan, shore spot, rotten flesh, chest wheat, closest sure food.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { planFood, scoutAtNightFor, type FoodWorld, type FoodStepOptions } from '../src/skills/foodPlan.ts'
+import { planFood, scoutAtNightFor, failPause, NOT_READY_PAUSE_MS, STEP_PAUSE_MS, type FoodWorld, type FoodStepOptions } from '../src/skills/foodPlan.ts'
 import { rodPlan } from '../src/skills/fishPlan.ts'
 
 const NOW = 1_000_000_000
@@ -72,4 +72,11 @@ test('scoutAtNightFor: the near ring at night goes, a wide one does not, the pro
   assert.equal(scoutAtNightFor(true, 120, { riskyRingsFrom: 48 }), false)
   assert.equal(scoutAtNightFor(false, 120, {}), false)
   assert.equal(scoutAtNightFor(true, 400, { scoutAtNight: true }), true)
+})
+
+test('failPause: a trip refused before leaving rests a few minutes; other failures keep their pause', () => {
+  assert.equal(failPause('scout', 'not ready for a trip (scouting 120 blocks out for food): health 1/20 (needs 6)'), NOT_READY_PAUSE_MS)
+  assert.equal(failPause('spot', 'not ready for a trip (going to a animal spot): health 6/20 (needs 12)'), NOT_READY_PAUSE_MS)
+  assert.equal(failPause('scout', 'scouted 43 blocks, no animals'), STEP_PAUSE_MS.scout)
+  assert.equal(failPause('withdraw', 'no chest with food that I know of'), STEP_PAUSE_MS.withdraw)
 })

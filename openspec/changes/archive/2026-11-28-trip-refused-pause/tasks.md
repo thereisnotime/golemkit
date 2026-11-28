@@ -1,0 +1,2 @@
+- [x] failPause with tests, used by keep_fed
+- [x] Doc line

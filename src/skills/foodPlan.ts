@@ -703,6 +703,16 @@ export const STEP_PAUSE_MS: Record<FoodStep, number> = {
   eat_rotten: 60_000
 }
 
+/** A trip step (scout, spot, trip, farm) refused before leaving ("not ready for a trip: health 1/20") rests this long: the body won't be ready in 20 s (live: refused 26 times in 20 minutes). */
+export const NOT_READY_PAUSE_MS = 3 * 60_000
+
+/** How long a step that failed with `message` is left alone (0 = not paused). */
+export function failPause (step: FoodStep, message: string, o: { grassLeft?: boolean } = {}): number {
+  if (step === 'seeds' && o.grassLeft) return SEEDS_RETRY_MS
+  if (/not ready for a trip/.test(message)) return Math.max(STEP_PAUSE_MS[step], NOT_READY_PAUSE_MS)
+  return STEP_PAUSE_MS[step]
+}
+
 /** How long to wait before the next keep_fed run, by what is left to do. */
 const RETRY = { soon: 20_000, danger: 45_000, night: 2 * 60_000, growing: 3 * 60_000, critical: 2 * 60_000, idle: 5 * 60_000 }
 

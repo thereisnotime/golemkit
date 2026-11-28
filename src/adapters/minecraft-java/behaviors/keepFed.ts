@@ -18,7 +18,7 @@ import {
   shoreKelp, appleLeaves, canSmeltKelp, farmWorkFor, breakableGrass, type Farm
 } from '../../../skills/food.ts'
 import {
-  rankSpots, seedCount, planFood, scoutAtNightFor, foodReportText, nextRing, recordSearch, breedPlan, foodDanger, farmChore, chorePause, rankFoodPlaces, placeSource,
+  rankSpots, seedCount, planFood, scoutAtNightFor, failPause, foodReportText, nextRing, recordSearch, breedPlan, foodDanger, farmChore, chorePause, rankFoodPlaces, placeSource,
   BREED_FOOD, STEP_PAUSE_MS, SEEDS_RETRY_MS, TRIP_PAUSE_MS, DEFAULT_RINGS, FAR_RINGS_FROM, RISKY_RINGS_FROM, SCOUT_GEAR, SCOUT_HUNGER_AT, SCOUT_FOOD_FLOOR,
   type FoodStep, type FoodWorld, type FoodDecision, type SearchRecord, type FoodChore, type ChoreWorld, type FoodPlace
 } from '../../../skills/foodPlan.ts'
@@ -849,7 +849,7 @@ export const keepFed = defineBehavior({
             break
           } else {
             tried.add(d.step)
-            const pause = d.step === 'seeds' && (r.data as { grassLeft?: boolean } | undefined)?.grassLeft ? SEEDS_RETRY_MS : STEP_PAUSE_MS[d.step]
+            const pause = failPause(d.step, r.message, { grassLeft: (r.data as { grassLeft?: boolean } | undefined)?.grassLeft })
             if (pause) { m.paused = { ...m.paused, [d.step]: Date.now() + pause }; saveMemory(agent, m) }
             // an empty ring: try the next one in the same run (the ladder widens), unless it was cut short
             if (d.step === 'scout' && !CUT_SHORT.test(r.message) && nextRing(m.searches, so.rings, Date.now(), so.ringMemoryMs)) tried.delete('scout')
