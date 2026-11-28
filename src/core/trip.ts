@@ -23,6 +23,8 @@ export interface TripSettings {
   needWeapon: boolean
   /** Health (of 20) below which it doesn't leave. Default 12. */
   minHealth: number
+  /** A food trip leaves with this much health when the bar is under 18 (health doesn't come back by waiting then). Default 6. */
+  foodMinHealth: number
   /** Turn back when the food left (bar + carried) drops to this fraction of what it left with. Default 0.5. */
   turnBackAt: number
   /** Turn back when the food bar is at or below this and no food is carried (0 = off). Default 6. */
@@ -43,6 +45,7 @@ export const TRIP_DEFAULTS: TripSettings = {
   minFood: 4,
   needWeapon: true,
   minHealth: 12,
+  foodMinHealth: 6,
   turnBackAt: 0.5,
   foodFloor: 6,
   daylightMarginS: 60,
@@ -120,7 +123,10 @@ export function planTripPrep (kit: TripKit, s: TripSettings, kind: TripKind, wai
   // full bar and no food items kept it from ever fetching wood, so it never got tools or food.
   const fedEnough = kit.bar >= FED_ENOUGH_BAR && kit.pantryItems === 0
   if (after < s.minFood && kind !== 'food' && !fedEnough && !waive.includes('food')) missing.push(after ? `food ${after} of ${s.minFood} items` : 'no food to take along')
-  if (kit.health < s.minHealth && !waive.includes('health')) missing.push(`health ${Math.round(kit.health)}/20 (needs ${s.minHealth})`)
+  // under 18 food health doesn't regenerate: waiting at home for 12 health never ends, so a food trip
+  // goes from foodMinHealth (Pax sat at 6 health and 12 food refusing every food trip, 28 Nov 2026)
+  const needHealth = kind === 'food' && kit.bar < 18 ? Math.min(s.minHealth, s.foodMinHealth) : s.minHealth
+  if (kit.health < needHealth && !waive.includes('health')) missing.push(`health ${Math.round(kit.health)}/20 (needs ${needHealth})`)
   const starving = kind === 'food' && kit.bar <= STARVING_BAR
   return {
     go: missing.length === 0 || starving,

@@ -157,6 +157,7 @@ can't change their own.
 | `trips.minFood` | 0–64 | fewest food items to leave with; food trips are exempt (default 4) |
 | `trips.needWeapon` | on/off | a sword or axe is needed to leave (default on) |
 | `trips.minHealth` | 0–20 | health needed to leave (default 12) |
+| `trips.foodMinHealth` | 0–20 | a food trip leaves with this much health when food is under 18, since health doesn't come back by waiting (default 6) |
 | `trips.turnBackAt` | 0–1 | turn back when the food left (bar + carried) is down to this share of what it left with (default 0.5) |
 | `trips.foodFloor` | 0–20 | turn back when the food bar is at or below this with nothing to eat (default 6, 0 = off) |
 | `trips.daylightMarginS` | 0–600 | turn back when the daylight left is the walk home plus this many seconds (default 60) |

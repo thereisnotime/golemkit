@@ -176,6 +176,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'trips.minFood', description: 'fewest food items to leave on a trip with; food trips are exempt (default 4)', schema: z.number().int().min(0).max(64) },
   { key: 'trips.needWeapon', description: 'a sword or axe is needed to leave on a trip (default on)', schema: bool },
   { key: 'trips.minHealth', description: 'health needed to leave on a trip (default 12)', schema: health },
+  { key: 'trips.foodMinHealth', description: 'a food trip leaves with this much health when food is under 18, since health does not come back by waiting then (default 6)', schema: health },
   { key: 'trips.turnBackAt', description: 'turn back when the food left (bar + carried) drops to this share of what it left with (default 0.5)', schema: unit },
   { key: 'trips.foodFloor', description: 'turn back when the food bar is at or below this with nothing to eat (default 6, 0 = off)', schema: health },
   { key: 'trips.daylightMarginS', description: 'turn back when the daylight left is the walk home plus this many seconds (default 60)', schema: z.number().int().min(0).max(600) },

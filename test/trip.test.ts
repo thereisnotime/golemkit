@@ -223,3 +223,13 @@ test('planTripPrep: well fed with nothing to take along may leave; with food in 
   assert.equal(withPantry.go, true)
   assert.equal(withPantry.topUp, S2.food)
 })
+
+test('planTripPrep: a food trip leaves from foodMinHealth when the bar is under 18 (waiting would not heal)', () => {
+  // Pax at 6 health, 12 food: every food trip refused for health, and health never came back
+  assert.equal(planTripPrep(kit({ health: 6, bar: 12 }), S, 'food').go, true)
+  assert.equal(planTripPrep(kit({ health: 5, bar: 12 }), S, 'food').go, false)
+  // well fed: it heals by waiting, so the normal 12 applies
+  assert.equal(planTripPrep(kit({ health: 6, bar: 18 }), S, 'food').go, false)
+  // other trips keep the normal rule
+  assert.equal(planTripPrep(kit({ health: 6, bar: 12 }), S, 'wood').go, false)
+})

@@ -1006,7 +1006,7 @@ pantry (chests it placed and `settings.storage.chests`, within `inventoryMemory.
 blocks of home, the same chests the pantry-low check counts; of those only the ones within 160
 blocks of where it stands, best food first) until it carries `trips.food` items (8), puts its best sword or axe in hand, and
 checks it. With no weapon (`trips.needWeapon`, on by default), fewer than `trips.minFood` items (4) or under `trips.minHealth`
-health (12) it stays and the behaviour backs off with the reason, e.g. `not ready for a trip
+health (12; a food trip with the food bar under 18 needs only `trips.foodMinHealth`, 6, since health doesn't come back by waiting then) it stays and the behaviour backs off with the reason, e.g. `not ready for a trip
 (looking for sheep 120 blocks out): no weapon, food 1 of 4 items`. Food trips don't need food
 along (getting some is the point), nor does any trip with a food bar of 16 or more when there is
 no food in reach to take (the bar is what it brings; a bot starting from nothing would otherwise

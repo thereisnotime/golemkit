@@ -1,0 +1,2 @@
+- [x] planTripPrep: foodMinHealth for food trips under 18 food
+- [x] Toggle, docs, unit test
