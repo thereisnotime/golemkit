@@ -3,7 +3,7 @@ import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
 import { z } from '../../../core/index.ts'
 import { defineBehavior } from '../../../brains/behaviors/types.ts'
-import { droppedItemName } from '../../../skills/pickup.ts'
+import { droppedItemName, unreachableDrop } from '../../../skills/pickup.ts'
 import { CROPS, isMature } from '../../../skills/farming.ts'
 import { isPlaceFace, vec } from '../../../skills/world.ts'
 import { resolveCenter, isDay, countWhere, dist, flatDist } from './util.ts'
@@ -19,7 +19,8 @@ export const collectDrops = defineBehavior({
   name: 'collect_drops',
   capabilities: ['move', 'inventory'],
   category: 'work',
-  description: 'Picks up dropped items lying nearby every so often (all items, or only the listed ones). Arm it while working so loot and drops don\'t despawn.',
+  description: 'Picks up dropped items lying nearby every so often (all items, or only the listed ones). Arm it while working so loot and drops don\'t despawn. ' +
+    'Drops it ran out of air going for (pickup.maxAirBreaks times, items on the bottom of a lake) are left alone for pickup.unreachableMinutes.',
   options: z.object({
     radius: z.number().min(2).max(32).default(12).describe('pick up drops this close'),
     items: z.array(z.string()).default([]).describe('only these items, e.g. oak_log,wheat; empty = everything'),
@@ -30,7 +31,8 @@ export const collectDrops = defineBehavior({
   create (o) {
     const wanted = (bot: Bot) => Object.values(bot.entities ?? {}).filter(e =>
       e.name === 'item' && e.position && bot.entity && e.position.distanceTo(bot.entity.position) <= o.radius &&
-      (!o.items.length || o.items.includes(droppedItemName(e) ?? '')))
+      (!o.items.length || o.items.includes(droppedItemName(e) ?? '')) &&
+      !unreachableDrop(bot, e)) // given up on: ran out of air going for it (pickup.maxAirBreaks)
     return {
       cooldownMs: o.everySeconds * 1000,
       failureCooldownMs: 20_000,

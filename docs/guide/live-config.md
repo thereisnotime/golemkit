@@ -168,6 +168,9 @@ can't change their own.
 | `inventoryMemory.indexOwn` | on/off | by day, look into its own and configured chests near home now and then ([check_storage](./behaviors#container-memory-check-storage)) and say when the pantry runs low (default off) |
 | `inventoryMemory.refreshMinutes` | 1–1440 | check_storage looks into a chest not seen inside for this long (default 60) |
 | `storage.anyContainer` | on/off | take anything it wants from every container it knows near home (chests, barrels, shulker boxes, furnaces, smokers, hoppers, droppers, dispensers, brewing stands); off = only chests it placed and `storage.chests` |
+| `pickup.maxAirBreaks` | 0–20 | give up on a dropped item after running out of air this many times going for it (items on the bottom of a lake); pickup_items, collect_drops and recover_items then skip it. 0 = never give up (default 2) |
+| `pickup.unreachableMinutes` | 0.5–240 | a drop it gave up on stays skipped this long; air breaks older than this are forgotten (default 10) |
+| `pickup.matchRadius` | 0–8 | other drops within this many blocks of a given-up drop are skipped with it (default 2) |
 | `inventoryMemory.radius` | 4–256 | check_storage: chests within this many blocks of home (default 48) |
 | `inventoryMemory.lowFood` | 0–1000 | tell the owners when the pantry holds fewer food items than this (default 8, 0 = never) |
 | `inventoryMemory.grumble` | on/off | grumble once in chat when its own chest is raided, moved or broken (default off) |

@@ -6,7 +6,7 @@
 // behaviour runs it right after a respawn. Decisions are pure in recoverPlan.ts.
 import type { Bot } from 'mineflayer'
 import { defineSkill, defineAction, z, ok, fail, travel, isHostile, checkAborted, fmtPos, itemName, type Agent, type ActionResult } from '../core/index.ts'
-import { pickupNearby, droppedItemName } from './pickup.ts'
+import { pickupNearby, droppedItemName, unreachableDrop } from './pickup.ts'
 import { vec } from './world.ts'
 import { equipGear } from './gear.ts'
 import { equipBestWeapon } from './combat.ts'
@@ -225,7 +225,7 @@ export async function recoverTrip (agent: Agent, bot: Bot, d: OwnDeath, signal: 
         if (why || Date.now() > pickupUntil) break
         checkAborted(signal)
         if (bot.inventory.emptySlotCount() === 0) break
-        const there = bot.nearestEntity(e => e.name === 'item' && dist3(e.position, at) <= r && (!item || droppedItemName(e) === item))
+        const there = bot.nearestEntity(e => e.name === 'item' && dist3(e.position, at) <= r && (!item || droppedItemName(e) === item) && !unreachableDrop(bot, e))
         if (!there) continue
         try {
           const reach = Math.min(32, Math.max(radius, Math.ceil(there.position.distanceTo(bot.entity.position)) + 2))

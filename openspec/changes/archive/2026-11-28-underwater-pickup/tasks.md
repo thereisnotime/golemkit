@@ -1,0 +1,4 @@
+- [x] pickupPlan.ts: settings with per-key fallback, record air breaks, give-up threshold, expiry, filter; unit tests
+- [x] pickupNearby / pickup_items: record air breaks, skip given-up drops, log once
+- [x] collect_drops score and recover_items skip given-up drops
+- [x] toggles, profile key check, docs (config, live-config, behaviors, actions), golden snapshots

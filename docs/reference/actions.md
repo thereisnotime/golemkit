@@ -1029,7 +1029,7 @@ Picking up dropped items.
 
 ### `pickup_items`
 
-Walk over dropped items lying nearby to pick them up.
+Walk over dropped items lying nearby to pick them up. Skips drops it kept running out of air going for (deep water).
 
 *aliases: `pickup`*
 

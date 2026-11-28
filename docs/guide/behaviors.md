@@ -1836,7 +1836,7 @@ Keeps a stock of wood: by day, while it has fewer than `keep` logs (4 planks cou
 
 *work · priority npc (20) · needs `pickup_items`*
 
-Picks up dropped items lying nearby every so often (all items, or only the listed ones). Arm it while working so loot and drops don't despawn.
+Picks up dropped items lying nearby every so often (all items, or only the listed ones). Arm it while working so loot and drops don't despawn. Drops it ran out of air going for (pickup.maxAirBreaks times, items on the bottom of a lake) are left alone for pickup.unreachableMinutes.
 
 | option | type | default | description |
 |---|---|---|---|

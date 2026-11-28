@@ -5718,7 +5718,7 @@
       },
       {
         "name": "pickup_items",
-        "description": "Walk over dropped items lying nearby to pick them up.",
+        "description": "Walk over dropped items lying nearby to pick them up. Skips drops it kept running out of air going for (deep water).",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -9590,7 +9590,7 @@
       },
       {
         "name": "pickup_items",
-        "description": "Walk over dropped items lying nearby to pick them up.",
+        "description": "Walk over dropped items lying nearby to pick them up. Skips drops it kept running out of air going for (deep water).",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -15313,7 +15313,7 @@
       },
       {
         "name": "pickup_items",
-        "description": "Walk over dropped items lying nearby to pick them up.",
+        "description": "Walk over dropped items lying nearby to pick them up. Skips drops it kept running out of air going for (deep water).",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
