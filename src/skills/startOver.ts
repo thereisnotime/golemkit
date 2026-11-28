@@ -68,13 +68,14 @@ export function avoidPoints (bot: Bot, s: StartOverSettings): AvoidPoint[] {
 }
 
 /** Starts a start-over (state packing at home, or where it stands). Returns false when one is already under way. */
-export function beginStartOver (agent: Agent, bot: Bot, by: string, direction?: string): boolean {
+export function beginStartOver (agent: Agent, bot: Bot, by: string, direction?: string, run?: string): boolean {
   if (startingOver(agent)) return false
   const home = getHome(agent)
   const p = bot.entity.position
   const origin = home ?? { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z), dimension: bot.game?.dimension }
   const st: StartOverState = { phase: 'packing', startedAt: Date.now(), by, origin: { x: origin.x, y: origin.y, z: origin.z, ...(origin.dimension ? { dim: origin.dimension } : {}) } }
   if (direction) st.direction = direction
+  if (run) st.run = run
   saveStartOver(agent, st)
   noteStartOver(agent, bot, 'start', `starting over (asked by ${by}), old base at ${fmtPos(origin)}`, { by, origin: st.origin })
   return true

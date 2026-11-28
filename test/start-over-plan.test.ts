@@ -153,6 +153,9 @@ test('state machine: range used up: best fallback, else turn, else give up', () 
   if (turn.do === 'turn') assert.equal(turn.heading, 90)
   // after a turn the range counts the legs since
   assert.equal(startOverStep(st({ turns: 1, legsSinceTurn: 2 }), far, S).do, 'leg')
+  // the range after a turn counts blocks walked, not legs (short mountain legs)
+  assert.equal(startOverStep(st({ turns: 1, legsSinceTurn: 20, walkedSinceTurn: 400 }), far, S).do, 'leg')
+  assert.equal(startOverStep(st({ turns: 1, legsSinceTurn: 2, walkedSinceTurn: 1000, best: { ...best, fallback: false } }), far, S).do, 'turn')
   assert.equal(startOverStep(st({ turns: 2, legsSinceTurn: 10 }), far, S).do, 'give_up')
   // out of turns with a place looked at: settle at the best one even if it isn't fallback-worthy
   assert.equal(startOverStep(st({ turns: 2, legsSinceTurn: 10, best: { ...best, fallback: false } }), far, S).do, 'settle')
@@ -216,4 +219,25 @@ test('night shelter fallback: protected ground does not count', async () => {
   const { shelterFallback } = await import('../src/skills/startOverPlan.ts')
   assert.deepEqual(shelterFallback("can't dig in here (protected area); move away first"), { counts: false, step: 24 })
   assert.deepEqual(shelterFallback('ground here is too thin or unsafe to dig a shelter'), { counts: true, step: 12 })
+})
+
+test('go fires once per run id; settle retries', async () => {
+  const { goFires, settleRetry } = await import('../src/skills/startOverPlan.ts')
+  assert.equal(goFires(null, { go: true, run: '' }), true)
+  assert.equal(goFires(null, { go: false, run: '' }), false)
+  assert.equal(goFires({ phase: 'settled' }, { go: true, run: '' }), false)
+  assert.equal(goFires({ phase: 'settled' }, { go: true, run: '2' }), true)
+  assert.equal(goFires({ phase: 'settled', run: '2' }, { go: true, run: '2' }), false)
+  assert.equal(goFires({ phase: 'travelling' }, { go: true, run: '3' }), false, 'not while one runs')
+  assert.equal(startOverSettings({ run: 2 }).run, '2')
+  assert.equal(settleRetry(0, 600), true)
+  assert.equal(settleRetry(5, 600), false)
+  assert.equal(settleRetry(0, 30), false)
+})
+
+test('a second start-over keeps the first old base', async () => {
+  const { abandonedState } = await import('../src/skills/startOverPlan.ts')
+  const store: Record<string, unknown> = { places: { old_base: { x: 560, y: 68, z: -46 } } }
+  const r = abandonedState(k => store[k], { x: 1092, y: 148, z: -68 })
+  assert.deepEqual((r.set.places as Record<string, unknown>).old_base, { x: 560, y: 68, z: -46 })
 })

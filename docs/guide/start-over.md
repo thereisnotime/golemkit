@@ -28,7 +28,8 @@ behaviors:
 
 `go: true` fires when the bot starts. The run is stored in `data/bots/<name>/store.json` under
 `startOver`. Once that key exists, even as settled or failed, `go` doesn't fire again. To run it a
-second time, call the action.
+second time, call the action, or set `startOver.run` to a new id (`run: "2"`). That run starts
+from the current home and keeps the first `old_base`.
 
 ## Steps
 
@@ -83,10 +84,12 @@ it was.
    somebody's build (more than `maxBuildBlocks` blocks of planks, glass, doors, farmland...). The
    first place that passes is the one. After `snowTurnAfter` (3) snowy places in a row, the main
    heading turns 90 degrees. North of Pax's fortress was frozen land with polar bears.
-5. **Range.** At `maxDistance` (1500) without a good place, it settles at the best place it looked
+5. **Range.** After a turn, the range counts the blocks actually walked, so short legs in the
+   mountains don't use it up. At `maxDistance` (1500) without a good place, it settles at the best place it looked
    at, if that place had at least some grass and trees and wasn't snowy, protected or built on.
    Otherwise it turns 90 degrees and tries that way for the same length, up to `maxTurns` times.
-   After that it settles at the best place it looked at even if it was snowy, and only if it never
+   After that it settles at the best place it looked at even if it was snowy. If it can't walk
+   there, it tries again up to 5 times before settling where it stands, and only if it never
    looked anywhere does it make home where it stands.
 6. **Settle.** Home goes there, the bed goes down (`place_bed`), a chest goes down (`place_chest`,
    crafted from planks if needed), and ores and ingots go into the chest. Tools, food, seeds, logs
@@ -105,6 +108,7 @@ back to its default on its own when its value is bad.
 | key | default | what |
 |---|---|---|
 | `go` | off | start once by itself on start |
+| `run` | (none) | with `go`: a new id starts one more run |
 | `minDistance` | 500 | settle no closer than this to the old base |
 | `maxDistance` | 1500 | look no further than this before turning |
 | `legLength` | 96 | blocks per leg |

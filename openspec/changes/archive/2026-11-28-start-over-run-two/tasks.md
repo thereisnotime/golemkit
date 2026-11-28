@@ -1,0 +1,2 @@
+- [x] walkedSinceTurn, settleRetry, goFires, old_base kept; tests
+- [x] Toggle, docs, Pax profile

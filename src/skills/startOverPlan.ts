@@ -19,6 +19,8 @@ export interface AvoidPoint extends XZ { name?: string, radius: number }
 export interface StartOverSettings {
   /** Start on its own once (on start), remembered in storage so it doesn't fire again after it is done. */
   go: boolean
+  /** With go: a run id; a new id starts a new start-over once even after an earlier one finished. */
+  run: string
   /** Settle no closer than this to the old base, blocks. */
   minDistance: number
   /** Look no further than this from the old base, blocks. */
@@ -56,6 +58,7 @@ export interface StartOverSettings {
 
 export const START_OVER_DEFAULTS: StartOverSettings = {
   go: false,
+  run: '',
   minDistance: 500,
   maxDistance: 1500,
   legLength: 96,
@@ -103,6 +106,7 @@ export function startOverSettings (raw: unknown): StartOverSettings {
   const dir = typeof o.direction === 'string' && (COMPASS as readonly string[]).includes(o.direction.toLowerCase()) ? o.direction.toLowerCase() : d.direction
   return {
     go: bool(o.go, d.go),
+    run: typeof o.run === 'string' || typeof o.run === 'number' ? String(o.run) : d.run,
     minDistance: min,
     maxDistance: Math.max(min + 64, int(o.maxDistance, d.maxDistance, 128, 10_000)),
     legLength: int(o.legLength, d.legLength, 32, 256),
@@ -410,6 +414,12 @@ export interface StartOverState {
   turns?: number
   /** Legs walked since the last turn. */
   legsSinceTurn?: number
+  /** Blocks actually walked since the last turn (the range after a turn; short mountain legs count for what they moved). */
+  walkedSinceTurn?: number
+  /** settings.startOver.run that started it. */
+  run?: string
+  /** Times the walk to the settle target failed. */
+  settleFails?: number
   /** Snowy places looked at in a row (snowTurnAfter). */
   snowyLooks?: number
   /** Furthest from the origin so far. */
@@ -483,7 +493,7 @@ export function startOverStep (st: StartOverState | null | undefined, f: StepFac
     }
   }
   // the range: distance from the old base, or after a turn the legs walked since (the new way gets the same length)
-  const used = (st.turns ?? 0) > 0 ? (st.legsSinceTurn ?? 0) * s.legLength + s.minDistance : dist
+  const used = (st.turns ?? 0) > 0 ? (st.walkedSinceTurn ?? (st.legsSinceTurn ?? 0) * s.legLength) + s.minDistance : dist
   if (used >= s.maxDistance) {
     if (st.best?.fallback) return { do: 'settle', at: st.best, why: `best place within ${s.maxDistance} blocks: ${st.best.why}` }
     if ((st.turns ?? 0) < s.maxTurns) return { do: 'turn', heading: (st.heading ?? 0) + 90, why: `nothing good within ${s.maxDistance} blocks that way` }
@@ -551,7 +561,8 @@ export function abandonedState (get: (key: string) => unknown, origin: Pos & { d
     if (BASE_PLACE.test(name) || near(p, origin, radius)) continue
     places[name] = p
   }
-  places.old_base = { x: origin.x, y: origin.y, z: origin.z, ...(origin.dim ? { dimension: origin.dim } : {}) }
+  // a second start-over keeps the first old base (the one pinned chests and the owner know)
+  if (!places.old_base) places.old_base = { x: origin.x, y: origin.y, z: origin.z, ...(origin.dim ? { dimension: origin.dim } : {}) }
   set.places = places
   const sites: Record<string, unknown> = {}
   for (const [k, r] of Object.entries(obj(get('sites')))) {
@@ -587,4 +598,17 @@ export function abandonedState (get: (key: string) => unknown, origin: Pos & { d
  */
 export function shelterFallback (message: string): { counts: boolean, step: number } {
   return /protected area/.test(message) ? { counts: false, step: 24 } : { counts: true, step: 12 }
+}
+
+/** Whether settings.startOver.go starts a run now: no run stored yet, or a finished one with another run id. Pure. */
+export function goFires (st: Pick<StartOverState, 'phase' | 'run'> | null | undefined, s: Pick<StartOverSettings, 'go' | 'run'>): boolean {
+  if (!s.go) return false
+  if (!st) return true
+  const done = st.phase === 'settled' || st.phase === 'failed'
+  return done && s.run !== '' && (st.run ?? '') !== s.run
+}
+
+/** Settling at a far target that it couldn't walk to: try again (up to 5 times) unless it is close already. Pure. */
+export function settleRetry (fails: number, distance: number): boolean {
+  return distance > 64 && fails < 5
 }

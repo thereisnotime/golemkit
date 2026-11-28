@@ -78,7 +78,10 @@ settings:
   # go fires once on start; the state in storage (startOver) keeps it from firing again once settled.
   # It packs, walks 500+ blocks by day away from spawn and the village, and settles where there is
   # grass, trees, water and animals. The old base stays as the place old_base.
-  startOver: { go: true, minDistance: 500, maxDistance: 1500, avoid: [{ name: spawn, x: 545, z: 45, radius: 300 }, { name: village, x: -2770, z: 1090, radius: 500 }] }
+  # Run 1 (2026-11-28) went north (snow, polar bears), east (snow), then south over frozen peaks
+  # and settled on a peak at 1092 148 -68. Run 2 starts from there heading south, where the grove
+  # turned grassy around z 250.
+  startOver: { go: true, run: "2", direction: s, minDistance: 500, maxDistance: 1500, avoid: [{ name: spawn, x: 545, z: 45, radius: 300 }, { name: village, x: -2770, z: 1090, radius: 500 }] }
 # Behaviours that run on their own between LLM turns (docs/guide/behaviors.md). Pax or ${MC_OWNER:-Robin}
 # can arm more at runtime (behavior_arm / !behavior_arm follow_owner); those changes persist.
 behaviors:

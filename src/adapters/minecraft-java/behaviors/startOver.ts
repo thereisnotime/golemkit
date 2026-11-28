@@ -7,7 +7,7 @@ import type { Bot } from 'mineflayer'
 import { z, needsSurvival, fmtPos, sleep } from '../../../core/index.ts'
 import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import {
-  startOverStep, chooseHeading, siteVerdict, fallbackOk, betterBest, angleCompass, packValue, dryLegHeading, pointAt, shelterFallback,
+  startOverStep, chooseHeading, siteVerdict, fallbackOk, betterBest, angleCompass, packValue, dryLegHeading, pointAt, shelterFallback, goFires, settleRetry,
   type StartOverState, type StepFacts, type SiteFacts
 } from '../../../skills/startOverPlan.ts'
 import {
@@ -65,8 +65,8 @@ export const startOverBehavior = defineBehavior({
         if (!fired) {
           fired = true
           const s = startOverConfig(agent)
-          // settings.startOver.go: once; the stored state (even settled or failed) keeps it from firing again
-          if (s.go && !startOverState(agent)) beginStartOver(agent, b, 'settings', s.direction || undefined)
+          // settings.startOver.go: once; the stored state (even settled or failed) keeps it from firing again, unless startOver.run is new
+          if (goFires(startOverState(agent), s)) beginStartOver(agent, b, 'settings', s.direction || undefined, s.run || undefined)
         }
         if (now < waitUntil || !startingOver(agent)) return 0
         const st = startOverState(agent)!
@@ -102,7 +102,7 @@ export const startOverBehavior = defineBehavior({
             noteStartOver(agent, bot, 'pack', r.message, { took })
             const heading = st.heading ?? chooseHeading(st.origin, avoidPoints(bot, s), s.maxDistance, st.direction ?? s.direction)
             const dropped = abandonOldBase(agent, st.origin)
-            st = { ...st, phase: 'travelling', heading, packed: took, legs: 0, fails: 0, turns: 0, legsSinceTurn: 0, farthest: 0 }
+            st = { ...st, phase: 'travelling', heading, packed: took, legs: 0, fails: 0, turns: 0, legsSinceTurn: 0, walkedSinceTurn: 0, farthest: 0, snowyLooks: 0, best: undefined, settleFails: 0 }
             save(st)
             noteStartOver(agent, bot, 'leave', `left the old base ${fmtPos(st.origin)} (kept as place old_base), heading ${angleCompass(heading)}; dropped ${dropped.length} base keys`, { heading })
             tell(bot, `starting over: packed ${fmtTally(took)}, heading ${angleCompass(heading)} to find a better place (${s.minDistance}+ blocks)`)
@@ -143,14 +143,14 @@ export const startOverBehavior = defineBehavior({
             const moved = (r.data as { moved?: number } | undefined)?.moved ?? 0
             const p = bot.entity.position
             const dist = Math.hypot(p.x - st.origin.x, p.z - st.origin.z)
-            st = { ...st, legs: (st.legs ?? 0) + 1, legsSinceTurn: (st.legsSinceTurn ?? 0) + 1, fails: !r.ok && moved < 16 ? (st.fails ?? 0) + 1 : 0, farthest: Math.max(st.farthest ?? 0, dist) }
+            st = { ...st, legs: (st.legs ?? 0) + 1, legsSinceTurn: (st.legsSinceTurn ?? 0) + 1, walkedSinceTurn: (st.walkedSinceTurn ?? 0) + moved, fails: !r.ok && moved < 16 ? (st.fails ?? 0) + 1 : 0, farthest: Math.max(st.farthest ?? 0, dist) }
             save(st)
             looked = null
             noteStartOver(agent, bot, 'leg', `leg ${st.legs} ${angleCompass(heading)}${heading !== step.heading ? ' (around water)' : ''}: ${r.message}; ${Math.round(dist)} from the old base`, { ok: r.ok, moved: Math.round(moved), dist: Math.round(dist) })
             return r
           }
           case 'turn': {
-            st = { ...st, heading: step.heading, turns: (st.turns ?? 0) + 1, legsSinceTurn: 0, fails: 0, snowyLooks: 0 }
+            st = { ...st, heading: step.heading, turns: (st.turns ?? 0) + 1, legsSinceTurn: 0, walkedSinceTurn: 0, fails: 0, snowyLooks: 0 }
             save(st)
             noteStartOver(agent, bot, 'turn', `${step.why}: turning ${angleCompass(step.heading)}`)
             return { ok: true, message: step.why }
@@ -167,7 +167,20 @@ export const startOverBehavior = defineBehavior({
           case 'settle': {
             if (st.phase !== 'settling') { st = { ...st, phase: 'settling', target: { x: step.at.x, y: step.at.y, z: step.at.z, why: step.why } }; save(st) }
             let h = await ctx.act('start_over_settle', { x: step.at.x, y: step.at.y, z: step.at.z })
-            if (!h.ok) h = await ctx.act('start_over_settle', here) // can't get there: right here then
+            if (!h.ok) {
+              // a far target it couldn't walk to: again in a bit (the walk resumes from further on), right here only after 5 tries
+              const p = bot.entity.position
+              const left = Math.hypot(p.x - step.at.x, p.z - step.at.z)
+              if (settleRetry(st.settleFails ?? 0, left)) {
+                st = { ...st, settleFails: (st.settleFails ?? 0) + 1 }
+                save(st)
+                noteStartOver(agent, bot, 'settle', `couldn't get to ${fmtPos(step.at)} yet (${st.settleFails}/5, ${Math.round(left)} blocks left): ${h.message}`)
+                waitUntil = Date.now() + 20_000
+                return h
+              }
+              const q = bot.entity.position.floored()
+              h = await ctx.act('start_over_settle', { x: q.x, y: q.y, z: q.z })
+            }
             if (!h.ok) { waitUntil = Date.now() + 30_000; return h }
             const notes = [h.message]
             if (bot.inventory.items().some(i => /_bed$/.test(itemName(i))) && agent.getAction('place_bed')) {
