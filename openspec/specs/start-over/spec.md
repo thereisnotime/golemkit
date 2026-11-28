@@ -65,3 +65,10 @@ When digging in for the night fails because the spot is protected, the start-ove
 #### Scenario: respawned at spawn at night
 - **WHEN** the bot respawns at a protected world spawn at night
 - **THEN** it walks 24 blocks along its heading and digs in there
+
+### Requirement: No night walking
+When it could not dig in three times in a night, the start-over SHALL wait for the morning instead of walking on.
+
+#### Scenario: no shelter
+- **WHEN** three bunkers failed tonight
+- **THEN** it waits where it is until day

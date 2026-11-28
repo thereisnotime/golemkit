@@ -127,7 +127,7 @@ test('state machine: walks by day, shelters by night, waits at dusk', () => {
   assert.equal(near.do, 'leg')
   if (near.do === 'leg') assert.deepEqual(near.target, { x: 200, z: 0 })
   assert.equal(startOverStep(st({}), day({ x: 100, z: 0 }, { isNight: true, daylightMs: 0 }), S).do, 'shelter')
-  assert.equal(startOverStep(st({ shelterFails: 3 }), day({ x: 100, z: 0 }, { isNight: true, daylightMs: 0 }), S).do, 'leg')
+  assert.equal(startOverStep(st({ shelterFails: 3 }), day({ x: 100, z: 0 }, { isNight: true, daylightMs: 0 }), S).do, 'wait')
   assert.equal(startOverStep(st({}), day({ x: 100, z: 0 }, { daylightMs: 10_000 }), S).do, 'wait')
   // a blocked leg turns 45 degrees
   const det = startOverStep(st({ fails: 1 }), day({ x: 100, z: 0 }), S)

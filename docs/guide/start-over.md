@@ -70,7 +70,7 @@ it was.
    the other way, then 90. After a leg that works it is back on the main heading. It walks by day only. Half
    a minute before dark it stops, and at night it digs in (`bunker`, until morning). If that fails
    on protected ground (world spawn after a death), it walks 24 blocks on and tries again; other
-   failures move it 12 blocks on, and after three of those it walks through the night. Meals and
+   failures move it 12 blocks on, and after three of those it waits for the morning where it is. Meals and
    danger still go first: keep_fed, stay_safe and recover_drops all outrank it.
 4. **Look.** Once it is `minDistance` (500) blocks from the old base and outside the avoid points,
    it looks around after every leg (`siteVerdict`). Within 32 blocks it wants:

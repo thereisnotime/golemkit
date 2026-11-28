@@ -455,7 +455,7 @@ export const DUSK_MS = 30_000
 
 /**
  * The next step of a start-over. packing: pack by day, then leave (the behaviour moves it on to
- * travelling); at night or late in the day it waits for the morning. travelling: by night shelter (after 3 failed bunkers it walks on); at dusk wait; by
+ * travelling); at night or late in the day it waits for the morning. travelling: by night shelter (after 3 failed bunkers it waits for the morning); at dusk wait; by
  * day, far enough from the old base and outside the avoid points, look at the place (with `site`
  * known: settle when it passes); past maxDistance settle at the best fallback seen, else turn the
  * main heading 90 degrees (maxTurns times), else give up; otherwise walk the next leg.
@@ -468,7 +468,8 @@ export function startOverStep (st: StartOverState | null | undefined, f: StepFac
   if (st.phase === 'packing') return f.isNight || f.daylightMs < DUSK_MS * 4 ? { do: 'wait', why: 'leaving at daybreak' } : { do: 'pack' }
   if (st.phase === 'settling') return st.target ? { do: 'settle', at: st.target, why: st.target.why } : { do: 'look' }
   // travelling
-  if (f.isNight) return (st.shelterFails ?? 0) >= 3 ? leg(st, f, s) : { do: 'shelter' }
+  // no shelter after 3 tries: wait for the morning where it is (walking at night got it killed twice)
+  if (f.isNight) return (st.shelterFails ?? 0) >= 3 ? { do: 'wait', why: 'no shelter tonight, waiting for the morning' } : { do: 'shelter' }
   if (f.daylightMs < DUSK_MS) return { do: 'wait', why: 'dusk: digging in once it is dark' }
   const dist = Math.hypot(f.pos.x - st.origin.x, f.pos.z - st.origin.z)
   if (dist >= s.minDistance && !f.avoided) {
