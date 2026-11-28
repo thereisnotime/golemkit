@@ -2,7 +2,7 @@
 // The owner says "start over" (or settings.startOver.go fires it once on start): the bot packs the
 // most precious things from its chests near home, walks off in one direction by day (digging in
 // at night), and settles at the first place far enough away with grass, trees, water and animals
-// that isn't snowy, protected or built on. Home, bed and a chest go there; the old base anchor,
+// that isn't in a bad biome, protected or built on (the rules are settings.startOver). Home, bed and a chest go there; the old base anchor,
 // farms and home places are dropped so its usual behaviours build fresh around the new home.
 //
 // The decisions are pure in startOverPlan.ts. The state lives in storage (startOver) so a restart
@@ -15,12 +15,12 @@ import {
   type Agent, type ActionResult
 } from '../core/index.ts'
 import {
-  startOverSettings, packPlan, siteVerdict, abandonedState, angleCompass, inAvoided,
+  startOverSettings, packPlan, siteVerdict, abandonedState, angleCompass, inAvoided, dimensionOk, START_OVER_DEFAULTS,
   type StartOverSettings, type StartOverState, type SiteFacts, type AvoidPoint, type Pos
 } from './startOverPlan.ts'
 import { chestView, chestTotals, takeItemsFromOwnChests, fmtTally } from './containers.ts'
 import { foodPoints } from './trip.ts'
-import { getHome, setHome, findStandable, type Place } from './navigation.ts'
+import { getHome, setHome, findStandable, registerHomeAway, setHomeAway, clearHomeAway, type Place } from './navigation.ts'
 import { surfaceWater, offLimits, spawnOf, freezes, ownWork, BUILD, ICE, GRASS } from './food.ts'
 import { ownBedsNear } from './bed.ts'
 import { vec, reachBlock, digBlock } from './world.ts'
@@ -28,8 +28,8 @@ import { pickupNearby } from './pickup.ts'
 import { LOGS, ANIMALS } from './searchPlan.ts'
 
 export const START_OVER_KEY = 'startOver'
-/** Set while it has no home on purpose (travelling): the NPC controller doesn't put home where it stands. */
-export const HOME_AWAY_KEY = 'home.away'
+/** The owner name of home.away while a run is under way. */
+const HOME_AWAY_BY = 'start_over'
 
 /** settings.startOver for this bot. */
 export function startOverConfig (agent: Agent): StartOverSettings {
@@ -49,6 +49,9 @@ export function startingOver (agent: Agent): boolean {
   const st = startOverState(agent)
   return !!st && (st.phase === 'packing' || st.phase === 'travelling' || st.phase === 'settling')
 }
+
+// home.away holds only while a run is under way (packing, travelling, settling)
+registerHomeAway(HOME_AWAY_BY, startingOver)
 
 /** Log line and journal event for a step. */
 export function noteStartOver (agent: Agent, bot: Bot | null, step: string, text: string, data: Record<string, unknown> = {}): void {
@@ -88,7 +91,7 @@ export function abandonOldBase (agent: Agent, origin: StartOverState['origin']):
   const r = abandonedState(k => agent.storage.get(k), origin, s.oldBaseRadius, drop)
   for (const k of r.del) agent.storage.delete(k)
   for (const [k, v] of Object.entries(r.set)) agent.storage.set(k, v)
-  agent.storage.set(HOME_AWAY_KEY, 'starting over')
+  setHomeAway(agent, HOME_AWAY_BY, 'starting over')
   return r.del
 }
 
@@ -162,7 +165,7 @@ const startOverAction = defineAction({
   exclusive: false,
   description: 'Leave this base behind and start over somewhere better: pack the most precious things from my chests near home ' +
     '(iron and diamond gear, ores and ingots, the best weapon, armour, shield and bow, arrows, food, seeds, the bed, torches, a stack of logs, some cobblestone), ' +
-    'walk off in one direction by day (500+ blocks, digging in at night) to a place with grass, trees, water and animals that is not snowy, protected or built on, ' +
+    `walk off in one direction by day (at least startOver.minDistance blocks, ${START_OVER_DEFAULTS.minDistance} by default, digging in at night) to a place with grass, trees, water and animals that is not in a bad biome (startOver.badBiomes), protected or built on, ` +
     'then set home there with a bed and a chest and build up from scratch. cancel stops it; status says how far it got.',
   params: z.object({
     cancel: z.boolean().default(false).describe('stop a start-over under way (it stays where it is)'),
@@ -176,13 +179,16 @@ const startOverAction = defineAction({
     if (p.cancel) {
       if (!st || !startingOver(agent)) return fail('not starting over')
       saveStartOver(agent, { ...st, phase: 'failed', doneAt: Date.now(), note: `cancelled by ${player ?? caller.name}` })
-      agent.storage.delete(HOME_AWAY_KEY)
+      clearHomeAway(agent)
       if (!getHome(agent)) { const q = bot.entity.position.floored(); setHome(agent, { x: q.x, y: q.y, z: q.z, dimension: bot.game?.dimension }) }
       noteStartOver(agent, bot, 'cancel', `cancelled by ${player ?? caller.name}`)
       return ok(`stopped starting over (${st.phase})${getHome(agent) ? `; home is ${fmtPos(getHome(agent)!)}` : ''}`)
     }
+    const s = startOverConfig(agent)
+    const dim = bot.game?.dimension ? String(bot.game.dimension) : undefined
+    if (!dimensionOk(dim, s)) return fail(`can't start over in the ${dim?.replace(/^minecraft:/, '')}: only in ${s.dimensions.join(', ')} (startOver.dimensions)`)
     if (!beginStartOver(agent, bot, player ?? caller.name, p.direction)) return fail(`already starting over: ${st ? startOverText(st) : ''}`)
-    return ok('starting over: packing the best things from my chests first, then off to find a better place')
+    return ok(`starting over: packing the best things from my chests first, then off to find a better place at least ${s.minDistance} blocks away`)
   }
 })
 
@@ -286,7 +292,7 @@ const settleAction = defineAction({
     const spot: Place = findStandable(bot, q.x, q.y, q.z, 3, true) ?? { x: q.x, y: q.y, z: q.z }
     const home = { x: spot.x, y: spot.y, z: spot.z, dimension: bot.game?.dimension }
     setHome(agent, home)
-    agent.storage.delete(HOME_AWAY_KEY)
+    clearHomeAway(agent)
     return ok(`home is now ${fmtPos(home)}`, home)
   }
 })

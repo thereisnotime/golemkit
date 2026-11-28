@@ -47,6 +47,8 @@ export interface ReflexOptions {
   air?: boolean
   /** ...at or below this much air (of 20), earlier at low health. Default 10. */
   airBelow?: number
+  /** After getting air: look for dry land this far out, blocks (12-128). Default 48. */
+  airShoreRadius?: number
 }
 
 /** Actions the ranged reflex never interrupts. */

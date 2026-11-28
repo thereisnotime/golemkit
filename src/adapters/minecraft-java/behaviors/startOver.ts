@@ -7,17 +7,17 @@ import type { Bot } from 'mineflayer'
 import { z, needsSurvival, fmtPos, sleep } from '../../../core/index.ts'
 import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import {
-  startOverStep, chooseHeading, angleCompass, packValue, pointAt, canLeave, goFires, redirected,
+  startOverStep, chooseHeading, angleCompass, packValue, pointAt, canLeave, goFires, redirected, dimensionOk, START_OVER_DEFAULTS,
   applyLook, applyLeg, applyTurn, applyLeave, applyDay, applyShelterFail, settleNext, stashPicks,
   type StartOverState, type StepFacts, type SiteFacts
 } from '../../../skills/startOverPlan.ts'
 import {
   startOverConfig, startOverState, saveStartOver, startingOver, beginStartOver, abandonOldBase, noteStartOver,
-  avoidPoints, avoidedAt, lookAround, factsText, HOME_AWAY_KEY
+  avoidPoints, avoidedAt, lookAround, factsText
 } from '../../../skills/startOver.ts'
 import { daylightMs, foodPoints } from '../../../skills/trip.ts'
 import { fmtTally } from '../../../skills/containers.ts'
-import { getHome, setHome, getPlaces, inWater, legOverWater } from '../../../skills/navigation.ts'
+import { getHome, setHome, getPlaces, inWater, legOverWater, clearHomeAway, homeAway } from '../../../skills/navigation.ts'
 import { itemName } from '../../../core/index.ts'
 import { ownerTarget } from './util.ts'
 
@@ -39,8 +39,8 @@ export const startOverBehavior = defineBehavior({
   category: 'routine',
   description: 'Carries out a start-over (the start_over action, or settings.startOver.go once on start): packs the most precious things from ' +
     'its chests near home, leaves the old base behind (kept as the place old_base), walks off in one direction by day and digs in at night, ' +
-    'looks around once it is far enough (startOver.minDistance, default 500) and settles at the first place with grass, trees, water and animals that ' +
-    "isn't snowy, protected or built on: home, bed and a chest there, then its other behaviours build up from scratch. Resumes after a restart or a death.",
+    `looks around once it is far enough (startOver.minDistance, default ${START_OVER_DEFAULTS.minDistance}) and settles at the first place with grass, trees, water and animals that ` +
+    "isn't in a bad biome (startOver.badBiomes), protected or built on: home, bed and a chest there, then its other behaviours build up from scratch. Resumes after a restart or a death.",
   options,
   requires: ['start_over_pack', 'start_over_leg', 'start_over_settle'],
   uses: ['check_chests', 'deposit', 'bunker', 'place_bed', 'place_chest'],
@@ -67,10 +67,14 @@ export const startOverBehavior = defineBehavior({
           fired = true
           const s = startOverConfig(agent)
           // settings.startOver.go: once; the stored state (even settled or failed) keeps it from firing again, unless startOver.run is new
-          if (goFires(startOverState(agent), s)) beginStartOver(agent, b, 'settings', s.direction || undefined, s.run || undefined)
+          const dim = b.game?.dimension ? String(b.game.dimension) : undefined
+          if (goFires(startOverState(agent), s) && dimensionOk(dim, s)) beginStartOver(agent, b, 'settings', s.direction || undefined, s.run || undefined)
+          else if (goFires(startOverState(agent), s)) { fired = false; return 0 } // try again once back in an allowed dimension
           const r = redirected(startOverState(agent), s)
           if (r) { save(r); noteStartOver(agent, b, 'redirect', `run ${s.run}: carrying on ${r.heading !== undefined ? angleCompass(r.heading) : ''} from here`, { run: s.run }) }
         }
+        // homeAway clears the flag when no run is under way (finished, cancelled, state removed)
+        homeAway(agent)
         if (now < waitUntil || !startingOver(agent)) return 0
         const st = startOverState(agent)!
         const light = daylightMs(b)
@@ -162,7 +166,7 @@ export const startOverBehavior = defineBehavior({
           case 'give_up': {
             st = { ...st, phase: 'failed', doneAt: Date.now(), note: step.why }
             save(st)
-            agent.storage.delete(HOME_AWAY_KEY)
+            clearHomeAway(agent)
             if (!getHome(agent)) setHome(agent, { ...here, dimension: bot.game?.dimension })
             noteStartOver(agent, bot, 'give_up', `${step.why}; home is here now, ${fmtPos(here)}`)
             tell(bot, `couldn't find a better place: ${step.why}. I'll make do here (${fmtPos(here)})`)

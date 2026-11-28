@@ -80,7 +80,7 @@ function fake (actions: string[] = ['wander', 'go_home', 'npc_interrupt']): Fake
     },
     agent: {
       log: createLogger('test'),
-      storage: { get: (k: string, fb?: unknown) => store.has(k) ? store.get(k) : fb, set: (k: string, v: unknown) => store.set(k, v) },
+      storage: { get: (k: string, fb?: unknown) => store.has(k) ? store.get(k) : fb, set: (k: string, v: unknown) => store.set(k, v), delete: (k: string) => store.delete(k) },
       get currentAction () { return current },
       getAction: (n: string) => actions.includes(n) ? { name: n } : undefined,
       act (name: string, params: unknown, opts: { caller: any, priority: number }): Promise<ActionResult> {
@@ -341,6 +341,30 @@ test('suspended: no behaviour runs, even above the holder, and the running one s
   c.stop()
 })
 
+test('autoHome: a stale home.away (its owner says the reason is gone) is cleared and home is set', async () => {
+  const { registerHomeAway, setHomeAway, homeAway } = await import('../src/skills/navigation.ts')
+  let away = true
+  registerHomeAway('test_trip', () => away)
+  const g = fake()
+  g.agent.storage.set('home', undefined)
+  setHomeAway(g.agent, 'test_trip', 'travelling')
+  assert.equal(homeAway(g.agent), true)
+  away = false
+  new NpcController(g.agent, g.bot, { behaviors: [], now: () => g.clock.t })
+  assert.equal(g.agent.storage.get('home.away'), undefined, 'cleared')
+  assert.deepEqual(g.agent.storage.get('home'), { x: 0, y: 64, z: 0, dimension: 'overworld' })
+  // start_over's flag holds exactly while a run is under way
+  const { startingOver } = await import('../src/skills/startOver.ts')
+  const h = fake()
+  setHomeAway(h.agent, 'start_over', 'starting over')
+  h.agent.storage.set('startOver', { phase: 'travelling', startedAt: 0, by: 'x', origin: { x: 0, y: 64, z: 0 } })
+  assert.equal(startingOver(h.agent), true)
+  assert.equal(homeAway(h.agent), true)
+  h.agent.storage.set('startOver', { phase: 'failed', startedAt: 0, by: 'x', origin: { x: 0, y: 64, z: 0 } })
+  assert.equal(homeAway(h.agent), false)
+  assert.equal(h.agent.storage.get('home.away'), undefined)
+})
+
 test('autoHome: home goes where it stands, unless home.away says no home on purpose (start_over travelling)', () => {
   const f = fake()
   f.agent.storage.set('home', undefined)
@@ -348,7 +372,9 @@ test('autoHome: home goes where it stands, unless home.away says no home on purp
   assert.deepEqual(f.agent.storage.get('home'), { x: 0, y: 64, z: 0, dimension: 'overworld' })
   const g = fake()
   g.agent.storage.set('home', undefined)
+  // the plain-text flag of older versions, with a run under way
   g.agent.storage.set('home.away', 'starting over')
+  g.agent.storage.set('startOver', { phase: 'travelling', startedAt: 0, by: 'x', origin: { x: 0, y: 64, z: 0 } })
   new NpcController(g.agent, g.bot, { behaviors: [], now: () => g.clock.t })
   assert.equal(g.agent.storage.get('home'), undefined)
 })

@@ -95,7 +95,9 @@ test('air: unknown blocks above (unloaded) do not count as air', () => {
 
 test('air trigger: threshold, earlier at low health, off, head out of water', () => {
   const s = airSettings(undefined)
-  assert.deepEqual(s, { enabled: true, below: 10 })
+  assert.deepEqual(s, { enabled: true, below: 10, shoreRadius: 48 })
+  assert.equal(airSettings({ airShoreRadius: 80 }).shoreRadius, 80)
+  assert.equal(airSettings({ airShoreRadius: 500 }).shoreRadius, 48, 'out of range: default')
   assert.equal(airTrigger({ settings: s, headInWater: true, oxygen: 11, health: 20 }), null)
   assert.match(airTrigger({ settings: s, headInWater: true, oxygen: 10, health: 20 })!, /air 10\/20/)
   assert.equal(airTrigger({ settings: s, headInWater: false, oxygen: 2, health: 20 }), null, 'head out of water: breathing already')

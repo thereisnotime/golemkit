@@ -138,7 +138,7 @@ test('site verdict', () => {
 
 const S = startOverSettings({ minDistance: 500, maxDistance: 1500, legLength: 100 })
 const origin = { x: 0, y: 64, z: 0 }
-const st = (o: Partial<StartOverState>): StartOverState => ({ phase: 'travelling', startedAt: 0, by: 'pe4ka', origin, heading: 0, ...o })
+const st = (o: Partial<StartOverState>): StartOverState => ({ phase: 'travelling', startedAt: 0, by: 'owner', origin, heading: 0, ...o })
 const day = (pos: { x: number, z: number }, o: Partial<StepFacts> = {}): StepFacts => ({ pos: { ...pos, y: 64 }, isNight: false, daylightMs: 300_000, ...o })
 
 test('state machine: phases', () => {

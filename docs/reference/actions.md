@@ -1362,7 +1362,7 @@ Starting over somewhere better: pack the best things, walk off, settle with home
 
 ### `start_over`
 
-Leave this base behind and start over somewhere better: pack the most precious things from my chests near home (iron and diamond gear, ores and ingots, the best weapon, armour, shield and bow, arrows, food, seeds, the bed, torches, a stack of logs, some cobblestone), walk off in one direction by day (500+ blocks, digging in at night) to a place with grass, trees, water and animals that is not snowy, protected or built on, then set home there with a bed and a chest and build up from scratch. cancel stops it; status says how far it got.
+Leave this base behind and start over somewhere better: pack the most precious things from my chests near home (iron and diamond gear, ores and ingots, the best weapon, armour, shield and bow, arrows, food, seeds, the bed, torches, a stack of logs, some cobblestone), walk off in one direction by day (at least startOver.minDistance blocks, 500 by default, digging in at night) to a place with grass, trees, water and animals that is not in a bad biome (startOver.badBiomes), protected or built on, then set home there with a bed and a chest and build up from scratch. cancel stops it; status says how far it got.
 
 *non-exclusive*
 

@@ -32,6 +32,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'reflexes.rangedDefense', description: 'react to mobs shooting at it: shoot back, shield, cover or back off', schema: bool },
   { key: 'reflexes.air', description: 'when drowning, stop and get air: swim up, break ice or a roof above, or swim to an opening', schema: bool },
   { key: 'reflexes.airBelow', description: 'go for air at or below this much air (of 20; earlier at low health)', schema: health },
+  { key: 'reflexes.airShoreRadius', description: 'after getting air, look for dry land this far out, blocks (default 48)', schema: z.number().int().min(12).max(128) },
   { key: 'combat.adaptiveWeapon', description: 'pick the best weapon per target (damage, enchantments, finishers, axes vs shields)', schema: bool },
   { key: 'combat.ranged', description: 'use bow/crossbow for flyers and out-of-reach targets when it has arrows', schema: bool },
   { key: 'combat.shield', description: 'raise a shield against ranged mobs between swings', schema: bool },

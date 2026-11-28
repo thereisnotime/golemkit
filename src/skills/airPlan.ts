@@ -155,15 +155,20 @@ export interface AirSettings {
   enabled: boolean
   /** Go for air at or below this (of 20). */
   below: number
+  /** Out of the water: look for dry land this far out, blocks (the middle of a lake). */
+  shoreRadius: number
 }
 
 export const AIR_BELOW = 10
+/** Default reflexes.airShoreRadius: dry land is looked for this far out. */
+export const AIR_SHORE_RADIUS = 48
 /** Air counts as back at this (of 20). */
 export const AIR_DONE = 18
 
-export function airSettings (r: { air?: boolean, airBelow?: number } | undefined): AirSettings {
+export function airSettings (r: { air?: boolean, airBelow?: number, airShoreRadius?: number } | undefined): AirSettings {
   const below = typeof r?.airBelow === 'number' && r.airBelow >= 0 && r.airBelow <= 20 ? r.airBelow : AIR_BELOW
-  return { enabled: r?.air !== false, below }
+  const shore = typeof r?.airShoreRadius === 'number' && r.airShoreRadius >= 12 && r.airShoreRadius <= 128 ? Math.round(r.airShoreRadius) : AIR_SHORE_RADIUS
+  return { enabled: r?.air !== false, below, shoreRadius: shore }
 }
 
 /** The threshold to use: earlier the lower the health (drowning does 2 a second). */

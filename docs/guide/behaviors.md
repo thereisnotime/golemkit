@@ -1681,7 +1681,7 @@ After a death, goes back for the dropped things before they despawn (5 minutes):
 
 *routine · priority behavior (35) · needs `start_over_pack`, `start_over_leg`, `start_over_settle` · uses `check_chests`, `deposit`, `bunker`, `place_bed`, `place_chest` when present*
 
-Carries out a start-over (the start_over action, or settings.startOver.go once on start): packs the most precious things from its chests near home, leaves the old base behind (kept as the place old_base), walks off in one direction by day and digs in at night, looks around once it is far enough (startOver.minDistance, default 500) and settles at the first place with grass, trees, water and animals that isn't snowy, protected or built on: home, bed and a chest there, then its other behaviours build up from scratch. Resumes after a restart or a death.
+Carries out a start-over (the start_over action, or settings.startOver.go once on start): packs the most precious things from its chests near home, leaves the old base behind (kept as the place old_base), walks off in one direction by day and digs in at night, looks around once it is far enough (startOver.minDistance, default 500) and settles at the first place with grass, trees, water and animals that isn't in a bad biome (startOver.badBiomes), protected or built on: home, bed and a chest there, then its other behaviours build up from scratch. Resumes after a restart or a death.
 
 | option | type | default | description |
 |---|---|---|---|

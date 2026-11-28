@@ -2,4 +2,4 @@
 - [x] 2. Pure applyLook/applyLeg/applyTurn/applyShelterFail/applyLeave/settleNext; turnAfterRejects; turns by best untried heading
 - [x] 3. baseAnchored registry and dropPlaces/dropKeys
 - [x] 4. Shared tier table, stash from pack kinds, leg water test in navigation, own builds in lookAround
-- [ ] 5. Description, home.away owner, dimensions, reflexes.airShoreRadius, JSDoc and comments
+- [x] 5. Description, home.away owner, dimensions, reflexes.airShoreRadius, JSDoc and comments

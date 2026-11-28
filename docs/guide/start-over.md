@@ -26,6 +26,10 @@ behaviors:
   start_over: {}               # armed by default on the companion variant
 ```
 
+A start-over only starts in one of `startOver.dimensions` (the overworld by default); the
+action refuses elsewhere and `go` waits until the bot is back. A run under way waits while the bot
+is in another dimension than its old base.
+
 `go: true` fires when the bot starts. The run is stored in `data/bots/<name>/store.json` under
 `startOver`. Once that key exists, even as settled or failed, `go` doesn't fire again. To run it a
 second time, call the action, or set `startOver.run` to a new id (`run: "2"`). That run starts
@@ -69,8 +73,11 @@ it was.
    Base safety, integrity, fortress repair and the plot farm all hang off the base anchor, so they
    stop. The old base stays as the place `old_base`, for reference only. Torches, its own blocks,
    mines and tree spots stay: everything that uses them filters by distance from home. While it
-   travels, `home.away` is set so the NPC controller doesn't put home wherever it stands after a
-   restart.
+   travels, `home.away` is set (`setHomeAway` in `src/skills/navigation.ts`) so the NPC controller
+   doesn't put home wherever it stands after a restart. The flag names its owner, and reading it
+   asks the owner whether the reason still holds: once no run is under way (settled, given up,
+   cancelled, or the state removed) it is cleared. A run whose behaviour is disarmed is paused,
+   not finished, so the flag stays; `!start_over cancel=true` ends it.
 3. **Go.** It picks a heading. That is `startOver.direction` if set. Otherwise it is the compass
    direction whose path stays furthest from world spawn (`spawnRadius`) and the `avoid` points,
    and away from them. Then it walks legs of `legLength` blocks with `travel`, which avoids water

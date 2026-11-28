@@ -29,6 +29,42 @@ export function setHome (agent: Agent, place: Place): void {
   agent.storage.set(HOME_KEY, place)
 }
 
+/** Storage key of the "no home on purpose" flag (homeAway). */
+export const HOME_AWAY_KEY = 'home.away'
+
+/** Checks per owner of the flag: is the reason for having no home still there? */
+const HOME_AWAY_CHECKS = new Map<string, (agent: Agent) => boolean>()
+
+/** An owner of home.away says how to tell whether it still holds (start_over: a run is under way). Call at module load. */
+export function registerHomeAway (by: string, stillAway: (agent: Agent) => boolean): void {
+  HOME_AWAY_CHECKS.set(by, stillAway)
+}
+
+/** Sets the "no home on purpose" flag (travelling to a new base): the NPC controller doesn't put home where the bot stands. */
+export function setHomeAway (agent: Agent, by: string, why: string): void {
+  agent.storage.set(HOME_AWAY_KEY, { by, why })
+}
+
+export function clearHomeAway (agent: Agent): void {
+  agent.storage.delete(HOME_AWAY_KEY)
+}
+
+/**
+ * Whether the bot has no home on purpose. The flag's owner check runs each time, and a flag whose
+ * reason is gone (the run finished, was cancelled, or its state was removed) is cleared, so a bot
+ * is never left homeless by a stale flag. A flag from an owner that registered no check holds.
+ */
+export function homeAway (agent: Agent): boolean {
+  const v = agent.storage.get<unknown>(HOME_AWAY_KEY)
+  if (v === undefined || v === null || v === false) return false
+  const by = v && typeof v === 'object' ? (v as { by?: unknown }).by : undefined
+  // the old plain-text flag was start_over's
+  const check = HOME_AWAY_CHECKS.get(typeof by === 'string' ? by : 'start_over')
+  if (!check || check(agent)) return true
+  clearHomeAway(agent)
+  return false
+}
+
 export function getPlaces (agent: Agent): Record<string, Place> {
   return agent.storage.get<Record<string, Place>>(PLACES_KEY, {})
 }
@@ -166,11 +202,6 @@ export function inWater (bot: Bot): boolean {
 }
 
 /**
- * Swims to the nearest dry spot within 12 blocks (does nothing when not in water). Returns
- * whether it ended out of the water. For actions that end with the bot afloat: an idle bot
- * in deep water sinks and drowns.
- */
-/**
  * Offsets to look for dry land at, nearest ring first: every 2 blocks out to 12, then every 4
  * out to `maxRadius` with 16 directions (the middle of a lake). Pure, exported for tests.
  */
@@ -183,6 +214,11 @@ export function dryLandOffsets (maxRadius = 12): [number, number][] {
   return out
 }
 
+/**
+ * Swims to the nearest dry spot within `maxRadius` blocks (12 by default; dryLandOffsets) and does
+ * nothing when not in water. Returns whether it ended out of the water. For actions that end with
+ * the bot afloat: an idle bot in deep water sinks and drowns.
+ */
 export async function reachDryLand (bot: Bot, signal: AbortSignal, maxRadius = 12): Promise<boolean> {
   if (!inWater(bot)) return true
   const p = bot.entity.position

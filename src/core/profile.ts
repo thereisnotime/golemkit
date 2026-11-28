@@ -155,7 +155,7 @@ export const ProfileSchema = z.object({
   /** Extra blueprint folders (relative to the profile), added to settings.build.blueprintDirs. */
   blueprints: z.union([z.string(), z.array(z.string())]).optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
-  /** Reflex tuning: { selfDefense, autoEat, eatBelow, retreatBelow (0 = never retreat), waterFightAbove, rangedDefense, air, airBelow }. */
+  /** Reflex tuning: { selfDefense, autoEat, eatBelow, retreatBelow (0 = never retreat), waterFightAbove, rangedDefense, air, airBelow, airShoreRadius }. */
   reflexes: z.object({
     selfDefense: z.boolean().optional(),
     autoEat: z.boolean().optional(),
@@ -164,7 +164,8 @@ export const ProfileSchema = z.object({
     waterFightAbove: z.number().optional(),
     rangedDefense: z.boolean().optional(),
     air: z.boolean().optional(),
-    airBelow: z.number().min(0).max(20).optional()
+    airBelow: z.number().min(0).max(20).optional(),
+    airShoreRadius: z.number().int().min(12).max(128).optional()
   }).optional(),
   /** Retry policies (actions, llm, reconnect); see core/retry.ts. */
   retry: z.object({

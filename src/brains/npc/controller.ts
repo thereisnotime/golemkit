@@ -4,7 +4,7 @@ import {
   PRIORITY, ActionAbortedError, checkAborted, sleep,
   type Agent, type ActionResult, type Caller, type Logger, type GameClient, type DeciderSnapshot
 } from '../../core/index.ts'
-import { getHome, setHome } from '../../skills/navigation.ts'
+import { getHome, setHome, homeAway } from '../../skills/navigation.ts'
 import { Blackboard, type BlackboardOptions } from './blackboard.ts'
 import { decide, failureCooldown, flipCooldown, isFlip, type Scored, type SelectOptions } from './select.ts'
 import { helpDesk, type HelpDesk } from './help.ts'
@@ -170,8 +170,8 @@ export class NpcController {
     if (Array.isArray(opts.behaviors)) this.checkNames(opts.needs ? [...opts.behaviors, ...opts.needs.behaviors()] : opts.behaviors)
     this.behaviors()
     const self = agent.adapter.self()
-    // home.away: no home on purpose (start_over is travelling to a new place), don't put it here
-    if ((opts.autoHome ?? true) && self && !getHome(agent) && !agent.storage.get('home.away')) {
+    // homeAway: no home on purpose (travelling to a new place), don't put it here; a stale flag is cleared
+    if ((opts.autoHome ?? true) && self && !getHome(agent) && !homeAway(agent)) {
       const p = self.position
       setHome(agent, { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z), dimension: self.game.dimension as string | undefined })
       this.log.info(`home set to spawn ${Math.floor(p.x)} ${Math.floor(p.y)} ${Math.floor(p.z)}`)

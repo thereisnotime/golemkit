@@ -7,7 +7,7 @@
 import type { Bot } from 'mineflayer'
 import { Vec3 } from 'vec3'
 import { defineAction, z, ok, fail, getAir, headInWater, oxygen, fmtPos, climbOntoLedge, airCells, sleep, checkAborted } from '../core/index.ts'
-import { boxedIn, shaftExit, type V } from './airPlan.ts'
+import { boxedIn, shaftExit, airSettings, type V } from './airPlan.ts'
 import { reachDryLand } from './navigation.ts'
 import { fillerBlock, pillarUp } from './survival.ts'
 
@@ -47,8 +47,8 @@ export const air = defineAction({
       const watch = setInterval(() => { if (headInWater(bot) && oxygen(bot) < LOW_ON_THE_WAY) low.abort() }, 250)
       let dry = false
       try {
-        // out to 48 blocks: in the middle of a lake 12 found nothing and it bobbed up and down for minutes
-        dry = await reachDryLand(bot, AbortSignal.any([signal, low.signal]), 48)
+        // out to reflexes.airShoreRadius: in the middle of a lake 12 blocks found nothing and it bobbed up and down for minutes
+        dry = await reachDryLand(bot, AbortSignal.any([signal, low.signal]), airSettings(agent.settings.reflexes as Parameters<typeof airSettings>[0]).shoreRadius)
       } catch (e) {
         if (signal.aborted || !low.signal.aborted) throw e
       } finally {
