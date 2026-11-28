@@ -1,0 +1,6 @@
+- [x] Pure `rodPlan` (carried, chest, craft, withdraw then craft) with tests
+- [x] planFood: eat_rotten, chest wheat bread, fish step, starvingRange; tests
+- [x] keep_fed: sensing (rotten, chest wheat, fish water), steps, options, CUT_SHORT
+- [x] fish action and food sources use the chests for a rod
+- [x] eat action `item` param, golden snapshots
+- [x] Docs: behaviours guide, actions reference

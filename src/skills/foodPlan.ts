@@ -455,6 +455,7 @@ export function dryWaypoint (center: XZ, w: XZ, wet: (p: XZ) => boolean | null):
 export type FoodStep =
   | 'eat' | 'cook' | 'bread' | 'withdraw' | 'harvest' | 'farm' | 'spot' | 'hunt'
   | 'scout' | 'trip' | 'seeds' | 'start_farm' | 'plant' | 'breed' | 'forage' | 'report'
+  | 'fish' | 'eat_rotten'
 
 export type FoodRung = 'inventory' | 'known' | 'search' | 'trip' | 'farm' | 'critical'
 
@@ -536,6 +537,14 @@ export interface FoodWorld {
   lastReportAt?: number
   /** The best known food place worth a trip (rankFoodPlaces' first), or null. */
   knownPlace?: { name: string, distance: number } | null
+  /** Rotten flesh carried: eaten only when food is at or below eatRottenAt and nothing better is at hand. */
+  rotten?: number
+  /** Wheat in containers it may take from (with what it carries, 3 make a bread). */
+  chestWheat?: number
+  /** Wheat carried. */
+  carriedWheat?: number
+  /** Distance to a shore spot by open water near home when it has or can get a fishing rod, else null. */
+  fishDistance?: number | null
   /** Clock for the time-based rules (epoch ms); default Date.now(). */
   now?: number
 }
@@ -585,6 +594,12 @@ export interface FoodStepOptions {
   critical?: number
   /** At most one starving report per this long (default 10 minutes). */
   reportEveryMs?: number
+  /** Fish at open water near home when it has or can make a rod (default false here; keep_fed's option defaults to true). */
+  fish?: boolean
+  /** Food at or below this with no other food at hand: eat rotten flesh (default 0 here = never; keep_fed's default is 6). */
+  eatRottenAt?: number
+  /** Food at or below `critical`: its farm, remembered spots and known places further than this are skipped for the closest sure food (default: no limit here; keep_fed's default is 96). */
+  starvingRange?: number
 }
 
 export interface FoodDecision {
@@ -672,7 +687,9 @@ export const STEP_PAUSE_MS: Record<FoodStep, number> = {
   plant: 10 * 60_000,
   breed: 10 * 60_000,
   forage: 5 * 60_000,
-  report: 0
+  report: 0,
+  fish: 10 * 60_000,
+  eat_rotten: 60_000
 }
 
 /** How long to wait before the next keep_fed run, by what is left to do. */
@@ -691,7 +708,10 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   const critical = (w.food ?? 20) <= (o.critical ?? 6)
   // starving at night: its own farm, a chest or a spot close to home is worth the dark (starving is certain harm, the dark only likely)
   const nearRing = o.riskyRingsFrom ?? RISKY_RINGS_FROM
-  const mayGo = (d: number) => (!far(d) || dayOrBold || (critical && d <= nearRing * 2)) && (!far(d) || !w.danger)
+  // starving: the closest sure food, not a long walk that eats the rest (Pax, 28 Nov 2026: food 6, set off for a village 3500 blocks away)
+  const close = (d: number) => !critical || o.starvingRange === undefined || d <= o.starvingRange
+  const mayGo = (d: number) => (!far(d) || dayOrBold || (critical && d <= nearRing * 2)) && (!far(d) || !w.danger) && close(d)
+  const fishNow = !!o.fish && w.fishDistance != null && (dayOrBold || critical) && !w.danger && close(w.fishDistance)
   const huntable = w.animals > 0 || (!!w.starving && (w.herd ?? 0) > 0)
   const keep = w.starving ? 0 : (o.keepAtLeast ?? 0)
   const seeds = w.seeds ?? 0
@@ -707,9 +727,12 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   if (o.cook && w.raw.length && w.canCook && ok('cook')) return d('cook', 'inventory', `raw ${w.raw.join(', ')} and a furnace with fuel`)
   if (w.canBake && ok('bread')) return d('bread', 'inventory', '3+ wheat')
   if (o.eatRaw && w.safeRaw && ok('eat')) return d('eat', 'inventory', `can't cook, eating raw ${w.raw.join(', ')}`)
+  // starving with nothing else in the bag: rotten flesh feeds (4 points, a short hunger effect) and buys time to get real food
+  if ((w.rotten ?? 0) > 0 && (w.food ?? 20) <= (o.eatRottenAt ?? 0) && ok('eat_rotten')) return d('eat_rotten', 'inventory', `food ${w.food}/20 and nothing better carried: rotten flesh`)
 
   // 2. sources it knows
   if (o.chests && w.foodChest && ok('withdraw')) return d('withdraw', 'known', 'food in a known chest')
+  if (o.chests && (w.chestWheat ?? 0) > 0 && !w.canBake && (w.chestWheat ?? 0) + (w.carriedWheat ?? 0) >= 3 && ok('bread')) return d('bread', 'known', `${w.chestWheat} wheat in its chests: taking it to bake bread`)
   if (o.harvest && w.ripeCrops > 0 && ok('harvest')) return d('harvest', 'known', `${w.ripeCrops} ripe crops in range`)
   if (o.harvest && o.farms !== false && w.farmDistance != null && mayGo(w.farmDistance) && ok('farm')) return d('farm', 'known', `own farm ${w.farmDistance} blocks away is ripe or due a visit`)
   // a spot counts only when we are not standing at it already (within 16 blocks the hunt/harvest steps see it)
@@ -719,6 +742,7 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   if (o.hunt && huntable && ok('hunt')) {
     return d('hunt', 'known', w.animals > 0 ? `${w.animals} animals to spare in range` : `starving, hunting the breeders too (${w.herd})`, { keepAtLeast: keep })
   }
+  if (fishNow && ok('fish')) return d('fish', 'known', `open water ${Math.round(w.fishDistance!)} blocks away and a rod: fishing`)
 
   // 2b. not urgent: a farm is long-term food, so tend, grow or start it before a long search
   const food = w.food ?? 0
@@ -733,7 +757,7 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   const farFrom = o.farRingsFrom ?? FAR_RINGS_FROM
   const ring = nextRing(w.searches ?? [], rings, now, o.ringMemoryMs ?? RING_MEMORY_MS)
   const farRing = !!ring && ring.radius > farFrom
-  const place = o.trips !== false && w.knownPlace && !w.night && !w.danger && ok('trip') ? w.knownPlace : null
+  const place = o.trips !== false && w.knownPlace && !w.night && !w.danger && close(w.knownPlace.distance) && ok('trip') ? w.knownPlace : null
   const trip = () => d('trip', 'trip', `${ring ? `before searching ${ring.radius} blocks out` : 'every ring came up empty'}: known food place ${place!.name} ${Math.round(place!.distance)} blocks away`)
   let searchBlocked = ''
   if (!o.scout || !w.canScout) searchBlocked = 'scouting is off'

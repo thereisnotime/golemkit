@@ -35,6 +35,7 @@ import { getPlaces, sameDimension } from '../../../skills/navigation.ts'
 import { dist, hostilesNear } from './util.ts'
 import { helpDesk } from '../../../brains/npc/help.ts'
 import { tripRun } from './trip.ts'
+import { canGetRod, fishWaterDistance } from '../../../skills/foodSources.ts'
 
 /** Raw food -> what cooking makes of it. */
 export const COOKED: Record<string, string> = {
@@ -95,6 +96,15 @@ function foodChests (bot: Bot, agent: Agent): { x: number, y: number, z: number,
   return knownContainers(agent)
     .map(c => ({ ...c, item: Object.keys(c.contents).filter(n => isFood(bot, n)).sort((a, b) => (c.contents[b] ?? 0) - (c.contents[a] ?? 0))[0] }))
     .filter((c): c is typeof c & { item: string } => !!c.item)
+    .sort((a, b) => dist(a, pos) - dist(b, pos))
+}
+
+/** Wheat in containers it may take from (nearest first). */
+function wheatChests (bot: Bot, agent: Agent): { x: number, y: number, z: number, count: number }[] {
+  const pos = bot.entity.position
+  return knownContainers(agent)
+    .filter(c => (c.contents.wheat ?? 0) > 0 && !agent.protectedAreas?.isProtected?.(c as never))
+    .map(c => ({ x: c.x, y: c.y, z: c.z, count: c.contents.wheat ?? 0 }))
     .sort((a, b) => dist(a, pos) - dist(b, pos))
 }
 
@@ -171,6 +181,10 @@ const options = z.object({
     crops: z.array(z.string()).optional().describe('what grows there (wheat, carrots, potatoes)')
   })).default([]).describe('known farms and villages to go to for food (preferred over the far search rings)'),
   breed: z.boolean().default(true).describe('breed animals near home between meals when it has their food (wheat: cows, sheep; seeds: chickens; carrots: pigs)'),
+  fish: z.boolean().default(true).describe('fish at open water near home when it has a fishing rod or can make one (2 string, 3 sticks; from its chests too)'),
+  fishRange: z.number().min(8).max(96).default(48).describe('how far from home it looks for open water to fish'),
+  eatRottenAt: z.number().min(0).max(20).default(6).describe('food at or below this with nothing better carried: eat rotten flesh (0 = never)'),
+  starvingRange: z.number().min(16).max(10_000).default(96).describe('food at or below 6: its farm, remembered spots and known food places further than this are skipped for the closest sure food (fish, hunt, chests)'),
   report: z.boolean().default(true).describe('when food is critical (6 or less) or every ring came up empty and nothing works, whisper the owner how far it looked and what would help (at most once an hour)')
 })
 
@@ -392,6 +406,16 @@ export function senseFood (agent: Agent, bot: Bot, o: O): FoodWorld {
     paused: m.paused,
     lastReportAt: m.lastReportAt,
     knownPlace: (() => { const p = tripPlaces(agent, bot, o)[0]; return p ? { name: p.name, distance: Math.round(p.distance) } : null })(),
+    rotten: has('rotten_flesh'),
+    carriedWheat: has('wheat'),
+    chestWheat: agent.getAction('withdraw') && agent.getAction('craft') ? wheatChests(bot, agent).reduce((n, c) => n + c.count, 0) : 0,
+    fishDistance: (() => {
+      if (!o.fish || !agent.getAction('fish')) return null
+      try {
+        if (!canGetRod(agent, bot)) return null
+        return fishWaterDistance(agent, bot, o.fishRange)
+      } catch { return null }
+    })(),
     now: Date.now()
   }
 }
@@ -545,8 +569,23 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
       }
       return ctx.act('smelt', { item: raw, count: Math.min(8, has(raw)) })
     }
-    case 'bread':
+    case 'bread': {
+      // short of wheat: take what its chests hold, nearest first, until there is enough for a bread
+      for (const c of wheatChests(bot, agent)) {
+        if (has('wheat') >= 3) break
+        if (dist(c, bot.entity.position) > 4 && agent.getAction('goto')) {
+          const walk = await ctx.act('goto', { x: c.x, y: c.y, z: c.z })
+          if (!walk.ok) continue
+        }
+        await ctx.act('withdraw', { item: 'wheat', count: 64, x: c.x, y: c.y, z: c.z })
+      }
+      if (has('wheat') < 3) return { ok: false, message: `only ${has('wheat')} wheat, 3 make a bread` }
       return ctx.act('craft', { item: 'bread', count: Math.floor(has('wheat') / 3) })
+    }
+    case 'eat_rotten':
+      return ctx.act('eat', { item: 'rotten_flesh' })
+    case 'fish':
+      return ctx.act('fish', { count: 4, radius: o.fishRange, maxMinutes: 5 })
     case 'withdraw': {
       if (o.chestPlace && getPlaces(agent)[o.chestPlace.toLowerCase()] && agent.getAction('goto_place')) {
         const there = await ctx.act('goto_place', { name: o.chestPlace })
@@ -673,7 +712,7 @@ function foodStock (bot: Bot): string {
 }
 
 /** Search outcomes that say nothing about the ring (cut short by night or danger) are not remembered as empty. */
-const CUT_SHORT = /night fell|mobs|health is low|it is night|turned back|not ready for a trip/
+const CUT_SHORT = /night fell|mobs|health is low|it is night|turned back|not ready for a trip|out of air|did not get to scout/
 
 export const keepFed = defineBehavior({
   name: 'keep_fed',
@@ -687,7 +726,7 @@ export const keepFed = defineBehavior({
     'Between meals it starts, replants, re-tills and grows its farm and breeds animals near home. Arm it so you never starve between turns.',
   options,
   requires: ['eat'],
-  uses: ['withdraw', 'harvest', 'hunt', 'smelt', 'craft', 'goto', 'goto_place', 'list_container', 'find_food', 'start_farm', 'tend_farm', 'plant', 'gather_seeds', 'forage', 'breed'],
+  uses: ['withdraw', 'harvest', 'hunt', 'smelt', 'craft', 'eat', 'fish', 'goto', 'goto_place', 'list_container', 'find_food', 'start_farm', 'tend_farm', 'plant', 'gather_seeds', 'forage', 'breed'],
   priority: 'behavior',
   create (o, { agent }) {
     const so = stepOptions(o)

@@ -490,11 +490,16 @@
       },
       {
         "name": "eat",
-        "description": "Eat the best food in the inventory.",
+        "description": "Eat the best food in the inventory, or the named item (e.g. rotten_flesh as a last resort when starving).",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "item": {
+              "description": "eat this item instead of the best food (rotten_flesh, spider_eye and the like only this way)",
+              "type": "string"
+            }
+          }
         },
         "exclusive": true,
         "longRunning": false
@@ -1324,11 +1329,16 @@
       },
       {
         "name": "eat",
-        "description": "Eat the best food in the inventory.",
+        "description": "Eat the best food in the inventory, or the named item (e.g. rotten_flesh as a last resort when starving).",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "item": {
+              "description": "eat this item instead of the best food (rotten_flesh, spider_eye and the like only this way)",
+              "type": "string"
+            }
+          }
         },
         "exclusive": true,
         "longRunning": false
@@ -2199,11 +2209,16 @@
       },
       {
         "name": "eat",
-        "description": "Eat the best food in the inventory.",
+        "description": "Eat the best food in the inventory, or the named item (e.g. rotten_flesh as a last resort when starving).",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "item": {
+              "description": "eat this item instead of the best food (rotten_flesh, spider_eye and the like only this way)",
+              "type": "string"
+            }
+          }
         },
         "exclusive": true,
         "longRunning": false
@@ -3132,11 +3147,16 @@
       },
       {
         "name": "eat",
-        "description": "Eat the best food in the inventory.",
+        "description": "Eat the best food in the inventory, or the named item (e.g. rotten_flesh as a last resort when starving).",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "item": {
+              "description": "eat this item instead of the best food (rotten_flesh, spider_eye and the like only this way)",
+              "type": "string"
+            }
+          }
         },
         "exclusive": true,
         "longRunning": false
@@ -4458,7 +4478,7 @@
       },
       {
         "name": "fish",
-        "description": "Fish for food: makes a rod from 2 string and 3 sticks when it has none, goes to open water near home (or breaks a hole in a frozen lake, which turns back into water over the lake), and fishes until it has `count` catches or `maxMinutes` pass. Cod and salmon are cooked later by keep_fed.",
+        "description": "Fish for food: takes a rod from its chests or makes one from 2 string and 3 sticks (taking what it lacks from its chests) when it has none, goes to open water near home (or breaks a hole in a frozen lake, which turns back into water over the lake), and fishes until it has `count` catches or `maxMinutes` pass. Cod and salmon are cooked later by keep_fed.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -7197,11 +7217,16 @@
       },
       {
         "name": "eat",
-        "description": "Eat the best food in the inventory.",
+        "description": "Eat the best food in the inventory, or the named item (e.g. rotten_flesh as a last resort when starving).",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "item": {
+              "description": "eat this item instead of the best food (rotten_flesh, spider_eye and the like only this way)",
+              "type": "string"
+            }
+          }
         },
         "exclusive": true,
         "longRunning": false
@@ -8330,7 +8355,7 @@
       },
       {
         "name": "fish",
-        "description": "Fish for food: makes a rod from 2 string and 3 sticks when it has none, goes to open water near home (or breaks a hole in a frozen lake, which turns back into water over the lake), and fishes until it has `count` catches or `maxMinutes` pass. Cod and salmon are cooked later by keep_fed.",
+        "description": "Fish for food: takes a rod from its chests or makes one from 2 string and 3 sticks (taking what it lacks from its chests) when it has none, goes to open water near home (or breaks a hole in a frozen lake, which turns back into water over the lake), and fishes until it has `count` catches or `maxMinutes` pass. Cod and salmon are cooked later by keep_fed.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -10919,11 +10944,16 @@
       },
       {
         "name": "eat",
-        "description": "Eat the best food in the inventory.",
+        "description": "Eat the best food in the inventory, or the named item (e.g. rotten_flesh as a last resort when starving).",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "item": {
+              "description": "eat this item instead of the best food (rotten_flesh, spider_eye and the like only this way)",
+              "type": "string"
+            }
+          }
         },
         "exclusive": true,
         "longRunning": false
@@ -11794,11 +11824,16 @@
       },
       {
         "name": "eat",
-        "description": "Eat the best food in the inventory.",
+        "description": "Eat the best food in the inventory, or the named item (e.g. rotten_flesh as a last resort when starving).",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "item": {
+              "description": "eat this item instead of the best food (rotten_flesh, spider_eye and the like only this way)",
+              "type": "string"
+            }
+          }
         },
         "exclusive": true,
         "longRunning": false
@@ -12727,11 +12762,16 @@
       },
       {
         "name": "eat",
-        "description": "Eat the best food in the inventory.",
+        "description": "Eat the best food in the inventory, or the named item (e.g. rotten_flesh as a last resort when starving).",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
-          "properties": {}
+          "properties": {
+            "item": {
+              "description": "eat this item instead of the best food (rotten_flesh, spider_eye and the like only this way)",
+              "type": "string"
+            }
+          }
         },
         "exclusive": true,
         "longRunning": false
@@ -14053,7 +14093,7 @@
       },
       {
         "name": "fish",
-        "description": "Fish for food: makes a rod from 2 string and 3 sticks when it has none, goes to open water near home (or breaks a hole in a frozen lake, which turns back into water over the lake), and fishes until it has `count` catches or `maxMinutes` pass. Cod and salmon are cooked later by keep_fed.",
+        "description": "Fish for food: takes a rod from its chests or makes one from 2 string and 3 sticks (taking what it lacks from its chests) when it has none, goes to open water near home (or breaks a hole in a frozen lake, which turns back into water over the lake), and fishes until it has `count` catches or `maxMinutes` pass. Cod and salmon are cooked later by keep_fed.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",

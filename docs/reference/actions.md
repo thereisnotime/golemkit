@@ -1299,9 +1299,11 @@ Eating, sleeping, emergency pillars and getting air.
 
 ### `eat`
 
-Eat the best food in the inventory.
+Eat the best food in the inventory, or the named item (e.g. rotten_flesh as a last resort when starving).
 
-No parameters.
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `item` | string |  |  | eat this item instead of the best food (rotten_flesh, spider_eye and the like only this way) |
 
 ### `sleep`
 

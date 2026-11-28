@@ -96,7 +96,7 @@ See [Bodyguard](/guide/behaviors#bodyguard).
 ### survival
 | action | |
 |---|---|
-| `eat` | Eat the best food in the inventory. |
+| `eat` | Eat the best food in the inventory, or the named item (e.g. rotten_flesh as a last resort when starving). |
 | `sleep` | Sleep in a bed within 16 blocks. |
 | `wake` | Get out of bed. |
 | `pillar` | Emergency escape: jump and place blocks underneath, out of reach of mobs. |

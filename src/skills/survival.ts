@@ -26,12 +26,15 @@ export function bestFood (bot: Bot) {
 const eat = defineAction({
   name: 'eat',
   capabilities: ['eat'],
-  description: 'Eat the best food in the inventory.',
-  params: noParams,
-  async run ({ bot }) {
+  description: 'Eat the best food in the inventory, or the named item (e.g. rotten_flesh as a last resort when starving).',
+  params: z.object({
+    item: z.string().optional().describe('eat this item instead of the best food (rotten_flesh, spider_eye and the like only this way)')
+  }),
+  async run ({ bot }, p) {
     if (bot.food >= 20) return fail('not hungry')
-    const food = bestFood(bot)
-    if (!food) return fail('nothing to eat')
+    const foods = (bot.registry as any).foodsByName ?? {}
+    const food = p.item ? bot.inventory.items().find(i => i.name === p.item && foods[i.name]) : bestFood(bot)
+    if (!food) return fail(p.item ? `no ${p.item} to eat` : 'nothing to eat')
     await bot.equip(food, 'hand')
     await bot.consume()
     return ok(`ate ${food.name}, food ${bot.food}/20`)

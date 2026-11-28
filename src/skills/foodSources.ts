@@ -23,6 +23,7 @@ import {
 } from './food.ts'
 import { seedCount, pickFarmSeed, breedPlan, BREED_FOOD, type CellKind, type SiteCandidate } from './foodPlan.ts'
 import { herdSurplus } from './combat.ts'
+import { rodPlan } from './fishPlan.ts'
 import { farmSiteVerdict, nextFarmName, type FarmSiteCell } from './needPlan.ts'
 import { coverItem, iceMakesWater } from './coldFarmPlan.ts'
 import { planFarmRepair, farmRepairSettings, type FarmRepairPlan } from './farmRepairPlan.ts'
@@ -145,7 +146,7 @@ export function senseFoodSources (agent: Agent, bot: Bot, now = Date.now()): Foo
     grass,
     plot: spot && (!plotPlace || sameDimension(bot, plotPlace)) ? { known: true, used: farms.some(f => f.kind === 'plot' || (pc && f.x === pc.x && f.z === pc.z)) } : null,
     rod: !!inv.fishing_rod,
-    canMakeRod: (inv.string ?? 0) >= 2 && ((inv.stick ?? 0) >= 3 || planks >= 2 || logs >= 1),
+    canMakeRod: (inv.string ?? 0) >= 2 && ((inv.stick ?? 0) >= 3 || planks >= 2 || logs >= 1) || rodPlan({ inv, stored, canCraft: !!agent.getAction('craft') }).step !== 'none',
     water,
     breed: !!agent.getAction('breed') && !!breedPlan(herd.adults, inv, { maxHerd: 12 }),
     hunt: agent.getAction('hunt') ? hunt : 0,
@@ -600,9 +601,35 @@ const plotFarmAction = defineAction({
 
 // ------------------------------------------------------------------ fish
 
-/** A fishing rod in the inventory, crafted from 2 string and 3 sticks when it has none. */
-async function getRod (bot: Bot, signal: AbortSignal): Promise<string | null> {
+/** Whether it has a fishing rod or can get one now: carried, in its chests, or made from string and sticks it carries or its chests hold. */
+export function canGetRod (agent: Agent, bot: Bot): boolean {
+  let stored: Record<string, number> = {}
+  try { stored = chestTotals(chestView(agent, bot)).has } catch {}
+  return rodPlan({ inv: inventory(bot), stored, canCraft: !!agent.getAction('craft') }).step !== 'none'
+}
+
+/** Distance from the bot to water it could fish in near home (open, or lake ice to break a hole in), else null. */
+export function fishWaterDistance (agent: Agent, bot: Bot, radius: number): number | null {
+  const home = getHome(agent)
+  const centre = home && sameDimension(bot, home) ? vec(bot, home.x, home.y, home.z) : bot.entity.position
+  const spot = fishingWater(agent, bot, centre, radius, farmingOptions(agent).iceWater && !!agent.canDig)
+  return spot ? Math.round(Math.hypot(spot.pos.x - bot.entity.position.x, spot.pos.z - bot.entity.position.z)) : null
+}
+
+/**
+ * A fishing rod in the inventory: carried, taken from its chests, or crafted from 2 string and 3
+ * sticks, taking the string, sticks or planks it lacks from its chests first (rodPlan).
+ */
+async function getRod (ctx: Pick<ActionContext, 'bot' | 'agent' | 'signal'>): Promise<string | null> {
+  const { bot, agent, signal } = ctx
   if (findItem(bot, 'fishing_rod')) return ''
+  let stored: Record<string, number> = {}
+  try { stored = chestTotals(chestView(agent, bot)).has } catch {}
+  const plan = rodPlan({ inv: inventory(bot), stored, canCraft: !!agent.getAction('craft') })
+  if (plan.step === 'withdraw') {
+    await takeItemsFromOwnChests(ctx, plan.take).catch(() => null)
+    if (findItem(bot, 'fishing_rod')) return 'took a fishing rod from a chest'
+  }
   if (countItem(bot, 'string') < 2) return null
   if (countItem(bot, 'stick') < 3) {
     const planks = bot.inventory.items().find(i => itemName(i).endsWith('_planks'))
@@ -629,7 +656,7 @@ const FISH = ['cod', 'salmon', 'tropical_fish', 'pufferfish']
 
 const fishAction = defineAction({
   name: 'fish',
-  description: 'Fish for food: makes a rod from 2 string and 3 sticks when it has none, goes to open water near home (or breaks a ' +
+  description: 'Fish for food: takes a rod from its chests or makes one from 2 string and 3 sticks (taking what it lacks from its chests) when it has none, goes to open water near home (or breaks a ' +
     'hole in a frozen lake, which turns back into water over the lake), and fishes until it has `count` catches or `maxMinutes` ' +
     'pass. Cod and salmon are cooked later by keep_fed.',
   capabilities: ['move'],
@@ -642,8 +669,8 @@ const fishAction = defineAction({
   async run (ctx, p): Promise<ActionResult> {
     const { bot, agent, signal, log } = ctx
     const notes: string[] = []
-    const rod = await getRod(bot, signal)
-    if (rod === null) return fail('no fishing rod and no 2 string to make one (spiders drop string)')
+    const rod = await getRod(ctx)
+    if (rod === null) return fail('no fishing rod and no 2 string to make one, carried or in its chests (spiders drop string)')
     if (!findItem(bot, 'fishing_rod')) return fail(`no fishing rod: ${rod}`)
     if (rod) notes.push(rod)
     const home = getHome(agent)

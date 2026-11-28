@@ -747,10 +747,17 @@ flowchart TB
 
 - **1 · inventory:** eat ready food, cook raw meat or potatoes when it has fuel and a furnace
   (nearby, carried or craftable from 8 cobblestone), bake bread from 3 wheat, and eat safe raw
-  meat when cooking isn't possible (never raw chicken).
+  meat when cooking isn't possible (never raw chicken). Starving (food at or below `eatRottenAt`,
+  default 6) with nothing better carried, it eats rotten flesh: 4 food points and a short hunger
+  effect buy time to get real food (Pax died on 28 Nov 2026 with 18 rotten flesh in its bag,
+  saying it had nothing to eat).
 - **2 · known sources:** a chest it has looked into, ripe crops in `radius` (its own farm or a
-  village's), its own farm further out when ripe or due a visit, a remembered `food:animals` /
-  `food:village_farm` spot, and animals in range. A known spot further than `radius` only wins
+  village's), wheat in its chests (taken to bake bread when it and what it carries make 3), its
+  own farm further out when ripe or due a visit, a remembered `food:animals` /
+  `food:village_farm` spot, animals in range, then fishing (`fish`, on by default): open water
+  within `fishRange` (default 48) of home, or lake ice to break a hole in, when it has a rod or
+  can get one (from its chests, or crafted from 2 string and 3 sticks it carries or takes from
+  its chests). Fishing runs by day, or at night when starving, never with hostiles near. A known spot further than `radius` only wins
   over hunting when there is nothing to hunt where the bot stands, and a spot in a remembered
   danger zone doesn't count. Village carrots and potatoes are harvested like wheat and each
   cell gets its own crop back.
@@ -779,6 +786,11 @@ flowchart TB
   (sprinting burns food about ten times faster) and paths around water where it can; when it
   still runs out of air it gets air (up, through ice or to an opening, see [air](/concepts/world#air)) before heading for dry land. Berry bushes (and kelp, with a
   furnace) count as food up to 64 blocks out.
+  **Starving** (food 6 or less): the closest sure food comes first. Its farm, remembered spots and
+  known food places further than `starvingRange` (default 96) from it are skipped, so it fishes,
+  hunts and empties its chests instead of setting off on a long trip (Pax at food 6 set off for a
+  village 3500 blocks away). A search that ran out of air or never got going is not remembered as
+  an empty ring either.
   **Starving at night** (food 6 or less): its own farm, a food chest, a remembered spot within
   twice `riskyRingsFrom` (96 blocks) and the near ring are worth the dark; wider rings are not
   started at all at that food level (the floor above). Between ladder runs a starving bot holds the body (score 45: above `chop_wood_loop` and
@@ -1637,6 +1649,10 @@ Looks after food on its own, climbing a ladder when hungry (or hurt and too hung
 | `tripRange` | number (64..10000) | `4000` | known food places further away than this are not worth a trip |
 | `foodPlaces` | list | `[]` | known farms and villages to go to for food (preferred over the far search rings) |
 | `breed` | boolean | `true` | breed animals near home between meals when it has their food (wheat: cows, sheep; seeds: chickens; carrots: pigs) |
+| `fish` | boolean | `true` | fish at open water near home when it has a fishing rod or can make one (2 string, 3 sticks; from its chests too) |
+| `fishRange` | number (8..96) | `48` | how far from home it looks for open water to fish |
+| `eatRottenAt` | number (0..20) | `6` | food at or below this with nothing better carried: eat rotten flesh (0 = never) |
+| `starvingRange` | number (16..10000) | `96` | food at or below 6: its farm, remembered spots and known food places further than this are skipped for the closest sure food (fish, hunt, chests) |
 | `report` | boolean | `true` | when food is critical (6 or less) or every ring came up empty and nothing works, whisper the owner how far it looked and what would help (at most once an hour) |
 
 ### `recover_drops`
