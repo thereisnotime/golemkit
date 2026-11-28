@@ -15,6 +15,10 @@ export interface ToggleDef {
 const bool = z.boolean()
 const health = z.number().min(0).max(20)
 const unit = z.number().min(0).max(1)
+/** A list of names: an array, or a comma separated string (a profile value or a chat line). */
+const list = z.preprocess(v => typeof v === 'string' ? v.split(',').map(x => x.trim()).filter(Boolean) : v, z.array(z.string().min(1)))
+/** A place to keep away from (startOver.avoid); radius falls back on startOver.avoidRadius. */
+export const AVOID_POINT = z.object({ x: z.number(), z: z.number(), radius: z.number().min(0).max(10_000).optional(), name: z.string().optional() })
 
 export const TOGGLES: ToggleDef[] = [
   { key: 'selfAware', description: 'show the bot its own variant, profile, model and settings every turn (observe: self)', schema: bool },
@@ -278,24 +282,61 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'deathSpots.minutes', description: 'how long a death spot is avoided (default 10)', schema: z.number().min(0.5).max(240) },
   { key: 'deathSpots.stepCost', description: 'extra path cost per block inside a death spot (default 8; 0 = paths ignore it)', schema: z.number().min(0).max(50) },
   { key: 'startOver.go', description: 'start over once on its own when it starts (remembered: it doesn\'t fire again once done)', schema: bool },
+  { key: 'startOver.run', description: 'with go: a run id; a new id starts one more start-over (from the current home) even after an earlier one finished, or redirects one under way', schema: z.union([z.string(), z.number()]).transform(v => String(v)) },
   { key: 'startOver.minDistance', description: 'settle no closer than this to the old base, blocks (default 500)', schema: z.number().int().min(64).max(5000) },
-  { key: 'startOver.maxDistance', description: 'look no further than this from the old base before turning 90 degrees, blocks (default 1500)', schema: z.number().int().min(128).max(10_000) },
+  { key: 'startOver.maxDistance', description: 'look no further than this from the old base before turning, blocks (default 1500; at least minDistance + 64)', schema: z.number().int().min(128).max(10_000) },
   { key: 'startOver.legLength', description: 'walk this far per leg before looking again, blocks (default 96)', schema: z.number().int().min(32).max(256) },
-  { key: 'startOver.legMinutes', description: 'a leg taking longer than this counts as blocked and the next one turns 45 degrees (default 4)', schema: z.number().min(0.5).max(30) },
-  { key: 'startOver.direction', description: 'which way to go; empty = away from spawn and the avoid points (default empty)', schema: z.union([z.enum(['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']), z.literal('')]) },
-  { key: 'startOver.spawnRadius', description: 'keep this far from world spawn, blocks (default 300)', schema: z.number().int().min(0).max(5000) },
-  { key: 'startOver.take', description: 'packed first whatever the value table says (comma separated; prefix* and *suffix work)', schema: z.array(z.string().min(1)) },
-  { key: 'startOver.leave', description: 'never packed (comma separated; prefix* and *suffix work)', schema: z.array(z.string().min(1)) },
+  { key: 'startOver.legMinutes', description: 'a leg taking longer than this counts as blocked and the next one takes a detour (default 4)', schema: z.number().min(0.5).max(30) },
+  { key: 'startOver.blockedMoved', description: 'a failed leg that moved fewer blocks than this counts as blocked (default 16)', schema: z.number().int().min(0).max(256) },
+  { key: 'startOver.detours', description: 'detour angles tried either side of the heading when a leg is blocked or wet, in order (default 45, 90)', schema: z.preprocess(v => typeof v === 'string' ? v.split(',').map(x => Number(x.trim())) : v, z.array(z.number().min(1).max(180)).min(1)) },
+  { key: 'startOver.direction', description: 'which way to go; empty = away from spawn and the avoid points (default empty)', schema: z.preprocess(v => typeof v === 'string' ? v.trim().toLowerCase() : v, z.union([z.enum(['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']), z.literal('')])) },
+  { key: 'startOver.dimensions', description: 'dimensions a start-over may run in (default overworld)', schema: list },
+  { key: 'startOver.spawnRadius', description: 'keep this far from world spawn, blocks (default 300; 0 = spawn is not avoided)', schema: z.number().int().min(0).max(5000) },
+  { key: 'startOver.avoid', description: 'more places to keep away from, a list of { name, x, z, radius } (JSON live); entries without x and z are skipped', schema: z.preprocess(v => Array.isArray(v) ? v.filter(a => AVOID_POINT.safeParse(a).success) : v, z.array(AVOID_POINT)) },
+  { key: 'startOver.avoidRadius', description: 'radius of an avoid point that gives none, blocks (default 400)', schema: z.number().int().min(0).max(10_000) },
+  { key: 'startOver.take', description: 'packed first whatever the value table says (comma separated; prefix* and *suffix work)', schema: list },
+  { key: 'startOver.leave', description: 'never packed (comma separated; prefix* and *suffix work)', schema: list },
   { key: 'startOver.freeSlots', description: 'inventory slots left free after packing (default 2)', schema: z.number().int().min(0).max(20) },
-  { key: 'startOver.minGrass', description: 'grass blocks within 32 a new place needs (default 24)', schema: z.number().int().min(0).max(1000) },
-  { key: 'startOver.minLogs', description: 'tree logs within 32 a new place needs (default 8)', schema: z.number().int().min(0).max(1000) },
-  { key: 'startOver.minWater', description: 'open water sources within 32 that don\'t freeze (default 1)', schema: z.number().int().min(0).max(100) },
-  { key: 'startOver.minAnimals', description: 'passive animals within 64 (default 2)', schema: z.number().int().min(0).max(100) },
+  { key: 'startOver.packRadius', description: 'chests within this many blocks of home are packed from (default 48)', schema: z.number().int().min(8).max(128) },
+  { key: 'startOver.roomAbove', description: 'with more used inventory slots than this, it first puts what isn\'t worth packing into the old chests (default 24)', schema: z.number().int().min(0).max(36) },
+  { key: 'startOver.stash', description: 'pack value kinds put into the new chest when it settles: treasure, metal, ore, ammo, seeds, light, fuel, material, wood, stone, block, gear, food (default treasure, metal, ore)', schema: list },
+  { key: 'startOver.minGrass', description: 'grass blocks within lookRadius a new place needs (default 24)', schema: z.number().int().min(0).max(1000) },
+  { key: 'startOver.minLogs', description: 'tree logs within lookRadius a new place needs (default 8)', schema: z.number().int().min(0).max(1000) },
+  { key: 'startOver.minWater', description: 'open water sources within waterRadius that don\'t freeze (and ice with iceAsWater) a new place needs (default 1)', schema: z.number().int().min(0).max(100) },
+  { key: 'startOver.minAnimals', description: 'passive animals within animalRadius a new place needs (default 2)', schema: z.number().int().min(0).max(100) },
   { key: 'startOver.maxBuildBlocks', description: 'blocks of somebody\'s build nearby that rule a place out (default 6)', schema: z.number().int().min(0).max(1000) },
-  { key: 'startOver.allowSnow', description: 'snowy and frozen biomes are fine (default off)', schema: bool },
-  { key: 'startOver.maxTurns', description: 'times it turns 90 degrees after maxDistance without a good place before making do (default 2)', schema: z.number().int().min(0).max(3) },
-  { key: 'startOver.run', description: 'with go: a run id; a new id starts one more start-over (from the current home) even after an earlier one finished', schema: z.string() },
-  { key: 'startOver.snowTurnAfter', description: 'snowy places looked at in a row after which it turns 90 degrees (0 = never; default 3)', schema: z.number().int().min(0).max(20) },
+  { key: 'startOver.badBiomes', description: 'biomes a new place must not be in (names, prefix* and *suffix; default snowy_*, frozen_*, ice_spikes, grove, jagged_peaks; empty = any biome)', schema: list },
+  { key: 'startOver.badCold', description: 'a place where water freezes counts as a bad biome too (default on)', schema: bool },
+  { key: 'startOver.iceAsWater', description: 'surface ice counts as water for a new place (default off)', schema: bool },
+  { key: 'startOver.lookRadius', description: 'grass, logs and builds are counted within this many blocks (default 32)', schema: z.number().int().min(8).max(96) },
+  { key: 'startOver.waterRadius', description: 'water is counted within this many blocks (default 64)', schema: z.number().int().min(8).max(128) },
+  { key: 'startOver.animalRadius', description: 'animals are counted within this many blocks (default 64)', schema: z.number().int().min(8).max(128) },
+  { key: 'startOver.treeDepth', description: 'logs more than this many blocks under the surface (caves, mineshafts) don\'t count as trees (default 12)', schema: z.number().int().min(0).max(64) },
+  { key: 'startOver.weights.grass', description: 'site score per grass block (default 0.25)', schema: z.number().min(0).max(100) },
+  { key: 'startOver.weights.logs', description: 'site score per log (default 1)', schema: z.number().min(0).max(100) },
+  { key: 'startOver.weights.water', description: 'site score per water source (default 3)', schema: z.number().min(0).max(100) },
+  { key: 'startOver.weights.animals', description: 'site score per animal (default 4)', schema: z.number().min(0).max(100) },
+  { key: 'startOver.weights.badBiome', description: 'site score taken off in a bad biome (default 100)', schema: z.number().min(0).max(10_000) },
+  { key: 'startOver.weights.build', description: 'site score taken off per build block over maxBuildBlocks (default 10)', schema: z.number().min(0).max(1000) },
+  { key: 'startOver.caps.grass', description: 'grass blocks counted at most, for the score (default 200)', schema: z.number().int().min(1).max(1000) },
+  { key: 'startOver.caps.logs', description: 'logs counted at most, for the score (default 60)', schema: z.number().int().min(1).max(1000) },
+  { key: 'startOver.caps.water', description: 'water sources counted at most, for the score (default 10)', schema: z.number().int().min(1).max(100) },
+  { key: 'startOver.caps.animals', description: 'animals counted at most, for the score (default 10)', schema: z.number().int().min(1).max(100) },
+  { key: 'startOver.fallback.grass', description: 'grass a place needs to be the fallback once the range is used up (default 8)', schema: z.number().int().min(0).max(1000) },
+  { key: 'startOver.fallback.logs', description: 'logs a place needs to be the fallback once the range is used up (default 4)', schema: z.number().int().min(0).max(1000) },
+  { key: 'startOver.turnAfterRejects', description: 'places looked at and rejected in a row (for any reason) after which it turns (0 = never; default 3)', schema: z.number().int().min(0).max(20) },
+  { key: 'startOver.maxTurns', description: 'turns of 90 degrees after the range runs out, an ocean, or rejects in a row, before making do (default 2)', schema: z.number().int().min(0).max(7) },
+  { key: 'startOver.duskSeconds', description: 'stop walking this long before dark and dig in once night falls (default 30)', schema: z.number().min(0).max(600) },
+  { key: 'startOver.leaveDaylightSeconds', description: 'pack and leave only with at least this much daylight left; else wait at home for the morning (default 120)', schema: z.number().min(0).max(1200) },
+  { key: 'startOver.shelterTries', description: 'failed bunkers in a night before it waits for the morning where it stands (default 3)', schema: z.number().int().min(0).max(20) },
+  { key: 'startOver.shelterStep', description: 'blocks it walks on along the heading after a failed bunker (default 12)', schema: z.number().int().min(0).max(128) },
+  { key: 'startOver.protectedStep', description: 'blocks it walks on after a bunker refused on protected ground; those don\'t count as tries (default 24)', schema: z.number().int().min(0).max(256) },
+  { key: 'startOver.shelterMinutes', description: 'longest a night bunker is kept (default 15)', schema: z.number().min(1).max(60) },
+  { key: 'startOver.settleTries', description: 'failed walks to a far settle target before it settles where it stands (default 5)', schema: z.number().int().min(0).max(50) },
+  { key: 'startOver.settleNear', description: 'a settle target closer than this counts as reached when the walk fails, blocks (default 64)', schema: z.number().int().min(0).max(512) },
+  { key: 'startOver.oldBaseRadius', description: 'places, containers, pinned chests and beds within this many blocks of the old base belong to it (default 256)', schema: z.number().int().min(16).max(4096) },
+  { key: 'startOver.dropPlaces', description: 'more place names dropped on leaving wherever they are (prefix* and *suffix; modules add their own base places)', schema: list },
+  { key: 'startOver.dropKeys', description: 'more storage keys dropped on leaving (modules add their own base-anchored keys)', schema: list },
   { key: 'respawn.enabled', description: 'respawn by itself when dead, also when it logs in dead (default on)', schema: bool },
   { key: 'respawn.retrySeconds', description: 'ask to respawn again this often while still dead (default 5)', schema: z.number().min(1).max(120) },
   { key: 'respawn.maxTries', description: 'reconnect after this many respawn asks without coming back (default 6)', schema: z.number().int().min(1).max(50) },
@@ -327,7 +368,9 @@ export function parseToggleValue (def: ToggleDef, raw: unknown): { ok: true, val
   if (typeof raw === 'string') {
     const s = raw.trim()
     const probe = def.schema
-    if (probe.safeParse(true).success && /^(true|false|on|off|yes|no)$/i.test(s)) v = /^(true|on|yes)$/i.test(s)
+    const json = /^[[{]/.test(s) ? (() => { try { return { v: JSON.parse(s) as unknown } } catch { return null } })() : null
+    if (json) v = json.v
+    else if (probe.safeParse(true).success && /^(true|false|on|off|yes|no)$/i.test(s)) v = /^(true|on|yes)$/i.test(s)
     else if (probe.safeParse(1).success && s !== '' && !Number.isNaN(Number(s))) v = Number(s)
     else if (probe.safeParse(['x']).success) v = s.split(',').map(x => x.trim()).filter(Boolean)
     else v = s
@@ -338,6 +381,33 @@ export function parseToggleValue (def: ToggleDef, raw: unknown): { ok: true, val
 
 export function getPath (obj: Record<string, unknown>, path: string): unknown {
   return path.split('.').reduce<unknown>((o, k) => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined), obj)
+}
+
+/** Sets a dotted path in a plain object, making the levels on the way. */
+export function setPath (obj: Record<string, unknown>, path: string, value: unknown): void {
+  const keys = path.split('.')
+  let o = obj
+  for (const k of keys.slice(0, -1)) o = (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k]) ? o[k] : (o[k] = {})) as Record<string, unknown>
+  o[keys.at(-1)!] = value
+}
+
+/**
+ * settings.<group> over `defaults` with per-key fallback, driven by the toggle schemas (one
+ * safeParse per `group.*` toggle, nested keys too): a value that fails its schema keeps the
+ * default, the rest still apply. The toggles are the one place a key's type and range live.
+ */
+export function toggleSettings<T extends object> (group: string, raw: unknown, defaults: T): T {
+  const out = structuredClone(defaults) as Record<string, unknown>
+  const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {}
+  for (const t of TOGGLES) {
+    if (!t.key.startsWith(`${group}.`) || t.key.endsWith('.*')) continue
+    const path = t.key.slice(group.length + 1)
+    const v = getPath(src, path)
+    if (v === undefined) continue
+    const r = t.schema.safeParse(v)
+    if (r.success) setPath(out, path, r.data)
+  }
+  return out as T
 }
 
 /** Turns { "a.b": 1 } into { a: { b: 1 } }. */

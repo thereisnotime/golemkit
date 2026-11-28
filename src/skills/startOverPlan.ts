@@ -1,13 +1,16 @@
 // Starting over somewhere else (pure, unit tested in test/start-over-plan.test.ts). The owner of a
-// bot stuck in a bad spot (Pax: a snowy fortress with no grass, frozen shores and animals 285
-// blocks away) says "start over": the bot packs the most precious things from its chests near
-// home, walks off in one direction by day, digs in at night, and settles at the first place far
-// enough away that has grass, trees, water and animals and isn't snowy, protected or built on.
-// Then home, bed and a chest go there, and its usual behaviours build fresh around the new home.
+// bot stuck in a bad spot (no grass for seeds, no trees close, animals far away) says "start
+// over": the bot packs the most precious things from its chests near home, walks off in one
+// direction by day, digs in at night, and settles at the first place far enough away that passes
+// the site rules (grass, trees, water, animals; not a bad biome, protected or built on, all knobs
+// in settings.startOver). Then home, bed and a chest go there, and its usual behaviours build
+// fresh around the new home.
 //
 // Here: the settings (settings.startOver, per-key fallback), the pack ranking (packPlan), the
 // heading (chooseHeading, headingAfterBlock), the site verdict (siteVerdict) and the state machine
 // (startOverStep). skills/startOver.ts reads the world into these and does the walking.
+
+import { toggleSettings } from '../core/toggles.ts'
 
 export interface XZ { x: number, z: number }
 export interface Pos { x: number, y: number, z: number }
@@ -16,6 +19,10 @@ export interface Pos { x: number, y: number, z: number }
 
 export interface AvoidPoint extends XZ { name?: string, radius: number }
 
+/**
+ * settings.startOver. The type, range and description of every key live in the startOver.*
+ * toggles (core/toggles.ts); startOverSettings reads them with per-key fallback.
+ */
 export interface StartOverSettings {
   /** Start on its own once (on start), remembered in storage so it doesn't fire again after it is done. */
   go: boolean
@@ -27,18 +34,34 @@ export interface StartOverSettings {
   maxDistance: number
   /** Walk this far per leg before looking around again, blocks. */
   legLength: number
+  /** Minutes per leg before it counts as blocked. */
+  legMinutes: number
+  /** A failed leg that moved fewer blocks than this counts as blocked. */
+  blockedMoved: number
+  /** Detour angles tried either side of the heading, in order. */
+  detours: number[]
   /** A compass direction to head in (n, ne, e, ...), or '' to pick one away from spawn and the avoid points. */
   direction: string
+  /** Dimensions a start-over may run in. */
+  dimensions: string[]
   /** World spawn is kept this far away (spawnOf), blocks. */
   spawnRadius: number
   /** More places to keep away from (a village, someone's base). */
   avoid: AvoidPoint[]
+  /** Radius of an avoid point that gives none. */
+  avoidRadius: number
   /** Item names (a trailing * matches a prefix, a leading * a suffix) packed first, whatever the table says. */
   take: string[]
   /** Item names never packed. */
   leave: string[]
   /** Inventory slots left free after packing (for pickups on the way). */
   freeSlots: number
+  /** Chests within this many blocks of home are packed from. */
+  packRadius: number
+  /** With more used slots than this, what isn't worth packing goes into the old chests first. */
+  roomAbove: number
+  /** Pack value kinds (PackKind) put into the new chest on settling. */
+  stash: string[]
   /** Site rules. */
   minGrass: number
   minLogs: number
@@ -46,14 +69,47 @@ export interface StartOverSettings {
   minAnimals: number
   /** Blocks of somebody's build within the look radius that rule a site out. */
   maxBuildBlocks: number
-  /** Allow snowy and frozen biomes (default off: the whole point). */
-  allowSnow: boolean
-  /** Minutes per leg before it counts as blocked. */
-  legMinutes: number
-  /** Times the heading turns 90 degrees after reaching maxDistance without a site, before giving up. */
+  /** Biome names (prefix*, *suffix) a site must not be in. */
+  badBiomes: string[]
+  /** Where water freezes counts as a bad biome too. */
+  badCold: boolean
+  /** Surface ice counts as water. */
+  iceAsWater: boolean
+  /** Look radii: grass, logs and builds; water; animals. */
+  lookRadius: number
+  waterRadius: number
+  animalRadius: number
+  /** Logs deeper than this under the surface aren't trees. */
+  treeDepth: number
+  /** Site score weights. */
+  weights: { grass: number, logs: number, water: number, animals: number, badBiome: number, build: number }
+  /** Counts above these don't add to the score. */
+  caps: { grass: number, logs: number, water: number, animals: number }
+  /** What the fallback place (once the range is used up) needs. */
+  fallback: { grass: number, logs: number }
+  /** Rejected looks in a row after which it turns (0: never). */
+  turnAfterRejects: number
+  /** Turns before it makes do. */
   maxTurns: number
-  /** Snowy places looked at in a row after which the heading turns 90 degrees (0: never). */
-  snowTurnAfter: number
+  /** Stops walking this long before dark. */
+  duskSeconds: number
+  /** Packs and leaves only with this much daylight left. */
+  leaveDaylightSeconds: number
+  /** Failed bunkers in a night before it waits for the morning. */
+  shelterTries: number
+  /** Blocks walked on after a failed bunker, and after one refused on protected ground. */
+  shelterStep: number
+  protectedStep: number
+  /** Longest a night bunker is kept, minutes. */
+  shelterMinutes: number
+  /** Failed walks to a far settle target before settling where it stands, and what counts as far. */
+  settleTries: number
+  settleNear: number
+  /** Things within this many blocks of the old base belong to it. */
+  oldBaseRadius: number
+  /** More place names and storage keys dropped on leaving (modules register their own). */
+  dropPlaces: string[]
+  dropKeys: string[]
 }
 
 export const START_OVER_DEFAULTS: StartOverSettings = {
@@ -62,70 +118,61 @@ export const START_OVER_DEFAULTS: StartOverSettings = {
   minDistance: 500,
   maxDistance: 1500,
   legLength: 96,
+  legMinutes: 4,
+  blockedMoved: 16,
+  detours: [45, 90],
   direction: '',
+  dimensions: ['overworld'],
   spawnRadius: 300,
   avoid: [],
+  avoidRadius: 400,
   take: [],
   leave: [],
   freeSlots: 2,
+  packRadius: 48,
+  roomAbove: 24,
+  stash: ['treasure', 'metal', 'ore'],
   minGrass: 24,
   minLogs: 8,
   minWater: 1,
   minAnimals: 2,
   maxBuildBlocks: 6,
-  allowSnow: false,
-  legMinutes: 4,
+  badBiomes: ['snowy_*', 'frozen_*', 'ice_spikes', 'grove', 'jagged_peaks'],
+  badCold: true,
+  iceAsWater: false,
+  lookRadius: 32,
+  waterRadius: 64,
+  animalRadius: 64,
+  treeDepth: 12,
+  weights: { grass: 0.25, logs: 1, water: 3, animals: 4, badBiome: 100, build: 10 },
+  caps: { grass: 200, logs: 60, water: 10, animals: 10 },
+  fallback: { grass: 8, logs: 4 },
+  turnAfterRejects: 3,
   maxTurns: 2,
-  snowTurnAfter: 3
+  duskSeconds: 30,
+  leaveDaylightSeconds: 120,
+  shelterTries: 3,
+  shelterStep: 12,
+  protectedStep: 24,
+  shelterMinutes: 15,
+  settleTries: 5,
+  settleNear: 64,
+  oldBaseRadius: 256,
+  dropPlaces: [],
+  dropKeys: []
 }
 
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {}
-const num = (v: unknown, d: number, lo: number, hi: number): number => typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d
-const int = (v: unknown, d: number, lo: number, hi: number): number => Math.round(num(v, d, lo, hi))
-const bool = (v: unknown, d: boolean): boolean => typeof v === 'boolean' ? v : d
-const strs = (v: unknown, d: string[]): string[] => Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string' && s.length > 0) : typeof v === 'string' ? v.split(',').map(s => s.trim()).filter(Boolean) : d
 
 export const COMPASS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'] as const
 
-function parseAvoid (v: unknown): AvoidPoint[] {
-  if (!Array.isArray(v)) return []
-  const out: AvoidPoint[] = []
-  for (const a of v) {
-    const o = obj(a)
-    if (typeof o.x !== 'number' || typeof o.z !== 'number') continue
-    out.push({ x: o.x, z: o.z, radius: num(o.radius, 400, 0, 10_000), ...(typeof o.name === 'string' ? { name: o.name } : {}) })
-  }
-  return out
-}
-
-/** settings.startOver with per-key fallback: a bad value falls back on its default, the rest still apply. */
+/** settings.startOver with per-key fallback from the startOver.* toggle schemas: a bad value falls back on its default, the rest still apply. */
 export function startOverSettings (raw: unknown): StartOverSettings {
-  const o = obj(raw)
-  const d = START_OVER_DEFAULTS
-  const min = int(o.minDistance, d.minDistance, 64, 5000)
-  const dir = typeof o.direction === 'string' && (COMPASS as readonly string[]).includes(o.direction.toLowerCase()) ? o.direction.toLowerCase() : d.direction
-  return {
-    go: bool(o.go, d.go),
-    run: typeof o.run === 'string' || typeof o.run === 'number' ? String(o.run) : d.run,
-    minDistance: min,
-    maxDistance: Math.max(min + 64, int(o.maxDistance, d.maxDistance, 128, 10_000)),
-    legLength: int(o.legLength, d.legLength, 32, 256),
-    direction: dir,
-    spawnRadius: int(o.spawnRadius, d.spawnRadius, 0, 5000),
-    avoid: Array.isArray(o.avoid) ? parseAvoid(o.avoid) : d.avoid,
-    take: strs(o.take, d.take),
-    leave: strs(o.leave, d.leave),
-    freeSlots: int(o.freeSlots, d.freeSlots, 0, 20),
-    minGrass: int(o.minGrass, d.minGrass, 0, 1000),
-    minLogs: int(o.minLogs, d.minLogs, 0, 1000),
-    minWater: int(o.minWater, d.minWater, 0, 100),
-    minAnimals: int(o.minAnimals, d.minAnimals, 0, 100),
-    maxBuildBlocks: int(o.maxBuildBlocks, d.maxBuildBlocks, 0, 1000),
-    allowSnow: bool(o.allowSnow, d.allowSnow),
-    legMinutes: num(o.legMinutes, d.legMinutes, 0.5, 30),
-    maxTurns: int(o.maxTurns, d.maxTurns, 0, 3),
-    snowTurnAfter: int(o.snowTurnAfter, d.snowTurnAfter, 0, 20)
-  }
+  const s = toggleSettings('startOver', raw, START_OVER_DEFAULTS)
+  // across keys: the range is always beyond the distance to settle at, avoid points get a radius
+  s.maxDistance = Math.max(s.minDistance + 64, s.maxDistance)
+  s.avoid = s.avoid.map(a => ({ ...a, radius: a.radius ?? s.avoidRadius }))
+  return s
 }
 
 // ------------------------------------------------------------------ packing
@@ -321,13 +368,16 @@ export function chooseHeading (from: XZ, avoid: readonly AvoidPoint[], range: nu
   return best
 }
 
-/** Detours tried in turn when a leg is blocked: 45 and 90 degrees either side of the main heading. */
-export const DETOURS = [45, -45, 90, -90]
+/** Detour offsets tried in turn, either side of the heading: [45, 90] gives 45, -45, 90, -90. Pure. */
+export function detourOffsets (detours: readonly number[] = START_OVER_DEFAULTS.detours): number[] {
+  return detours.flatMap(d => [d, -d])
+}
 
 /** The heading for the next leg after `fails` blocked legs in a row (0: the main heading). Pure. */
-export function headingAfterBlock (main: number, fails: number): number {
+export function headingAfterBlock (main: number, fails: number, detours: readonly number[] = START_OVER_DEFAULTS.detours): number {
   if (fails <= 0) return main
-  return main + DETOURS[(fails - 1) % DETOURS.length]!
+  const offs = detourOffsets(detours)
+  return main + offs[(fails - 1) % offs.length]!
 }
 
 /**
@@ -335,9 +385,9 @@ export function headingAfterBlock (main: number, fails: number): number {
  * 45/90 degree detours whose leg doesn't end (or pass half way) over water, by `wet` (true: water,
  * false: land, null: not loaded, counts as land). Null when all of them are wet (an ocean ahead). Pure.
  */
-export function dryLegHeading (main: number, fails: number, wet: (deg: number) => boolean | null): number | null {
-  const first = headingAfterBlock(main, fails)
-  const tries = [first, ...DETOURS.map(d => first + d)]
+export function dryLegHeading (main: number, fails: number, wet: (deg: number) => boolean | null, detours: readonly number[] = START_OVER_DEFAULTS.detours): number | null {
+  const first = headingAfterBlock(main, fails, detours)
+  const tries = [first, ...detourOffsets(detours).map(d => first + d)]
   return tries.find(h => wet(h) !== true) ?? null
 }
 
@@ -351,13 +401,13 @@ export function inAvoided (p: XZ, avoid: readonly AvoidPoint[]): AvoidPoint | nu
 export interface SiteFacts {
   /** Biome name at the surface. */
   biome: string | null
-  /** Snowy or frozen biome (or water freezes here). */
-  snowy: boolean
+  /** Water freezes here (a cold biome or a mountain top). */
+  cold: boolean
   /** Grass blocks open to the sky (and grass plants: seeds) nearby. */
   grass: number
   /** Logs of natural trees nearby. */
   logs: number
-  /** Water sources open to the sky that don't freeze (within twice the look radius; ice too with allowSnow). */
+  /** Water sources open to the sky that don't freeze (and surface ice with iceAsWater). */
   water: number
   /** Passive animals in sight. */
   animals: number
@@ -369,15 +419,27 @@ export interface SiteFacts {
 
 export interface SiteVerdict { ok: boolean, score: number, why: string }
 
+type SiteRules = Pick<StartOverSettings, 'minGrass' | 'minLogs' | 'minWater' | 'minAnimals' | 'maxBuildBlocks' | 'badBiomes' | 'badCold' | 'weights' | 'caps'>
+
+/** The biome is one the settings rule out: a name on badBiomes (prefix*, *suffix), or cold with badCold. Pure. */
+export function badBiome (f: Pick<SiteFacts, 'biome' | 'cold'>, s: Pick<StartOverSettings, 'badBiomes' | 'badCold'>): boolean {
+  if (s.badCold && f.cold) return true
+  const b = f.biome?.replace(/^minecraft:/, '')
+  return !!b && s.badBiomes.some(p => nameMatches(p, b))
+}
+
 /** Whether a place is good enough to start over at, with a score for "the best seen so far". Pure. */
-export function siteVerdict (f: SiteFacts, s: Pick<StartOverSettings, 'minGrass' | 'minLogs' | 'minWater' | 'minAnimals' | 'maxBuildBlocks' | 'allowSnow'>): SiteVerdict {
+export function siteVerdict (f: SiteFacts, s: SiteRules): SiteVerdict {
   const have = `grass ${f.grass}, logs ${f.logs}, water ${f.water}, animals ${f.animals}${f.biome ? `, ${f.biome.replace(/_/g, ' ')}` : ''}`
-  // a usable score even for places that fail: grass and trees matter most, animals are a bonus
-  const score = Math.min(f.grass, 200) / 4 + Math.min(f.logs, 60) + Math.min(f.water, 10) * 3 + Math.min(f.animals, 10) * 4 -
-    (f.snowy ? 100 : 0) - (f.protected ? 1000 : 0) - Math.max(0, f.buildBlocks - s.maxBuildBlocks) * 10
+  const bad = badBiome(f, s)
+  const w = s.weights
+  const c = s.caps
+  // a usable score even for places that fail; protected ground never wins
+  const score = Math.min(f.grass, c.grass) * w.grass + Math.min(f.logs, c.logs) * w.logs + Math.min(f.water, c.water) * w.water + Math.min(f.animals, c.animals) * w.animals -
+    (bad ? w.badBiome : 0) - (f.protected ? PROTECTED_PENALTY : 0) - Math.max(0, f.buildBlocks - s.maxBuildBlocks) * w.build
   const no: string[] = []
   if (f.protected) no.push('protected area')
-  if (f.snowy && !s.allowSnow) no.push('snowy')
+  if (bad) no.push(f.cold && s.badCold ? 'cold (water freezes)' : 'bad biome')
   if (f.buildBlocks > s.maxBuildBlocks) no.push(`somebody's build (${f.buildBlocks} blocks)`)
   if (f.grass < s.minGrass) no.push(`little grass (${f.grass})`)
   if (f.logs < s.minLogs) no.push(`few trees (${f.logs} logs)`)
@@ -386,9 +448,12 @@ export function siteVerdict (f: SiteFacts, s: Pick<StartOverSettings, 'minGrass'
   return no.length ? { ok: false, score, why: `${no.join(', ')}; ${have}` } : { ok: true, score, why: have }
 }
 
-/** Good enough as a fallback once the range is used up: not protected, built on or snowy, some grass and trees. */
-export function fallbackOk (f: SiteFacts, s: Pick<StartOverSettings, 'maxBuildBlocks' | 'allowSnow'>): boolean {
-  return !f.protected && (s.allowSnow || !f.snowy) && f.buildBlocks <= s.maxBuildBlocks && f.grass >= 8 && f.logs >= 4
+/** Taken off the score of a protected place: it never wins over one that isn't. */
+const PROTECTED_PENALTY = 1000
+
+/** Good enough as a fallback once the range is used up: not protected, built on or in a bad biome, fallback.grass and fallback.logs. Pure. */
+export function fallbackOk (f: SiteFacts, s: Pick<StartOverSettings, 'maxBuildBlocks' | 'badBiomes' | 'badCold' | 'fallback'>): boolean {
+  return !f.protected && !badBiome(f, s) && f.buildBlocks <= s.maxBuildBlocks && f.grass >= s.fallback.grass && f.logs >= s.fallback.logs
 }
 
 // ------------------------------------------------------------------ the state machine
@@ -398,7 +463,7 @@ export type StartOverPhase = 'packing' | 'travelling' | 'settling' | 'settled' |
 export interface StartOverState {
   phase: StartOverPhase
   startedAt: number
-  /** Who or what started it ("pe4ka", "settings"). */
+  /** Who or what started it (a player's name, "settings"). */
   by: string
   /** The old base (home when it started). */
   origin: Pos & { dim?: string }
@@ -420,8 +485,8 @@ export interface StartOverState {
   run?: string
   /** Times the walk to the settle target failed. */
   settleFails?: number
-  /** Snowy places looked at in a row (snowTurnAfter). */
-  snowyLooks?: number
+  /** Places looked at and rejected in a row (turnAfterRejects). */
+  rejects?: number
   /** Furthest from the origin so far. */
   farthest?: number
   /** The best place looked at so far (a fallback when the range runs out). */
@@ -460,31 +525,30 @@ export type StartOverStep =
   | { do: 'give_up', why: string }
   | { do: 'none' }
 
-/** Leave the walk this long before dark (ms): it digs in once night falls. */
-export const DUSK_MS = 30_000
-
 /**
  * The next step of a start-over. packing: pack by day, then leave (the behaviour moves it on to
- * travelling); at night or late in the day it waits for the morning. travelling: by night shelter (after 3 failed bunkers it waits for the morning); at dusk wait; by
- * day, far enough from the old base and outside the avoid points, look at the place (with `site`
- * known: settle when it passes); past maxDistance settle at the best fallback seen, else turn the
- * main heading 90 degrees (maxTurns times), else give up; otherwise walk the next leg.
+ * travelling); at night or with under leaveDaylightSeconds of daylight it waits for the morning.
+ * travelling: by night shelter (after shelterTries failed bunkers it waits for the morning); in
+ * the last duskSeconds of daylight wait; by day, far enough from the old base and outside the
+ * avoid points, turn after turnAfterRejects rejected looks in a row, else look at the place (with
+ * `site` known: settle when it passes); past maxDistance settle at the best fallback seen, else
+ * turn (maxTurns times), else settle at the best place seen or give up; otherwise walk the next leg.
  * settling: settle at the target. Pure.
  */
 export function startOverStep (st: StartOverState | null | undefined, f: StepFacts, s: StartOverSettings): StartOverStep {
   if (!st) return { do: 'none' }
   if (st.phase === 'settled' || st.phase === 'failed') return { do: 'none' }
   // packing happens at home and leaving right after, so it waits for the morning (home is safe at night)
-  if (st.phase === 'packing') return f.isNight || f.daylightMs < DUSK_MS * 4 ? { do: 'wait', why: 'leaving at daybreak' } : { do: 'pack' }
+  if (st.phase === 'packing') return canLeave(f.isNight ? 0 : f.daylightMs, s) ? { do: 'pack' } : { do: 'wait', why: 'leaving at daybreak' }
   if (st.phase === 'settling') return st.target ? { do: 'settle', at: st.target, why: st.target.why } : { do: 'look' }
   // travelling
-  // no shelter after 3 tries: wait for the morning where it is (walking at night got it killed twice)
-  if (f.isNight) return (st.shelterFails ?? 0) >= 3 ? { do: 'wait', why: 'no shelter tonight, waiting for the morning' } : { do: 'shelter' }
-  if (f.daylightMs < DUSK_MS) return { do: 'wait', why: 'dusk: digging in once it is dark' }
+  // no shelter after shelterTries: wait for the morning where it is (walking at night is how bots die)
+  if (f.isNight) return (st.shelterFails ?? 0) >= s.shelterTries ? { do: 'wait', why: 'no shelter tonight, waiting for the morning' } : { do: 'shelter' }
+  if (f.daylightMs < s.duskSeconds * 1000) return { do: 'wait', why: 'dusk: digging in once it is dark' }
   const dist = Math.hypot(f.pos.x - st.origin.x, f.pos.z - st.origin.z)
   if (dist >= s.minDistance && !f.avoided) {
-    if (!s.allowSnow && s.snowTurnAfter > 0 && (st.snowyLooks ?? 0) >= s.snowTurnAfter && (st.turns ?? 0) < s.maxTurns) {
-      return { do: 'turn', heading: (st.heading ?? 0) + 90, why: `snow for ${st.snowyLooks} looks in a row that way` }
+    if (s.turnAfterRejects > 0 && (st.rejects ?? 0) >= s.turnAfterRejects && (st.turns ?? 0) < s.maxTurns) {
+      return { do: 'turn', heading: (st.heading ?? 0) + 90, why: `${st.rejects} places in a row no good that way` }
     }
     if (f.site === undefined) return { do: 'look' }
     if (f.site) {
@@ -505,7 +569,7 @@ export function startOverStep (st: StartOverState | null | undefined, f: StepFac
 }
 
 function leg (st: StartOverState, f: StepFacts, s: StartOverSettings): StartOverStep {
-  const heading = headingAfterBlock(st.heading ?? 0, st.fails ?? 0)
+  const heading = headingAfterBlock(st.heading ?? 0, st.fails ?? 0, s.detours)
   return { do: 'leg', heading, target: pointAt(f.pos, heading, s.legLength) }
 }
 
@@ -519,11 +583,8 @@ export function betterBest (best: StartOverState['best'], at: Pos, v: SiteVerdic
 
 // ------------------------------------------------------------------ leaving the old base behind
 
-/** Things within this many blocks of the old base belong to it (places, containers, pinned chests). */
-export const OLD_BASE_RADIUS = 256
-
-/** Whether `p` is at the base it left (the place old_base), so pinned chests there don't count. Pure. */
-export function atOldBase (places: Record<string, unknown> | undefined, p: XZ, radius = OLD_BASE_RADIUS): boolean {
+/** Whether `p` is within `radius` (startOver.oldBaseRadius) of the base it left (the place old_base), so pinned chests there don't count. Pure. */
+export function atOldBase (places: Record<string, unknown> | undefined, p: XZ, radius = START_OVER_DEFAULTS.oldBaseRadius): boolean {
   return near(places?.old_base, p, radius)
 }
 
@@ -553,7 +614,7 @@ function near (p: unknown, origin: XZ, radius: number): boolean {
  * own blocks, mines, trees and chests it placed stay: they are filtered by distance from home.
  * Returns the keys to set and the keys to delete. Pure.
  */
-export function abandonedState (get: (key: string) => unknown, origin: Pos & { dim?: string }, radius = OLD_BASE_RADIUS): { set: Record<string, unknown>, del: string[] } {
+export function abandonedState (get: (key: string) => unknown, origin: Pos & { dim?: string }, radius = START_OVER_DEFAULTS.oldBaseRadius): { set: Record<string, unknown>, del: string[] } {
   const set: Record<string, unknown> = {}
   const del: string[] = ['home', ...ABANDON_KEYS]
   const places: Record<string, unknown> = {}
@@ -593,11 +654,17 @@ export function abandonedState (get: (key: string) => unknown, origin: Pos & { d
 
 /**
  * What to do when digging in for the night failed: in a protected area (world spawn, where it
- * respawns) it isn't the ground's fault, so it doesn't count towards the 3 tries and it walks 24
- * blocks on to get out; other failures count and it moves 12 blocks on to try new ground. Pure.
+ * respawns) it isn't the ground's fault, so it doesn't count towards shelterTries and it walks
+ * protectedStep blocks on to get out; other failures count and it moves shelterStep blocks on to
+ * try new ground. Pure.
  */
-export function shelterFallback (message: string): { counts: boolean, step: number } {
-  return /protected area/.test(message) ? { counts: false, step: 24 } : { counts: true, step: 12 }
+export function shelterFallback (message: string, s: Pick<StartOverSettings, 'shelterStep' | 'protectedStep'> = START_OVER_DEFAULTS): { counts: boolean, step: number } {
+  return /protected area/.test(message) ? { counts: false, step: s.protectedStep } : { counts: true, step: s.shelterStep }
+}
+
+/** Enough daylight left (ms) to pack and leave (leaveDaylightSeconds). Pure. */
+export function canLeave (daylightMs: number, s: Pick<StartOverSettings, 'leaveDaylightSeconds'>): boolean {
+  return daylightMs > 0 && daylightMs >= s.leaveDaylightSeconds * 1000
 }
 
 /** Whether settings.startOver.go starts a run now: no run stored yet, or a finished one with another run id. Pure. */
@@ -608,20 +675,20 @@ export function goFires (st: Pick<StartOverState, 'phase' | 'run'> | null | unde
   return done && s.run !== '' && (st.run ?? '') !== s.run
 }
 
-/** Settling at a far target that it couldn't walk to: try again (up to 5 times) unless it is close already. Pure. */
-export function settleRetry (fails: number, distance: number): boolean {
-  return distance > 64 && fails < 5
+/** Settling at a far target that it couldn't walk to: try again (settleTries times) unless it is within settleNear already. Pure. */
+export function settleRetry (fails: number, distance: number, s: Pick<StartOverSettings, 'settleTries' | 'settleNear'> = START_OVER_DEFAULTS): boolean {
+  return distance > s.settleNear && fails < s.settleTries
 }
 
 /**
  * settings.startOver.run changed while a run is travelling (the owner changed the plan): carry on
- * from where it is with the new direction (or the old heading), fresh turns, range and snow count,
+ * from where it is with the new direction (or the old heading), fresh turns, range and reject count,
  * same origin. Null when nothing changes. Pure.
  */
 export function redirected (st: StartOverState | null | undefined, s: Pick<StartOverSettings, 'go' | 'run' | 'direction'>): StartOverState | null {
   if (!st || !s.go || !s.run || st.phase !== 'travelling' || (st.run ?? '') === s.run) return null
   const given = s.direction ? compassAngle(s.direction) : null
-  return { ...st, run: s.run, ...(s.direction ? { direction: s.direction } : {}), heading: given ?? st.heading, turns: 0, legsSinceTurn: 0, walkedSinceTurn: 0, snowyLooks: 0, fails: 0 }
+  return { ...st, run: s.run, ...(s.direction ? { direction: s.direction } : {}), heading: given ?? st.heading, turns: 0, legsSinceTurn: 0, walkedSinceTurn: 0, rejects: 0, fails: 0 }
 }
 
 /** A surface block a leg shouldn't end on: water, lava and ice (frozen oceans and rivers have holes and drowned under them). Pure. */

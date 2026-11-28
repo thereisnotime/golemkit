@@ -1,6 +1,7 @@
 // Starting over somewhere else (src/skills/startOverPlan.ts): settings, the pack ranking, the
 // heading, the site verdict and the state machine.
 import { test } from 'node:test'
+import { TOGGLES, getPath } from '../src/core/toggles.ts'
 import assert from 'node:assert/strict'
 import {
   startOverSettings, START_OVER_DEFAULTS, packPlan, dryLegHeading, packValue, gearSlot, chooseHeading, headingAfterBlock, angleCompass,
@@ -12,7 +13,25 @@ const FOOD: Record<string, number> = { bread: 5, cooked_beef: 8, apple: 4, rotte
 const fp = (n: string) => FOOD[n] ?? 0
 const stack = (n: string) => /_sword$|_pickaxe$|_axe$|_helmet$|_chestplate$|_leggings$|_boots$|shield|bow|_bed$|bucket/.test(n) ? 1 : n === 'snowball' || n === 'ender_pearl' ? 16 : 64
 
-test('settings: per-key fallback', () => {
+test('settings: per-key fallback from the toggle schemas', () => {
+  // every settings key has a toggle (one source of truth for its type and range) and vice versa
+  const keys = (o: object, pre = ''): string[] => Object.entries(o).flatMap(([k, v]) => v && typeof v === 'object' && !Array.isArray(v) ? keys(v, `${pre}${k}.`) : [`${pre}${k}`])
+  const toggles = TOGGLES.filter(t => t.key.startsWith('startOver.')).map(t => t.key.slice('startOver.'.length)).sort()
+  assert.deepEqual(keys(START_OVER_DEFAULTS).sort(), toggles)
+  // the defaults pass their own schemas
+  for (const t of TOGGLES.filter(t => t.key.startsWith('startOver.'))) assert.ok(t.schema.safeParse(getPath(START_OVER_DEFAULTS as never, t.key.slice(10))).success, t.key)
+  const n = startOverSettings({ weights: { grass: 2, logs: 'x' }, fallback: { grass: 3 }, detours: [30, 60, 120], badBiomes: 'desert, *_badlands' })
+  assert.equal(n.weights.grass, 2)
+  assert.equal(n.weights.logs, START_OVER_DEFAULTS.weights.logs)
+  assert.deepEqual(n.fallback, { grass: 3, logs: START_OVER_DEFAULTS.fallback.logs })
+  assert.deepEqual(n.detours, [30, 60, 120])
+  assert.deepEqual(n.badBiomes, ['desert', '*_badlands'])
+  assert.equal(startOverSettings({ avoidRadius: 50, avoid: [{ x: 1, z: 2 }] }).avoid[0]!.radius, 50)
+  assert.equal(startOverSettings({ maxTurns: 9 }).maxTurns, START_OVER_DEFAULTS.maxTurns)
+  // defaults are not shared between calls
+  startOverSettings({}).badBiomes.push('x')
+  assert.ok(!START_OVER_DEFAULTS.badBiomes.includes('x'))
+
   const s = startOverSettings({ go: true, minDistance: 'far', maxDistance: 900, direction: 'NE', take: 'spruce_log, *_sapling', avoid: [{ x: 1, z: 2 }, { x: 'a' }] })
   assert.equal(s.go, true)
   assert.equal(s.minDistance, START_OVER_DEFAULTS.minDistance)
@@ -84,6 +103,8 @@ test('heading: away from spawn, given direction wins', () => {
   assert.equal(headingAfterBlock(0, 1), 45)
   assert.equal(headingAfterBlock(0, 2), -45)
   assert.equal(headingAfterBlock(0, 5), 45)
+  assert.equal(headingAfterBlock(0, 3, [30, 60]), 60)
+  assert.equal(dryLegHeading(0, 0, h => h === 0, [20]), 20)
   assert.ok(inAvoided({ x: 545, z: 100 }, [spawn]))
   // a leg over water turns to the first dry detour
   assert.equal(dryLegHeading(270, 0, h => h === 270 ? true : h === 315 ? true : null), 225)
@@ -91,19 +112,28 @@ test('heading: away from spawn, given direction wins', () => {
   assert.equal(dryLegHeading(270, 0, () => true), null, 'water all round: none')
 })
 
-const GOOD: SiteFacts = { biome: 'plains', snowy: false, grass: 120, logs: 30, water: 4, animals: 5, buildBlocks: 0, protected: false }
+const GOOD: SiteFacts = { biome: 'plains', cold: false, grass: 120, logs: 30, water: 4, animals: 5, buildBlocks: 0, protected: false }
 
 test('site verdict', () => {
   const s = START_OVER_DEFAULTS
   assert.equal(siteVerdict(GOOD, s).ok, true)
-  const snow = siteVerdict({ ...GOOD, snowy: true, biome: 'snowy_taiga' }, s)
+  const snow = siteVerdict({ ...GOOD, biome: 'snowy_taiga' }, s)
   assert.equal(snow.ok, false)
-  assert.match(snow.why, /snowy/)
+  assert.match(snow.why, /bad biome/)
+  assert.match(siteVerdict({ ...GOOD, cold: true }, s).why, /cold/)
+  // the bad biomes are a setting: any list, empty = any biome, cold only with badCold
+  assert.equal(siteVerdict({ ...GOOD, biome: 'snowy_taiga', cold: true }, { ...s, badBiomes: [], badCold: false }).ok, true)
+  assert.equal(siteVerdict({ ...GOOD, biome: 'desert' }, { ...s, badBiomes: ['desert', '*_badlands'] }).ok, false)
+  assert.equal(siteVerdict({ ...GOOD, biome: 'minecraft:wooded_badlands' }, { ...s, badBiomes: ['desert', '*_badlands'] }).ok, false)
+  assert.ok(siteVerdict({ ...GOOD, biome: 'snowy_taiga' }, s).score === siteVerdict(GOOD, s).score - s.weights.badBiome)
+  // the score weights are knobs too
+  assert.ok(siteVerdict(GOOD, { ...s, weights: { ...s.weights, animals: 100 } }).score > siteVerdict(GOOD, s).score)
   assert.match(siteVerdict({ ...GOOD, buildBlocks: 40 }, s).why, /build/)
   assert.match(siteVerdict({ ...GOOD, animals: 0 }, s).why, /few animals/)
   assert.ok(siteVerdict(GOOD, s).score > siteVerdict({ ...GOOD, logs: 2 }, s).score)
   assert.equal(fallbackOk({ ...GOOD, animals: 0, water: 0 }, s), true)
-  assert.equal(fallbackOk({ ...GOOD, snowy: true }, s), false)
+  assert.equal(fallbackOk({ ...GOOD, biome: 'frozen_river' }, s), false)
+  assert.equal(fallbackOk({ ...GOOD, grass: 10 }, { ...s, fallback: { grass: 20, logs: 4 } }), false)
 })
 
 const S = startOverSettings({ minDistance: 500, maxDistance: 1500, legLength: 100 })
@@ -138,7 +168,7 @@ test('state machine: looks once far enough, settles on a good place', () => {
   assert.equal(startOverStep(st({}), day({ x: 520, z: 0 }), S).do, 'look')
   const good = startOverStep(st({}), day({ x: 520, z: 0 }, { site: GOOD }), S)
   assert.equal(good.do, 'settle')
-  const bad = startOverStep(st({}), day({ x: 520, z: 0 }, { site: { ...GOOD, snowy: true } }), S)
+  const bad = startOverStep(st({}), day({ x: 520, z: 0 }, { site: { ...GOOD, biome: 'snowy_plains' } }), S)
   assert.equal(bad.do, 'leg')
   // inside an avoided area: doesn't look, walks on
   assert.equal(startOverStep(st({}), day({ x: 520, z: 0 }, { avoided: true }), S).do, 'leg')
@@ -206,14 +236,13 @@ test('chests pinned at the old base no longer count', async () => {
   assert.equal(configuredChests(agent).length, 2)
 })
 
-test('state machine: snow look after look turns the heading', () => {
-  const t = startOverStep(st({ snowyLooks: 3 }), day({ x: 600, z: 0 }), S)
+test('state machine: rejected look after look turns the heading', () => {
+  const t = startOverStep(st({ rejects: 3 }), day({ x: 600, z: 0 }), S)
   assert.equal(t.do, 'turn')
-  if (t.do === 'turn') assert.equal(t.heading, 90)
-  assert.equal(startOverStep(st({ snowyLooks: 2 }), day({ x: 600, z: 0 }), S).do, 'look')
-  assert.equal(startOverStep(st({ snowyLooks: 3, turns: 2 }), day({ x: 600, z: 0 }), S).do, 'look', 'no turns left')
-  assert.equal(startOverStep(st({ snowyLooks: 5 }), day({ x: 600, z: 0 }), startOverSettings({ snowTurnAfter: 0 })).do, 'look')
-  assert.equal(startOverStep(st({ snowyLooks: 5 }), day({ x: 600, z: 0 }), startOverSettings({ allowSnow: true })).do, 'look', 'snow allowed: no snow turns')
+  assert.equal(startOverStep(st({ rejects: 2 }), day({ x: 600, z: 0 }), S).do, 'look')
+  assert.equal(startOverStep(st({ rejects: 3, turns: 2 }), day({ x: 600, z: 0 }), S).do, 'look', 'no turns left')
+  assert.equal(startOverStep(st({ rejects: 5 }), day({ x: 600, z: 0 }), startOverSettings({ turnAfterRejects: 0 })).do, 'look')
+  assert.equal(startOverStep(st({ rejects: 4 }), day({ x: 600, z: 0 }), startOverSettings({ turnAfterRejects: 5 })).do, 'look')
 })
 
 test('night shelter fallback: protected ground does not count', async () => {
@@ -245,11 +274,12 @@ test('a second start-over keeps the first old base', async () => {
 
 test('a new run id while travelling redirects the run', async () => {
   const { redirected } = await import('../src/skills/startOverPlan.ts')
-  const cur = st({ heading: 270, turns: 2, walkedSinceTurn: 900, snowyLooks: 2, run: '2' })
+  const cur = st({ heading: 270, turns: 2, walkedSinceTurn: 900, rejects: 2, run: '2' })
   const r = redirected(cur, { go: true, run: '3', direction: 'w' })!
   assert.equal(r.heading, 180)
   assert.equal(r.turns, 0)
   assert.equal(r.walkedSinceTurn, 0)
+  assert.equal(r.rejects, 0)
   assert.equal(r.run, '3')
   assert.deepEqual(r.origin, cur.origin)
   assert.equal(redirected(cur, { go: true, run: '2', direction: 'w' }), null)

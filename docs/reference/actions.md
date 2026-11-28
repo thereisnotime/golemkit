@@ -768,7 +768,7 @@ Look at one of its own farms that site health marked bad (flooded, frozen) and r
 
 ### `plot_farm`
 
-Turn the farm plot its base keeps free inside the walls (base project farm_plot) into a small farm, no bucket needed: water already in reach of the plot, or ice it carries (only Silk Touch brings ice) broken in the middle, else a dry plot (crops on dry farmland still grow, about half as fast, as long as every tilled cell is planted). Torches give the crops light 9 and keep the middle water from freezing. Settings farming.plot, plotWater (auto | water | dry), plotSwap.
+Turn the farm plot its base keeps free inside the walls (base project farm_plot) into a farm, or extend its farm when the plot grew: water already in reach of the plot; on a plot of 5 and up a water bucket (carried, from a container, an empty one filled, or crafted from 3 iron) poured in the middle; ice it carries (only Silk Touch brings ice) broken in the middle; else a dry plot (crops on dry farmland still grow, about half as fast, as long as every tilled cell is planted). Short of seeds it takes them from its chests, then breaks grass near home. Torches give the crops light 9 and keep the middle water from freezing. Settings farming.plot, plotWater (auto | water | dry), plotSwap, plotSize, plotSeedRadius.
 
 *long-running*
 
@@ -1380,7 +1380,7 @@ Packs for a start-over: its own bed by home comes along, then the most precious 
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `radius` | integer (8..128) |  | `48` |  |
+| `radius` | integer (8..128) |  |  | chests within this many blocks of home (default startOver.packRadius) |
 
 ### `start_over_leg`
 

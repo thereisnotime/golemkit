@@ -4,7 +4,7 @@ import type { Item } from 'prismarine-item'
 import { defineSkill, defineAction, z, ok, fail, goals, fmtPos, itemName, checkAborted, sleep, travel, type Agent, type ActionResult } from '../core/index.ts'
 import { vec, reachBlock, within, gotoWithin } from './world.ts'
 import { parseChestRoles, type ChestRole } from './searchPlan.ts'
-import { atOldBase } from './startOverPlan.ts'
+import { atOldBase, startOverSettings } from './startOverPlan.ts'
 import { isToolOrArmor, planDeposit, depositable, chestTakes, planChestSpot, type DepositChest, type DepositNeeds, type DepositPlan, type TakeChest } from './storagePlan.ts'
 import { craftItem } from './crafting.ts'
 import { ensurePlanks } from './toolkit.ts'
@@ -429,7 +429,8 @@ export function configuredChests (agent: Agent): Pos[] {
 export function configuredChestRoles (agent: Agent): (Pos & { role: ChestRole })[] {
   const s = (agent.settings as { storage?: { chests?: unknown } } | undefined)?.storage
   const places = (agent as { storage?: Agent['storage'] }).storage?.get<Record<string, unknown>>('places', {})
-  return parseChestRoles(s?.chests).filter(c => !atOldBase(places, c))
+  const radius = startOverSettings((agent.settings as { startOver?: unknown } | undefined)?.startOver).oldBaseRadius
+  return parseChestRoles(s?.chests).filter(c => !atOldBase(places, c, radius))
 }
 
 /** The role of one of its chests: configured ones by the profile, the ones it placed are storage. Null: not one of its chests. */

@@ -87,7 +87,7 @@ settings:
   # frozen water counts as water). The old fortress lacked exactly those: seeds and animals.
   # Run 4 respawned in that ocean and used its turns there; run 5 redirects south from spawn.
   # Run 5 turned away from snow it was allowed (fixed) and missed water just out of sight; run 6.
-  startOver: { go: true, run: "6", direction: s, allowSnow: true, minAnimals: 1, maxDistance: 2500, minDistance: 500, avoid: [{ name: spawn, x: 545, z: 45, radius: 300 }, { name: village, x: -2770, z: 1090, radius: 500 }] }
+  startOver: { go: true, run: "6", direction: s, badBiomes: [], badCold: false, iceAsWater: true, minAnimals: 1, maxDistance: 2500, minDistance: 500, avoid: [{ name: spawn, x: 545, z: 45, radius: 300 }, { name: village, x: -2770, z: 1090, radius: 500 }] }
 # Behaviours that run on their own between LLM turns (docs/guide/behaviors.md). Pax or ${MC_OWNER:-Robin}
 # can arm more at runtime (behavior_arm / !behavior_arm follow_owner); those changes persist.
 behaviors:

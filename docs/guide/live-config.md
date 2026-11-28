@@ -251,24 +251,61 @@ can't change their own.
 | `deathSpots.minutes` | 0.5–240 | how long (default 10) |
 | `deathSpots.stepCost` | 0–50 | extra path cost per block inside a death spot (default 8; 0 = paths ignore it) |
 | `startOver.go` | on/off | start over once on its own when it starts (remembered: it doesn't fire again once done) ([start over](./start-over)) |
+| `startOver.run` | text | with go: a run id; a new id starts one more start-over (from the current home) even after an earlier one finished, or redirects one under way |
 | `startOver.minDistance` | 64–5000 | settle no closer than this to the old base, blocks (default 500) |
-| `startOver.maxDistance` | 128–10000 | look no further than this from the old base before turning 90 degrees, blocks (default 1500) |
+| `startOver.maxDistance` | 128–10000 | look no further than this from the old base before turning, blocks (default 1500; at least minDistance + 64) |
 | `startOver.legLength` | 32–256 | walk this far per leg before looking again, blocks (default 96) |
-| `startOver.legMinutes` | 0.5–30 | a leg taking longer than this counts as blocked and the next one turns 45 degrees (default 4) |
+| `startOver.legMinutes` | 0.5–30 | a leg taking longer than this counts as blocked and the next one takes a detour (default 4) |
+| `startOver.blockedMoved` | 0–256 | a failed leg that moved fewer blocks than this counts as blocked (default 16) |
+| `startOver.detours` | angles | detour angles tried either side of the heading when a leg is blocked or wet, in order (default 45, 90) |
 | `startOver.direction` | n / ne / e / se / s / sw / w / nw / empty | which way to go; empty = away from spawn and the avoid points (default empty) |
-| `startOver.spawnRadius` | 0–5000 | keep this far from world spawn, blocks (default 300) |
-| `startOver.take` | item names | packed first whatever the value table says (comma separated; prefix* and *suffix work) |
-| `startOver.leave` | item names | never packed (comma separated; prefix* and *suffix work) |
+| `startOver.dimensions` | names | dimensions a start-over may run in (default overworld) |
+| `startOver.spawnRadius` | 0–5000 | keep this far from world spawn, blocks (default 300; 0 = spawn is not avoided) |
+| `startOver.avoid` | list of { name, x, z, radius } | more places to keep away from, a list of { name, x, z, radius } (JSON live); entries without x and z are skipped |
+| `startOver.avoidRadius` | 0–10000 | radius of an avoid point that gives none, blocks (default 400) |
+| `startOver.take` | names | packed first whatever the value table says (comma separated; prefix* and *suffix work) |
+| `startOver.leave` | names | never packed (comma separated; prefix* and *suffix work) |
 | `startOver.freeSlots` | 0–20 | inventory slots left free after packing (default 2) |
-| `startOver.minGrass` | 0–1000 | grass blocks within 32 a new place needs (default 24) |
-| `startOver.minLogs` | 0–1000 | tree logs within 32 a new place needs (default 8) |
-| `startOver.minWater` | 0–100 | open water sources within 32 that don't freeze (default 1) |
-| `startOver.minAnimals` | 0–100 | passive animals within 64 (default 2) |
+| `startOver.packRadius` | 8–128 | chests within this many blocks of home are packed from (default 48) |
+| `startOver.roomAbove` | 0–36 | with more used inventory slots than this, it first puts what isn't worth packing into the old chests (default 24) |
+| `startOver.stash` | names | pack value kinds put into the new chest when it settles: treasure, metal, ore, ammo, seeds, light, fuel, material, wood, stone, block, gear, food (default treasure, metal, ore) |
+| `startOver.minGrass` | 0–1000 | grass blocks within lookRadius a new place needs (default 24) |
+| `startOver.minLogs` | 0–1000 | tree logs within lookRadius a new place needs (default 8) |
+| `startOver.minWater` | 0–100 | open water sources within waterRadius that don't freeze (and ice with iceAsWater) a new place needs (default 1) |
+| `startOver.minAnimals` | 0–100 | passive animals within animalRadius a new place needs (default 2) |
 | `startOver.maxBuildBlocks` | 0–1000 | blocks of somebody's build nearby that rule a place out (default 6) |
-| `startOver.allowSnow` | on/off | snowy and frozen biomes are fine (default off) |
-| `startOver.maxTurns` | 0–3 | times it turns 90 degrees after maxDistance without a good place before making do (default 2) |
-| `startOver.run` | text | with `go`: a run id; a new id starts one more start-over (from the current home) even after an earlier one finished |
-| `startOver.snowTurnAfter` | 0–20 | snowy places looked at in a row after which it turns 90 degrees (0 = never; default 3) |
+| `startOver.badBiomes` | names | biomes a new place must not be in (names, prefix* and *suffix; default snowy_*, frozen_*, ice_spikes, grove, jagged_peaks; empty = any biome) |
+| `startOver.badCold` | on/off | a place where water freezes counts as a bad biome too (default on) |
+| `startOver.iceAsWater` | on/off | surface ice counts as water for a new place (default off) |
+| `startOver.lookRadius` | 8–96 | grass, logs and builds are counted within this many blocks (default 32) |
+| `startOver.waterRadius` | 8–128 | water is counted within this many blocks (default 64) |
+| `startOver.animalRadius` | 8–128 | animals are counted within this many blocks (default 64) |
+| `startOver.treeDepth` | 0–64 | logs more than this many blocks under the surface (caves, mineshafts) don't count as trees (default 12) |
+| `startOver.weights.grass` | 0–100 | site score per grass block (default 0.25) |
+| `startOver.weights.logs` | 0–100 | site score per log (default 1) |
+| `startOver.weights.water` | 0–100 | site score per water source (default 3) |
+| `startOver.weights.animals` | 0–100 | site score per animal (default 4) |
+| `startOver.weights.badBiome` | 0–10000 | site score taken off in a bad biome (default 100) |
+| `startOver.weights.build` | 0–1000 | site score taken off per build block over maxBuildBlocks (default 10) |
+| `startOver.caps.grass` | 1–1000 | grass blocks counted at most, for the score (default 200) |
+| `startOver.caps.logs` | 1–1000 | logs counted at most, for the score (default 60) |
+| `startOver.caps.water` | 1–100 | water sources counted at most, for the score (default 10) |
+| `startOver.caps.animals` | 1–100 | animals counted at most, for the score (default 10) |
+| `startOver.fallback.grass` | 0–1000 | grass a place needs to be the fallback once the range is used up (default 8) |
+| `startOver.fallback.logs` | 0–1000 | logs a place needs to be the fallback once the range is used up (default 4) |
+| `startOver.turnAfterRejects` | 0–20 | places looked at and rejected in a row (for any reason) after which it turns (0 = never; default 3) |
+| `startOver.maxTurns` | 0–7 | turns of 90 degrees after the range runs out, an ocean, or rejects in a row, before making do (default 2) |
+| `startOver.duskSeconds` | 0–600 | stop walking this long before dark and dig in once night falls (default 30) |
+| `startOver.leaveDaylightSeconds` | 0–1200 | pack and leave only with at least this much daylight left; else wait at home for the morning (default 120) |
+| `startOver.shelterTries` | 0–20 | failed bunkers in a night before it waits for the morning where it stands (default 3) |
+| `startOver.shelterStep` | 0–128 | blocks it walks on along the heading after a failed bunker (default 12) |
+| `startOver.protectedStep` | 0–256 | blocks it walks on after a bunker refused on protected ground; those don't count as tries (default 24) |
+| `startOver.shelterMinutes` | 1–60 | longest a night bunker is kept (default 15) |
+| `startOver.settleTries` | 0–50 | failed walks to a far settle target before it settles where it stands (default 5) |
+| `startOver.settleNear` | 0–512 | a settle target closer than this counts as reached when the walk fails, blocks (default 64) |
+| `startOver.oldBaseRadius` | 16–4096 | places, containers, pinned chests and beds within this many blocks of the old base belong to it (default 256) |
+| `startOver.dropPlaces` | names | more place names dropped on leaving wherever they are (prefix* and *suffix; modules add their own base places) |
+| `startOver.dropKeys` | names | more storage keys dropped on leaving (modules add their own base-anchored keys) |
 | `respawn.enabled` | on/off | respawn by itself when dead, also when it logs in dead (default on) |
 | `respawn.retrySeconds` | 1–120 | ask to respawn again this often while still dead (default 5) |
 | `respawn.maxTries` | 1–50 | reconnect after this many asks without coming back (default 6) |

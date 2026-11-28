@@ -70,28 +70,32 @@ it was.
    in water or on ice (frozen oceans have holes and drowned under them), or pass over water half or three quarters of the way, it takes the first 45 or 90
    degree detour that stays on land. If there is none (an ocean ahead), it turns 90 degrees
    instead of swimming. A leg that gets nowhere turns the next one 45 degrees, then
-   the other way, then 90. After a leg that works it is back on the main heading. It walks by day only. Half
-   a minute before dark it stops, and at night it digs in (`bunker`, until morning). If that fails
-   on protected ground (world spawn after a death), it walks 24 blocks on and tries again; other
-   failures move it 12 blocks on, and after three of those it waits for the morning where it is. Meals and
+   the other way, then 90. After a leg that works it is back on the main heading. It walks by day only. `duskSeconds`
+   (30) before dark it stops, and at night it digs in (`bunker`, until morning). If that fails
+   on protected ground (world spawn after a death), it walks `protectedStep` (24) blocks on and tries again; other
+   failures move it `shelterStep` (12) blocks on, and after `shelterTries` (3) of those it waits for the morning where it is. Meals and
    danger still go first: keep_fed, stay_safe and recover_drops all outrank it.
 4. **Look.** Once it is `minDistance` (500) blocks from the old base and outside the avoid points,
-   it looks around after every leg (`siteVerdict`). Within 32 blocks it wants:
-   - `minGrass` grass blocks open to the sky;
-   - `minLogs` tree logs;
-   - `minWater` water sources that don't freeze (within 64; with `allowSnow` ice counts);
-   - `minAnimals` passive animals (within 64).
+   it looks around after every leg (`siteVerdict`). It wants:
+   - `minGrass` grass blocks open to the sky within `lookRadius` (32);
+   - `minLogs` tree logs within `lookRadius`, no deeper than `treeDepth` under the surface;
+   - `minWater` water sources that don't freeze within `waterRadius` (64; with `iceAsWater`
+     surface ice counts);
+   - `minAnimals` passive animals within `animalRadius` (64).
 
-   The place must not be a snowy or frozen biome (unless `allowSnow`), a protected area, or next to
-   somebody's build (more than `maxBuildBlocks` blocks of planks, glass, doors, farmland...). The
-   first place that passes is the one. After `snowTurnAfter` (3) snowy places in a row, the main
-   heading turns 90 degrees (not with `allowSnow`). North of Pax's fortress was frozen land with polar bears.
+   The place must not be in a bad biome (`badBiomes`, by default snowy and frozen ones; with
+   `badCold` also anywhere water freezes), a protected area, or next to somebody's build (more
+   than `maxBuildBlocks` blocks of planks, glass, doors, farmland...). The first place that passes
+   is the one. Places that fail still get a score (`weights`, `caps`) for "the best seen so far".
+   After `turnAfterRejects` (3) rejected places in a row, for whatever reason, the main heading
+   turns.
 5. **Range.** After a turn, the range counts the blocks actually walked, so short legs in the
    mountains don't use it up. At `maxDistance` (1500) without a good place, it settles at the best place it looked
-   at, if that place had at least some grass and trees and wasn't snowy, protected or built on.
+   at, if that place had at least `fallback.grass` grass and `fallback.logs` logs and wasn't in a
+   bad biome, protected or built on.
    Otherwise it turns 90 degrees and tries that way for the same length, up to `maxTurns` times.
-   After that it settles at the best place it looked at even if it was snowy. If it can't walk
-   there, it tries again up to 5 times before settling where it stands, and only if it never
+   After that it settles at the best place it looked at even if it failed the rules. If it can't walk
+   there, it tries again up to `settleTries` (5) times before settling where it stands, and only if it never
    looked anywhere does it make home where it stands.
 6. **Settle.** Home goes there, the bed goes down (`place_bed`), a chest goes down (`place_chest`,
    crafted from planks if needed), and ores and ingots go into the chest. Tools, food, seeds, logs
@@ -105,33 +109,49 @@ it was.
 ## Settings
 
 All under `settings.startOver`, all live (`!config_set startOver.minDistance 800`). Each key falls
-back to its default on its own when its value is bad.
+back to its default on its own when its value is bad. The full list with ranges is in the
+[feature toggles](./live-config#what-can-be-changed) table (`startOver.*`); the type and range of
+each key live only in those toggle schemas, and the planner reads its settings through them.
 
 | key | default | what |
 |---|---|---|
 | `go` | off | start once by itself on start |
-| `run` | (none) | with `go`: a new id starts one more run |
+| `run` | (none) | with `go`: a new id starts one more run, or redirects one under way |
 | `minDistance` | 500 | settle no closer than this to the old base |
 | `maxDistance` | 1500 | look no further than this before turning |
-| `legLength` | 96 | blocks per leg |
-| `legMinutes` | 4 | a leg taking longer counts as blocked |
+| `legLength` / `legMinutes` | 96 / 4 | blocks per leg; a leg taking longer counts as blocked |
+| `blockedMoved` | 16 | a failed leg that moved less than this counts as blocked |
+| `detours` | [45, 90] | angles tried either side of the heading around a blocked or wet leg |
 | `direction` | (auto) | `n`, `ne`, `e`, ... |
+| `dimensions` | [overworld] | where a start-over may run |
 | `spawnRadius` | 300 | keep this far from world spawn |
-| `avoid` | [] | more places to keep away from: `{ name, x, z, radius }` |
+| `avoid` / `avoidRadius` | [] / 400 | more places to keep away from: `{ name, x, z, radius }`; radius defaults to `avoidRadius` |
 | `take` / `leave` | [] | item names packed first / never |
-| `freeSlots` | 2 | slots left free after packing |
+| `freeSlots` / `packRadius` / `roomAbove` | 2 / 48 / 24 | slots left free; chests packed from; used slots above which it makes room first |
+| `stash` | [treasure, metal, ore] | pack kinds put into the new chest |
 | `minGrass` / `minLogs` / `minWater` / `minAnimals` | 24 / 8 / 1 / 2 | what a good place needs |
 | `maxBuildBlocks` | 6 | somebody's build nearby rules a place out |
-| `allowSnow` | off | snowy biomes are fine; frozen water then counts as water |
-| `maxTurns` | 2 | 90-degree turns before making do |
-| `snowTurnAfter` | 3 | snowy looks in a row before turning 90 degrees |
+| `badBiomes` | [snowy_\*, frozen_\*, ice_spikes, grove, jagged_peaks] | biomes ruled out (`prefix*`, `*suffix`); `[]` = any biome |
+| `badCold` | on | a place where water freezes counts as a bad biome |
+| `iceAsWater` | off | surface ice counts as water |
+| `lookRadius` / `waterRadius` / `animalRadius` / `treeDepth` | 32 / 64 / 64 / 12 | how far it looks; logs deeper than `treeDepth` under the surface aren't trees |
+| `weights` | grass 0.25, logs 1, water 3, animals 4, badBiome 100, build 10 | the site score |
+| `caps` | grass 200, logs 60, water 10, animals 10 | counts above these don't add to the score |
+| `fallback` | grass 8, logs 4 | what the fallback place needs once the range is used up |
+| `turnAfterRejects` | 3 | rejected looks in a row (any reason) before turning |
+| `maxTurns` | 2 | turns before making do |
+| `duskSeconds` / `leaveDaylightSeconds` | 30 / 120 | stop walking before dark; daylight needed to pack and leave |
+| `shelterTries` / `shelterStep` / `protectedStep` / `shelterMinutes` | 3 / 12 / 24 / 15 | night bunkers |
+| `settleTries` / `settleNear` | 5 / 64 | retries of a far settle target |
+| `oldBaseRadius` | 256 | what belongs to the old base |
+| `dropPlaces` / `dropKeys` | [] | more places and storage keys dropped on leaving |
 
 ## Notes
 
 - A death on the way sends it back to the world spawn, because its bed is in its bag. The run
   goes on from there with the same heading. recover_drops goes back for its things first, if it
   can.
-- Chests pinned in the profile (`storage.chests`) within 256 blocks of `old_base` stop counting
+- Chests pinned in the profile (`storage.chests`) within `oldBaseRadius` (256) blocks of `old_base` stop counting
   as its chests. Without that, keep_fed walked straight back to the old pantry. keep_fed's
   `foodPlaces` stays in the profile, so drop any entry there that names an old farm.
 - The decisions are pure and unit tested in `test/start-over-plan.test.ts`: the settings, the pack

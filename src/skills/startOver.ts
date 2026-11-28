@@ -25,7 +25,7 @@ import { surfaceWater, surfaceAt, offLimits, spawnOf, freezes, BUILD } from './f
 import { ownBedsNear } from './bed.ts'
 import { vec, reachBlock, digBlock } from './world.ts'
 import { pickupNearby } from './pickup.ts'
-import { LOGS, ANIMALS, BIOME_WORDS } from './searchPlan.ts'
+import { LOGS, ANIMALS } from './searchPlan.ts'
 
 export const START_OVER_KEY = 'startOver'
 /** Set while it has no home on purpose (travelling): the NPC controller doesn't put home where it stands. */
@@ -83,7 +83,7 @@ export function beginStartOver (agent: Agent, bot: Bot, by: string, direction?: 
 
 /** Drops the old base from storage (abandonedState) and keeps it as the place old_base. */
 export function abandonOldBase (agent: Agent, origin: StartOverState['origin']): string[] {
-  const r = abandonedState(k => agent.storage.get(k), origin)
+  const r = abandonedState(k => agent.storage.get(k), origin, startOverConfig(agent).oldBaseRadius)
   for (const k of r.del) agent.storage.delete(k)
   for (const [k, v] of Object.entries(r.set)) agent.storage.set(k, v)
   agent.storage.set(HOME_AWAY_KEY, 'starting over')
@@ -92,40 +92,43 @@ export function abandonOldBase (agent: Agent, origin: StartOverState['origin']):
 
 // ------------------------------------------------------------------ looking at a place
 
-const SNOW_RE = new RegExp(BIOME_WORDS.snow!.pattern)
 const GRASS_PLANTS = /^(short_grass|grass|tall_grass|fern)$/
 
 function blockIds (bot: Bot, names: readonly string[]): number[] {
   return names.map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
 }
 
-/** What the place around the bot looks like for settling (SiteFacts). */
-export function lookAround (agent: Agent, bot: Bot, radius = 32, iceAsWater = false): SiteFacts {
+export type LookSettings = Pick<StartOverSettings, 'lookRadius' | 'waterRadius' | 'animalRadius' | 'treeDepth' | 'iceAsWater' | 'caps' | 'minGrass' | 'minLogs' | 'minWater'>
+
+/** What the place around the bot looks like for settling (SiteFacts), within the look radii of the settings. */
+export function lookAround (agent: Agent, bot: Bot, s: LookSettings): SiteFacts {
+  const radius = s.lookRadius
   const here = bot.entity.position.floored()
   const ground = bot.blockAt(here.offset(0, -1, 0)) as (Block & { biome?: { name?: string } }) | null
   // a server-synced registry (NeoForge) keeps biome names only as keys of biomesByName
   const byName = (bot.registry as { biomesByName?: Record<string, unknown> }).biomesByName ?? {}
   const raw = ground?.biome as ({ name?: string, id?: number } | undefined)
   const biome = raw?.name || (raw ? Object.keys(byName).find(k => byName[k] === raw || (byName[k] as { id?: number } | undefined)?.id === raw.id && raw.id !== undefined) : undefined)?.replace(/^minecraft:/, '') || null
-  const snowy = (!!biome && SNOW_RE.test(biome)) || freezes(bot, { x: here.x, y: here.y, z: here.z })
+  const cold = freezes(bot, { x: here.x, y: here.y, z: here.z })
   const surface = (p: { x: number, y: number, z: number }, depth: number) => { const sy = surfaceY(bot, p.x, p.z); return sy === null || sy - p.y <= depth }
   const grassId = bot.registry.blocksByName.grass_block?.id
   const grass = grassId === undefined ? 0 : bot.findBlocks({
-    matching: grassId, maxDistance: radius, count: 400,
+    matching: grassId, maxDistance: radius, count: Math.max(s.caps.grass, s.minGrass),
     useExtraInfo: (b: Block) => { const up = bot.blockAt(b.position.offset(0, 1, 0)); return !!up && (up.name === 'air' || GRASS_PLANTS.test(up.name)) }
   }).length
-  const logs = bot.findBlocks({ matching: blockIds(bot, LOGS), maxDistance: radius, count: 200 }).filter(p => surface(p, 12)).length
-  // water a bit further out: the farm code looks for a site by water out to 96
-  let water = surfaceWater(bot, here, radius * 2, 32).filter(w => !freezes(bot, w)).length
-  // snow allowed: frozen water counts too (the cold-farm code keeps a farm's water open)
-  if (iceAsWater) {
+  // logs under the surface are a mineshaft or a cave, not trees
+  const logs = bot.findBlocks({ matching: blockIds(bot, LOGS), maxDistance: radius, count: Math.max(s.caps.logs, s.minLogs) * 2 }).filter(p => surface(p, s.treeDepth)).length
+  const waterCount = Math.max(s.caps.water, s.minWater)
+  let water = surfaceWater(bot, here, s.waterRadius, waterCount * 3).filter(w => !freezes(bot, w)).length
+  // iceAsWater: frozen water counts too (the cold-farm code breaks the ice and keeps a farm's water open)
+  if (s.iceAsWater) {
     const ice = blockIds(bot, ['ice'])
-    if (ice.length) water += bot.findBlocks({ matching: ice, maxDistance: radius * 2, count: 16, useExtraInfo: (b: Block) => bot.blockAt(b.position.offset(0, 1, 0))?.name === 'air' }).length
+    if (ice.length) water += bot.findBlocks({ matching: ice, maxDistance: s.waterRadius, count: waterCount, useExtraInfo: (b: Block) => bot.blockAt(b.position.offset(0, 1, 0))?.name === 'air' }).length
   }
-  const animals = Object.values(bot.entities ?? {}).filter(e => e?.position && ANIMALS.includes(e.name ?? '') && e.position.distanceTo(bot.entity.position) <= radius * 2).length
+  const animals = Object.values(bot.entities ?? {}).filter(e => e?.position && ANIMALS.includes(e.name ?? '') && e.position.distanceTo(bot.entity.position) <= s.animalRadius).length
   const buildNames = Object.keys(bot.registry.blocksByName).filter(n => BUILD.test(n))
   const buildBlocks = bot.findBlocks({ matching: blockIds(bot, buildNames), maxDistance: radius + 16, count: 64 }).filter(p => surface(p, 3)).length
-  return { biome, snowy, grass, logs, water, animals, buildBlocks, protected: offLimits(agent, bot, here, 0) }
+  return { biome, cold, grass, logs, water, animals, buildBlocks, protected: offLimits(agent, bot, here, 0) }
 }
 
 /**
@@ -147,7 +150,7 @@ export function legWet (bot: Bot, deg: number, length: number): boolean | null {
 
 /** Short text of the facts for logs. */
 export function factsText (f: SiteFacts): string {
-  return `${f.biome?.replace(/_/g, ' ') ?? 'unknown biome'}${f.snowy ? ' (snowy)' : ''}: grass ${f.grass}, logs ${f.logs}, water ${f.water}, animals ${f.animals}, build blocks ${f.buildBlocks}${f.protected ? ', protected' : ''}`
+  return `${f.biome?.replace(/_/g, ' ') ?? 'unknown biome'}${f.cold ? ' (cold)' : ''}: grass ${f.grass}, logs ${f.logs}, water ${f.water}, animals ${f.animals}, build blocks ${f.buildBlocks}${f.protected ? ', protected' : ''}`
 }
 
 // ------------------------------------------------------------------ actions
@@ -213,7 +216,7 @@ const packAction = defineAction({
   internal: true,
   capabilities: ['containers', 'move'],
   description: 'Packs for a start-over: its own bed by home comes along, then the most precious things from its chests near home (startOverPlan.packPlan) up to the inventory space.',
-  params: z.object({ radius: z.number().int().min(8).max(128).default(48) }),
+  params: z.object({ radius: z.number().int().min(8).max(128).optional().describe('chests within this many blocks of home (default startOver.packRadius)') }),
   async run ({ agent, bot: client, signal, log }, p): Promise<ActionResult> {
     const bot = client as Bot
     const s = startOverConfig(agent)
@@ -238,7 +241,7 @@ const packAction = defineAction({
         break
       }
     }
-    const chests = chestView(agent, bot, p.radius)
+    const chests = chestView(agent, bot, p.radius ?? s.packRadius)
     const totals = chestTotals(chests).has
     const picks = packPlan({ chests: totals, inventory: inventoryTally(bot), freeSlots: freeSlots(bot), stackSize: stackSize(bot), foodPoints: n => foodPoints(bot, n), take: s.take, leave: s.leave, keepFree: s.freeSlots })
     if (!picks.length) return ok(`nothing worth packing in ${chests.length} chests${notes.length ? `; ${notes.join('; ')}` : ''}`, { took: {} })
