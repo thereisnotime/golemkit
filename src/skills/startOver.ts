@@ -15,13 +15,13 @@ import {
   type Agent, type ActionResult
 } from '../core/index.ts'
 import {
-  startOverSettings, packPlan, siteVerdict, abandonedState, angleCompass, inAvoided,
+  startOverSettings, packPlan, siteVerdict, abandonedState, angleCompass, inAvoided, pointAt,
   type StartOverSettings, type StartOverState, type SiteFacts, type AvoidPoint, type Pos
 } from './startOverPlan.ts'
 import { chestView, chestTotals, takeItemsFromOwnChests, fmtTally } from './containers.ts'
 import { foodPoints } from './trip.ts'
 import { getHome, setHome, findStandable, type Place } from './navigation.ts'
-import { surfaceWater, offLimits, spawnOf, freezes, BUILD } from './food.ts'
+import { surfaceWater, surfaceAt, offLimits, spawnOf, freezes, BUILD } from './food.ts'
 import { ownBedsNear } from './bed.ts'
 import { vec, reachBlock, digBlock } from './world.ts'
 import { pickupNearby } from './pickup.ts'
@@ -116,6 +116,23 @@ export function lookAround (agent: Agent, bot: Bot, radius = 32): SiteFacts {
   const buildNames = Object.keys(bot.registry.blocksByName).filter(n => BUILD.test(n))
   const buildBlocks = bot.findBlocks({ matching: blockIds(bot, buildNames), maxDistance: radius + 16, count: 64 }).filter(p => surface(p, 3)).length
   return { biome, snowy, grass, logs, water, animals, buildBlocks, protected: offLimits(agent, bot, here, 0) }
+}
+
+/**
+ * Whether a leg from the bot at `deg` ends (or passes half way and three quarters) over water:
+ * true water, false land, null not loaded. For dryLegHeading.
+ */
+export function legWet (bot: Bot, deg: number, length: number): boolean | null {
+  const p = bot.entity.position
+  let seen = false
+  for (const f of [0.5, 0.75, 1]) {
+    const q = pointAt({ x: p.x, z: p.z }, deg, length * f)
+    const top = surfaceAt(bot, q.x, Math.floor(p.y), q.z)
+    if (!top) continue
+    seen = true
+    if (/water|lava|bubble_column|kelp|seagrass/.test(top.name)) return true
+  }
+  return seen ? false : null
 }
 
 /** Short text of the facts for logs. */

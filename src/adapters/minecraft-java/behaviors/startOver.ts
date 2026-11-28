@@ -7,12 +7,12 @@ import type { Bot } from 'mineflayer'
 import { z, needsSurvival, fmtPos, sleep } from '../../../core/index.ts'
 import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import {
-  startOverStep, chooseHeading, siteVerdict, fallbackOk, betterBest, angleCompass, packValue,
+  startOverStep, chooseHeading, siteVerdict, fallbackOk, betterBest, angleCompass, packValue, dryLegHeading, pointAt,
   type StartOverState, type StepFacts, type SiteFacts
 } from '../../../skills/startOverPlan.ts'
 import {
   startOverConfig, startOverState, saveStartOver, startingOver, beginStartOver, abandonOldBase, noteStartOver,
-  avoidPoints, avoidedAt, lookAround, factsText, HOME_AWAY_KEY
+  avoidPoints, avoidedAt, lookAround, factsText, legWet, HOME_AWAY_KEY
 } from '../../../skills/startOver.ts'
 import { daylightMs, foodPoints } from '../../../skills/trip.ts'
 import { fmtTally } from '../../../skills/containers.ts'
@@ -132,14 +132,17 @@ export const startOverBehavior = defineBehavior({
             return { ok: true, message: v.why }
           }
           case 'leg': {
-            const r = await ctx.act('start_over_leg', { x: step.target.x, z: step.target.z, minutes: s.legMinutes })
+            // around water: the first detour whose leg ends on land
+            const heading = dryLegHeading(st.heading ?? 0, st.fails ?? 0, h => legWet(bot, h, s.legLength))
+            const target = heading === step.heading ? step.target : pointAt(here, heading, s.legLength)
+            const r = await ctx.act('start_over_leg', { x: target.x, z: target.z, minutes: s.legMinutes })
             const moved = (r.data as { moved?: number } | undefined)?.moved ?? 0
             const p = bot.entity.position
             const dist = Math.hypot(p.x - st.origin.x, p.z - st.origin.z)
             st = { ...st, legs: (st.legs ?? 0) + 1, legsSinceTurn: (st.legsSinceTurn ?? 0) + 1, fails: !r.ok && moved < 16 ? (st.fails ?? 0) + 1 : 0, farthest: Math.max(st.farthest ?? 0, dist) }
             save(st)
             looked = null
-            noteStartOver(agent, bot, 'leg', `leg ${st.legs} ${angleCompass(step.heading)}: ${r.message}; ${Math.round(dist)} from the old base`, { ok: r.ok, moved: Math.round(moved), dist: Math.round(dist) })
+            noteStartOver(agent, bot, 'leg', `leg ${st.legs} ${angleCompass(heading)}${heading !== step.heading ? ' (around water)' : ''}: ${r.message}; ${Math.round(dist)} from the old base`, { ok: r.ok, moved: Math.round(moved), dist: Math.round(dist) })
             return r
           }
           case 'turn': {

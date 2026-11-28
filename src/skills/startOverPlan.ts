@@ -322,6 +322,17 @@ export function headingAfterBlock (main: number, fails: number): number {
   return main + DETOURS[(fails - 1) % DETOURS.length]!
 }
 
+/**
+ * The heading for the next leg: from headingAfterBlock(main, fails) on, the first of it and its
+ * 45/90 degree detours whose leg doesn't end (or pass half way) over water, by `wet` (true: water,
+ * false: land, null: not loaded, counts as land). All wet: the first one anyway. Pure.
+ */
+export function dryLegHeading (main: number, fails: number, wet: (deg: number) => boolean | null): number {
+  const first = headingAfterBlock(main, fails)
+  const tries = [first, ...DETOURS.map(d => first + d)]
+  return tries.find(h => wet(h) !== true) ?? first
+}
+
 /** Inside an avoid point's radius (spawn, a village). */
 export function inAvoided (p: XZ, avoid: readonly AvoidPoint[]): AvoidPoint | null {
   return avoid.find(a => Math.hypot(p.x - a.x, p.z - a.z) < a.radius) ?? null

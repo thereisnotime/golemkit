@@ -37,3 +37,10 @@ The bot SHALL walk legs in one heading by day (away from spawn and `startOver.av
 #### Scenario: restart mid-way
 - **WHEN** the bot restarts while travelling
 - **THEN** it carries on with the stored heading and does not set home where it stands
+
+### Requirement: Legs around water
+Each start-over leg SHALL take the first of the main heading and its 45 and 90 degree detours whose leg does not end or pass over open water where the world is loaded.
+
+#### Scenario: lake ahead
+- **WHEN** the leg north ends in a lake and the leg north-east ends on land
+- **THEN** the bot walks the north-east leg

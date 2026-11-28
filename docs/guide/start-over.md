@@ -64,8 +64,10 @@ it was.
 3. **Go.** It picks a heading. That is `startOver.direction` if set. Otherwise it is the compass
    direction whose path stays furthest from world spawn (`spawnRadius`) and the `avoid` points,
    and away from them. Then it walks legs of `legLength` blocks with `travel`, which avoids water
-   and finds its own detours. A leg that gets nowhere turns the next one 45 degrees, then the other
-   way, then 90; after a leg that works it is back on the main heading. It walks by day only. Half
+   and finds its own detours. Before each leg it checks the ground along it. If the leg would end
+   in water, or pass over water half or three quarters of the way, it takes the first 45 or 90
+   degree detour that stays on land. A leg that gets nowhere turns the next one 45 degrees, then
+   the other way, then 90. After a leg that works it is back on the main heading. It walks by day only. Half
    a minute before dark it stops, and at night it digs in (`bunker`, until morning). Meals and
    danger still go first: keep_fed, stay_safe and recover_drops all outrank it.
 4. **Look.** Once it is `minDistance` (500) blocks from the old base and outside the avoid points,

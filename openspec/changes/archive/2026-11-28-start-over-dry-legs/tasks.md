@@ -1,0 +1,2 @@
+- [x] Pure dryLegHeading with tests
+- [x] legWet reads the surface along the leg; the behaviour picks the dry heading
