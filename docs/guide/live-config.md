@@ -236,8 +236,8 @@ can't change their own.
 | `baseSafety.mineKeepClear` | 0–8 | an inside mine starts at least this far from the gate (default 2) |
 | `baseSafety.retireCloseMines` | on/off | an old mine just outside the walls is capped and retired (default on) |
 | `baseSafety.useOutsideMines` | on/off | with minePlacement inside, trips still go down a known mine outside the walls instead of digging one inside (default off) |
-| `baseSafety.floorHoles` | on/off | fill holes in the floor surface inside the walls, dirt in a farm plot (default on) |
 | `baseSafety.floorHoles` | on/off | also fill holes in the floor surface inside the walls; dirt in a farm plot (default on) |
+| `baseSafety.clearFixtures` | on/off | break a torch or flower standing in a hole it fills; off = leave such a spot alone (default on) |
 | `materials.sources` | list of chests / substitutes / craft / nearby / mine / far | [where build and repair materials come from](./base-projects#where-materials-come-from), in this order; leave one out to turn it off (default all six in that order) |
 | `materials.retryMinutes` | 0–1440 | a source that gave nothing of an item is skipped for it this long (default 30; 0 = always retry) |
 | `materials.mineMinutes` | 1–60 | longest trip down its own mine for build blocks (default 6) |

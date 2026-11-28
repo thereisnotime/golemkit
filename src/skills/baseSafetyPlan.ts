@@ -51,10 +51,35 @@ export interface ScanOptions {
   skyDark?: number
   /** Also report holes in the floor surface inside the walls. Default true. */
   floorHoles?: boolean
+  /** A torch or flower standing in a hole is broken so the hole can be filled. Default true (settings baseSafety.clearFixtures). */
+  clearFixtures?: boolean
 }
 
 /** Blocks at floor level that are meant to be open and are no hole: a farm's water. */
 const MEANT_OPEN = /^(water|lava|bubble_column)$/
+/** Open blocks a placed block simply replaces. */
+const REPLACED = /^(air|cave_air|void_air|water|lava|bubble_column|short_grass|grass|tall_grass|fern|large_fern|snow|dead_bush|vine|seagrass|tall_seagrass|fire|soul_fire)$/
+/** Small things that break in one hit and are nobody's build: a torch (often its own, lighting the hole), a flower, a mushroom, a cobweb. */
+const FIXTURE = /^((soul_|redstone_|copper_)?(wall_)?torch|dandelion|poppy|blue_orchid|allium|azure_bluet|[a-z]+_tulip|oxeye_daisy|cornflower|lily_of_the_valley|torchflower|wither_rose|pink_petals|brown_mushroom|red_mushroom|cobweb)$/
+
+/**
+ * What a non-full block in a hole (or a cell a fix wants to fill) is to the filler. Pure.
+ * - `solid`: a full block, nothing to do
+ * - `meant`: water or lava, meant to be open at floor level (a farm's water)
+ * - `open`: air, grass, snow: the block just goes in
+ * - `clear`: a torch or flower: broken first, then filled (clearFixtures on)
+ * - `keep`: anything else not solid (crops, a sapling, a rail, a sign, a button, a pressure
+ *   plate...): somebody put it there on purpose, so it is no hole and is left alone. Placing into
+ *   it fails every time ("wheat is already there"), so it must never be a step.
+ */
+export type HoleCellKind = 'solid' | 'meant' | 'open' | 'clear' | 'keep'
+export function holeCellKind (c: Pick<Cell, 'name' | 'solid'>, clearFixtures = true): HoleCellKind {
+  if (c.solid) return 'solid'
+  if (MEANT_OPEN.test(c.name)) return 'meant'
+  if (REPLACED.test(c.name)) return 'open'
+  if (FIXTURE.test(c.name)) return clearFixtures ? 'clear' : 'keep'
+  return 'keep'
+}
 
 /** A mine the bot dug (stairMine.ts): its entrance and the blocks it dug (stairs, tunnel), as far as known. */
 export interface MineRef { id: string, entrance: Pos, cells: Pos[] }
@@ -89,6 +114,10 @@ export interface FloorHole {
   soil: boolean
   /** It goes deeper than the scan looks: only the top of it is filled. */
   deep: boolean
+  /** Its bottom cell sits on a solid block, so it can be filled bottom up; else only its floor block is plugged (against the floor around it). */
+  supported: boolean
+  /** Cells holding a torch or flower, broken before the fill. */
+  clear: Pos[]
 }
 
 export interface ScanResult {
@@ -196,33 +225,98 @@ export function scanBase (area: BaseArea, look: Look, o: ScanOptions, mines: rea
     const y = area.floorY
     // a mine's stairs inside the walls are capped, not filled
     const mineCols = new Set(mines.flatMap(m => [m.entrance, ...m.cells]).map(p => `${p.x},${p.z}`))
+    const clearOk = o.clearFixtures !== false
     for (let x = area.min.x; x <= area.max.x; x++) {
       for (let z = area.min.z; z <= area.max.z; z++) {
         if (!area.inside(x, z) || mineCols.has(`${x},${z}`)) continue
         const top = at({ x, y, z })
-        if (!top || top.solid || MEANT_OPEN.test(top.name) || seen.has(k({ x, y, z }))) continue
+        if (!top || seen.has(k({ x, y, z }))) continue
+        // crops, a door's bottom, a rail, a sign: not a hole (and the fill could never go in)
+        const kind = holeCellKind(top, clearOk)
+        if (kind === 'solid' || kind === 'meant' || kind === 'keep') continue
         const cells: Pos[] = []
+        const clear: Pos[] = []
         let deep = true
+        let supported = false
         for (let yy = y; yy >= y - o.depth; yy--) {
-          const c = at({ x, y: yy, z })
-          if (!c) break
-          if (c.solid || seen.has(k({ x, y: yy, z }))) { deep = false; break }
-          cells.push({ x, y: yy, z })
+          const p = { x, y: yy, z }
+          const c = at(p)
+          // not loaded, or opening into a dark cavity below: no floor under it to build up from
+          if (!c || seen.has(k(p))) { deep = false; break }
+          const ck = holeCellKind(c, clearOk)
+          if (ck === 'solid') { deep = false; supported = true; break }
+          if (ck === 'keep') { deep = false; break }
+          if (ck === 'clear') clear.push(p)
+          cells.push(p)
         }
-        holes.push({ x, z, cells: cells.reverse(), soil: !!area.soil?.(x, z), deep })
+        holes.push({ x, z, cells: cells.reverse(), soil: !!area.soil?.(x, z), deep, supported, clear })
       }
     }
   }
   return { cavities, threats, holes, unknown, box }
 }
 
-/** The steps for the floor holes: fill each, bottom up (a deep one only its top 3). Pure. */
+/**
+ * The steps for the floor holes. Pure. A hole on solid ground is filled bottom up (each block
+ * goes on the one below). One that opens into a cave, goes deeper than the scan or ends on
+ * something that isn't solid has nothing to build up from: only its floor block is plugged,
+ * placed against the floor around it (what is under the plug is a cavity for the cave fixes).
+ * Pax's holes over the flooded cave under its fortress waited forever on a bottom block with
+ * nothing to place it against.
+ */
 export function planHoleFills (holes: readonly FloorHole[]): FixStep[] {
   return holes.flatMap(h => {
-    const cells = h.deep ? h.cells.slice(-3) : h.cells
+    const cells = h.supported ? h.cells : h.cells.slice(-1)
+    const clear = new Set(h.clear.map(k))
     // the floor block itself in stone (dirt in a farm plot), what is under it with any filler
-    return cells.map((pos, i) => ({ technique: 'seal' as const, action: 'fill' as const, pos, ...(h.soil ? { soil: true } : i === cells.length - 1 ? { floor: true } : {}) }))
+    return cells.map((pos, i) => ({
+      technique: 'seal' as const, action: 'fill' as const, pos,
+      ...(h.soil ? { soil: true } : i === cells.length - 1 ? { floor: true } : {}),
+      ...(clear.has(k(pos)) ? { clear: true } : {})
+    }))
   })
+}
+
+/**
+ * What to do with a fill step given what is in its cell now. Pure. `done` when a full block is
+ * there already, `skip` for a cell holding something that is not ours to break (placing into it
+ * would fail every session), `clear` to break a torch or flower first, `place` otherwise.
+ */
+export function fillStepTarget (c: Pick<Cell, 'name' | 'solid'> | undefined, clearFixtures = true): 'place' | 'clear' | 'skip' | 'done' {
+  if (!c) return 'place'
+  const kind = holeCellKind(c, clearFixtures)
+  if (kind === 'solid') return 'done'
+  if (kind === 'keep') return 'skip'
+  return kind === 'clear' ? 'clear' : 'place'
+}
+
+/** Stone a floor is made of: the top of a hole in the floor gets one of these first. */
+export const FLOOR_STONE = ['cobblestone', 'cobbled_deepslate', 'stone', 'andesite', 'stone_bricks', 'mossy_cobblestone', 'polished_andesite', 'smooth_stone']
+/** Soil for a hole in a farm plot. */
+export const SOIL = ['dirt', 'coarse_dirt', 'rooted_dirt', 'grass_block']
+
+/**
+ * Which carried block fills a cell. Pure. `fillers` are the carried filler blocks (name -> count).
+ * A farm plot hole takes soil first; the floor block of a hole takes floor stone first, then
+ * other stone, dirt, planks and logs last; a block under the floor takes the most plentiful of
+ * stone and dirt, then planks, then logs. Anything solid it carries does in the end: a hole must
+ * not wait for cobblestone that isn't coming.
+ */
+export function pickFiller (fillers: Readonly<Record<string, number>>, want: { soil?: boolean, floor?: boolean } = {}): string | null {
+  const have = Object.entries(fillers).filter(([, n]) => n > 0)
+  if (!have.length) return null
+  const tier = (n: string): number => {
+    if (want.soil && SOIL.includes(n)) return 0
+    if (/_log$|_wood$|_stem$|_hyphae$/.test(n)) return 5
+    if (/_planks$/.test(n)) return 4
+    if (want.floor) {
+      if (FLOOR_STONE.includes(n)) return 1
+      if (SOIL.includes(n) || /^(mud|clay|snow_block)$/.test(n)) return 3
+      return 2
+    }
+    return 2
+  }
+  return have.sort((a, b) => tier(a[0]) - tier(b[0]) || b[1] - a[1] || a[0].localeCompare(b[0]))[0]![0]
 }
 
 /** One line per hole for chat and status. Pure. */
@@ -245,6 +339,8 @@ export interface FixStep {
   soil?: boolean
   /** fill with a stone block if it has one: the top of a hole in the floor. */
   floor?: boolean
+  /** break the torch or flower in the cell first. */
+  clear?: boolean
 }
 
 export interface FixOptions {

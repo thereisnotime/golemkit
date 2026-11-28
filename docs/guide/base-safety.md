@@ -45,9 +45,23 @@ A hole in the floor open to the sky is no cavity (it isn't dark), but the owner 
 and falls in. With `floorHoles` on (default) the scan also lists every open block at floor level
 in a column inside the walls, down to the first solid block (at most `depth`): a farm's water, a
 known mine's stairs (they get a cap) and cells that are part of a cavity (sealed with it) are
-left out. The fix fills each hole from the bottom up, the floor block itself in stone when it
-carries some; in the farm plot base projects keep inside the walls, with dirt. These steps come
-first in the `integrity` project, with the seals.
+left out. So are cells holding something that isn't a full block but is somebody's: crops, a
+sapling, a rail, a sign, a button (a fill could never go in there). Doors, trapdoors, farmland
+and path blocks are full blocks to the scan, so they are never holes.
+
+A hole on solid ground is filled from the bottom up. One that opens into a cave under the floor,
+goes deeper than `depth` or ends on something that isn't solid has nothing to build up from, so
+only its floor block is plugged, placed against the floor around it; what is under the plug is a
+cavity for the cave fixes. A torch or flower standing in a hole (often its own torch, lighting
+the hole bottom as a spawn spot) is broken first (`clearFixtures`, on by default; off leaves such
+a spot alone and doesn't count it as a hole). Any fill step whose cell holds a full block by the
+time it gets there is skipped, and one with nothing to place against yet gets a second go at the
+end of the session, after its neighbours.
+
+The floor block goes in as floor stone when it has some (cobblestone, cobbled deepslate, stone,
+andesite...), taken from its chests when it carries none; otherwise any filler it carries: other
+stone, then dirt, then planks, logs last. A hole in the farm plot base projects keep inside the
+walls gets dirt first. These steps come first in the `integrity` project, with the seals.
 
 ## Fixes
 
@@ -159,6 +173,7 @@ Profile key `baseSafety:` (or `false`), live with `config_set baseSafety.*`:
 | `mineClearance` | 4 | a new mine starts at least this far from the walls |
 | `minePlacement` | outside | outside, inside or either |
 | `floorHoles` | on | also fill holes in the floor surface inside the walls (dirt in a farm plot) |
+| `clearFixtures` | on | break a torch or flower standing in a hole or opening it fills; off = leave the spot alone |
 
 Profile key `deathSpots:` (or `false`): `enabled` (on), `minutes` (10), `radius` (6), `yRange` (4),
 `stepCost` (8).

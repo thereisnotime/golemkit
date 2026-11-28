@@ -50,10 +50,18 @@ After a death the bot SHALL remember the spot as a danger zone of kind `death` w
 
 ### Requirement: Holes in the floor surface are fixed
 With `baseSafety.floorHoles` on (default), the scan SHALL also report every open block at floor
-level in a column inside the walls that is not part of a cavity, a farm's water or a known mine's
-stairs, with the open blocks below it down to the first solid one (at most `depth`), and the
-integrity project SHALL fill them bottom up: the floor block in stone when the bot carries some,
-dirt in the farm plot kept inside the walls.
+level in a column inside the walls that is not part of a cavity, a farm's water, a known mine's
+stairs or a cell holding something placed on purpose that is not a full block (crops, a sapling,
+a rail, a sign, a button), with the open blocks below it down to the first solid one (at most
+`depth`). The integrity project SHALL fill a hole that sits on solid ground bottom up, and SHALL
+only plug the floor block of a hole that opens into a cave, goes deeper than `depth` or ends on a
+block that isn't solid. With `baseSafety.clearFixtures` on (default) a torch or flower in a cell
+to fill SHALL be broken first; off, such a floor cell SHALL not count as a hole. A fill step
+SHALL be dropped when its cell holds a full block or something placed on purpose. The floor block
+SHALL go in as floor stone when the bot carries or stores some, else as any filler it carries
+(other stone, dirt, planks, logs last); a hole in the farm plot kept inside the walls SHALL get
+dirt first. A block with nothing to place against yet SHALL get a second try at the end of the
+session.
 
 #### Scenario: A hole open to the sky
 - **WHEN** a floor block inside the walls is missing and the one below it too, both lit by the sky
@@ -62,6 +70,22 @@ dirt in the farm plot kept inside the walls.
 #### Scenario: Farm plot
 - **WHEN** a cell of the reserved farm plot is empty
 - **THEN** it is filled with dirt, not stone
+
+#### Scenario: A torch in the hole
+- **WHEN** a one-block hole in the floor holds a torch standing on its bottom
+- **THEN** the torch is broken and the hole filled, instead of failing with "torch is already there" every session
+
+#### Scenario: A hole over a cave
+- **WHEN** a hole in the floor runs down into a dark cave under the base
+- **THEN** only its floor block is plugged, against the floor around it, and the cave below is left to the cavity fixes
+
+#### Scenario: Crops at floor level
+- **WHEN** a floor cell inside the walls holds wheat or a rail
+- **THEN** it is not reported as a hole and no fill step targets it
+
+#### Scenario: Out of cobblestone
+- **WHEN** the bot carries spruce logs and dirt but no stone, and its chests hold no cobblestone
+- **THEN** the floor block goes in as dirt rather than waiting for cobblestone
 
 ### Requirement: The bot's own mine goes inside its base under a hatch
 With `baseSafety.minePlacement: inside` (default) a new staircase mine SHALL start inside the base walls, on a straight line of free floor columns clear of the gate by `mineKeepClear`, the farm plot, the workshop and the storage row, preferring a line along a wall. Its first stair steps MAY dig the base's own floor blocks at that line only; the dig keep-out SHALL hold everywhere else. With `mineHatch` the floor cells the stairs cut SHALL get trapdoors after the first trip (crafted from planks or logs when it has none), and a wooden trapdoor hatch SHALL be opened for a trip and closed after it. With `retireCloseMines` a known mine outside the walls within `mineClearance` of them SHALL be capped and retired, also when it is found capped already. A torch, ladder, rail or similar small block standing in a cap cell SHALL be taken out before the cap is placed (when the bot may dig). With `inside` and `useOutsideMines` off (default), a known mine outside the walls SHALL NOT be used for trips, so the next trip digs the inside mine; when no free spot inside is found, a trip MAY still go down such a mine. A retired mine SHALL NOT be reported unsafe by the site check. `outside` SHALL keep the old placement; `either` SHALL try inside first; with no settled base the mine SHALL start near home.

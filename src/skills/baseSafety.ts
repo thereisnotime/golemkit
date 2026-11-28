@@ -7,10 +7,10 @@
 import type { Bot } from 'mineflayer'
 import type { ActionContext, ActionResult, Agent } from '../core/index.ts'
 import { ok, fail, checkAborted, fmtPos, siteBook, baseSafetySettings, type BaseSafetySettings } from '../core/index.ts'
-import { vec } from './world.ts'
-import { placeBlockState } from './placement.ts'
-import { inventoryCounts } from './toolkit.ts'
-import { fillerBlock, isFiller } from './survival.ts'
+import { vec, digBlock } from './world.ts'
+import { placeBlockState, reachToDig, NotPlaceableYet } from './placement.ts'
+import { inventoryCounts, equipFor } from './toolkit.ts'
+import { isFiller } from './survival.ts'
 import { supplyTorches } from './lighting.ts'
 import { craftItem } from './crafting.ts'
 import { takeItemsFromOwnChests } from './containers.ts'
@@ -19,6 +19,7 @@ import { getMines, saveMine } from './stairMine.ts'
 import { capItem, placeCap, type PlacedCap } from './caps.ts'
 import {
   scanBase, planFixes, mineFindings, planMineCaps, retireMine, mineCells, describeCavity, planHoleFills, describeHole,
+  fillStepTarget, pickFiller, FLOOR_STONE, SOIL,
   type Look, type MineRef, type FixStep, type CavityFix, type MineFinding, type ScanResult
 } from './baseSafetyPlan.ts'
 
@@ -66,7 +67,7 @@ export function checkBase (agent: Agent, bot: Bot): BaseCheck | string {
   // a farm plot inside the walls is soil: a hole there is filled with dirt
   const plot = agent.storage.get<{ farm_plot?: { x0: number, z0: number, size: number } }>('projects.spots', {})?.farm_plot
   const area = plot ? { ...base.area, soil: (x: number, z: number) => x >= plot.x0 && x < plot.x0 + plot.size && z >= plot.z0 && z < plot.z0 + plot.size } : base.area
-  const scan = scanBase(area, look, { margin: settings.margin, depth: settings.depth, floorHoles: settings.floorHoles }, refs)
+  const scan = scanBase(area, look, { margin: settings.margin, depth: settings.depth, floorHoles: settings.floorHoles, clearFixtures: settings.clearFixtures }, refs)
   const fixes = planFixes(scan.threats, settings, refs)
   const mines = mineFindings(refs, base.area, look, settings.mineClearance)
   const caps = planMineCaps(mines, settings)
@@ -74,11 +75,19 @@ export function checkBase (agent: Agent, bot: Bot): BaseCheck | string {
   // a torch already standing on the spot is done: the light reading can stay low next to one
   // (Pax's integrity project stalled three sessions on "torch is already there")
   const torchThere = (s: FixStep) => s.action === 'torch' && /(^|_)torch$/.test(look(s.pos)?.name ?? '')
-  const steps = [...caps.steps, ...holeSteps, ...fixes.flatMap(f => f.steps)].filter(s => !torchThere(s)).sort((a, b) => (ORDER[a.technique] ?? 9) - (ORDER[b.technique] ?? 9))
+  // a fill into a cell holding a torch (often its own, lighting the spot) failed every session
+  // with "torch is already there": break it first; crops, a rail or a sign are not ours, so no step
+  const fillable = (s: FixStep): FixStep | null => {
+    if (s.action !== 'fill') return s
+    const t = fillStepTarget(look(s.pos), settings.clearFixtures)
+    return t === 'done' || t === 'skip' ? null : t === 'clear' ? { ...s, clear: true } : s
+  }
+  const steps = [...caps.steps, ...holeSteps, ...fixes.flatMap(f => f.steps)].filter(s => !torchThere(s)).map(fillable).filter((s): s is FixStep => !!s)
+    .sort((a, b) => (ORDER[a.technique] ?? 9) - (ORDER[b.technique] ?? 9))
   const unfixed = [...caps.unfixed, ...fixes.filter(f => f.unfixed).map(f => `${describeCavity(f.cavity)}: ${f.unfixed}`)]
   const lines = [
     ...mines.filter(f => !f.capped).map(f => `mine ${f.mine.id} at ${fmtPos(f.mine.entrance)}: entrance ${f.problem}${f.caps.length ? `, ${f.caps.length} open block${f.caps.length === 1 ? '' : 's'} to cap` : ''}`),
-    ...scan.holes.map(h => `${describeHole(h)}: fill ${h.deep ? Math.min(3, h.cells.length) : h.cells.length}`),
+    ...scan.holes.map(h => `${describeHole(h)}: fill ${h.supported ? h.cells.length : 1}${h.clear.length ? `, break ${h.clear.length} torch or flower first` : ''}`),
     ...fixes.map(f => `${describeCavity(f.cavity)}${f.steps.length ? `: ${stepText(f.steps)}` : ''}${f.unfixed ? `; ${f.unfixed}` : ''}`)
   ]
   if (scan.unknown > 0) lines.push(`${scan.unknown} blocks not loaded (not judged)`)
@@ -104,16 +113,20 @@ function stepText (steps: readonly FixStep[]): string {
 
 type Ctx = Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>
 
-/** Dirt for a hole in a farm plot; stone for the top of a hole in the floor. */
-const SOIL = ['dirt', 'coarse_dirt', 'rooted_dirt', 'grass_block']
-const FLOOR_STONE = ['cobblestone', 'cobbled_deepslate', 'stone', 'andesite', 'stone_bricks', 'mossy_cobblestone']
+/** The filler blocks it carries, name -> count. */
+const carriedFillers = (bot: Bot): Record<string, number> => Object.fromEntries(Object.entries(inventoryCounts(bot)).filter(([k]) => isFiller(k)))
 
-/** Gets filler (its chests first, then crafts nothing: cobblestone and dirt are what it digs anyway); dirt for `soil` of them. */
-async function supplyFiller (ctx: Ctx, need: number, soil = 0): Promise<number> {
+/**
+ * Gets filler from its chests (it crafts nothing: cobblestone and dirt are what it digs anyway):
+ * dirt for `soil` of them, cobblestone for the `floor` blocks when it carries no floor stone, and
+ * cobblestone up to `need` in all. What it carries already counts, whatever it is.
+ */
+async function supplyFiller (ctx: Ctx, need: number, soil = 0, floor = 0): Promise<number> {
   const bot = ctx.bot as Bot
-  const have = () => Object.entries(inventoryCounts(bot)).filter(([k]) => isFiller(k)).reduce((a, [, v]) => a + v, 0)
-  const dirt = () => SOIL.reduce((a, n) => a + (inventoryCounts(bot)[n] ?? 0), 0)
-  if (soil > dirt()) await takeItemsFromOwnChests({ bot, agent: ctx.agent as Agent, signal: ctx.signal }, { dirt: soil - dirt() }, 64).catch(e => { checkAborted(ctx.signal) })
+  const have = () => Object.values(carriedFillers(bot)).reduce((a, v) => a + v, 0)
+  const count = (names: readonly string[]) => names.reduce((a, n) => a + (inventoryCounts(bot)[n] ?? 0), 0)
+  if (soil > count(SOIL)) await takeItemsFromOwnChests({ bot, agent: ctx.agent as Agent, signal: ctx.signal }, { dirt: soil - count(SOIL) }, 64).catch(e => { checkAborted(ctx.signal) })
+  if (floor > count(FLOOR_STONE)) await takeItemsFromOwnChests({ bot, agent: ctx.agent as Agent, signal: ctx.signal }, { cobblestone: floor - count(FLOOR_STONE) }, 64).catch(e => { checkAborted(ctx.signal) })
   if (have() >= need) return have()
   await takeItemsFromOwnChests({ bot, agent: ctx.agent as Agent, signal: ctx.signal }, { cobblestone: need - have() }, 64).catch(e => { checkAborted(ctx.signal) })
   return have()
@@ -156,7 +169,7 @@ export async function secureBase (ctx: Ctx, check: BaseCheck, minutes: number): 
   const torches = check.steps.filter(s => s.action === 'torch').length
   const caps = check.steps.filter(s => s.action === 'cap')
   const notes: string[] = retiredNow.map(id => `retired ${id} (capped already; the next mine goes inside the base)`)
-  if (fills) await supplyFiller(ctx, fills, check.steps.filter(s => s.action === 'fill' && s.soil).length)
+  if (fills) await supplyFiller(ctx, fills, check.steps.filter(s => s.action === 'fill' && s.soil).length, check.steps.filter(s => s.action === 'fill' && s.floor).length)
   if (caps.some(s => s.cap === 'trapdoor')) await supplyTrapdoors(ctx, caps.filter(s => s.cap === 'trapdoor').length)
   if (torches) {
     const t = await supplyTorches(bot, signal, log, Math.min(torches, 16)).catch(e => { checkAborted(signal); return 0 })
@@ -165,15 +178,29 @@ export async function secureBase (ctx: Ctx, check: BaseCheck, minutes: number): 
   const done: Record<string, number> = {}
   const failed: string[] = []
   const capped = new Map<string, { cells: FixStep['pos'][], kind: PlacedCap }>()
-  for (const s of check.steps) {
+  // a block with nothing to place it against yet gets one more go at the end, once its neighbours are in
+  const queue = [...check.steps]
+  const first = queue.length
+  for (let n = 0; n < queue.length; n++) {
+    const s = queue[n]!
     checkAborted(signal)
     if (Date.now() > until) { notes.push(`session over after ${minutes} min`); break }
     try {
       if (s.action === 'fill') {
-        const carried = (names: readonly string[]) => names.find(n => bot.inventory.items().some(i => i.name === n))
-        const f = (s.soil && carried(SOIL)) || (s.floor && carried(FLOOR_STONE)) || fillerBlock(bot)
+        const at = vec(bot, s.pos.x, s.pos.y, s.pos.z)
+        const here = bot.blockAt(at) as unknown as { name: string, boundingBox: string } | null
+        const t = here ? fillStepTarget({ name: here.name, solid: here.boundingBox === 'block' }, check.settings.clearFixtures) : 'place'
+        // filled already (a neighbour's fill, a block it placed earlier) or not ours to break
+        if (t === 'done' || t === 'skip') continue
+        if (t === 'clear' && here) {
+          await reachToDig(bot, at, signal, log)
+          await equipFor(bot, here as never)
+          await digBlock(bot, here as never, signal)
+        }
+        const f = pickFiller(carriedFillers(bot), { soil: !!s.soil, floor: !!s.floor })
         if (!f) { failed.push('out of filler blocks'); break }
-        await placeBlockState(bot, f, vec(bot, s.pos.x, s.pos.y, s.pos.z), undefined, signal, { canDig: false })
+        const r = await placeBlockState(bot, f, at, undefined, signal, { canDig: false })
+        if (!r.ok) throw new Error(`placing ${f} at ${fmtPos(s.pos)} did not take`)
       } else if (s.action === 'torch') {
         if (/(^|_)torch$/.test(bot.blockAt(vec(bot, s.pos.x, s.pos.y, s.pos.z))?.name ?? '')) { done[s.technique] = (done[s.technique] ?? 0) + 1; continue }
         if (!bot.inventory.items().some(i => i.name === 'torch')) { failed.push('out of torches'); continue }
@@ -191,6 +218,7 @@ export async function secureBase (ctx: Ctx, check: BaseCheck, minutes: number): 
       done[s.technique] = (done[s.technique] ?? 0) + 1
     } catch (e) {
       checkAborted(signal)
+      if (e instanceof NotPlaceableYet && n < first) { queue.push(s); continue }
       const msg = (e as Error).message
       if (!failed.includes(msg)) failed.push(msg)
       log.debug('base safety: step failed', { at: fmtPos(s.pos), action: s.action, error: msg })

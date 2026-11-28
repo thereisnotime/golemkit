@@ -2,7 +2,7 @@
 // which of them are threats, the fix techniques and where a mine may start.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { scanBase, planHoleFills, describeHole, planFixes, torchSpots, fillOrder, mineSpotProblem, describeCavity, whereOf, mineFindings, planMineCaps, mineCells, type BaseArea, type Cell, type Pos } from '../src/skills/baseSafetyPlan.ts'
+import { scanBase, planHoleFills, describeHole, holeCellKind, fillStepTarget, pickFiller, planFixes, torchSpots, fillOrder, mineSpotProblem, describeCavity, whereOf, mineFindings, planMineCaps, mineCells, type BaseArea, type Cell, type Pos } from '../src/skills/baseSafetyPlan.ts'
 import { BASE_SAFETY_DEFAULTS, baseSafetySettings, deathSpotsSettings } from '../src/core/baseSafety.ts'
 
 // a 9x9 base (walls on the ring, inside 1..7) with its floor at y 10 on solid stone; open sky above
@@ -216,4 +216,99 @@ test('base safety: a hole down into a tunnel is filled down its lit column, the 
   assert.equal(h.deep, false)
   // the sky-lit column goes down through the tunnel to its floor
   assert.deepEqual(h.cells.map(c => c.y), [6, 7, 8, 9, 10])
+})
+
+// Pax's fortress: floor holes listed for hours and never filled. A torch standing in a hole
+// failed every fill ("torch is already there"), a hole over the flooded cave under the floor
+// waited on a bottom block with nothing to place it against, and the floor block went in as
+// whatever it carried most of (spruce logs) instead of the cobblestone in its chests.
+const withBlocks = (blocks: Record<string, string>, holes: Pos[] = []) => {
+  const base = world(holes)
+  return (p: Pos): Cell => {
+    const n = blocks[key(p)]
+    if (!n) return base(p)
+    return { name: n, solid: false, sky: 15, light: /torch/.test(n) ? 14 : 0 }
+  }
+}
+
+test('floor holes: a torch standing in a hole is broken and the hole filled; off with clearFixtures false', () => {
+  const look = withBlocks({ '3,10,3': 'torch' })
+  const r = scanBase(AREA, look, O)
+  assert.equal(r.holes.length, 1)
+  assert.deepEqual(r.holes[0]!.clear, [{ x: 3, y: 10, z: 3 }])
+  const steps = planHoleFills(r.holes)
+  assert.equal(steps.length, 1)
+  assert.equal(steps[0]!.clear, true)
+  assert.equal(steps[0]!.floor, true)
+  assert.equal(scanBase(AREA, look, { ...O, clearFixtures: false }).holes.length, 0)
+  // a torch at the bottom of a 2-deep hole: cleared on the way up
+  const deeper = scanBase(AREA, withBlocks({ '4,9,4': 'wall_torch' }, [{ x: 4, y: 10, z: 4 }]), O)
+  assert.deepEqual(planHoleFills(deeper.holes).map(s => [s.pos.y, !!s.clear]), [[9, true], [10, false]])
+})
+
+test('floor holes: crops, a rail or a sign at floor level are no hole (a fill could never go in)', () => {
+  const soil = { ...AREA, soil: (x: number, z: number) => x >= 5 && x <= 6 && z >= 5 && z <= 6 }
+  const r = scanBase(soil, withBlocks({ '5,10,5': 'wheat', '2,10,2': 'rail', '3,10,6': 'oak_sign', '6,10,2': 'oak_sapling' }), O)
+  assert.equal(r.holes.length, 0)
+  // grass and snow are replaced like air: still a hole
+  assert.equal(scanBase(AREA, withBlocks({ '3,10,3': 'short_grass', '4,10,4': 'snow' }), O).holes.length, 2)
+})
+
+test('floor holes: one over a cave or deeper than the scan only gets its floor block plugged', () => {
+  // a 3-deep hole at 4,4 straight down into a dark tunnel (y 6 and 7) that the scan reads as dark under it
+  const tunnelCells = tunnel(2, 6, 4, 6)
+  const look = (p: Pos): Cell => {
+    if (p.x === 4 && p.z === 4 && p.y >= 8 && p.y <= 10) return { name: 'air', solid: false, sky: 15 }
+    if (tunnelCells.some(c => key(c) === key(p))) return { name: 'air', solid: false, sky: 0 }
+    return world()(p)
+  }
+  const h = scanBase(AREA, look, O).holes.find(x => x.x === 4 && x.z === 4)!
+  assert.equal(h.supported, false)
+  assert.equal(h.deep, false)
+  const steps = planHoleFills([h])
+  assert.deepEqual(steps.map(s => s.pos.y), [10])
+  assert.equal(steps[0]!.floor, true)
+  // deeper than the scan looks: the top only
+  const deep = scanBase(AREA, world(shaft(3, 3, 0)), { ...O, depth: 4 }).holes[0]!
+  assert.equal(deep.deep, true)
+  assert.equal(deep.supported, false)
+  assert.deepEqual(planHoleFills([deep]).map(s => s.pos.y), [10])
+  // on solid ground: bottom up, as before
+  const ok = scanBase(AREA, world([{ x: 3, y: 10, z: 3 }, { x: 3, y: 9, z: 3 }]), O).holes[0]!
+  assert.equal(ok.supported, true)
+})
+
+test('floor holes: what a fill step does with what is in its cell', () => {
+  assert.equal(holeCellKind({ name: 'water', solid: false }), 'meant')
+  assert.equal(holeCellKind({ name: 'farmland', solid: true }), 'solid')
+  assert.equal(holeCellKind({ name: 'oak_door', solid: true }), 'solid')
+  assert.equal(holeCellKind({ name: 'cave_air', solid: false }), 'open')
+  assert.equal(holeCellKind({ name: 'soul_wall_torch', solid: false }), 'clear')
+  assert.equal(holeCellKind({ name: 'red_tulip', solid: false }), 'clear')
+  assert.equal(holeCellKind({ name: 'torch', solid: false }, false), 'keep')
+  assert.equal(holeCellKind({ name: 'carrots', solid: false }), 'keep')
+  assert.equal(fillStepTarget(undefined), 'place')
+  assert.equal(fillStepTarget({ name: 'cobblestone', solid: true }), 'done')
+  assert.equal(fillStepTarget({ name: 'air', solid: false }), 'place')
+  assert.equal(fillStepTarget({ name: 'water', solid: false }), 'place')
+  assert.equal(fillStepTarget({ name: 'torch', solid: false }), 'clear')
+  assert.equal(fillStepTarget({ name: 'torch', solid: false }, false), 'skip')
+  assert.equal(fillStepTarget({ name: 'powered_rail', solid: false }), 'skip')
+})
+
+test('floor holes: the filler is any solid block it carries, floor stone first for the floor block', () => {
+  // the floor block: cobblestone over the 60 spruce logs it carries
+  assert.equal(pickFiller({ spruce_log: 60, cobblestone: 2, dirt: 10 }, { floor: true }), 'cobblestone')
+  // no floor stone: other stone, then dirt, then planks, logs last
+  assert.equal(pickFiller({ spruce_log: 60, granite: 3, dirt: 10 }, { floor: true }), 'granite')
+  assert.equal(pickFiller({ spruce_log: 60, dirt: 1, spruce_planks: 9 }, { floor: true }), 'dirt')
+  assert.equal(pickFiller({ spruce_log: 60, spruce_planks: 9 }, { floor: true }), 'spruce_planks')
+  assert.equal(pickFiller({ spruce_log: 60 }, { floor: true }), 'spruce_log')
+  // a farm plot hole: soil first, else anything
+  assert.equal(pickFiller({ cobblestone: 30, dirt: 2 }, { soil: true }), 'dirt')
+  assert.equal(pickFiller({ cobblestone: 30 }, { soil: true }), 'cobblestone')
+  // under the floor: the most plentiful of stone and dirt, logs last
+  assert.equal(pickFiller({ cobblestone: 3, dirt: 20, oak_log: 64 }), 'dirt')
+  assert.equal(pickFiller({}), null)
+  assert.equal(pickFiller({ cobblestone: 0 }), null)
 })
