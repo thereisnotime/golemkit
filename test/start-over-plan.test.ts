@@ -209,3 +209,9 @@ test('state machine: snow look after look turns the heading', () => {
   assert.equal(startOverStep(st({ snowyLooks: 3, turns: 2 }), day({ x: 600, z: 0 }), S).do, 'look', 'no turns left')
   assert.equal(startOverStep(st({ snowyLooks: 5 }), day({ x: 600, z: 0 }), startOverSettings({ snowTurnAfter: 0 })).do, 'look')
 })
+
+test('night shelter fallback: protected ground does not count', async () => {
+  const { shelterFallback } = await import('../src/skills/startOverPlan.ts')
+  assert.deepEqual(shelterFallback("can't dig in here (protected area); move away first"), { counts: false, step: 24 })
+  assert.deepEqual(shelterFallback('ground here is too thin or unsafe to dig a shelter'), { counts: true, step: 12 })
+})

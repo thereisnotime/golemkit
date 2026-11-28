@@ -1,0 +1,1 @@
+- [x] shelterFallback (pure) with a test, used by the behaviour

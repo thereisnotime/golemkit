@@ -576,3 +576,12 @@ export function abandonedState (get: (key: string) => unknown, origin: Pos & { d
   if (Object.keys(ladder).length) set.foodLadder = { ...ladder, searches: [] }
   return { set, del }
 }
+
+/**
+ * What to do when digging in for the night failed: in a protected area (world spawn, where it
+ * respawns) it isn't the ground's fault, so it doesn't count towards the 3 tries and it walks 24
+ * blocks on to get out; other failures count and it moves 12 blocks on to try new ground. Pure.
+ */
+export function shelterFallback (message: string): { counts: boolean, step: number } {
+  return /protected area/.test(message) ? { counts: false, step: 24 } : { counts: true, step: 12 }
+}

@@ -7,7 +7,7 @@ import type { Bot } from 'mineflayer'
 import { z, needsSurvival, fmtPos, sleep } from '../../../core/index.ts'
 import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import {
-  startOverStep, chooseHeading, siteVerdict, fallbackOk, betterBest, angleCompass, packValue, dryLegHeading, pointAt,
+  startOverStep, chooseHeading, siteVerdict, fallbackOk, betterBest, angleCompass, packValue, dryLegHeading, pointAt, shelterFallback,
   type StartOverState, type StepFacts, type SiteFacts
 } from '../../../skills/startOverPlan.ts'
 import {
@@ -112,10 +112,14 @@ export const startOverBehavior = defineBehavior({
             const r = await ctx.act('bunker', { untilDay: true, maxMinutes: 15 })
             if (r.ok) { noteStartOver(agent, bot, 'night', r.message); return r }
             if (/already under cover/.test(r.message)) { await sleep(15_000, ctx.signal); return { ok: true, message: 'waiting out the night under cover' } }
-            st = { ...st, shelterFails: (st.shelterFails ?? 0) + 1 }
-            save(st)
-            noteStartOver(agent, bot, 'night', `couldn't dig in (${st.shelterFails}/3): ${r.message}`)
-            if ((st.shelterFails ?? 0) < 3) await ctx.act('start_over_leg', { x: here.x + 12, z: here.z + 12, minutes: 0.5 })
+            // protected ground (world spawn after a death) doesn't count: walk on out of it along the heading
+            const fb = shelterFallback(r.message)
+            if (fb.counts) { st = { ...st, shelterFails: (st.shelterFails ?? 0) + 1 }; save(st) }
+            noteStartOver(agent, bot, 'night', `couldn't dig in${fb.counts ? ` (${st.shelterFails}/3)` : ''}: ${r.message}`)
+            if ((st.shelterFails ?? 0) < 3) {
+              const t = pointAt(here, st.heading ?? 0, fb.step)
+              await ctx.act('start_over_leg', { x: t.x, z: t.z, minutes: 1 })
+            }
             return r
           }
           case 'wait': {
