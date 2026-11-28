@@ -102,7 +102,10 @@ function blockIds (bot: Bot, names: readonly string[]): number[] {
 export function lookAround (agent: Agent, bot: Bot, radius = 32): SiteFacts {
   const here = bot.entity.position.floored()
   const ground = bot.blockAt(here.offset(0, -1, 0)) as (Block & { biome?: { name?: string } }) | null
-  const biome = ground?.biome?.name || null
+  // a server-synced registry (NeoForge) keeps biome names only as keys of biomesByName
+  const byName = (bot.registry as { biomesByName?: Record<string, unknown> }).biomesByName ?? {}
+  const raw = ground?.biome as ({ name?: string, id?: number } | undefined)
+  const biome = raw?.name || (raw ? Object.keys(byName).find(k => byName[k] === raw || (byName[k] as { id?: number } | undefined)?.id === raw.id && raw.id !== undefined) : undefined)?.replace(/^minecraft:/, '') || null
   const snowy = (!!biome && SNOW_RE.test(biome)) || freezes(bot, { x: here.x, y: here.y, z: here.z })
   const surface = (p: { x: number, y: number, z: number }, depth: number) => { const sy = surfaceY(bot, p.x, p.z); return sy === null || sy - p.y <= depth }
   const grassId = bot.registry.blocksByName.grass_block?.id
