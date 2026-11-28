@@ -24,9 +24,10 @@ import { digMineAction } from './stairMine.ts'
 import { getPlaces, setPlace, getHome, sameDimension } from './navigation.ts'
 import { gotoWithin, vec } from './world.ts'
 import { baseAnchored } from '../core/baseAnchored.ts'
+import { TIER_RANK as TIERS_BY_RANK } from './tiers.ts'
 
 export type UpTo = 'stone' | 'iron' | 'diamond'
-const TIER_RANK: Record<string, number> = { none: 0, wooden: 1, stone: 2, iron: 3, diamond: 4, netherite: 5 }
+const TIER_RANK: Record<string, number> = { none: 0, ...TIERS_BY_RANK }
 const HEAD_ITEM: Record<'stone' | 'iron' | 'diamond', string> = { stone: 'cobblestone', iron: 'iron_ingot', diamond: 'diamond' }
 const STONE_HEADS = ['cobblestone', 'cobbled_deepslate', 'blackstone']
 export const ARMOUR: Record<string, number> = { iron_helmet: 5, iron_chestplate: 8, iron_leggings: 7, iron_boots: 4 }

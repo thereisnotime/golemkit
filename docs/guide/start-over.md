@@ -111,7 +111,7 @@ it was.
    there, it tries again up to `settleTries` (5) times before settling where it stands, and only if it never
    looked anywhere does it make home where it stands.
 6. **Settle.** Home goes there, the bed goes down (`place_bed`), a chest goes down (`place_chest`,
-   crafted from planks if needed), and ores and ingots go into the chest. Tools, food, seeds, logs
+   crafted from planks if needed), and the `stash` kinds (gems, metal, ores, redstone and lapis) go into the chest. Tools, food, seeds, logs
    and torches stay on it for the work ahead. It tells the owner where and why. From then on its
    usual behaviours work around the new home as on a new world:
    - keep_spawn_bed sleeps in the bed at night, which sets the spawn point;
@@ -141,7 +141,7 @@ each key live only in those toggle schemas, and the planner reads its settings t
 | `avoid` / `avoidRadius` | [] / 400 | more places to keep away from: `{ name, x, z, radius }`; radius defaults to `avoidRadius` |
 | `take` / `leave` | [] | item names packed first / never |
 | `freeSlots` / `packRadius` / `roomAbove` | 2 / 48 / 24 | slots left free; chests packed from; used slots above which it makes room first |
-| `stash` | [treasure, metal, ore] | pack kinds put into the new chest |
+| `stash` | [gem, metal, ore, dust] | pack kinds (`packKind`) put into the new chest |
 | `minGrass` / `minLogs` / `minWater` / `minAnimals` | 24 / 8 / 1 / 2 | what a good place needs |
 | `maxBuildBlocks` | 6 | somebody's build nearby rules a place out |
 | `badBiomes` | [snowy_\*, frozen_\*, ice_spikes, grove, jagged_peaks] | biomes ruled out (`prefix*`, `*suffix`); `[]` = any biome |

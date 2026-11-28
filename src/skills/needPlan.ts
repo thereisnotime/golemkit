@@ -4,8 +4,9 @@
 import type { SiteVerdict } from '../core/sites.ts'
 import { heldTier, ironChain, chainIngots } from './progression.ts'
 import type { ToolKind } from './toolkit.ts'
+import { TIER_RANK } from './tiers.ts'
 
-const TIER: Record<string, number> = { none: 0, wooden: 1, golden: 1, stone: 2, iron: 3, diamond: 4, netherite: 5 }
+const TIER: Record<string, number> = { none: 0, ...TIER_RANK }
 
 export interface GearState {
   /** Items carried and worn, by name. */

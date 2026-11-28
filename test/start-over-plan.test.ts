@@ -288,7 +288,7 @@ test('a new run id while travelling redirects the run', async () => {
 })
 
 test('ice counts as water for legs', async () => {
-  const { wetTop } = await import('../src/skills/startOverPlan.ts')
+  const { wetTop } = await import('../src/skills/navigation.ts')
   for (const n of ['water', 'ice', 'packed_ice', 'blue_ice', 'kelp']) assert.equal(wetTop(n), true, n)
   for (const n of ['grass_block', 'snow_block', 'snow', 'dirt', 'stone']) assert.equal(wetTop(n), false, n)
 })
@@ -393,4 +393,26 @@ test('base-anchored keys and places come from the modules that own them', async 
   const r = abandonedState(k => store[k], { x: 0, y: 64, z: 0 }, 256, { keys: baseAnchoredKeys(), places: baseAnchoredPlaces() })
   assert.ok(r.del.includes('kiln.state'))
   assert.deepEqual(Object.keys(r.set.places as object).sort(), ['found:iron', 'old_base'])
+})
+
+test('one tier table for gear; the stash comes from the pack kinds', async () => {
+  const { gearRank, packKind, stashPicks, packValue } = await import('../src/skills/startOverPlan.ts')
+  const { TIER_RANK, itemTierRank } = await import('../src/skills/tiers.ts')
+  const { toolTier } = await import('../src/skills/toolkit.ts')
+  assert.equal(gearRank('golden_helmet'), TIER_RANK.golden)
+  assert.ok(gearRank('chainmail_chestplate') > gearRank('golden_chestplate'))
+  assert.equal(gearRank('shears'), 3)
+  assert.equal(itemTierRank('minecraft:diamond_boots'), 4)
+  assert.equal(toolTier('golden_pickaxe', 'pickaxe'), toolTier('wooden_pickaxe', 'pickaxe'), 'toolkit agrees: golden is wooden tier')
+  // iron gear still ranks above the iron it is made of, diamond gear above iron gear
+  assert.ok(packValue('iron_sword', fp)!.value > packValue('iron_ingot', fp)!.value)
+  assert.ok(packValue('diamond_pickaxe', fp)!.value > packValue('iron_pickaxe', fp)!.value)
+  assert.equal(packKind('raw_iron', fp), 'metal')
+  assert.equal(packKind('deepslate_gold_ore', fp), 'ore')
+  assert.equal(packKind('bread', fp), 'food')
+  assert.equal(packKind('dirt', fp), null)
+  const inv = { raw_iron: 5, diamond: 2, redstone: 9, bread: 4, torch: 30, stone_pickaxe: 1, totem_of_undying: 1, dirt: 3 }
+  assert.deepEqual(stashPicks(inv, fp, START_OVER_DEFAULTS.stash), { raw_iron: 5, diamond: 2, redstone: 9 })
+  assert.deepEqual(stashPicks(inv, fp, ['food', 'light']), { bread: 4, torch: 30 })
+  assert.deepEqual(stashPicks(inv, fp, []), {})
 })

@@ -713,7 +713,8 @@ export function ownWork (agent: Agent): ((p: Pos) => boolean) | undefined {
   })
 }
 
-const GRASS = ['short_grass', 'grass', 'tall_grass', 'fern', 'large_fern']
+/** Grass plants (seeds come from these). */
+export const GRASS = ['short_grass', 'grass', 'tall_grass', 'fern', 'large_fern']
 const grassIds = (bot: Bot) => GRASS.map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
 
 /** Seed grass more than this far above or below the bot is left alone (caves, cliffs). */

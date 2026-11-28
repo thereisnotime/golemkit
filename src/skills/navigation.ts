@@ -9,6 +9,7 @@ import {
 import { gotoWithin as walkWithin, GotoTimeoutError } from './world.ts'
 import { prepareTripAction } from './trip.ts'
 import { escapeBox, ShelteredError } from './survival.ts'
+import { surfaceAt } from './food.ts'
 
 export interface Place {
   x: number
@@ -125,6 +126,30 @@ export function findStandable (bot: Bot, x: number, y: number, z: number, span =
     if (isPassable(feet) && isPassable(head)) return { x, y: y + dy, z }
   }
   return null
+}
+
+/** A surface block a walk shouldn't end on: water, lava and ice (frozen oceans and rivers have holes and drowned under them). Pure. */
+export function wetTop (name: string): boolean {
+  return /water|lava|bubble_column|kelp|seagrass|^ice$|packed_ice|blue_ice|frosted_ice/.test(name)
+}
+
+/**
+ * Whether a walk of `length` blocks from the bot at `deg` degrees (east 0, south 90) ends, or
+ * passes half and three quarters of the way, over water, lava or ice (wetTop): true wet, false
+ * land, null not loaded. start_over picks its legs with it.
+ */
+export function legOverWater (bot: Bot, deg: number, length: number): boolean | null {
+  const p = bot.entity.position
+  let seen = false
+  for (const f of [0.5, 0.75, 1]) {
+    const x = Math.round(p.x + Math.cos(deg * Math.PI / 180) * length * f)
+    const z = Math.round(p.z + Math.sin(deg * Math.PI / 180) * length * f)
+    const top = surfaceAt(bot, x, Math.floor(p.y), z)
+    if (!top) continue
+    seen = true
+    if (wetTop(top.name)) return true
+  }
+  return seen ? false : null
 }
 
 /** In water from the blocks at the feet, the head and below, and whether it stands (pure, for tests). */

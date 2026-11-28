@@ -11,6 +11,7 @@
 // (startOverStep). skills/startOver.ts reads the world into these and does the walking.
 
 import { toggleSettings } from '../core/toggles.ts'
+import { itemTierRank } from './tiers.ts'
 
 export interface XZ { x: number, z: number }
 export interface Pos { x: number, y: number, z: number }
@@ -131,7 +132,7 @@ export const START_OVER_DEFAULTS: StartOverSettings = {
   freeSlots: 2,
   packRadius: 48,
   roomAbove: 24,
-  stash: ['treasure', 'metal', 'ore'],
+  stash: ['gem', 'metal', 'ore', 'dust'],
   minGrass: 24,
   minLogs: 8,
   minWater: 1,
@@ -183,7 +184,6 @@ const GEAR_SLOTS: [RegExp, string][] = [
   [/^shield$/, 'shield'], [/^bow$/, 'bow'], [/^crossbow$/, 'crossbow'], [/^fishing_rod$/, 'fishing_rod'],
   [/^shears$/, 'shears'], [/^flint_and_steel$/, 'flint_and_steel'], [/_bed$/, 'bed'], [/^(water_)?bucket$/, 'bucket']
 ]
-const TIER_RANK: Record<string, number> = { netherite: 6, diamond: 5, iron: 4, chainmail: 3, golden: 2, stone: 2, leather: 1, wooden: 1 }
 
 /** The gear slot an item fills (one of each is packed), or null. */
 export function gearSlot (name: string): string | null {
@@ -191,30 +191,38 @@ export function gearSlot (name: string): string | null {
   return null
 }
 
-/** How good a piece of gear is within its slot (netherite 6 .. wooden/leather 1, plain items 3). */
+/** How good a piece of gear is within its slot (tiers.ts: netherite 5 .. wooden/golden/leather 1; items without a tier, like shears or a bucket, 3). */
 export function gearRank (name: string): number {
-  const m = /^([a-z]+)_/.exec(name)
-  return (m && TIER_RANK[m[1]!]) ?? 3
+  return itemTierRank(name) ?? 3
 }
 
-/** Value and how many are worth carrying, for anything that isn't gear. */
-const STOCK: [RegExp, number, number][] = [
-  [/^(netherite_ingot|netherite_scrap|diamond|totem_of_undying|enchanted_golden_apple)$/, 98, 64],
-  [/^(emerald|golden_apple|ender_pearl)$/, 88, 64],
-  [/^(iron_ingot|raw_iron|iron_ore|deepslate_iron_ore|iron_block|raw_iron_block)$/, 80, 128],
-  [/^(diamond_ore|deepslate_diamond_ore|emerald_ore|deepslate_emerald_ore)$/, 80, 16],
-  [/^(gold_ingot|raw_gold|gold_ore|deepslate_gold_ore|gold_block)$/, 66, 64],
-  [/^arrow$|^spectral_arrow$/, 64, 64],
-  [/^(wheat_seeds|beetroot_seeds|carrot|potato|melon_seeds|pumpkin_seeds)$/, 62, 64],
-  [/^torch$/, 60, 64],
-  [/^(coal|charcoal)$/, 58, 64],
-  [/^(redstone|lapis_lazuli|redstone_block|lapis_block|redstone_ore|deepslate_redstone_ore|lapis_ore|deepslate_lapis_ore)$/, 50, 64],
-  [/^(copper_ingot|raw_copper|copper_ore|deepslate_copper_ore)$/, 40, 64],
-  [/^(string|leather|white_wool|[a-z_]+_wool|feather|bone_meal|flint)$/, 34, 32],
-  [/_sapling$/, 32, 16],
-  [/(_log|_wood|_stem)$/, 46, 64],
-  [/^(cobblestone|cobbled_deepslate)$/, 36, 64],
-  [/^(crafting_table|furnace|chest)$/, 30, 1]
+/** What sort of thing an item is for packing and stashing (startOver.stash picks kinds for the new chest). */
+export type PackKind = 'gem' | 'treasure' | 'metal' | 'ore' | 'dust' | 'ammo' | 'seeds' | 'light' | 'fuel' | 'material' | 'plant' | 'wood' | 'stone' | 'block' | 'gear' | 'food'
+
+/** Kind, value and how many are worth carrying, for anything that isn't gear. */
+const STOCK: [RegExp, PackKind, number, number][] = [
+  [/^(netherite_ingot|netherite_scrap|diamond)$/, 'gem', 98, 64],
+  [/^(totem_of_undying|enchanted_golden_apple)$/, 'treasure', 98, 64],
+  [/^emerald$/, 'gem', 88, 64],
+  [/^(golden_apple|ender_pearl)$/, 'treasure', 88, 64],
+  [/^(iron_ingot|raw_iron|iron_block|raw_iron_block)$/, 'metal', 80, 128],
+  [/^(iron_ore|deepslate_iron_ore)$/, 'ore', 80, 128],
+  [/^(diamond_ore|deepslate_diamond_ore|emerald_ore|deepslate_emerald_ore)$/, 'ore', 80, 16],
+  [/^(gold_ingot|raw_gold|gold_block)$/, 'metal', 66, 64],
+  [/^(gold_ore|deepslate_gold_ore)$/, 'ore', 66, 64],
+  [/^arrow$|^spectral_arrow$/, 'ammo', 64, 64],
+  [/^(wheat_seeds|beetroot_seeds|carrot|potato|melon_seeds|pumpkin_seeds)$/, 'seeds', 62, 64],
+  [/^torch$/, 'light', 60, 64],
+  [/^(coal|charcoal)$/, 'fuel', 58, 64],
+  [/^(redstone|lapis_lazuli|redstone_block|lapis_block)$/, 'dust', 50, 64],
+  [/^(redstone_ore|deepslate_redstone_ore|lapis_ore|deepslate_lapis_ore)$/, 'ore', 50, 64],
+  [/^(copper_ingot|raw_copper)$/, 'metal', 40, 64],
+  [/^(copper_ore|deepslate_copper_ore)$/, 'ore', 40, 64],
+  [/^(string|leather|white_wool|[a-z_]+_wool|feather|bone_meal|flint)$/, 'material', 34, 32],
+  [/_sapling$/, 'plant', 32, 16],
+  [/(_log|_wood|_stem)$/, 'wood', 46, 64],
+  [/^(cobblestone|cobbled_deepslate)$/, 'stone', 36, 64],
+  [/^(crafting_table|furnace|chest)$/, 'block', 30, 1]
 ]
 
 export interface PackItem { name: string, count: number }
@@ -237,6 +245,9 @@ export interface PackInput {
 
 export interface PackPick { name: string, count: number, value: number, why: string }
 
+/** What packValue says about an item. */
+export interface PackValue { value: number, cap: number, why: string, kind: PackKind | null }
+
 /** `pattern` matches `name`: exact, prefix* or *suffix. */
 export function nameMatches (pattern: string, name: string): boolean {
   if (pattern.startsWith('*')) return name.endsWith(pattern.slice(1))
@@ -244,21 +255,39 @@ export function nameMatches (pattern: string, name: string): boolean {
   return pattern === name
 }
 
-/** Value (0..100) of one more stack of `name` and the most worth carrying, or null when it stays. Pure. */
-export function packValue (name: string, foodPoints: (name: string) => number, take: readonly string[] = [], leave: readonly string[] = []): { value: number, cap: number, why: string } | null {
+/** The kind of an item by the pack table (gear, food, a STOCK kind), or null for things not worth packing. Pure. */
+export function packKind (name: string, foodPoints: (name: string) => number): PackKind | null {
+  if (gearSlot(name)) return 'gear'
+  for (const [re, kind] of STOCK) if (re.test(name)) return kind
+  return foodPoints(name) > 0 ? 'food' : null
+}
+
+/** Value (0..100) of one more stack of `name`, the most worth carrying and its kind, or null when it stays. Pure. */
+export function packValue (name: string, foodPoints: (name: string) => number, take: readonly string[] = [], leave: readonly string[] = []): PackValue | null {
   if (leave.some(p => nameMatches(p, name))) return null
-  if (take.some(p => nameMatches(p, name))) return { value: 100, cap: Infinity, why: 'on the take list' }
+  const kind = packKind(name, foodPoints)
+  if (take.some(p => nameMatches(p, name))) return { value: 100, cap: Infinity, why: 'on the take list', kind }
   const slot = gearSlot(name)
   if (slot) {
     const r = gearRank(name)
-    if (slot === 'bed') return { value: 90, cap: 1, why: 'bed' }
-    if (slot === 'shield' || slot === 'bow' || slot === 'crossbow') return { value: 85, cap: 1, why: slot }
-    return { value: 50 + r * 8, cap: 1, why: `${slot} (gear)` }
+    if (slot === 'bed') return { value: 90, cap: 1, why: 'bed', kind }
+    if (slot === 'shield' || slot === 'bow' || slot === 'crossbow') return { value: 85, cap: 1, why: slot, kind }
+    return { value: 54 + r * 9, cap: 1, why: `${slot} (gear)`, kind }
   }
-  for (const [re, value, cap] of STOCK) if (re.test(name)) return { value, cap, why: 'stock' }
+  for (const [re, k, value, cap] of STOCK) if (re.test(name)) return { value, cap, why: 'stock', kind: k }
   const fp = foodPoints(name)
-  if (fp > 0) return { value: 60 + Math.min(fp, 8), cap: 64, why: 'food' }
+  if (fp > 0) return { value: 60 + Math.min(fp, 8), cap: 64, why: 'food', kind }
   return null
+}
+
+/** Items (name -> count) of the kinds on startOver.stash: what goes into the new chest on settling. Pure. */
+export function stashPicks (inventory: Record<string, number>, foodPoints: (name: string) => number, stash: readonly string[]): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const [name, n] of Object.entries(inventory)) {
+    const k = packKind(name, foodPoints)
+    if (n > 0 && k && stash.includes(k)) out[name] = n
+  }
+  return out
 }
 
 /**
@@ -278,7 +307,7 @@ export function packPlan (p: PackInput): PackPick[] {
     const s = gearSlot(n)
     if (s && c > 0) bestHeld[s] = Math.max(bestHeld[s] ?? 0, gearRank(n))
   }
-  const cands: { name: string, value: number, cap: number, why: string }[] = []
+  const cands: ({ name: string } & PackValue)[] = []
   for (const [name, n] of Object.entries(p.chests)) {
     if (n <= 0) continue
     const v = packValue(name, p.foodPoints, take, leave)
@@ -793,9 +822,4 @@ export function redirected (st: StartOverState | null | undefined, s: Pick<Start
   const given = s.direction ? compassAngle(s.direction) : null
   const heading = given ?? st.heading
   return { ...st, run: s.run, ...(s.direction ? { direction: s.direction } : {}), heading, tried: heading !== undefined ? [normHeading(heading)] : [], turns: 0, legsSinceTurn: 0, walkedSinceTurn: 0, rejects: 0, fails: 0 }
-}
-
-/** A surface block a leg shouldn't end on: water, lava and ice (frozen oceans and rivers have holes and drowned under them). Pure. */
-export function wetTop (name: string): boolean {
-  return /water|lava|bubble_column|kelp|seagrass|^ice$|packed_ice|blue_ice|frosted_ice/.test(name)
 }

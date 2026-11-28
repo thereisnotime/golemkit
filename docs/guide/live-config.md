@@ -268,7 +268,7 @@ can't change their own.
 | `startOver.freeSlots` | 0–20 | inventory slots left free after packing (default 2) |
 | `startOver.packRadius` | 8–128 | chests within this many blocks of home are packed from (default 48) |
 | `startOver.roomAbove` | 0–36 | with more used inventory slots than this, it first puts what isn't worth packing into the old chests (default 24) |
-| `startOver.stash` | names | pack value kinds put into the new chest when it settles: treasure, metal, ore, ammo, seeds, light, fuel, material, wood, stone, block, gear, food (default treasure, metal, ore) |
+| `startOver.stash` | names | pack kinds put into the new chest when it settles: gem, treasure, metal, ore, dust, ammo, seeds, light, fuel, material, plant, wood, stone, block, gear, food (default gem, metal, ore, dust) |
 | `startOver.minGrass` | 0–1000 | grass blocks within lookRadius a new place needs (default 24) |
 | `startOver.minLogs` | 0–1000 | tree logs within lookRadius a new place needs (default 8) |
 | `startOver.minWater` | 0–100 | open water sources within waterRadius that don't freeze (and ice with iceAsWater) a new place needs (default 1) |

@@ -7,13 +7,14 @@ import type { Block } from 'prismarine-block'
 import { checkAborted, itemName, ok, fail, sleep, type ActionResult } from '../core/index.ts'
 import { craftItem } from './crafting.ts'
 import { countItem } from './world.ts'
+import { TIER_RANK } from './tiers.ts'
 
 export type ToolKind = 'axe' | 'pickaxe' | 'shovel' | 'sword' | 'hoe'
 export type Tier = 'wooden' | 'stone' | 'iron' | 'diamond' | 'netherite'
 
 /** Best first. Golden tools are left out on purpose (they break almost at once). */
 export const TIERS: Tier[] = ['netherite', 'diamond', 'iron', 'stone', 'wooden']
-const RANK: Record<string, number> = { wooden: 1, golden: 1, stone: 2, iron: 3, diamond: 4, netherite: 5 }
+const RANK = TIER_RANK
 
 /** Head material count and sticks per tool kind. */
 export const TOOL_SHAPE: Record<ToolKind, { head: number, sticks: number }> = {

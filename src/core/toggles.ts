@@ -299,7 +299,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'startOver.freeSlots', description: 'inventory slots left free after packing (default 2)', schema: z.number().int().min(0).max(20) },
   { key: 'startOver.packRadius', description: 'chests within this many blocks of home are packed from (default 48)', schema: z.number().int().min(8).max(128) },
   { key: 'startOver.roomAbove', description: 'with more used inventory slots than this, it first puts what isn\'t worth packing into the old chests (default 24)', schema: z.number().int().min(0).max(36) },
-  { key: 'startOver.stash', description: 'pack value kinds put into the new chest when it settles: treasure, metal, ore, ammo, seeds, light, fuel, material, wood, stone, block, gear, food (default treasure, metal, ore)', schema: list },
+  { key: 'startOver.stash', description: 'pack kinds put into the new chest when it settles: gem, treasure, metal, ore, dust, ammo, seeds, light, fuel, material, plant, wood, stone, block, gear, food (default gem, metal, ore, dust)', schema: list },
   { key: 'startOver.minGrass', description: 'grass blocks within lookRadius a new place needs (default 24)', schema: z.number().int().min(0).max(1000) },
   { key: 'startOver.minLogs', description: 'tree logs within lookRadius a new place needs (default 8)', schema: z.number().int().min(0).max(1000) },
   { key: 'startOver.minWater', description: 'open water sources within waterRadius that don\'t freeze (and ice with iceAsWater) a new place needs (default 1)', schema: z.number().int().min(0).max(100) },

@@ -15,13 +15,13 @@ import {
   type Agent, type ActionResult
 } from '../core/index.ts'
 import {
-  startOverSettings, packPlan, siteVerdict, abandonedState, angleCompass, inAvoided, pointAt, wetTop,
+  startOverSettings, packPlan, siteVerdict, abandonedState, angleCompass, inAvoided,
   type StartOverSettings, type StartOverState, type SiteFacts, type AvoidPoint, type Pos
 } from './startOverPlan.ts'
 import { chestView, chestTotals, takeItemsFromOwnChests, fmtTally } from './containers.ts'
 import { foodPoints } from './trip.ts'
 import { getHome, setHome, findStandable, type Place } from './navigation.ts'
-import { surfaceWater, surfaceAt, offLimits, spawnOf, freezes, BUILD } from './food.ts'
+import { surfaceWater, offLimits, spawnOf, freezes, ownWork, BUILD, ICE, GRASS } from './food.ts'
 import { ownBedsNear } from './bed.ts'
 import { vec, reachBlock, digBlock } from './world.ts'
 import { pickupNearby } from './pickup.ts'
@@ -94,7 +94,6 @@ export function abandonOldBase (agent: Agent, origin: StartOverState['origin']):
 
 // ------------------------------------------------------------------ looking at a place
 
-const GRASS_PLANTS = /^(short_grass|grass|tall_grass|fern)$/
 
 function blockIds (bot: Bot, names: readonly string[]): number[] {
   return names.map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
@@ -116,38 +115,23 @@ export function lookAround (agent: Agent, bot: Bot, s: LookSettings): SiteFacts 
   const grassId = bot.registry.blocksByName.grass_block?.id
   const grass = grassId === undefined ? 0 : bot.findBlocks({
     matching: grassId, maxDistance: radius, count: Math.max(s.caps.grass, s.minGrass),
-    useExtraInfo: (b: Block) => { const up = bot.blockAt(b.position.offset(0, 1, 0)); return !!up && (up.name === 'air' || GRASS_PLANTS.test(up.name)) }
+    useExtraInfo: (b: Block) => { const up = bot.blockAt(b.position.offset(0, 1, 0)); return !!up && (up.name === 'air' || GRASS.includes(up.name)) }
   }).length
   // logs under the surface are a mineshaft or a cave, not trees
   const logs = bot.findBlocks({ matching: blockIds(bot, LOGS), maxDistance: radius, count: Math.max(s.caps.logs, s.minLogs) * 2 }).filter(p => surface(p, s.treeDepth)).length
   const waterCount = Math.max(s.caps.water, s.minWater)
   let water = surfaceWater(bot, here, s.waterRadius, waterCount * 3).filter(w => !freezes(bot, w)).length
-  // iceAsWater: frozen water counts too (the cold-farm code breaks the ice and keeps a farm's water open)
+  // iceAsWater: frozen water counts too, as for a farm site on a frozen shore (the cold-farm code breaks the ice and keeps a farm's water open)
   if (s.iceAsWater) {
-    const ice = blockIds(bot, ['ice'])
+    const ice = blockIds(bot, Object.keys(bot.registry.blocksByName).filter(n => ICE.test(n)))
     if (ice.length) water += bot.findBlocks({ matching: ice, maxDistance: s.waterRadius, count: waterCount, useExtraInfo: (b: Block) => bot.blockAt(b.position.offset(0, 1, 0))?.name === 'air' }).length
   }
   const animals = Object.values(bot.entities ?? {}).filter(e => e?.position && ANIMALS.includes(e.name ?? '') && e.position.distanceTo(bot.entity.position) <= s.animalRadius).length
   const buildNames = Object.keys(bot.registry.blocksByName).filter(n => BUILD.test(n))
-  const buildBlocks = bot.findBlocks({ matching: blockIds(bot, buildNames), maxDistance: radius + 16, count: 64 }).filter(p => surface(p, 3)).length
+  // its own work (torches, covers, its farms and base) isn't somebody's build, as for a farm site (food.ts cellKind)
+  const own = ownWork(agent)
+  const buildBlocks = bot.findBlocks({ matching: blockIds(bot, buildNames), maxDistance: radius + 16, count: 64 }).filter(p => surface(p, 3) && !own?.({ x: p.x, y: p.y, z: p.z })).length
   return { biome, cold, grass, logs, water, animals, buildBlocks, protected: offLimits(agent, bot, here, 0) }
-}
-
-/**
- * Whether a leg from the bot at `deg` ends (or passes half way and three quarters) over water or ice:
- * true water, false land, null not loaded. For dryLegHeading.
- */
-export function legWet (bot: Bot, deg: number, length: number): boolean | null {
-  const p = bot.entity.position
-  let seen = false
-  for (const f of [0.5, 0.75, 1]) {
-    const q = pointAt({ x: p.x, z: p.z }, deg, length * f)
-    const top = surfaceAt(bot, q.x, Math.floor(p.y), q.z)
-    if (!top) continue
-    seen = true
-    if (wetTop(top.name)) return true
-  }
-  return seen ? false : null
 }
 
 /** Short text of the facts for logs. */

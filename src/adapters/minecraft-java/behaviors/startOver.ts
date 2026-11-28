@@ -8,16 +8,16 @@ import { z, needsSurvival, fmtPos, sleep } from '../../../core/index.ts'
 import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import {
   startOverStep, chooseHeading, angleCompass, packValue, pointAt, canLeave, goFires, redirected,
-  applyLook, applyLeg, applyTurn, applyLeave, applyDay, applyShelterFail, settleNext,
+  applyLook, applyLeg, applyTurn, applyLeave, applyDay, applyShelterFail, settleNext, stashPicks,
   type StartOverState, type StepFacts, type SiteFacts
 } from '../../../skills/startOverPlan.ts'
 import {
   startOverConfig, startOverState, saveStartOver, startingOver, beginStartOver, abandonOldBase, noteStartOver,
-  avoidPoints, avoidedAt, lookAround, factsText, legWet, HOME_AWAY_KEY
+  avoidPoints, avoidedAt, lookAround, factsText, HOME_AWAY_KEY
 } from '../../../skills/startOver.ts'
 import { daylightMs, foodPoints } from '../../../skills/trip.ts'
 import { fmtTally } from '../../../skills/containers.ts'
-import { getHome, setHome, getPlaces, inWater } from '../../../skills/navigation.ts'
+import { getHome, setHome, getPlaces, inWater, legOverWater } from '../../../skills/navigation.ts'
 import { itemName } from '../../../core/index.ts'
 import { ownerTarget } from './util.ts'
 
@@ -25,8 +25,6 @@ import { ownerTarget } from './util.ts'
 export const START_OVER_SCORE = 58
 /** At night: dig in, like stay_safe's shelter. */
 export const START_OVER_NIGHT_SCORE = 66
-/** Things worth putting in the new chest: ores and ingots (tools, food, seeds, logs, torches stay on it for the work ahead). */
-const STASH = /^(raw_(iron|gold|copper)|(iron|gold|copper|netherite)_ingot|diamond|emerald|redstone|lapis_lazuli|.*_ore)$/
 
 const oldBase = (agent: Parameters<typeof getPlaces>[0]) => getPlaces(agent).old_base ?? null
 
@@ -91,7 +89,7 @@ export const startOverBehavior = defineBehavior({
         if (!night) { const d = applyDay(st); if (d !== st) { st = d; save(st) } }
         const facts: StepFacts = {
           pos: here, isNight: night, daylightMs: light, avoided: avoidedAt(bot, s, here), avoid: avoidPoints(bot, s),
-          wet: h => legWet(bot, h, s.legLength), swimming: inWater(bot), ...(bot.game?.dimension ? { dim: String(bot.game.dimension) } : {})
+          wet: h => legOverWater(bot, h, s.legLength), swimming: inWater(bot), ...(bot.game?.dimension ? { dim: String(bot.game.dimension) } : {})
         }
         if (looked && Math.hypot(looked.x - here.x, looked.z - here.z) < 16) facts.site = looked.facts
         const step = startOverStep(st, facts, s)
@@ -197,8 +195,9 @@ export const startOverBehavior = defineBehavior({
             if (agent.getAction('place_chest')) {
               const c = await ctx.act('place_chest', { range: 6 })
               notes.push(c.message)
-              const stash: Record<string, number> = {}
-              for (const i of bot.inventory.items()) if (STASH.test(itemName(i))) stash[itemName(i)] = (stash[itemName(i)] ?? 0) + i.count
+              const carried: Record<string, number> = {}
+              for (const i of bot.inventory.items()) carried[itemName(i)] = (carried[itemName(i)] ?? 0) + i.count
+              const stash = stashPicks(carried, m => foodPoints(bot, m), s.stash)
               if (c.ok && Object.keys(stash).length && agent.getAction('deposit')) {
                 const d = await ctx.act('deposit', { items: stash })
                 notes.push(d.message)
