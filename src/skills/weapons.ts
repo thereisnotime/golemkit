@@ -14,6 +14,7 @@ import type { Agent } from '../core/index.ts'
 import { aimArrow } from './tactics.ts'
 import { dodgeSettings, type DodgeSettings } from './dodgePlan.ts'
 import { retreatSettings, type RetreatSettings } from './retreatPlan.ts'
+import { enchantsOf } from './enchants.ts'
 
 /** Vanilla 1.21 attack damage and attacks per second. */
 const MELEE: Record<string, { damage: number, speed: number }> = {
@@ -131,7 +132,7 @@ function candidates (bot: Bot): (Candidate & { item: any })[] {
   return bot.inventory.items().flatMap(item => {
     const stats = MELEE[item.name] ?? (/_sword$/.test(item.name) ? { damage: 6, speed: 1.6 } : /_axe$/.test(item.name) ? { damage: 8, speed: 0.9 } : null)
     if (!stats) return []
-    const enchants = ((item as any).enchants ?? []) as { name: string, lvl: number }[]
+    const enchants = enchantsOf(item)
     return [{ name: item.name, ...stats, enchants, item }]
   })
 }

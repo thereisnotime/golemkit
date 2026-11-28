@@ -5,13 +5,14 @@
 import type { Bot } from 'mineflayer'
 import { defineAction, z, ok, fail } from '../core/index.ts'
 import { pickArmor, pickOffhand, armorScore, type ArmorSlot, type ArmorItem } from './tactics.ts'
+import { enchantsOf } from './enchants.ts'
 
 const SLOT_INDEX: Record<ArmorSlot, number> = { head: 5, torso: 6, legs: 7, feet: 8 }
 const OFFHAND = 45
 
 function asArmor (it: any): ArmorItem & { item: any } {
   const max = it.maxDurability
-  return { name: it.name, enchants: it.enchants ?? [], durabilityLeft: max ? max - (it.durabilityUsed ?? 0) : undefined, item: it }
+  return { name: it.name, enchants: enchantsOf(it), durabilityLeft: max ? max - (it.durabilityUsed ?? 0) : undefined, item: it }
 }
 
 export interface GearPlan { armor: Partial<Record<ArmorSlot, string>>, offhand: string | null }

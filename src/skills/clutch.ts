@@ -4,6 +4,7 @@
 import type { Bot } from 'mineflayer'
 import { defineAction, z, ok, fail, sleep, checkAborted } from '../core/index.ts'
 import { clutchDecision, extinguishDecision, fallDamage } from './techniques.ts'
+import { enchantsOf } from './enchants.ts'
 
 const SOFT = /^(water|bubble_column|slime_block|powder_snow|cobweb|ladder|vine|scaffolding|twisting_vines|weeping_vines|hay_block|honey_block)$/
 
@@ -31,7 +32,7 @@ export function burning (bot: Bot): boolean {
 
 function featherFalling (bot: Bot): number {
   const boots = bot.inventory.slots[8] as any
-  return ((boots?.enchants ?? []) as { name: string, lvl: number }[]).find(e => e.name === 'feather_falling')?.lvl ?? 0
+  return enchantsOf(boots).find(e => e.name === 'feather_falling')?.lvl ?? 0
 }
 
 function feetBlock (bot: Bot): any {

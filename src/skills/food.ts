@@ -2,6 +2,7 @@
 // small farm next to water (start_farm) and breed animals (breed). Food spots and farms are
 // remembered in agent.storage (and as named places, so goto_place and farm_loop can use
 // them). The planning parts are pure and live in foodPlan.ts.
+import { enchantsOf } from './enchants.ts'
 import type { Bot } from 'mineflayer'
 import type { Block } from 'prismarine-block'
 import type { Entity } from 'prismarine-entity'
@@ -946,7 +947,7 @@ export function torchesAvailable (bot: Bot): number {
 
 /** Holds a tool without Silk Touch (ice broken with it makes no water), or nothing. */
 export async function holdNoSilk (bot: Bot): Promise<void> {
-  const silk = (i: any) => ((i?.enchants ?? []) as { name: string }[]).some(e => e.name === 'silk_touch')
+  const silk = (i: any) => enchantsOf(i).some(e => e.name === 'silk_touch')
   const pick = bot.inventory.items().find(i => itemName(i).endsWith('_pickaxe') && !silk(i))
   if (pick) { await bot.equip(pick, 'hand'); return }
   if (silk(bot.heldItem)) await bot.unequip('hand').catch(() => {})

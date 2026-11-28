@@ -393,7 +393,8 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         return false
       }
 
-      const timer = setInterval(() => {
+      // one tick: a throw here must never take the bot down (it did once, on a strange item)
+      const reflexTick = (): void => {
         if (!needsSurvival(bot)) return // creative/spectator: no hunger, no danger
         if (isEscaping(bot)) return // leaving a fight (escape.ts): it eats and fights back on its own until it is done
         const { selfDefense, autoEat, eatBelow, retreatBelow } = cfg()
@@ -435,7 +436,8 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         if (autoEat && bot.food < eatBelow && agent.getAction('eat') && bestFood(bot)) void reflex('eat')
         // Eat to heal when hurt and safe (food above 17 doesn't heal faster, but saturation helps).
         else if (autoEat && !mob && bot.health < 14 && bot.food < 20 && agent.getAction('eat') && bestFood(bot)) void reflex('eat')
-      }, 2000)
+      }
+      const timer = setInterval(() => { try { reflexTick() } catch (e) { agent.log.info(`reflexes: tick failed: ${(e as Error).message}`) } }, 2000)
 
       return () => {
         bot.off('entityHurt', onHurt)

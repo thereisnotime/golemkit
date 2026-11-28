@@ -1,6 +1,7 @@
 // Pure combat decisions (no bot, unit-tested): attack cooldown, when to jump for a critical hit,
 // which mob to fight first, when to disengage, which armour to wear and how to aim an arrow.
 // fight() in combat.ts turns these into movement; nothing here touches the world.
+import { enchantList } from './enchants.ts'
 
 /** Vanilla 1.21 attack speed (attacks per second) of what is in the main hand. */
 const SPEED: Record<string, number> = {
@@ -214,7 +215,7 @@ export function armorScore (it: ArmorItem): { slot: ArmorSlot, score: number } |
 }
 
 function prot (it: ArmorItem): number {
-  return (it.enchants ?? []).reduce((n, e) => n + (/protection$/.test(e.name) ? e.lvl * (e.name === 'protection' ? 0.75 : 0.4) : 0), 0)
+  return enchantList(it.enchants).reduce((n, e) => n + (/protection$/.test(e.name) ? e.lvl * (e.name === 'protection' ? 0.75 : 0.4) : 0), 0)
 }
 
 /**

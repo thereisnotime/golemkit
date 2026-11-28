@@ -15,6 +15,7 @@ import { dodgeLayer } from './dodge.ts'
 import { DODGE_DEFAULTS } from './dodgePlan.ts'
 import { bestFood } from './survival.ts'
 import { retreatCheck } from './retreat.ts'
+import { enchantsOf } from './enchants.ts'
 
 export type FightEnd = 'killed' | 'escaped' | 'timeout' | 'gave_up' | 'heal' | 'outnumbered' | 'retarget'
 export interface FightResult {
@@ -594,7 +595,7 @@ const SHIELD_LOWER_MS = 60
 
 /** Sweeping Edge level of the held item (0 without it). */
 function sweepingLevel (bot: Bot): number {
-  const e = ((bot.heldItem as any)?.enchants ?? []) as { name: string, lvl: number }[]
+  const e = enchantsOf(bot.heldItem)
   return e.find(x => x.name === 'sweeping_edge' || x.name === 'sweeping')?.lvl ?? 0
 }
 

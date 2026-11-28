@@ -12,6 +12,7 @@
 //     leaves a cover spot that gets it hit, and blocks arrows with a shield on the way when it has one;
 //   - every shooter and patrol it deals with is remembered as a danger zone (core/danger.ts) for a
 //     few minutes, so scouting and chopping don't walk back into it.
+import { enchantsOf } from './enchants.ts'
 import type { Bot } from 'mineflayer'
 import type { Entity } from 'prismarine-entity'
 import { defineAction, z, ok, fail, goals, isHostile, sleep, checkAborted, dangerMemory, fmtPos, type Agent } from '../core/index.ts'
@@ -386,7 +387,7 @@ function digMsFor (bot: Bot, b: Block): number | null {
   const name = kind ? bestToolIn(items.map(i => i.name), kind) : null
   const tool = name ? items.find(i => i.name === name) : bot.heldItem
   try {
-    const ms = b.digTime(tool?.type ?? null, bot.game?.gameMode === 'creative', false, false, (tool as any)?.enchants ?? [], [])
+    const ms = b.digTime(tool?.type ?? null, bot.game?.gameMode === 'creative', false, false, enchantsOf(tool), [])
     return Number.isFinite(ms) ? ms : null
   } catch { return null }
 }

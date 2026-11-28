@@ -6,6 +6,7 @@ import type { Bot } from 'mineflayer'
 import { Vec3 } from 'vec3'
 import { checkAborted } from '../../core/action.ts'
 import { airPlan, airDone, isIce, waterStepCost, type AirCell, type AirPlan, type V } from '../../skills/airPlan.ts'
+import { enchantsOf } from '../../skills/enchants.ts'
 
 const WATERY = /^(water|bubble_column|kelp|kelp_plant|seagrass|tall_seagrass)$/
 
@@ -100,7 +101,7 @@ function digMs (bot: Bot, block: any, onGround: boolean): number {
   try {
     const tool = bestTool(bot, block)
     const head = bot.inventory.slots[5]
-    const ench = [...(tool?.enchants ?? []), ...((head as any)?.enchants ?? [])]
+    const ench = [...enchantsOf(tool), ...enchantsOf(head)]
     return block.digTime(tool?.type ?? null, false, true, !onGround, ench, bot.entity.effects)
   } catch { return 5000 }
 }
