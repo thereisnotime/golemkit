@@ -278,6 +278,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'respawn.retrySeconds', description: 'ask to respawn again this often while still dead (default 5)', schema: z.number().min(1).max(120) },
   { key: 'respawn.maxTries', description: 'reconnect after this many respawn asks without coming back (default 6)', schema: z.number().int().min(1).max(50) },
   { key: 'pathfinder.thinkTimeoutMs', description: 'how long the pathfinder may plan one path (ms); raise on a loaded machine', schema: z.number().int().min(1000).max(60_000) },
+  { key: 'pathfinder.sprintAbove', description: 'walks only sprint when food is above this; sprinting burns food about ten times faster (default 12; 0 = always sprint)', schema: z.number().min(0).max(20) },
   { key: 'building', description: 'which blueprint to build: library (best saved match) | creative (design a new one) | ask (owner chooses when online)', schema: z.enum(['library', 'creative', 'ask']) },
   { key: 'build.creativeMethod', description: 'creative builds: hand (block by block like a player) | commands (/fill and /setblock when op; shown to other ops) | auto (= hand)', schema: z.enum(['auto', 'hand', 'commands']) },
   { key: 'build.handDelayMs', description: 'pause after each block in a creative hand build (ms, jittered)', schema: z.number().int().min(0).max(5000) },

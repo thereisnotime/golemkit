@@ -150,7 +150,7 @@ export async function travel (bot: Bot, target: { x: number, y?: number, z: numb
     if (!signal.aborted && budgeted?.turnBack && !budgeted.returning) throw new TripTurnBackError(budgeted.turnBack)
     throw e
   } finally {
-    if (mv && saved) { mv.allowSprinting = saved.sprint; mv.liquidCost = saved.liquid }
+    if (mv && saved) { if (opts.walk) mv.allowSprinting = saved.sprint; mv.liquidCost = saved.liquid }
   }
 }
 

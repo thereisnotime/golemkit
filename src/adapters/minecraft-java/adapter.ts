@@ -22,6 +22,7 @@ import { JournalCapture } from './journal-capture.ts'
 import { watchDeaths } from './deaths.ts'
 import { waterStepExclusion, trackOwnAir } from './air.ts'
 import { LIQUID_COST } from '../../skills/airPlan.ts'
+import { sprintAllowed, sprintAbove } from '../../skills/sprintPlan.ts'
 import { resolveViewDistance, viewDistanceChunks } from './viewDistance.ts'
 import { protectFromPathing } from './noBreak.ts'
 import { watchRespawn } from './respawn.ts'
@@ -138,6 +139,14 @@ export class MinecraftJavaAdapter implements GameAdapter {
       moves.exclusionAreasStep.push(deathStepExclusion(agent as never) as any)
       bot.pathfinder.setMovements(moves)
       this.applyPathfinderSettings(bot)
+      // walk, don't sprint, when food is low (sprintPlan.ts, settings pathfinder.sprintAbove)
+      const sprintByFood = () => {
+        const mv = (bot.pathfinder as any).movements
+        if (mv) mv.allowSprinting = sprintAllowed(bot.food, sprintAbove(getPath(agent.settings, 'pathfinder.sprintAbove')))
+      }
+      sprintByFood()
+      bot.on('health', sprintByFood)
+      this.sessionCleanups.push(() => bot.off('health', sprintByFood))
       this.sessionCleanups.push(watchRefusedDigs(bot, (pos) => agent.markProtected(pos)))
       try { this.sessionCleanups.push(this.capture.session(bot)) } catch (e) { agent.log.warn(`journal: ${(e as Error).message}`) }
       for (const fn of [...this.spawnFns]) fn()

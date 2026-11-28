@@ -1,0 +1,3 @@
+- [x] Pure sprintAllowed / sprintAbove with tests
+- [x] Adapter updates movements on health events
+- [x] Toggle and docs

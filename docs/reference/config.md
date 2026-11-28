@@ -137,6 +137,7 @@ table; the same keys work in the profile under `settings:` and live with `!confi
 | `settings.pickup` | the `pickup.*` toggles: [drops it can't reach](../guide/behaviors#collect-drops): after running out of air `maxAirBreaks` times going for a drop (items on the bottom of a lake), pickup_items, collect_drops and recover_items skip that drop and any within `matchRadius` blocks of it for `unreachableMinutes` | `maxAirBreaks: 2` (0 = never give up), `unreachableMinutes: 10`, `matchRadius: 2` |
 | `settings.retreat` | the `retreat.*` toggles: [leaving fights in time](../concepts/world#leaving-fights): the risk estimate, the escape routes and their order, healing and coming back, not fighting in the open when poorly placed | `enabled: true`, `hits: 2`, `floor: 4`, `hysteresis: 4`, `returnAbove: 16`, `routes: [home, pillar, sprint, bunker]`, `avoidFactors: 2` |
 | `settings.pathfinder.thinkTimeoutMs` | planning time per path (ms) | 10000 |
+| `settings.pathfinder.sprintAbove` | walks sprint only above this food level (sprinting burns food about ten times faster); 0 = always | 12 |
 | `settings.world.viewDistance` | chunks around the bot the client asks the server for: `tiny` (6), `short` (8), `normal` (10), `far` (12) or 2–32; the server caps it at its own `view-distance`. Fewer chunks use less memory but the bot sees less far ([memory](../guide/deployment#memory)) | `far` |
 | `settings.road`, `settings.build`, `settings.world.spawnProtection` | [roads](../guide/roads), creative builds, spawn-protection radius | see the toggles |
 

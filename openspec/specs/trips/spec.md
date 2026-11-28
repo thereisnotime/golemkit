@@ -59,3 +59,10 @@ A food trip SHALL need only `trips.foodMinHealth` health (default 6) when the fo
 #### Scenario: hurt but fed
 - **WHEN** health is 6 and food 18
 - **THEN** the food trip waits for health 12
+
+### Requirement: Walk when hungry
+The pathfinder SHALL sprint only while the food bar is above `pathfinder.sprintAbove` (default 12; 0 = always sprint), re-checked whenever health or food changes.
+
+#### Scenario: food trip on a low bar
+- **WHEN** food is 10 and a behaviour walks to a food spot
+- **THEN** the walk does not sprint
