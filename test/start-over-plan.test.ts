@@ -185,3 +185,18 @@ test('leaving the old base: anchored state dropped, world knowledge kept', async
   assert.equal((r.set.foodSpots as unknown[]).length, 1)
   assert.deepEqual(r.set.foodLadder, { searches: [], paused: { farm: 1 } })
 })
+
+test('chests pinned at the old base no longer count', async () => {
+  const { atOldBase } = await import('../src/skills/startOverPlan.ts')
+  const { configuredChests, configuredChestRoles } = await import('../src/skills/containers.ts')
+  const places: Record<string, unknown> = { old_base: { x: 560, y: 68, z: -46 } }
+  assert.equal(atOldBase(places, { x: 559, z: -47 }), true)
+  assert.equal(atOldBase(places, { x: 1559, z: -47 }), false)
+  assert.equal(atOldBase({}, { x: 559, z: -47 }), false)
+  const store = new Map<string, unknown>([['places', places]])
+  const agent = { settings: { storage: { chests: [{ at: [559, 69, -47], role: 'pantry' }, { at: [2000, 64, 0], role: 'gear' }] } }, storage: { get: (k: string, fb?: unknown) => store.has(k) ? store.get(k) : fb } } as never
+  assert.deepEqual(configuredChests(agent), [{ x: 2000, y: 64, z: 0 }])
+  assert.deepEqual(configuredChestRoles(agent).map(c => c.role), ['gear'])
+  store.delete('places')
+  assert.equal(configuredChests(agent).length, 2)
+})

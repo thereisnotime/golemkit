@@ -120,8 +120,8 @@ back to its default on its own when its value is bad.
 - A death on the way sends it back to the world spawn, because its bed is in its bag. The run
   goes on from there with the same heading. recover_drops goes back for its things first, if it
   can.
-- Profile settings pinned to the old base, such as `storage.chests` and keep_fed's `foodPlaces`,
-  stay in the profile. The chest ones are harmless, because chests count only within 48 blocks
-  of home. Drop a `foodPlaces` entry that names an old farm.
+- Chests pinned in the profile (`storage.chests`) within 256 blocks of `old_base` stop counting
+  as its chests. Without that, keep_fed walked straight back to the old pantry. keep_fed's
+  `foodPlaces` stays in the profile, so drop any entry there that names an old farm.
 - The decisions are pure and unit tested in `test/start-over-plan.test.ts`: the settings, the pack
   ranking, the heading, the site verdict, the state machine and the storage clean-up.

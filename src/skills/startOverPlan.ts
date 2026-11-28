@@ -497,6 +497,14 @@ export function betterBest (best: StartOverState['best'], at: Pos, v: SiteVerdic
 
 // ------------------------------------------------------------------ leaving the old base behind
 
+/** Things within this many blocks of the old base belong to it (places, containers, pinned chests). */
+export const OLD_BASE_RADIUS = 256
+
+/** Whether `p` is at the base it left (the place old_base), so pinned chests there don't count. Pure. */
+export function atOldBase (places: Record<string, unknown> | undefined, p: XZ, radius = OLD_BASE_RADIUS): boolean {
+  return near(places?.old_base, p, radius)
+}
+
 /** Storage keys that tie behaviours to the old base and are dropped outright when it leaves. */
 export const ABANDON_KEYS = [
   'projects.spots', 'projects.state', 'farms', 'build.active', 'spawnBed', 'spawnBed.searches', 'woodcutting.searches',
@@ -523,7 +531,7 @@ function near (p: unknown, origin: XZ, radius: number): boolean {
  * own blocks, mines, trees and chests it placed stay: they are filtered by distance from home.
  * Returns the keys to set and the keys to delete. Pure.
  */
-export function abandonedState (get: (key: string) => unknown, origin: Pos & { dim?: string }, radius = 256): { set: Record<string, unknown>, del: string[] } {
+export function abandonedState (get: (key: string) => unknown, origin: Pos & { dim?: string }, radius = OLD_BASE_RADIUS): { set: Record<string, unknown>, del: string[] } {
   const set: Record<string, unknown> = {}
   const del: string[] = ['home', ...ABANDON_KEYS]
   const places: Record<string, unknown> = {}

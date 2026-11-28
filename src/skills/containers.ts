@@ -3,7 +3,8 @@ import type { Block } from 'prismarine-block'
 import type { Item } from 'prismarine-item'
 import { defineSkill, defineAction, z, ok, fail, goals, fmtPos, itemName, checkAborted, sleep, travel, type Agent, type ActionResult } from '../core/index.ts'
 import { vec, reachBlock, within, gotoWithin } from './world.ts'
-import { parseChestList, parseChestRoles, type ChestRole } from './searchPlan.ts'
+import { parseChestRoles, type ChestRole } from './searchPlan.ts'
+import { atOldBase } from './startOverPlan.ts'
 import { isToolOrArmor, planDeposit, depositable, chestTakes, planChestSpot, type DepositChest, type DepositNeeds, type DepositPlan, type TakeChest } from './storagePlan.ts'
 import { craftItem } from './crafting.ts'
 import { ensurePlanks } from './toolkit.ts'
@@ -419,16 +420,16 @@ export function usableChests (agent: Agent): Pos[] {
   return list
 }
 
-/** Chests listed in the profile (storage.chests). */
+/** Chests listed in the profile (storage.chests), except ones at a base it left (start_over: the place old_base). */
 export function configuredChests (agent: Agent): Pos[] {
-  const s = (agent.settings as { storage?: { chests?: unknown } } | undefined)?.storage
-  return parseChestList(s?.chests)
+  return configuredChestRoles(agent).map(({ x, y, z }) => ({ x, y, z }))
 }
 
-/** Chests listed in the profile with their role (the first is the pantry unless roles say otherwise). */
+/** Chests listed in the profile with their role (the first is the pantry unless roles say otherwise), except ones at the old base. */
 export function configuredChestRoles (agent: Agent): (Pos & { role: ChestRole })[] {
   const s = (agent.settings as { storage?: { chests?: unknown } } | undefined)?.storage
-  return parseChestRoles(s?.chests)
+  const places = (agent as { storage?: Agent['storage'] }).storage?.get<Record<string, unknown>>('places', {})
+  return parseChestRoles(s?.chests).filter(c => !atOldBase(places, c))
 }
 
 /** The role of one of its chests: configured ones by the profile, the ones it placed are storage. Null: not one of its chests. */

@@ -44,3 +44,10 @@ Each start-over leg SHALL take the first of the main heading and its 45 and 90 d
 #### Scenario: lake ahead
 - **WHEN** the leg north ends in a lake and the leg north-east ends on land
 - **THEN** the bot walks the north-east leg
+
+### Requirement: Pinned chests at the old base
+Chests listed in settings.storage.chests within 256 blocks of the place `old_base` SHALL not count as its chests (pantry, gear or storage).
+
+#### Scenario: old pantry
+- **WHEN** the profile pins a pantry at the old base and the bot has started over
+- **THEN** keep_fed, trips and deposits ignore that pantry

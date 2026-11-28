@@ -1,0 +1,2 @@
+- [x] atOldBase (pure) and the filter in configuredChestRoles, with tests
+- [x] Docs note
