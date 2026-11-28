@@ -1,5 +1,5 @@
 - [x] 1. Settings through the toggle schemas, avoid toggle, all knobs, badBiomes/badCold/iceAsWater, config.md
-- [ ] 2. Pure applyLook/applyLeg/applyTurn/applyShelterFail/applyLeave/settleNext; turnAfterRejects; turns by best untried heading
+- [x] 2. Pure applyLook/applyLeg/applyTurn/applyShelterFail/applyLeave/settleNext; turnAfterRejects; turns by best untried heading
 - [ ] 3. baseAnchored registry and dropPlaces/dropKeys
 - [ ] 4. Shared tier table, stash from pack kinds, leg water test in navigation, own builds in lookAround
 - [ ] 5. Description, home.away owner, dimensions, reflexes.airShoreRadius, JSDoc and comments

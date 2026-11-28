@@ -336,18 +336,25 @@ export function pointAt (from: XZ, deg: number, distance: number): XZ {
   return { x: Math.round(from.x + Math.cos(deg * DEG) * distance), z: Math.round(from.z + Math.sin(deg * DEG) * distance) }
 }
 
+/** The 8 compass headings in degrees. */
+export const HEADINGS = COMPASS.map((_, i) => i * 45)
+
+/** A heading in whole degrees, 0..359. */
+export function normHeading (deg: number): number {
+  return ((Math.round(deg) % 360) + 360) % 360
+}
+
 /**
- * Which way to go from the old base: the given direction, else the one of 8 compass directions
- * whose path (to `range`) stays furthest from the avoid points (spawn, a village), ties broken by
- * pointing away from the first avoid point. Pure.
+ * Which way to go from `from`: the given direction, else the one of `options` (the 8 compass
+ * directions) whose path (to `range`) stays furthest from the avoid points (spawn, a village),
+ * ties broken by pointing away from the first avoid point. Pure.
  */
-export function chooseHeading (from: XZ, avoid: readonly AvoidPoint[], range: number, direction = ''): number {
+export function chooseHeading (from: XZ, avoid: readonly AvoidPoint[], range: number, direction = '', options: readonly number[] = HEADINGS): number {
   const given = direction ? compassAngle(direction) : null
   if (given !== null) return given
-  let best = 0
+  let best = options[0] ?? 0
   let bestScore = -Infinity
-  for (let i = 0; i < 8; i++) {
-    const deg = i * 45
+  for (const deg of options) {
     // closest approach to each avoid point along the path, relative to its radius
     let score = Infinity
     for (const a of avoid) {
@@ -475,8 +482,10 @@ export interface StartOverState {
   fails?: number
   /** Legs walked. */
   legs?: number
-  /** Times the main heading turned 90 degrees after the range ran out. */
+  /** Times the main heading turned. */
   turns?: number
+  /** Main headings this run has tried (0..359; turnHeading picks among the others). */
+  tried?: number[]
   /** Legs walked since the last turn. */
   legsSinceTurn?: number
   /** Blocks actually walked since the last turn (the range after a turn; short mountain legs count for what they moved). */
@@ -511,6 +520,14 @@ export interface StepFacts {
   site?: SiteFacts | null
   /** In an avoid point's radius. */
   avoided?: boolean
+  /** The places to keep away from (spawn, settings.startOver.avoid): turns are scored against them. */
+  avoid?: readonly AvoidPoint[]
+  /** Whether a leg at a heading ends or passes over water (true), land (false), or isn't loaded (null). */
+  wet?: (deg: number) => boolean | null
+  /** In the water now: every way looks wet from there, so it doesn't turn at an ocean. */
+  swimming?: boolean
+  /** The dimension it is in, when known. */
+  dim?: string
 }
 
 export type StartOverStep =
@@ -519,7 +536,7 @@ export type StartOverStep =
   | { do: 'shelter' }
   | { do: 'wait', why: string }
   | { do: 'look' }
-  | { do: 'leg', heading: number, target: XZ }
+  | { do: 'leg', heading: number, target: XZ, around?: boolean }
   | { do: 'settle', at: Pos, why: string }
   | { do: 'turn', heading: number, why: string }
   | { do: 'give_up', why: string }
@@ -541,14 +558,16 @@ export function startOverStep (st: StartOverState | null | undefined, f: StepFac
   // packing happens at home and leaving right after, so it waits for the morning (home is safe at night)
   if (st.phase === 'packing') return canLeave(f.isNight ? 0 : f.daylightMs, s) ? { do: 'pack' } : { do: 'wait', why: 'leaving at daybreak' }
   if (st.phase === 'settling') return st.target ? { do: 'settle', at: st.target, why: st.target.why } : { do: 'look' }
-  // travelling
+  // travelling: only in the old base's dimension (a portal, or a respawn somewhere odd)
+  if (f.dim && st.origin.dim && dimName(f.dim) !== dimName(st.origin.dim)) return { do: 'wait', why: `in the ${dimName(f.dim)}, the run is in the ${dimName(st.origin.dim)}` }
   // no shelter after shelterTries: wait for the morning where it is (walking at night is how bots die)
   if (f.isNight) return (st.shelterFails ?? 0) >= s.shelterTries ? { do: 'wait', why: 'no shelter tonight, waiting for the morning' } : { do: 'shelter' }
   if (f.daylightMs < s.duskSeconds * 1000) return { do: 'wait', why: 'dusk: digging in once it is dark' }
   const dist = Math.hypot(f.pos.x - st.origin.x, f.pos.z - st.origin.z)
   if (dist >= s.minDistance && !f.avoided) {
     if (s.turnAfterRejects > 0 && (st.rejects ?? 0) >= s.turnAfterRejects && (st.turns ?? 0) < s.maxTurns) {
-      return { do: 'turn', heading: (st.heading ?? 0) + 90, why: `${st.rejects} places in a row no good that way` }
+      const h = turnHeading(st, f.pos, f.avoid ?? [], s)
+      if (h !== null) return { do: 'turn', heading: h, why: `${st.rejects} places in a row no good that way` }
     }
     if (f.site === undefined) return { do: 'look' }
     if (f.site) {
@@ -560,7 +579,8 @@ export function startOverStep (st: StartOverState | null | undefined, f: StepFac
   const used = (st.turns ?? 0) > 0 ? (st.walkedSinceTurn ?? (st.legsSinceTurn ?? 0) * s.legLength) + s.minDistance : dist
   if (used >= s.maxDistance) {
     if (st.best?.fallback) return { do: 'settle', at: st.best, why: `best place within ${s.maxDistance} blocks: ${st.best.why}` }
-    if ((st.turns ?? 0) < s.maxTurns) return { do: 'turn', heading: (st.heading ?? 0) + 90, why: `nothing good within ${s.maxDistance} blocks that way` }
+    const h = (st.turns ?? 0) < s.maxTurns ? turnHeading(st, f.pos, f.avoid ?? [], s) : null
+    if (h !== null) return { do: 'turn', heading: h, why: `nothing good within ${s.maxDistance} blocks that way` }
     // out of turns: the best place it looked at beats wherever it happens to stand (a mountain top)
     if (st.best) return { do: 'settle', at: st.best, why: `nothing good after ${(st.turns ?? 0) + 1} directions, the best place seen: ${st.best.why}` }
     return { do: 'give_up', why: `nothing good within ${s.maxDistance} blocks after ${(st.turns ?? 0) + 1} directions` }
@@ -568,9 +588,96 @@ export function startOverStep (st: StartOverState | null | undefined, f: StepFac
   return leg(st, f, s)
 }
 
+/**
+ * The next leg: the main heading (or its detour after blocked legs), around water by `f.wet` (the
+ * first detour that stays on land). Water all round from land (an ocean): turn to the best untried
+ * dry heading while turns are left, else swim the main one.
+ */
 function leg (st: StartOverState, f: StepFacts, s: StartOverSettings): StartOverStep {
-  const heading = headingAfterBlock(st.heading ?? 0, st.fails ?? 0, s.detours)
-  return { do: 'leg', heading, target: pointAt(f.pos, heading, s.legLength) }
+  const main = headingAfterBlock(st.heading ?? 0, st.fails ?? 0, s.detours)
+  const dry = f.wet ? dryLegHeading(st.heading ?? 0, st.fails ?? 0, f.wet, s.detours) : main
+  if (dry === null && !f.swimming && (st.turns ?? 0) < s.maxTurns) {
+    const h = turnHeading(st, f.pos, f.avoid ?? [], s, f.wet)
+    if (h !== null) return { do: 'turn', heading: h, why: `water all the way ${angleCompass(main)}` }
+  }
+  const heading = dry ?? main
+  return { do: 'leg', heading, target: pointAt(f.pos, heading, s.legLength), ...(heading !== main ? { around: true } : {}) }
+}
+
+/** "minecraft:the_nether" -> "the_nether". */
+function dimName (d: string): string {
+  return d.replace(/^minecraft:/, '')
+}
+
+/** Whether a dimension is one a start-over may run in (startOver.dimensions). Pure. */
+export function dimensionOk (dim: string | undefined, s: Pick<StartOverSettings, 'dimensions'>): boolean {
+  return !dim || s.dimensions.some(d => dimName(d) === dimName(dim))
+}
+
+/**
+ * The heading for a turn: the best of the compass headings this run hasn't tried (and, with
+ * `wet`, that don't end in water), scored like chooseHeading against the avoid points plus the
+ * old base (out to minDistance), over the length a new way gets. Null when none is left. Pure.
+ */
+export function turnHeading (st: Pick<StartOverState, 'tried' | 'heading' | 'origin'>, from: XZ, avoid: readonly AvoidPoint[], s: Pick<StartOverSettings, 'minDistance' | 'maxDistance'>, wet?: (deg: number) => boolean | null): number | null {
+  const tried = new Set((st.tried ?? [st.heading ?? 0]).map(normHeading))
+  if (st.heading !== undefined) tried.add(normHeading(st.heading))
+  const options = HEADINGS.filter(h => !tried.has(h) && (!wet || wet(h) !== true))
+  if (!options.length) return null
+  const points = [...avoid, { x: st.origin.x, z: st.origin.z, radius: s.minDistance, name: 'old base' }]
+  return chooseHeading(from, points, Math.max(64, s.maxDistance - s.minDistance), '', options)
+}
+
+// ------------------------------------------------------------------ what a step leaves behind
+
+/** After a look: the best place so far and the rejects in a row. Pure. */
+export function applyLook (st: StartOverState, at: Pos, f: SiteFacts, s: StartOverSettings): { state: StartOverState, verdict: SiteVerdict } {
+  const v = siteVerdict(f, s)
+  return { state: { ...st, best: betterBest(st.best, at, v, fallbackOk(f, s)), rejects: v.ok ? 0 : (st.rejects ?? 0) + 1 }, verdict: v }
+}
+
+/** After a leg: counts, the range walked since the last turn, and blocked legs in a row (a failed leg that moved under blockedMoved). Pure. */
+export function applyLeg (st: StartOverState, r: { ok: boolean, moved: number, dist: number }, s: Pick<StartOverSettings, 'blockedMoved'>): StartOverState {
+  return {
+    ...st,
+    legs: (st.legs ?? 0) + 1,
+    legsSinceTurn: (st.legsSinceTurn ?? 0) + 1,
+    walkedSinceTurn: (st.walkedSinceTurn ?? 0) + r.moved,
+    fails: !r.ok && r.moved < s.blockedMoved ? (st.fails ?? 0) + 1 : 0,
+    farthest: Math.max(st.farthest ?? 0, r.dist)
+  }
+}
+
+/** After a turn: the new heading, tried, a fresh range, detours and rejects. Pure. */
+export function applyTurn (st: StartOverState, heading: number): StartOverState {
+  const tried = [...new Set([...(st.tried ?? (st.heading !== undefined ? [normHeading(st.heading)] : [])), normHeading(heading)])]
+  return { ...st, heading, tried, turns: (st.turns ?? 0) + 1, legsSinceTurn: 0, walkedSinceTurn: 0, fails: 0, rejects: 0 }
+}
+
+/** Leaving the old base: travelling on `heading` with everything counted from zero. Pure. */
+export function applyLeave (st: StartOverState, heading: number, packed: Record<string, number>): StartOverState {
+  return { ...st, phase: 'travelling', heading, tried: [normHeading(heading)], packed, legs: 0, fails: 0, turns: 0, legsSinceTurn: 0, walkedSinceTurn: 0, farthest: 0, rejects: 0, best: undefined, settleFails: 0 }
+}
+
+/** By day the night's failed bunkers are forgotten (the same state when there are none). Pure. */
+export function applyDay (st: StartOverState): StartOverState {
+  return st.shelterFails ? { ...st, shelterFails: 0 } : st
+}
+
+/**
+ * A bunker failed (shelterFallback): the state with the try counted (unless protected ground), and
+ * how far to walk on along the heading before trying again (0: it has used its shelterTries and
+ * waits for the morning). Pure.
+ */
+export function applyShelterFail (st: StartOverState, message: string, s: Pick<StartOverSettings, 'shelterStep' | 'protectedStep' | 'shelterTries'>): { state: StartOverState, counts: boolean, step: number } {
+  const fb = shelterFallback(message, s)
+  const state = fb.counts ? { ...st, shelterFails: (st.shelterFails ?? 0) + 1 } : st
+  return { state, counts: fb.counts, step: (state.shelterFails ?? 0) < s.shelterTries ? fb.step : 0 }
+}
+
+/** The walk to the settle target failed `left` blocks short: retry later (counted), or settle where it stands. Pure. */
+export function settleNext (st: StartOverState, left: number, s: Pick<StartOverSettings, 'settleTries' | 'settleNear'>): { do: 'retry', state: StartOverState } | { do: 'here' } {
+  return settleRetry(st.settleFails ?? 0, left, s) ? { do: 'retry', state: { ...st, settleFails: (st.settleFails ?? 0) + 1 } } : { do: 'here' }
 }
 
 /** The best place so far after looking at one: higher score wins, fallback-worthy ones over others. Pure. */
@@ -688,7 +795,8 @@ export function settleRetry (fails: number, distance: number, s: Pick<StartOverS
 export function redirected (st: StartOverState | null | undefined, s: Pick<StartOverSettings, 'go' | 'run' | 'direction'>): StartOverState | null {
   if (!st || !s.go || !s.run || st.phase !== 'travelling' || (st.run ?? '') === s.run) return null
   const given = s.direction ? compassAngle(s.direction) : null
-  return { ...st, run: s.run, ...(s.direction ? { direction: s.direction } : {}), heading: given ?? st.heading, turns: 0, legsSinceTurn: 0, walkedSinceTurn: 0, rejects: 0, fails: 0 }
+  const heading = given ?? st.heading
+  return { ...st, run: s.run, ...(s.direction ? { direction: s.direction } : {}), heading, tried: heading !== undefined ? [normHeading(heading)] : [], turns: 0, legsSinceTurn: 0, walkedSinceTurn: 0, rejects: 0, fails: 0 }
 }
 
 /** A surface block a leg shouldn't end on: water, lava and ice (frozen oceans and rivers have holes and drowned under them). Pure. */

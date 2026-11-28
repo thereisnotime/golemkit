@@ -180,7 +180,8 @@ test('state machine: range used up: best fallback, else turn, else give up', () 
   assert.equal(startOverStep(st({ best }), far, S).do, 'settle')
   const turn = startOverStep(st({ best: { ...best, fallback: false } }), far, S)
   assert.equal(turn.do, 'turn')
-  if (turn.do === 'turn') assert.equal(turn.heading, 90)
+  // away from the old base, not back and not the way it came
+  if (turn.do === 'turn') assert.ok(['se', 'ne'].includes(angleCompass(turn.heading)), angleCompass(turn.heading))
   // after a turn the range counts the legs since
   assert.equal(startOverStep(st({ turns: 1, legsSinceTurn: 2 }), far, S).do, 'leg')
   // the range after a turn counts blocks walked, not legs (short mountain legs)
@@ -290,4 +291,88 @@ test('ice counts as water for legs', async () => {
   const { wetTop } = await import('../src/skills/startOverPlan.ts')
   for (const n of ['water', 'ice', 'packed_ice', 'blue_ice', 'kelp']) assert.equal(wetTop(n), true, n)
   for (const n of ['grass_block', 'snow_block', 'snow', 'dirt', 'stone']) assert.equal(wetTop(n), false, n)
+})
+
+test('turns: the best untried heading against the avoid points and the old base', async () => {
+  const { turnHeading, applyTurn } = await import('../src/skills/startOverPlan.ts')
+  // heading north (270) 600 blocks north of the old base, spawn to the east
+  const cur = st({ heading: 270 })
+  const spawn = { x: 400, z: -600, radius: 300, name: 'spawn' }
+  const h = turnHeading(cur, { x: 0, z: -600 }, [spawn], S)!
+  assert.ok(['w', 'nw'].includes(angleCompass(h)), angleCompass(h))
+  // every heading tried: none left
+  assert.equal(turnHeading(st({ heading: 0, tried: [0, 45, 90, 135, 180, 225, 270, 315] }), { x: 0, z: 0 }, [], S), null)
+  // wet headings are left out
+  const dry = turnHeading(cur, { x: 0, z: -600 }, [], S, d => d !== 0)
+  assert.equal(dry, 0)
+  // a turn remembers the headings tried and starts a fresh range
+  const t = applyTurn(st({ heading: 270, rejects: 3, fails: 2, walkedSinceTurn: 300, turns: 0 }), 180)
+  assert.deepEqual(t.tried, [270, 180])
+  assert.deepEqual([t.turns, t.rejects, t.fails, t.walkedSinceTurn, t.heading], [1, 0, 0, 0, 180])
+  // a second turn doesn't pick a tried heading
+  const again = turnHeading(t, { x: -300, z: -600 }, [], S)!
+  assert.ok(![270, 180].includes(again))
+})
+
+test('state machine: an ocean ahead turns from land, swims on from the water', () => {
+  const allWet = () => true
+  const t = startOverStep(st({ heading: 180 }), day({ x: 100, z: 0 }, { wet: allWet }), S)
+  assert.equal(t.do, 'leg', 'water everywhere: no dry heading to turn to either, so it swims')
+  const someDry = (d: number) => d !== 90
+  const o = startOverStep(st({ heading: 180 }), day({ x: 100, z: 0 }, { wet: (d: number) => [180, 225, 135, 270, 90].includes(((d % 360) + 360) % 360) ? true : !someDry(d) }), S)
+  assert.equal(o.do, 'turn')
+  if (o.do === 'turn') assert.ok(![180, 225, 135, 270, 90].includes(o.heading))
+  assert.equal(startOverStep(st({ heading: 180 }), day({ x: 100, z: 0 }, { wet: allWet, swimming: true }), S).do, 'leg')
+  assert.equal(startOverStep(st({ heading: 180, turns: 2 }), day({ x: 100, z: 0 }, { wet: allWet }), S).do, 'leg', 'no turns left')
+  // around a lake: the first dry detour, marked
+  const lake = startOverStep(st({ heading: 0 }), day({ x: 100, z: 0 }, { wet: (d: number) => d === 0 }), S)
+  if (lake.do === 'leg') { assert.equal(lake.heading, 45); assert.equal(lake.around, true) } else assert.fail(lake.do)
+})
+
+test('state machine: waits outside the old base dimension; dimensions setting', async () => {
+  const { dimensionOk } = await import('../src/skills/startOverPlan.ts')
+  const w = startOverStep(st({ origin: { ...origin, dim: 'overworld' } }), day({ x: 100, z: 0 }, { dim: 'minecraft:the_nether' }), S)
+  assert.equal(w.do, 'wait')
+  assert.equal(startOverStep(st({ origin: { ...origin, dim: 'overworld' } }), day({ x: 100, z: 0 }, { dim: 'minecraft:overworld' }), S).do, 'leg')
+  assert.equal(dimensionOk('minecraft:the_nether', S), false)
+  assert.equal(dimensionOk('overworld', S), true)
+  assert.equal(dimensionOk('the_nether', startOverSettings({ dimensions: ['overworld', 'the_nether'] })), true)
+})
+
+test('step results: look, leg, leave, day, bunker, settle', async () => {
+  const { applyLook, applyLeg, applyLeave, applyDay, applyShelterFail, settleNext } = await import('../src/skills/startOverPlan.ts')
+  // looks: rejects in a row for any reason, reset by a good one; best kept
+  let a = applyLook(st({}), { x: 600, y: 64, z: 0 }, { ...GOOD, animals: 0 }, S)
+  assert.equal(a.state.rejects, 1)
+  a = applyLook(a.state, { x: 700, y: 64, z: 0 }, { ...GOOD, biome: 'desert' }, { ...S, badBiomes: ['desert'] })
+  assert.equal(a.state.rejects, 2)
+  assert.equal(a.state.best!.x, 600, 'the fallback-worthy place stays the best')
+  assert.equal(applyLook(a.state, { x: 800, y: 64, z: 0 }, GOOD, S).state.rejects, 0)
+  // legs: a failed leg that moved under blockedMoved is blocked
+  const l = applyLeg(st({ fails: 1 }), { ok: false, moved: 10, dist: 300 }, S)
+  assert.deepEqual([l.fails, l.legs, l.walkedSinceTurn, l.farthest], [2, 1, 10, 300])
+  assert.equal(applyLeg(st({ fails: 1 }), { ok: false, moved: 40, dist: 300 }, S).fails, 0)
+  assert.equal(applyLeg(st({ fails: 1 }), { ok: false, moved: 40, dist: 300 }, { blockedMoved: 64 }).fails, 2)
+  // leaving resets everything and remembers the heading as tried
+  const lv = applyLeave(st({ phase: 'packing', rejects: 4, turns: 2 }), 90, { diamond: 2 })
+  assert.deepEqual([lv.phase, lv.heading, lv.tried, lv.rejects, lv.turns, lv.packed], ['travelling', 90, [90], 0, 0, { diamond: 2 }])
+  // day: the night's bunker count goes
+  const n = st({ shelterFails: 2 })
+  assert.equal(applyDay(n).shelterFails, 0)
+  const d0 = st({})
+  assert.equal(applyDay(d0), d0)
+  // bunkers: counted tries walk shelterStep on until shelterTries, protected ground doesn't count
+  let b = applyShelterFail(st({}), 'ground too thin', S)
+  assert.deepEqual([b.counts, b.step, b.state.shelterFails], [true, 12, 1])
+  b = applyShelterFail(st({ shelterFails: 2 }), 'ground too thin', S)
+  assert.deepEqual([b.step, b.state.shelterFails], [0, 3], 'out of tries: waits')
+  b = applyShelterFail(st({ shelterFails: 2 }), "can't dig in here (protected area)", { ...S, protectedStep: 40 })
+  assert.deepEqual([b.counts, b.step, b.state.shelterFails], [false, 40, 2])
+  // settle: retry a far target settleTries times, then here
+  const r = settleNext(st({ settleFails: 1 }), 500, S)
+  assert.equal(r.do, 'retry')
+  if (r.do === 'retry') assert.equal(r.state.settleFails, 2)
+  assert.equal(settleNext(st({ settleFails: 5 }), 500, S).do, 'here')
+  assert.equal(settleNext(st({}), 30, S).do, 'here')
+  assert.equal(settleNext(st({}), 30, { settleTries: 5, settleNear: 10 }).do, 'retry')
 })

@@ -294,7 +294,7 @@ can't change their own.
 | `startOver.fallback.grass` | 0–1000 | grass a place needs to be the fallback once the range is used up (default 8) |
 | `startOver.fallback.logs` | 0–1000 | logs a place needs to be the fallback once the range is used up (default 4) |
 | `startOver.turnAfterRejects` | 0–20 | places looked at and rejected in a row (for any reason) after which it turns (0 = never; default 3) |
-| `startOver.maxTurns` | 0–7 | turns of 90 degrees after the range runs out, an ocean, or rejects in a row, before making do (default 2) |
+| `startOver.maxTurns` | 0–7 | turns (to the best heading not tried yet, away from the avoid points and the old base) after the range runs out, an ocean, or rejects in a row, before making do (default 2) |
 | `startOver.duskSeconds` | 0–600 | stop walking this long before dark and dig in once night falls (default 30) |
 | `startOver.leaveDaylightSeconds` | 0–1200 | pack and leave only with at least this much daylight left; else wait at home for the morning (default 120) |
 | `startOver.shelterTries` | 0–20 | failed bunkers in a night before it waits for the morning where it stands (default 3) |

@@ -67,10 +67,11 @@ it was.
    direction whose path stays furthest from world spawn (`spawnRadius`) and the `avoid` points,
    and away from them. Then it walks legs of `legLength` blocks with `travel`, which avoids water
    and finds its own detours. Before each leg it checks the ground along it. If the leg would end
-   in water or on ice (frozen oceans have holes and drowned under them), or pass over water half or three quarters of the way, it takes the first 45 or 90
-   degree detour that stays on land. If there is none (an ocean ahead), it turns 90 degrees
-   instead of swimming. A leg that gets nowhere turns the next one 45 degrees, then
-   the other way, then 90. After a leg that works it is back on the main heading. It walks by day only. `duskSeconds`
+   in water or on ice (frozen oceans have holes and drowned under them), or pass over water half or
+   three quarters of the way, it takes the first of the `detours` (45 then 90 degrees either side)
+   that stays on land. If there is none (an ocean ahead) and it stands on land, it turns instead
+   of swimming. A leg that gets nowhere (a failed leg that moved under `blockedMoved` blocks)
+   makes the next one take the next detour. After a leg that works it is back on the main heading. It walks by day only. `duskSeconds`
    (30) before dark it stops, and at night it digs in (`bunker`, until morning). If that fails
    on protected ground (world spawn after a death), it walks `protectedStep` (24) blocks on and tries again; other
    failures move it `shelterStep` (12) blocks on, and after `shelterTries` (3) of those it waits for the morning where it is. Meals and
@@ -93,7 +94,11 @@ it was.
    mountains don't use it up. At `maxDistance` (1500) without a good place, it settles at the best place it looked
    at, if that place had at least `fallback.grass` grass and `fallback.logs` logs and wasn't in a
    bad biome, protected or built on.
-   Otherwise it turns 90 degrees and tries that way for the same length, up to `maxTurns` times.
+   Otherwise it turns and tries that way for the same length, up to `maxTurns` times.
+
+   Every turn (the range, an ocean, rejects in a row) picks among the compass headings the run
+   hasn't tried yet (and, at an ocean, the dry ones) the one whose path stays furthest from the
+   avoid points and the old base, the same way the first heading was picked.
    After that it settles at the best place it looked at even if it failed the rules. If it can't walk
    there, it tries again up to `settleTries` (5) times before settling where it stands, and only if it never
    looked anywhere does it make home where it stands.

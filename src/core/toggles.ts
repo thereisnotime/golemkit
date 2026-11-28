@@ -325,7 +325,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'startOver.fallback.grass', description: 'grass a place needs to be the fallback once the range is used up (default 8)', schema: z.number().int().min(0).max(1000) },
   { key: 'startOver.fallback.logs', description: 'logs a place needs to be the fallback once the range is used up (default 4)', schema: z.number().int().min(0).max(1000) },
   { key: 'startOver.turnAfterRejects', description: 'places looked at and rejected in a row (for any reason) after which it turns (0 = never; default 3)', schema: z.number().int().min(0).max(20) },
-  { key: 'startOver.maxTurns', description: 'turns of 90 degrees after the range runs out, an ocean, or rejects in a row, before making do (default 2)', schema: z.number().int().min(0).max(7) },
+  { key: 'startOver.maxTurns', description: 'turns (to the best heading not tried yet, away from the avoid points and the old base) after the range runs out, an ocean, or rejects in a row, before making do (default 2)', schema: z.number().int().min(0).max(7) },
   { key: 'startOver.duskSeconds', description: 'stop walking this long before dark and dig in once night falls (default 30)', schema: z.number().min(0).max(600) },
   { key: 'startOver.leaveDaylightSeconds', description: 'pack and leave only with at least this much daylight left; else wait at home for the morning (default 120)', schema: z.number().min(0).max(1200) },
   { key: 'startOver.shelterTries', description: 'failed bunkers in a night before it waits for the morning where it stands (default 3)', schema: z.number().int().min(0).max(20) },
