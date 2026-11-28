@@ -123,6 +123,15 @@ in a cave under the base doesn't fence off the base above, where the bot respawn
 
 A second death in the same spot extends the zone.
 
+## Respawning
+
+A dead bot asks the server to respawn as soon as its health reads 0, also when it logs in already
+dead (health 0 at login, which otherwise leaves it on the death screen with nothing running). It
+logs `dead at login (health 0), respawning` or `dead (health 0), respawning`, then `respawned`.
+While it stays dead it asks again every `respawn.retrySeconds` (default 5); after
+`respawn.maxTries` asks (default 6) it reconnects. `respawn: false` turns this off (mineflayer's
+own single ask on the death event still happens).
+
 ## Settings
 
 Profile key `baseSafety:` (or `false`), live with `config_set baseSafety.*`:

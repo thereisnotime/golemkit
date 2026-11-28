@@ -22,6 +22,7 @@ import { unknownKeys } from './schemaKeys.ts'
 import { NeedsSettingsSchema, IdleSettingsSchema, SitesSettingsSchema, IDLE_MODES } from './needs.ts'
 import { ProjectsSettingsSchema } from './projects.ts'
 import { BaseSafetySettingsSchema, DeathSpotsSettingsSchema } from './baseSafety.ts'
+import { RespawnSettingsSchema } from './respawnPlan.ts'
 import { MaterialSourcesSettingsSchema } from './materialSources.ts'
 
 export const LlmProfileSchema = z.object({
@@ -121,6 +122,8 @@ export const ProfileSchema = z.object({
   baseSafety: z.union([z.literal(false), BaseSafetySettingsSchema]).optional().describe('base safety: find and fix caves, holes and mine entrances mobs can use; false = off'),
   /** Death spots: keep out of the spot it just died in for a while. false turns it off. Lands in settings.deathSpots. */
   deathSpots: z.union([z.literal(false), DeathSpotsSettingsSchema]).optional().describe('avoid the spot of a recent death for a while; false = off'),
+  /** Respawning by itself when dead, also when it logs in dead. false turns it off. Lands in settings.respawn. */
+  respawn: z.union([z.literal(false), RespawnSettingsSchema]).optional().describe('respawn by itself when dead (also when it logs in dead); false = off'),
   /** Material sources (docs/guide/base-projects.md#where-materials-come-from): where build and repair blocks come from, in order. Lands in settings.materials. */
   materials: MaterialSourcesSettingsSchema.optional().describe('where build and repair materials come from: chests, substitutes, craft, nearby, mine, far (in order)'),
   persona: z.string().optional(),
@@ -309,6 +312,7 @@ export function parseProfile (text: string, name = 'profile', file = '(inline)')
   if (profile.baseSafety !== undefined) settings.baseSafety = profile.baseSafety === false ? { enabled: false } : { ...(settings.baseSafety as object | undefined), ...profile.baseSafety }
   if (profile.materials !== undefined) settings.materials = { ...(settings.materials as object | undefined), ...profile.materials }
   if (profile.deathSpots !== undefined) settings.deathSpots = profile.deathSpots === false ? { enabled: false } : { ...(settings.deathSpots as object | undefined), ...profile.deathSpots }
+  if (profile.respawn !== undefined) settings.respawn = profile.respawn === false ? { enabled: false } : { ...(settings.respawn as object | undefined), ...profile.respawn }
   if (profile.building) settings.building = profile.building
   if (profile.worldedit !== undefined) settings.worldedit = { ...(settings.worldedit as object | undefined), ...(typeof profile.worldedit === 'boolean' ? { enabled: profile.worldedit } : profile.worldedit) }
   if (profile.blueprints) {

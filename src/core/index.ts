@@ -73,6 +73,10 @@ export {
   type SafetyTechnique, type CapKind, type MinePlacement, type BaseSafetySettings, type DeathSpotsSettings
 } from './baseSafety.ts'
 export {
+  RespawnSettingsSchema, RESPAWN_DEFAULTS, RESPAWN_INITIAL, respawnSettings, respawnDecision, respawnObserve,
+  type RespawnSettings, type RespawnState, type RespawnAction
+} from './respawnPlan.ts'
+export {
   MATERIAL_SOURCES, MATERIAL_SOURCES_DEFAULTS, MaterialSourcesSettingsSchema, materialSourcesSettings,
   type MaterialSource, type MaterialSourcesSettings
 } from './materialSources.ts'

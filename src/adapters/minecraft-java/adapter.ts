@@ -24,6 +24,7 @@ import { waterStepExclusion, trackOwnAir } from './air.ts'
 import { LIQUID_COST } from '../../skills/airPlan.ts'
 import { resolveViewDistance, viewDistanceChunks } from './viewDistance.ts'
 import { protectFromPathing } from './noBreak.ts'
+import { watchRespawn } from './respawn.ts'
 import './types.ts'
 
 type EventName = keyof AdapterEvents
@@ -107,6 +108,12 @@ export class MinecraftJavaAdapter implements GameAdapter {
     this.platform.afterPlugins?.(bot, { ...ctx, settings: agent.settings })
     // mineflayer copies every entity's air into bot.oxygenLevel; keep the bot's own (air.ts)
     this.sessionCleanups.push(trackOwnAir(bot))
+    // off the death screen, also when it logs in dead (respawn.ts, settings.respawn)
+    this.sessionCleanups.push(watchRespawn(bot, {
+      log: agent.log,
+      settings: () => getPath(agent.settings, 'respawn'),
+      reconnect: (why) => { if (this.bot === bot) { try { bot.quit(why) } catch {} } }
+    }))
     bot.once('login', () => this.platform.onLogin?.(bot, { ...ctx, settings: agent.settings }))
 
     bot.once('spawn', () => {

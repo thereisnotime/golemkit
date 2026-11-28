@@ -1,0 +1,4 @@
+- [x] Pure planner `respawnDecision` / `respawnObserve` with per-key settings fallback
+- [x] Adapter watcher from login on, with log lines and reconnect as last resort
+- [x] Profile key, toggles, docs (base-safety guide, config reference, live config)
+- [x] Unit tests

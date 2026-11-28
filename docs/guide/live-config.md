@@ -242,6 +242,9 @@ can't change their own.
 | `deathSpots.enabled` | on/off | keep out of the spot of a recent death (default on) |
 | `deathSpots.minutes` | 0.5–240 | how long (default 10) |
 | `deathSpots.stepCost` | 0–50 | extra path cost per block inside a death spot (default 8; 0 = paths ignore it) |
+| `respawn.enabled` | on/off | respawn by itself when dead, also when it logs in dead (default on) |
+| `respawn.retrySeconds` | 1–120 | ask to respawn again this often while still dead (default 5) |
+| `respawn.maxTries` | 1–50 | reconnect after this many asks without coming back (default 6) |
 | `humanize.enabled` | on/off | player-like reaction and typing delays |
 | `humanize.typoRate` | 0–1 | chance of a typo per message |
 | `humanize.lowercase` | on/off | write chat in lower case |
