@@ -62,4 +62,7 @@ test('starving: no trip to a food place 3500 blocks away; a near one is fine', (
   assert.equal(planFood({ ...pax, knownPlace: { name: 'farm', distance: 80 } }, opts).step, 'trip')
   // not starving: the far place is still worth a trip by day
   assert.equal(planFood({ ...pax, food: 12, starving: false }, opts).step, 'trip')
+  // food 7 with starvingRangeAt 8: no trip either (Pax set off at 7 and turned back at 6 within seconds)
+  assert.notEqual(planFood({ ...pax, food: 7, starving: false }, { ...opts, starvingRangeAt: 8 }).step, 'trip')
+  assert.equal(planFood({ ...pax, food: 9, starving: false }, { ...opts, starvingRangeAt: 8 }).step, 'trip')
 })

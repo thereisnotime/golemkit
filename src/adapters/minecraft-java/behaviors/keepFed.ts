@@ -184,7 +184,8 @@ const options = z.object({
   fish: z.boolean().default(true).describe('fish at open water near home when it has a fishing rod or can make one (2 string, 3 sticks; from its chests too)'),
   fishRange: z.number().min(8).max(96).default(48).describe('how far from home it looks for open water to fish'),
   eatRottenAt: z.number().min(0).max(20).default(6).describe('food at or below this with nothing better carried: eat rotten flesh (0 = never)'),
-  starvingRange: z.number().min(16).max(10_000).default(96).describe('food at or below 6: its farm, remembered spots and known food places further than this are skipped for the closest sure food (fish, hunt, chests)'),
+  starvingRangeAt: z.number().min(0).max(20).default(8).describe('food at or below this: only food within starvingRange counts (its farm, spots, known places further out are skipped)'),
+  starvingRange: z.number().min(16).max(10_000).default(96).describe('food at or below starvingRangeAt: its farm, remembered spots and known food places further than this are skipped for the closest sure food (fish, hunt, chests)'),
   report: z.boolean().default(true).describe('when food is critical (6 or less) or every ring came up empty and nothing works, whisper the owner how far it looked and what would help (at most once an hour)')
 })
 

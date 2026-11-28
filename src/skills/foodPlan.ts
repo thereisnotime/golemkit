@@ -600,6 +600,8 @@ export interface FoodStepOptions {
   eatRottenAt?: number
   /** Food at or below `critical`: its farm, remembered spots and known places further than this are skipped for the closest sure food (default: no limit here; keep_fed's default is 96). */
   starvingRange?: number
+  /** Food at or below this applies starvingRange (default: `critical`; keep_fed's default is 8, since a trip started at 7 turns back at the trip food floor of 6 within seconds). */
+  starvingRangeAt?: number
 }
 
 export interface FoodDecision {
@@ -709,7 +711,8 @@ export function planFood (w: FoodWorld, o: FoodStepOptions, tried: ReadonlySet<F
   // starving at night: its own farm, a chest or a spot close to home is worth the dark (starving is certain harm, the dark only likely)
   const nearRing = o.riskyRingsFrom ?? RISKY_RINGS_FROM
   // starving: the closest sure food, not a long walk that eats the rest (Pax, 28 Nov 2026: food 6, set off for a village 3500 blocks away)
-  const close = (d: number) => !critical || o.starvingRange === undefined || d <= o.starvingRange
+  const nearOnly = (w.food ?? 20) <= (o.starvingRangeAt ?? (o.critical ?? 6))
+  const close = (d: number) => !nearOnly || o.starvingRange === undefined || d <= o.starvingRange
   const mayGo = (d: number) => (!far(d) || dayOrBold || (critical && d <= nearRing * 2)) && (!far(d) || !w.danger) && close(d)
   const fishNow = !!o.fish && w.fishDistance != null && (dayOrBold || critical) && !w.danger && close(w.fishDistance)
   const huntable = w.animals > 0 || (!!w.starving && (w.herd ?? 0) > 0)

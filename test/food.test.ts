@@ -309,7 +309,7 @@ test('keep_fed: after the 250 ring it walks to a known village (foodPlaces) befo
   const inv = [{ name: 'wheat_seeds', count: 5, type: mcData.itemsByName.wheat_seeds.id }]
   const pos: any = { x: 0, y: 64, z: 0, distanceTo: () => 0, offset: () => pos, floored: () => pos, clone: () => ({ set: () => pos }) }
   const bot: any = {
-    food: 8, health: 12, entity: { position: pos }, registry: mcData, time: { timeOfDay: 2000 }, game: { dimension: 'minecraft:overworld' },
+    food: 10, health: 12, entity: { position: pos }, registry: mcData, time: { timeOfDay: 2000 }, game: { dimension: 'minecraft:overworld' },
     inventory: { items: () => inv, emptySlotCount: () => 30 }, entities: {}, findBlock: () => null, findBlocks: () => []
   }
   const actions = ['eat', 'hunt', 'smelt', 'craft', 'harvest', 'goto', 'find_food', 'start_farm']

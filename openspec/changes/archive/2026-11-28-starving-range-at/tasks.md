@@ -1,0 +1,2 @@
+- [x] planFood option starvingRangeAt, keep_fed default 8
+- [x] Tests, docs

@@ -363,11 +363,15 @@ SHALL NOT rule a farm site out as somebody's build. A site ruled out for a build
 - **THEN** the site is not ruled out as somebody's build
 
 ### Requirement: Starving takes the closest sure food
-With food at or below the critical level (6), keep_fed SHALL skip its farm, remembered food spots and known food places further than `starvingRange` (default 96 blocks) and use near sources (chests, crops in range, hunting in range, fishing near home) instead.
+With food at or below `starvingRangeAt` (keep_fed default 8), keep_fed SHALL skip its farm, remembered food spots and known food places further than `starvingRange` (default 96 blocks) and use near sources (chests, crops in range, hunting in range, fishing near home) instead.
 
 #### Scenario: a village 3500 blocks away
 - **WHEN** food is 5, the inner rings came up empty and the only known place is a village 3500 blocks away
 - **THEN** keep_fed does not start a trip there
+
+#### Scenario: one above critical
+- **WHEN** food is 7 and the only known place is 3500 blocks away
+- **THEN** keep_fed does not start a trip there (it would turn back at the trip food floor of 6)
 
 ### Requirement: Rotten flesh as a last resort
 With food at or below `eatRottenAt` (default 6; 0 turns it off) and no better food carried, keep_fed SHALL eat rotten flesh it carries.

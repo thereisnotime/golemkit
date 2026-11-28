@@ -786,7 +786,7 @@ flowchart TB
   (sprinting burns food about ten times faster) and paths around water where it can; when it
   still runs out of air it gets air (up, through ice or to an opening, see [air](/concepts/world#air)) before heading for dry land. Berry bushes (and kelp, with a
   furnace) count as food up to 64 blocks out.
-  **Starving** (food 6 or less): the closest sure food comes first. Its farm, remembered spots and
+  **Starving** (food at or below `starvingRangeAt`, default 8): the closest sure food comes first. Its farm, remembered spots and
   known food places further than `starvingRange` (default 96) from it are skipped, so it fishes,
   hunts and empties its chests instead of setting off on a long trip (Pax at food 6 set off for a
   village 3500 blocks away). A search that ran out of air or never got going is not remembered as
@@ -1652,7 +1652,8 @@ Looks after food on its own, climbing a ladder when hungry (or hurt and too hung
 | `fish` | boolean | `true` | fish at open water near home when it has a fishing rod or can make one (2 string, 3 sticks; from its chests too) |
 | `fishRange` | number (8..96) | `48` | how far from home it looks for open water to fish |
 | `eatRottenAt` | number (0..20) | `6` | food at or below this with nothing better carried: eat rotten flesh (0 = never) |
-| `starvingRange` | number (16..10000) | `96` | food at or below 6: its farm, remembered spots and known food places further than this are skipped for the closest sure food (fish, hunt, chests) |
+| `starvingRangeAt` | number (0..20) | `8` | food at or below this: only food within starvingRange counts (its farm, spots, known places further out are skipped) |
+| `starvingRange` | number (16..10000) | `96` | food at or below starvingRangeAt: its farm, remembered spots and known food places further than this are skipped for the closest sure food (fish, hunt, chests) |
 | `report` | boolean | `true` | when food is critical (6 or less) or every ring came up empty and nothing works, whisper the owner how far it looked and what would help (at most once an hour) |
 
 ### `recover_drops`
