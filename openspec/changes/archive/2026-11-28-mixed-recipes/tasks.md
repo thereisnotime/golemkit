@@ -1,0 +1,2 @@
+- [x] pure src/skills/mixedRecipe.ts with tests
+- [x] craftItem and the crafting table use it; planks from logs on a shortfall

@@ -7,6 +7,7 @@ import { stationSpotBlocked, leaveSpawnPoint, inSpawnProtection, refusedPlacemen
 import { makeRoom, dropsNear } from './efficiency.ts'
 import { pickupNearby } from './pickup.ts'
 import { inWater, reachDryLand } from './navigation.ts'
+import { mixFor } from './mixedRecipe.ts'
 
 const TABLE_SEARCH = 16
 const FURNACE_SEARCH = 32
@@ -167,14 +168,16 @@ async function getTable (bot: Bot, signal: AbortSignal): Promise<{ table: Block,
   const near = bot.findBlock({ matching: tableId, maxDistance: TABLE_SEARCH })
   if (near) return { table: near, placed: false }
   if (!findItem(bot, 'crafting_table')) {
-    let r = bot.recipesFor(bot.registry.itemsByName.crafting_table.id, null, 1, null)[0]
+    const tableItem = bot.registry.itemsByName.crafting_table.id
+    const tableRecipe = () => bot.recipesFor(tableItem, null, 1, null)[0] ?? mixFor(bot.recipesAll(tableItem, null, false), id => bot.inventory.count(id, null)).recipe ?? undefined
+    let r = tableRecipe()
     if (!r) {
       // logs but too few planks: one log makes the 4 planks a table takes (the mine trip came up with 6 logs and 2 planks and stopped here)
       const log = bot.inventory.items().find(i => /_(log|stem)$/.test(i.name) && !i.name.startsWith('stripped_'))
       const planks = log && bot.registry.itemsByName[log.name.replace(/_(log|stem)$/, '_planks')]
       const pr = planks ? bot.recipesFor(planks.id, null, 1, null)[0] : undefined
       if (pr) { await bot.craft(pr, 1).catch(() => {}); await sleep(SETTLE_MS, signal) }
-      r = bot.recipesFor(bot.registry.itemsByName.crafting_table.id, null, 1, null)[0]
+      r = tableRecipe()
     }
     if (!r) return 'needs a crafting table and there is none nearby (and no planks to make one)'
     await bot.craft(r, 1)
@@ -211,6 +214,44 @@ export async function emptyCraftGrid (bot: Bot): Promise<number> {
   return moved
 }
 
+/** "planks" for a group of oak_planks, spruce_planks, ...: the common suffix, else the first names. */
+function groupName (bot: Bot, ids: readonly number[]): string {
+  const ns = ids.map(id => bot.registry.items[id]?.name ?? String(id))
+  const tail = ns[0]?.split('_').pop() ?? ''
+  return tail && ns.every(n => n.endsWith(`_${tail}`) || n === tail) ? tail : ns.slice(0, 3).join(' / ')
+}
+
+/**
+ * Short of a tag group (planks) with what makes a member of it in hand (logs): makes that member
+ * in the inventory grid first, enough for the shortfall. True when it made something. Pax had
+ * logs and failed a chest for want of planks.
+ */
+async function craftShortfall (bot: Bot, signal: AbortSignal, variants: any[]): Promise<boolean> {
+  const have = (id: number) => bot.inventory.count(id, null)
+  const { short } = mixFor(variants, have)
+  const exactShort = short.length ? short : (() => {
+    const best = rankRecipes(variants, have)[0]
+    return best ? missingFor(best.delta, have).map(m => ({ alts: [m.id], need: m.need })) : []
+  })()
+  let made = false
+  for (const s of exactShort) {
+    // the member it can make the most of from the inventory alone
+    const options = s.alts.flatMap(id => bot.recipesFor(id, null, 1, null).map(r => ({ id, r, runs: maxCrafts(r.delta, have) }))).filter(o => o.runs > 0)
+      .sort((a, b) => b.runs - a.runs)
+    const o = options[0]
+    if (!o) continue
+    const runs = Math.min(o.runs, craftsNeeded(s.need, o.r.result.count))
+    for (let i = 0; i < runs; i++) {
+      checkAborted(signal)
+      try { await bot.craft(o.r, 1) } catch { break }
+      await sleep(SETTLE_MS, signal)
+      made = true
+    }
+  }
+  if (made) await emptyCraftGrid(bot)
+  return made
+}
+
 /**
  * Crafts `count` of an item from the inventory (the craft action's body, for other actions to
  * reuse inside their own lock). Uses a nearby crafting table or puts one down when needed.
@@ -224,10 +265,20 @@ export async function craftItem (bot: Bot, signal: AbortSignal, item: string, co
 
   let table: Block | null = null
   let placed = false
-  let recipes = bot.recipesFor(def.id, null, 1, null)
+  // the exact-variant recipes it can make, else a mix of a tag's members (any planks for a chest)
+  const runnable = (withTable: boolean): typeof all => {
+    const exact = bot.recipesFor(def.id, null, 1, withTable ? true : null)
+    if (exact.length) return exact
+    const m = mixFor(all.filter(r => withTable || !r.requiresTable), have)
+    return m.recipe ? [m.recipe] : []
+  }
+  let recipes = runnable(false)
+  if (!recipes.length && !runnable(true).length && await craftShortfall(bot, signal, all)) recipes = runnable(false)
   if (!recipes.length) {
-    recipes = bot.recipesFor(def.id, null, 1, true)
+    recipes = runnable(true)
     if (!recipes.length) {
+      const mix = mixFor(all, have)
+      if (mix.short.length) return fail(`missing ingredients for ${item}: need ${mix.short.map(s => `${s.need} more of any ${groupName(bot, s.alts)}`).join(', ')}`)
       const best = rankRecipes(all, have)[0]!
       return fail(`missing ingredients for ${item}: need ${names(bot, missingFor(best.delta, have))}`)
     }
@@ -250,7 +301,7 @@ export async function craftItem (bot: Bot, signal: AbortSignal, item: string, co
   while (runs > 0) {
     checkAborted(signal)
     // re-check every run: a recipe may use up one plank type while another still works
-    const pool = table ? bot.recipesFor(def.id, null, 1, table) : bot.recipesFor(def.id, null, 1, null)
+    const pool = runnable(!!table)
     const recipe = rankRecipes(pool, have)[0]
     if (!recipe || maxCrafts(recipe.delta, have) <= 0) break
     // one run per call: batching runs races the server's slot updates and the inventory
