@@ -88,7 +88,7 @@ test('heading: away from spawn, given direction wins', () => {
   // a leg over water turns to the first dry detour
   assert.equal(dryLegHeading(270, 0, h => h === 270 ? true : h === 315 ? true : null), 225)
   assert.equal(dryLegHeading(270, 0, () => false), 270)
-  assert.equal(dryLegHeading(270, 0, () => true), 270)
+  assert.equal(dryLegHeading(270, 0, () => true), null, 'water all round: none')
 })
 
 const GOOD: SiteFacts = { biome: 'plains', snowy: false, grass: 120, logs: 30, water: 4, animals: 5, buildBlocks: 0, protected: false }

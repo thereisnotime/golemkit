@@ -100,7 +100,7 @@ function blockIds (bot: Bot, names: readonly string[]): number[] {
 }
 
 /** What the place around the bot looks like for settling (SiteFacts). */
-export function lookAround (agent: Agent, bot: Bot, radius = 32): SiteFacts {
+export function lookAround (agent: Agent, bot: Bot, radius = 32, iceAsWater = false): SiteFacts {
   const here = bot.entity.position.floored()
   const ground = bot.blockAt(here.offset(0, -1, 0)) as (Block & { biome?: { name?: string } }) | null
   // a server-synced registry (NeoForge) keeps biome names only as keys of biomesByName
@@ -115,7 +115,12 @@ export function lookAround (agent: Agent, bot: Bot, radius = 32): SiteFacts {
     useExtraInfo: (b: Block) => { const up = bot.blockAt(b.position.offset(0, 1, 0)); return !!up && (up.name === 'air' || GRASS_PLANTS.test(up.name)) }
   }).length
   const logs = bot.findBlocks({ matching: blockIds(bot, LOGS), maxDistance: radius, count: 200 }).filter(p => surface(p, 12)).length
-  const water = surfaceWater(bot, here, radius, 32).filter(w => !freezes(bot, w)).length
+  let water = surfaceWater(bot, here, radius, 32).filter(w => !freezes(bot, w)).length
+  // snow allowed: frozen water counts too (the cold-farm code keeps a farm's water open)
+  if (iceAsWater) {
+    const ice = blockIds(bot, ['ice'])
+    if (ice.length) water += bot.findBlocks({ matching: ice, maxDistance: radius, count: 16, useExtraInfo: (b: Block) => bot.blockAt(b.position.offset(0, 1, 0))?.name === 'air' }).length
+  }
   const animals = Object.values(bot.entities ?? {}).filter(e => e?.position && ANIMALS.includes(e.name ?? '') && e.position.distanceTo(bot.entity.position) <= radius * 2).length
   const buildNames = Object.keys(bot.registry.blocksByName).filter(n => BUILD.test(n))
   const buildBlocks = bot.findBlocks({ matching: blockIds(bot, buildNames), maxDistance: radius + 16, count: 64 }).filter(p => surface(p, 3)).length

@@ -82,7 +82,10 @@ settings:
   # and settled on a peak at 1092 148 -68. Run 2 went south, west and north from there: snow
   # everywhere from x 480 to 1150, z -650 to 490. Run 3 redirects it west (the village 3500 blocks
   # west has farms), more patient with snow and with a longer range.
-  startOver: { go: true, run: "3", direction: w, snowTurnAfter: 10, maxDistance: 2500, minDistance: 500, avoid: [{ name: spawn, x: 545, z: 45, radius: 300 }, { name: village, x: -2770, z: 1090, radius: 500 }] }
+  # Run 3: west of spawn is ocean (drowned, a guardian). Run 4: snow allowed, south from spawn, where
+  # snowy taiga and grove had 400 grass, 200 logs and up to 18 animals (crops grow in snowy biomes;
+  # frozen water counts as water). The old fortress lacked exactly those: seeds and animals.
+  startOver: { go: true, run: "4", direction: s, allowSnow: true, maxDistance: 2500, minDistance: 500, avoid: [{ name: spawn, x: 545, z: 45, radius: 300 }, { name: village, x: -2770, z: 1090, radius: 500 }] }
 # Behaviours that run on their own between LLM turns (docs/guide/behaviors.md). Pax or ${MC_OWNER:-Robin}
 # can arm more at runtime (behavior_arm / !behavior_arm follow_owner); those changes persist.
 behaviors:

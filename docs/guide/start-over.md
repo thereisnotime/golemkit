@@ -68,7 +68,8 @@ it was.
    and away from them. Then it walks legs of `legLength` blocks with `travel`, which avoids water
    and finds its own detours. Before each leg it checks the ground along it. If the leg would end
    in water or on ice (frozen oceans have holes and drowned under them), or pass over water half or three quarters of the way, it takes the first 45 or 90
-   degree detour that stays on land. A leg that gets nowhere turns the next one 45 degrees, then
+   degree detour that stays on land. If there is none (an ocean ahead), it turns 90 degrees
+   instead of swimming. A leg that gets nowhere turns the next one 45 degrees, then
    the other way, then 90. After a leg that works it is back on the main heading. It walks by day only. Half
    a minute before dark it stops, and at night it digs in (`bunker`, until morning). If that fails
    on protected ground (world spawn after a death), it walks 24 blocks on and tries again; other
@@ -121,7 +122,7 @@ back to its default on its own when its value is bad.
 | `freeSlots` | 2 | slots left free after packing |
 | `minGrass` / `minLogs` / `minWater` / `minAnimals` | 24 / 8 / 1 / 2 | what a good place needs |
 | `maxBuildBlocks` | 6 | somebody's build nearby rules a place out |
-| `allowSnow` | off | snowy biomes are fine |
+| `allowSnow` | off | snowy biomes are fine; frozen water then counts as water |
 | `maxTurns` | 2 | 90-degree turns before making do |
 | `snowTurnAfter` | 3 | snowy looks in a row before turning 90 degrees |
 

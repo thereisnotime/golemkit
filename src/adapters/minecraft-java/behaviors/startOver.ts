@@ -129,7 +129,7 @@ export const startOverBehavior = defineBehavior({
             return { ok: true, message: step.why }
           }
           case 'look': {
-            const f = lookAround(agent, bot)
+            const f = lookAround(agent, bot, 32, s.allowSnow)
             looked = { x: here.x, z: here.z, facts: f }
             const v = siteVerdict(f, s)
             st = { ...st, best: betterBest(st.best, here, v, fallbackOk(f, s)), snowyLooks: f.snowy ? (st.snowyLooks ?? 0) + 1 : 0 }
@@ -139,7 +139,16 @@ export const startOverBehavior = defineBehavior({
           }
           case 'leg': {
             // around water: the first detour whose leg ends on land
-            const heading = dryLegHeading(st.heading ?? 0, st.fails ?? 0, h => legWet(bot, h, s.legLength))
+            const dry = dryLegHeading(st.heading ?? 0, st.fails ?? 0, h => legWet(bot, h, s.legLength))
+            // water or ice everywhere ahead (an ocean): turn rather than swim it (guardians, drowned)
+            if (dry === null && (st.turns ?? 0) < s.maxTurns) {
+              const h = (st.heading ?? 0) + 90
+              st = { ...st, heading: h, turns: (st.turns ?? 0) + 1, legsSinceTurn: 0, walkedSinceTurn: 0, fails: 0, snowyLooks: 0 }
+              save(st)
+              noteStartOver(agent, bot, 'turn', `water all the way ${angleCompass(step.heading)}: turning ${angleCompass(h)}`)
+              return { ok: true, message: 'water ahead, turned' }
+            }
+            const heading = dry ?? step.heading
             const target = heading === step.heading ? step.target : pointAt(here, heading, s.legLength)
             const r = await ctx.act('start_over_leg', { x: target.x, z: target.z, minutes: s.legMinutes })
             const moved = (r.data as { moved?: number } | undefined)?.moved ?? 0

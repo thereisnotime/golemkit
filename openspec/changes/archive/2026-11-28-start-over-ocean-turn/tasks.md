@@ -1,0 +1,3 @@
+- [x] dryLegHeading null when all wet, turn in the behaviour; test
+- [x] lookAround counts ice with allowSnow
+- [x] Docs, Pax profile
