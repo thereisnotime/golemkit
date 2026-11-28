@@ -164,6 +164,11 @@ flowchart TB
   class O,LOF r
 ```
 
+A mob a fight leaves (down a drop, in water or lava, in a dark cave) is remembered for a minute:
+the reflex that starts a fight before the first hit (a creeper within 7, a mob within 4) leaves it
+alone in that time unless it comes within 3 blocks. A creeper in a hole by the base set that reflex
+off 13 times in 20 minutes.
+
 Each melee step:
 
 ```mermaid

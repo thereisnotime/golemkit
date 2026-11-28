@@ -1,0 +1,3 @@
+- [x] leftMobs memory in combat.ts, stillLeft in tactics.ts with tests
+- [x] Reflex proactive trigger uses it
+- [x] World concepts doc

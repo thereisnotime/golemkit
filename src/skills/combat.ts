@@ -8,7 +8,7 @@ import { reachEffort, digIntoLiquid, SCAFFOLD_BLOCKS } from './reachPlan.ts'
 import { pickupNearby } from './pickup.ts'
 import { isRangedMob, weaponFlags, type WeaponFlags } from './weapons.ts'
 import { fightTarget, eyeReach, lineOfSight, creeperFuseLit, eatNow, fightFood, meleeNear, type FightResult } from './fight.ts'
-import { rankTargets, attackRefusal, type ThreatInfo } from './tactics.ts'
+import { rankTargets, attackRefusal, LEFT_MOB_MS, type ThreatInfo } from './tactics.ts'
 import { fillerBlock } from './survival.ts'
 import { getHome } from './navigation.ts'
 import { gearUp, wornArmorPoints } from './gear.ts'
@@ -88,6 +88,16 @@ export function combatRefusal (bot: Bot, e: Entity, attacking = false): string |
 }
 
 /** Everything worth fighting around the bot, most threatening first (tactics.rankTargets). */
+const left = new WeakMap<Bot, Map<number, number>>()
+/** Mobs a fight left lately (entity id -> until), for the proactive defend reflex (tactics.ts stillLeft). */
+export function leftMobs (bot: Bot): Map<number, number> {
+  let m = left.get(bot)
+  if (!m) { m = new Map(); left.set(bot, m) }
+  const now = Date.now()
+  for (const [k, v] of m) if (v <= now) m.delete(k)
+  return m
+}
+
 export function threats (bot: Bot, radius = 24): Entity[] {
   const me = bot.entity.position
   const list: (ThreatInfo & { e: Entity })[] = []
@@ -412,7 +422,7 @@ const defend = defineAction({
         // couldn't get to the archer: get out of its line of fire instead of standing there
         await backOff(bot, mob, signal, 20, 4000)
         notes.push(`couldn't reach the ${mob.name} (${r.reason}); backed out of its line of fire`)
-      } else if (r.reason) notes.push(`left the ${mob.name}: ${r.reason}`)
+      } else if (r.reason) { notes.push(`left the ${mob.name}: ${r.reason}`); leftMobs(bot).set(mob.id, Date.now() + LEFT_MOB_MS) }
     }
     touchAnchor(bot)
     // pulled too far from where the fighting started (shelter, home, the job): walk back

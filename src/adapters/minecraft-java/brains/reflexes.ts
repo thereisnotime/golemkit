@@ -11,7 +11,8 @@
 import { defineBrain, PRIORITY, nearestHostile, isHostile, FLYING, needsSurvival } from '../../../core/index.ts'
 import { bestFood, isClimbingOut, keepClimbing } from '../../../skills/survival.ts'
 import { isRangedMob } from '../../../skills/weapons.ts'
-import { threats } from '../../../skills/combat.ts'
+import { threats, leftMobs } from '../../../skills/combat.ts'
+import { stillLeft } from '../../../skills/tactics.ts'
 import { fightFood } from '../../../skills/fight.ts'
 import { retreatOf, retreatCheck } from '../../../skills/retreat.ts'
 import { isEscaping } from '../../../skills/escape.ts'
@@ -420,7 +421,7 @@ export const reflexes = (defaults: ReflexOptions = {}) => {
         if (selfDefense && bot.health > 0 && !busy && agent.getAction('defend') && !['defend', 'retreat', 'bunker', 'pillar', 'protect'].includes(agent.currentAction?.name ?? '')) {
           const t = threats(bot, 8)[0]
           const d = t ? t.position.distanceTo(bot.entity.position) : Infinity
-          if (t && isHostile(t) && !FLYING.has(t.name ?? '') && (d <= 4 || (t.name === 'creeper' && d <= 7)) && !climbingAway(t)) {
+          if (t && isHostile(t) && !FLYING.has(t.name ?? '') && (d <= 4 || (t.name === 'creeper' && d <= 7)) && !climbingAway(t) && !stillLeft(leftMobs(bot), t.id, d, Date.now())) {
             void reflex('defend')
             return
           }

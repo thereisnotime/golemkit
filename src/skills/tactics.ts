@@ -360,3 +360,14 @@ export function unpreparedForNight (s: { armorPoints: number, hasWeapon: boolean
   const missing = [s.armorPoints <= 0 && 'armour', !s.hasWeapon && 'weapon', !s.hasFood && 'food'].filter(Boolean)
   return missing.length ? `no ${missing.join(', no ')}` : null
 }
+
+// ---- mobs a fight left ----
+
+/** How long a mob a fight left (down a drop, in water, a dark cave) is not picked up again by the proactive defend: a creeper in a hole by the base set defend off 13 times in 20 minutes. */
+export const LEFT_MOB_MS = 60_000
+
+/** Whether the proactive defend should leave this mob alone: left recently and not right on top of the bot. */
+export function stillLeft (left: ReadonlyMap<number, number>, id: number, distance: number, now: number, closeIn = 3): boolean {
+  const until = left.get(id)
+  return until !== undefined && until > now && distance > closeIn
+}
