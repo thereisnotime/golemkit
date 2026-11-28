@@ -273,8 +273,14 @@ export function chatLine (s: Omit<BotStatus, 'summary'>, now = s.updatedAt): str
   const why = s.state === 'stuck' && s.blocker ? `can't: ${s.blocker}` : `why: ${s.why}`
   const aim = [s.need ? `need ${s.need}` : '', s.goal ? `goal ${s.goal}` : ''].filter(Boolean).join(', ')
   const prog = s.progress.at ? `progress ${fmtDuration(now - s.progress.at)} ago${s.progress.what ? ` (${s.progress.what})` : ''}` : 'no progress yet'
-  const hp = s.self && s.self.health !== null ? `hp ${Math.round(s.self.health)}${s.self.food !== null ? ` food ${s.self.food}` : ''}` : ''
+  const hp = s.self && s.self.health !== null ? `hp ${fmtHp(s.self.health)}${s.self.food !== null ? ` food ${s.self.food}` : ''}` : ''
   return clip([head, why, aim, prog, hp].filter(Boolean).join(' | '), 240)
+}
+
+/** Health for the status line: whole numbers, but alive below 1 shows as 0.1..0.9 (0 means dead). */
+export function fmtHp (h: number): string {
+  if (h > 0 && h < 1) return Math.max(0.1, Math.round(h * 10) / 10).toFixed(1)
+  return String(Math.round(h))
 }
 
 /** A status file is stale (the bot is not running) after this long without an update. */
@@ -317,7 +323,7 @@ export function formatStatus (s: BotStatus, now: number): string[] {
   lines.push(`  progress  ${s.progress.at ? `${fmtDuration(s.updatedAt - s.progress.at)} ago${s.progress.what ? ` (${s.progress.what})` : ''}` : 'none yet'}; stuck alert after ${fmtDuration(s.stuckAlertMs)}`)
   if (s.lastFailure) lines.push(`  failed    ${fmtDuration(s.updatedAt - s.lastFailure.at)} ago: ${s.lastFailure.what}: ${s.lastFailure.message}`)
   if (s.lastEvent) lines.push(`  event     ${fmtDuration(s.updatedAt - s.lastEvent.at)} ago: ${s.lastEvent.what}`)
-  if (s.self) lines.push(`  self      hp ${s.self.health === null ? '?' : Math.round(s.self.health)} food ${s.self.food ?? '?'} at ${pos}`)
+  if (s.self) lines.push(`  self      hp ${s.self.health === null ? '?' : fmtHp(s.self.health)} food ${s.self.food ?? '?'} at ${pos}`)
   if (s.alert.count) lines.push(`  alerts    ${s.alert.count} sent, last ${s.alert.lastAt ? fmtDuration(s.updatedAt - s.alert.lastAt) + ' ago' : '?'}`)
   for (const [skill, ls] of Object.entries(s.notes ?? {})) for (const [i, l] of ls.entries()) lines.push(`  ${(i ? '' : skill).padEnd(9)} ${l}`)
   if (!s.connected && s.lastDisconnect) lines.push(`  offline   ${s.lastDisconnect}`)

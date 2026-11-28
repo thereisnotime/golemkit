@@ -1,0 +1,2 @@
+- [x] `fmtHp` in status.ts, used by the summary line and the status view
+- [x] Unit test

@@ -384,3 +384,11 @@ test('formatStatus shows the last event (a retreat, say) when there is one', () 
   assert.ok(lines.some(l => /^ {2}event {5}30s ago: left the fight/.test(l)), lines.join('\n'))
   assert.ok(!formatStatus(status(), NOW).some(l => /event/.test(l)))
 })
+
+test('fmtHp: alive below 1 health does not read as dead', async () => {
+  const { fmtHp } = await import('../src/core/status.ts')
+  assert.equal(fmtHp(0.08), '0.1')
+  assert.equal(fmtHp(0.5), '0.5')
+  assert.equal(fmtHp(0), '0')
+  assert.equal(fmtHp(17.6), '18')
+})
