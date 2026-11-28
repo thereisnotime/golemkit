@@ -4,7 +4,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { chooseFoodSource, foodSourceSettings, foodSourceText, noteSourceRun, FOOD_SOURCE_DEFAULTS, type FoodSourceWorld } from '../src/skills/foodSourcePlan.ts'
 import { planFarmRepair, farmRepairSettings, type FarmRepairInput } from '../src/skills/farmRepairPlan.ts'
-import { planPlotFarm, hydrated, torchLight, growthChance, type PlotCell, type PlotFarmInput } from '../src/skills/plotFarmPlan.ts'
+import {
+  planPlotFarm, hydrated, torchLight, growthChance, choosePlotWater, plotSeedNeed, plantableCells, plotFarmSettings, PLOT_FARM_DEFAULTS,
+  type PlotCell, type PlotFarmInput, type PlotWaterInput
+} from '../src/skills/plotFarmPlan.ts'
 import { ownWorkTest, siteProblem, type SiteCandidate } from '../src/skills/foodPlan.ts'
 import { farmSiteVerdict, type FarmSiteCell } from '../src/skills/needPlan.ts'
 import { planFarmWork } from '../src/skills/farmPlan.ts'
@@ -223,4 +226,75 @@ test('plot: a blocked centre gets the dry torch, the reason names what is in the
   assert.ok(p.till.length >= 3)
   const lake = planPlotFarm(pin({ cells: plot((dx, dz) => dx === 1 && dz === 1 ? {} : { ground: 'blocked', name: 'spruce_planks' }) }))
   assert.match(lake.reason, /spruce_planks it must not touch/)
+})
+
+// ------------------------------------------------------------------ a bigger plot inside the fortress
+
+const win = (x: Partial<PlotWaterInput>): PlotWaterInput => ({
+  size: 7, mode: 'auto', near: false, centreBlocked: false, waterBuckets: 0, storedWaterBuckets: 0, buckets: 0, iron: 0, fillFrom: true, ice: false, ...x
+})
+
+test('plot water: a bucket carried or stored, ice, an empty bucket, 3 iron for one, else dry', () => {
+  assert.equal(choosePlotWater(win({ near: true, waterBuckets: 1 })).source, 'near')
+  assert.equal(choosePlotWater(win({ waterBuckets: 1, ice: true })).source, 'bucket')
+  assert.equal(choosePlotWater(win({ storedWaterBuckets: 1, ice: true })).source, 'chest_bucket')
+  assert.equal(choosePlotWater(win({ ice: true, buckets: 1, iron: 9 })).source, 'ice')
+  assert.equal(choosePlotWater(win({ buckets: 1, iron: 9 })).source, 'fill')
+  assert.equal(choosePlotWater(win({ iron: 3 })).source, 'craft')
+  // Pax: no bucket, no ice, 2 iron: dry, and the reason says what is missing
+  const pax = choosePlotWater(win({ iron: 2 }))
+  assert.equal(pax.source, 'none'); assert.match(pax.reason, /no water bucket, no bucket and 2 iron ingots \(3 make one\), no ice/)
+  assert.equal(choosePlotWater(win({ iron: 3, fillFrom: false })).source, 'none', 'a bucket is no good without water to fill it')
+  assert.match(choosePlotWater(win({ buckets: 1, fillFrom: false })).reason, /no water near home to fill my bucket/)
+  assert.equal(choosePlotWater(win({ mode: 'dry', waterBuckets: 1 })).source, 'none')
+  assert.equal(choosePlotWater(win({ centreBlocked: true, waterBuckets: 1 })).source, 'none')
+  // a 3x3 keeps the old rule: water in reach or ice, never a bucket trip
+  assert.equal(choosePlotWater(win({ size: 3, waterBuckets: 1 })).source, 'none')
+  assert.equal(choosePlotWater(win({ size: 3, ice: true })).source, 'ice')
+})
+
+test('plot farm: a poured bucket wets the plot from the middle', () => {
+  const wet = planPlotFarm(pin({ size: 7, cells: plot(() => ({}), 7), bucket: true, seeds: 64, freezes: false }))
+  assert.equal(wet.ok, true); assert.equal(wet.water, 'bucket'); assert.equal(wet.centre, 'water'); assert.equal(wet.growth, 'wet')
+  assert.equal(wet.till.length, 48)
+  assert.ok(!wet.till.some(([dx, dz]) => dx === 0 && dz === 0), 'the middle is the water')
+  assert.match(wet.reason, /water from a bucket poured in the middle/)
+  // water in reach still wins: no need to pour
+  assert.equal(planPlotFarm(pin({ bucket: true, water: [{ dx: 3, dy: 0, dz: 0 }] })).water, 'near')
+  // the poured water freezes under the sky in the cold like ice water: a ring torch keeps it open
+  assert.ok(planPlotFarm(pin({ bucket: true, freezes: true })).torches.length >= 1)
+})
+
+test('plot seeds: what the plot can take, against carried, chests and grass', () => {
+  assert.deepEqual(plotSeedNeed({ cells: 48, carried: 7, stored: 10 }), { want: 48, fromChests: 10, fromGrass: 31 })
+  assert.deepEqual(plotSeedNeed({ cells: 8, carried: 20, stored: 10 }), { want: 8, fromChests: 0, fromGrass: 0 })
+  assert.deepEqual(plotSeedNeed({ cells: 8, carried: 2, stored: 0 }), { want: 8, fromChests: 0, fromGrass: 6 })
+  // Pax's grown plot: 7 crops growing on the old 3x3, one bare farmland, a torch in the middle, stone floor around
+  const cells = plot((dx, dz) => Math.abs(dx) <= 1 && Math.abs(dz) <= 1
+    ? (dx === 0 && dz === 0 ? { ground: 'farmland', above: 'torch' } : { ground: 'farmland', above: dx === 1 && dz === 1 ? 'air' : 'crop' })
+    : { ground: 'swap' }, 7)
+  assert.equal(plantableCells(cells, false), 41, '40 stone cells and one bare farmland')
+  assert.equal(plantableCells(plot(() => ({}), 5), true), 25)
+  assert.equal(plantableCells(plot(() => ({}), 5), false), 24)
+})
+
+test('plot knobs: plotSize odd 3-11 (default 7), plotMin, plotSeedRadius; bad values fall back', () => {
+  assert.deepEqual(plotFarmSettings(undefined), PLOT_FARM_DEFAULTS)
+  assert.deepEqual(PLOT_FARM_DEFAULTS, { plotSize: 7, plotMin: 3, plotSeedRadius: 32 })
+  assert.equal(plotFarmSettings({ plotSize: 8 }).plotSize, 7, 'even goes one down')
+  assert.equal(plotFarmSettings({ plotSize: 99 }).plotSize, 7, 'out of range: the default')
+  assert.equal(plotFarmSettings({ plotSize: 'big', plotSeedRadius: 48 }).plotSeedRadius, 48, 'one bad key keeps the others')
+  assert.equal(plotFarmSettings({ plotSize: 5, plotMin: 9 }).plotMin, 5, 'plotMin never above plotSize')
+  assert.equal(plotFarmSettings(false).plotSize, 7)
+})
+
+test('food sources: a plot that grew past its farm gets the farm extended', () => {
+  const grown = world({ farms: [{ name: 'farm:2', kind: 'plot' }], plot: { known: true, used: true, grow: true } })
+  const c = chooseFoodSource(grown, { ...S, sources: ['plot', 'farm'] })
+  assert.equal(c.active, 'plot'); assert.equal(c.have, 'farm:2'); assert.equal(c.run, true)
+  assert.match(c.reason, /extend the farm/)
+  // failed a moment ago: leave it until the retry
+  const failed = chooseFoodSource({ ...grown, failed: { plot: { until: grown.now + 60_000, reason: 'no seeds' } } }, { ...S, sources: ['plot', 'farm'] })
+  assert.equal(failed.run, false); assert.equal(failed.have, 'farm:2')
+  assert.equal(chooseFoodSource({ ...grown, canDig: false }, { ...S, sources: ['plot'] }).run, false)
 })

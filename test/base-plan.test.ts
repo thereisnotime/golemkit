@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { loadBlueprints, rotate, placeCells, resolveRoles, solidCells, type Pos } from '../src/skills/blueprint.ts'
 import {
-  blueprintStages, stageCells, surveyStage, fitAnchor, interiorOf, fitRow, fitSquare, billOfMaterials, chestTakes, sessionWants,
+  blueprintStages, stageCells, surveyStage, fitAnchor, interiorOf, fitRow, fitSquare, growPlot, billOfMaterials, chestTakes, sessionWants,
   projectWords, projectNamed, safeToWork
 } from '../src/skills/basePlan.ts'
 import { goalHolds } from '../src/skills/projects.ts'
@@ -120,6 +120,34 @@ test('inside: floor columns clear of walls and ladder; a row against a wall faci
   assert.equal(sq.size, 5)
   const blocked = fitSquare(inside, c => c.z > ORIGIN.z + 3, { max: 5, min: 3 })
   assert.ok(!blocked || blocked.size <= 3)
+})
+
+test('farm plot: odd sides from plotSize, and growing a small plot inside the walls', () => {
+  const { cells, roles } = world()
+  const inside = interiorOf(cells, ['floor'])!
+  const door = cells.filter(c => roles[c.role]!.kind === 'door').map(c => ({ x: c.x, z: c.z }))
+  assert.equal(fitSquare(inside, () => true, { max: 7, min: 3, margin: 1, avoid: door, odd: true })!.size, 7)
+  assert.equal(fitSquare(inside, () => true, { max: 6, min: 3, odd: true })!.size, 5, 'never an even side')
+  // Pax: a 3x3 at 557 -43 in the fortress at 560 67 -43; the stone floor counts as free, the gate is kept clear
+  const old = { x0: 557, z0: -43, size: 3 }
+  const inOld = (c: { x: number, z: number }) => c.x >= 557 && c.x <= 559 && c.z >= -43 && c.z <= -41
+  const inSq = (s: { x0: number, z0: number, size: number }, c: { x: number, z: number }) => c.x >= s.x0 && c.x < s.x0 + s.size && c.z >= s.z0 && c.z < s.z0 + s.size
+  assert.deepEqual(growPlot(inside, () => true, old, { size: 7, margin: 1, avoid: door }), { plot: { x0: 555, z0: -45, size: 7 }, keepsOld: true }, 'the 7x7 around the old plot')
+  // a chest row along x 555-558 at z -45: the square keeps off it and still holds the old plot
+  const chests = (c: { x: number, z: number }) => !(c.z === -45 && c.x >= 555 && c.x <= 558)
+  const g5 = growPlot(inside, chests, old, { size: 7, margin: 1, avoid: door })!
+  assert.equal(g5.keepsOld, true)
+  for (let x = g5.plot.x0; x < g5.plot.x0 + g5.plot.size; x++) for (let z = g5.plot.z0; z < g5.plot.z0 + g5.plot.size; z++) assert.ok(chests({ x, z }))
+  // the old plot's columns count as free (crops and a torch stand on them)
+  assert.equal(growPlot(inside, c => !inOld(c), old, { size: 7, avoid: door })!.plot.size, 7)
+  // already big enough, or nothing around it free: no growth
+  assert.equal(growPlot(inside, () => true, { x0: 555, z0: -45, size: 7 }, { size: 7 }), null)
+  assert.equal(growPlot(inside, () => true, old, { size: 3 }), null)
+  assert.equal(growPlot(inside, () => false, old, { size: 7 }), null)
+  // a reserved column by the old plot (the inside mine's hatch): the square keeps off it, the old plot stays in
+  const hatch = { x: 556, z: -42 }
+  const gh = growPlot(inside, c => !(c.x === hatch.x && c.z === hatch.z), old, { size: 7, avoid: door })!
+  assert.ok(gh.keepsOld); assert.ok(!inSq(gh.plot, hatch))
 })
 
 test('bill of materials, chest takes and the session list', () => {

@@ -204,8 +204,11 @@ can't change their own.
 | `farming.ownBuilds` | on/off | its own torches, walls, covers, farms and base are not somebody's build near a farm site (default on) |
 | `farming.ownBaseRadius` | 0–64 | blocks around its base's anchor that count as its own (default 12) |
 | `farming.plot` | on/off | use the farm plot its base keeps inside the walls ([farm plot](./food-sources#the-base-s-farm-plot); default on) |
-| `farming.plotWater` | auto / water / dry | the plot's water: in reach or carried ice, else dry (auto); only with water; never (default auto) |
+| `farming.plotWater` | auto / water / dry | the plot's water: in reach; on a plot of 5 and up a water bucket (carried, stored, an empty one filled, or crafted from 3 iron); carried ice; else dry (auto); only with water; never (default auto) |
 | `farming.plotSwap` | on/off | dig out stone cells of the plot and put dirt in (default on) |
+| `farming.plotSize` | 3–11, odd | wanted side of the farm plot; a smaller one is [grown](./food-sources#growing-the-plot) and its farm extended (default 7) |
+| `farming.plotMin` | 3–11, odd | smallest farm plot worth keeping inside the walls (default 3) |
+| `farming.plotSeedRadius` | 8–96 | short of seeds for the plot: break grass this far from home (default 32) |
 | `food.sources` | list | [food sources](./food-sources) in order: repair, farm, plot, animals, fish, forage (`!config_set food.sources plot,fish`) |
 | `food.stock` | 0–256 | animals, fishing and foraging run below this many food items, carried plus chests (default 12) |
 | `food.retryMinutes` | 0–1440 | a failed food source is skipped this long (default 60) |

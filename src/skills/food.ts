@@ -220,9 +220,9 @@ export function farmWorkFor (agent: Agent, bot: Bot, farm: Farm, o: { targetSize
   const canTill = !!agent.canDig
   const canWater = canPlace(agent) && (!!inv.water_bucket || !!inv.bucket)
   // a plot farm never grows past its plot; its water (if any) is beside it, not in the middle, so every
-  // cell counts as wet enough (crops keep dry farmland); only a plot with ice-made water in the middle has it there
+  // cell counts as wet enough (crops keep dry farmland); only a plot with ice-made or poured water in the middle has it there
   const plot = farm.kind === 'plot'
-  return planFarmWork(grid, { targetSize: plot ? farm.size : o.targetSize, seeds: seedCount(inv), seedReserve: plot ? 0 : o.seedReserve, canTill, canWater: canWater && (!plot || farm.water === 'ice'), dry: plot ? farm.water !== 'ice' : farm.water === 'none' })
+  return planFarmWork(grid, { targetSize: plot ? farm.size : o.targetSize, seeds: seedCount(inv), seedReserve: plot ? 0 : o.seedReserve, canTill, canWater: canWater && (!plot || farm.water === 'ice' || farm.water === 'bucket'), dry: plot ? farm.water !== 'ice' && farm.water !== 'bucket' : farm.water === 'none' })
 }
 
 /** Ripe sweet berry bushes (age 2+) near a point, nearest first. */
@@ -568,7 +568,7 @@ const findFood = defineAction({
 
 const PLANTS = /^(short_grass|grass|tall_grass|fern|large_fern|dandelion|poppy|.*_tulip|azure_bluet|oxeye_daisy|cornflower|allium|blue_orchid|lily_of_the_valley|dead_bush|sweet_berry_bush|snow)$/
 /** Blocks players place: a plot near these is somebody's base or farm. */
-const BUILD = /(_planks|cobblestone|stone_bricks|bricks|glass|_fence|_wall|door|torch|lantern|_bed$|chest|barrel|crafting_table|furnace|_slab|_stairs|wool|carpet|concrete|terracotta|rail|ladder|sign|hay_block|composter|bell|scaffolding|farmland)/
+export const BUILD = /(_planks|cobblestone|stone_bricks|bricks|glass|_fence|_wall|door|torch|lantern|_bed$|chest|barrel|crafting_table|furnace|_slab|_stairs|wool|carpet|concrete|terracotta|rail|ladder|sign|hay_block|composter|bell|scaffolding|farmland)/
 /** Near a plot these rule it out: lava burns, ice means the water freezes there. */
 const HAZARD = /^(lava|ice|packed_ice|blue_ice|frosted_ice|powder_snow|magma_block|fire)$/
 export const ICE = /^(ice|packed_ice|blue_ice|frosted_ice)$/
@@ -594,6 +594,27 @@ export function cellKind (agent: Agent, bot: Bot, x: number, y: number, z: numbe
   const a2 = bot.blockAt(vec(bot, x, y + 2, z))
   if (TILLABLE.includes(g.name) && isBank(a.name) && a2 && (a2.name === 'air' || PLANTS.test(a2.name))) return 'tillable'
   return 'other'
+}
+
+/**
+ * Grass it may break for seeds without touching somebody's build: no placed block (BUILD) that
+ * isn't its own work within a block of it, at its height or one above or below.
+ */
+export function awayFromBuilds (agent: Agent, bot: Bot): (p: Vec3) => boolean {
+  const own = ownWork(agent)
+  return p => {
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          if (!dx && !dz && !dy) continue
+          const q = { x: p.x + dx, y: p.y + dy, z: p.z + dz }
+          const b = bot.blockAt(vec(bot, q.x, q.y, q.z))
+          if (b && BUILD.test(b.name) && !own?.(q)) return false
+        }
+      }
+    }
+    return true
+  }
 }
 
 /** Farm sites marked bad (site health), with their size. */
@@ -711,7 +732,7 @@ function openAbove (bot: Bot, p: { x: number, y: number, z: number }): boolean {
  * not protected, not near the world spawn, not in `skip`. Looks at many candidates, since the
  * nearest few dozen are often all inside a protected base.
  */
-export function breakableGrass (agent: Agent, bot: Bot, radius: number, o: { clearance?: number, skip?: ReadonlySet<string>, center?: { x: number, z: number }, count?: number } = {}): Block[] {
+export function breakableGrass (agent: Agent, bot: Bot, radius: number, o: { clearance?: number, skip?: ReadonlySet<string>, center?: { x: number, z: number }, count?: number, keep?: (p: Vec3) => boolean } = {}): Block[] {
   const ids = grassIds(bot)
   if (!ids.length) return []
   const center = o.center
@@ -724,6 +745,7 @@ export function breakableGrass (agent: Agent, bot: Bot, radius: number, o: { cle
     // into one (shot by skeletons at y -11)
     if (Math.abs(p.y - y0) > GRASS_Y_BAND || !openAbove(bot, p)) continue
     if (offLimits(agent, bot, p, o.clearance ?? 48)) continue
+    if (o.keep && !o.keep(p)) continue
     const b = bot.blockAt(p)
     if (b) out.push(b)
     if (out.length >= (o.count ?? 1)) break
@@ -775,11 +797,11 @@ async function collectDropsAt (bot: Bot, pos: Vec3, signal: AbortSignal, seen: S
  * block are walked over right away, and once more at the end.
  */
 export async function breakPlantsFor (ctx: Pick<ActionContext, 'bot' | 'agent' | 'signal' | 'log'>, want: number, clearance: number, maxMs = 4 * 60_000,
-  maxDistance = 64, maxBroken?: number): Promise<SeedRun> {
+  maxDistance = 64, maxBroken?: number, area: { center?: { x: number, z: number }, keep?: (p: Vec3) => boolean } = {}): Promise<SeedRun> {
   const { bot, agent, signal, log } = ctx
   const t0 = Date.now()
   const before = seedCount(inventory(bot))
-  const start = { x: bot.entity.position.x, z: bot.entity.position.z }
+  const start = area.center ?? { x: bot.entity.position.x, z: bot.entity.position.z }
   const limits = { ...seedLimits(want, maxMs), ...(maxBroken !== undefined ? { maxBroken } : {}) }
   const skip = new Set<string>()
   const seenDrops = new Set<number>()
@@ -791,7 +813,7 @@ export async function breakPlantsFor (ctx: Pick<ActionContext, 'bot' | 'agent' |
   const got = () => seedCount(inventory(bot)) - before
   while (true) {
     checkAborted(signal)
-    next = breakableGrass(agent, bot, maxDistance, { clearance, skip, center: start })[0]
+    next = breakableGrass(agent, bot, maxDistance, { clearance, skip, center: start, ...(area.keep ? { keep: area.keep } : {}) })[0]
     stopped = seedStopReason({ got: got(), want, broken, elapsedMs: Date.now() - t0, grassLeft: !!next, failsInRow }, limits)
     if (stopped || !next) break
     const target = next
@@ -813,7 +835,7 @@ export async function breakPlantsFor (ctx: Pick<ActionContext, 'bot' | 'agent' |
   // anything still lying around (a drop that rolled away, or arrived late)
   await pickupNearby(bot, signal, { radius: 8, maxMs: 10_000 }).catch(() => 0)
   const seeds = got()
-  const grassLeft = !!breakableGrass(agent, bot, maxDistance, { clearance, skip, center: start })[0]
+  const grassLeft = !!breakableGrass(agent, bot, maxDistance, { clearance, skip, center: start, ...(area.keep ? { keep: area.keep } : {}) })[0]
   const run: SeedRun = { broken, seeds, dropped, picked: Math.min(dropped, seeds), stopped: stopped ?? 'no more grass I may break in range', grassLeft, ms: Date.now() - t0 }
   log.debug('broke plants for seeds', { broken, seeds, dropped, stopped: run.stopped, grassLeft })
   return run

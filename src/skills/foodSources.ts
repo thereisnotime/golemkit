@@ -19,7 +19,7 @@ import { takeItemsFromOwnChests, chestView, chestTotals } from './containers.ts'
 import {
   getFarms, saveFarm, animalsAround, ripeBerries, shoreKelp, canSmeltKelp, surfaceWater, shoreIce, keepWaterOpen, farmingOptions,
   inventory, freezes, getHoe, tillAt, canPlace, torchesAvailable, holdNoSilk, pourWater, fillBucket, offLimits, seedsFromChests, breakPlantsFor,
-  ICE, type Farm
+  awayFromBuilds, ICE, type Farm
 } from './food.ts'
 import { seedCount, pickFarmSeed, breedPlan, BREED_FOOD, type CellKind, type SiteCandidate } from './foodPlan.ts'
 import { herdSurplus } from './combat.ts'
@@ -27,7 +27,11 @@ import { rodPlan } from './fishPlan.ts'
 import { farmSiteVerdict, nextFarmName, type FarmSiteCell } from './needPlan.ts'
 import { coverItem, iceMakesWater } from './coldFarmPlan.ts'
 import { planFarmRepair, farmRepairSettings, type FarmRepairPlan } from './farmRepairPlan.ts'
-import { planPlotFarm, type PlotCell, type PlotGround, type PlotAbove, type PlotWaterMode } from './plotFarmPlan.ts'
+import {
+  planPlotFarm, choosePlotWater, plotSeedNeed, plantableCells, hydrated, plotFarmSettings,
+  type PlotCell, type PlotGround, type PlotAbove, type PlotWaterMode, type PlotFarmSettings
+} from './plotFarmPlan.ts'
+import { gatherFromSources } from './materialSources.ts'
 import {
   chooseFoodSource, foodSourceSettings, foodSourceText, noteSourceRun,
   type FoodSourceWorld, type FoodSourceChoice, type FoodSourceName, type FoodSourceSettings
@@ -47,12 +51,12 @@ export function foodSettings (agent: Agent): FoodSourceSettings {
   return foodSourceSettings(s?.food, s?.farming)
 }
 
-/** farming.plotWater (auto | water | dry) and farming.plotSwap. */
-export function plotSettings (agent: Agent): { water: PlotWaterMode, swap: boolean } {
+/** farming.plotWater (auto | water | dry), farming.plotSwap and the plot knobs (plotSize, plotMin, plotSeedRadius). */
+export function plotSettings (agent: Agent): { water: PlotWaterMode, swap: boolean } & PlotFarmSettings {
   const f = (agent.settings as { farming?: unknown } | undefined)?.farming
   const o = f && typeof f === 'object' ? f as Record<string, unknown> : {}
   const w = o.plotWater
-  return { water: w === 'water' || w === 'dry' ? w : 'auto', swap: o.plotSwap !== false }
+  return { water: w === 'water' || w === 'dry' ? w : 'auto', swap: o.plotSwap !== false, ...plotFarmSettings(f) }
 }
 
 // ------------------------------------------------------------------ reading a farm square
@@ -97,6 +101,20 @@ function plotCentre (p: { x0: number, z0: number, size: number, y: number }) {
   return { x: p.x0 + h, y: p.y, z: p.z0 + h }
 }
 
+/** Its plot farm on the base's plot (centred inside the plot's square, this dimension when known), or null. */
+function plotFarmOn (agent: Agent, bot: Bot, spot: { x0: number, z0: number, size: number, y: number }): Farm | null {
+  const dim = bot.game?.dimension
+  const c = plotCentre(spot)
+  return getFarms(agent).find(f => (!f.dim || !dim || f.dim === dim) && ((f.x === c.x && f.z === c.z) ||
+    (f.kind === 'plot' && f.x >= spot.x0 && f.x < spot.x0 + spot.size && f.z >= spot.z0 && f.z < spot.z0 + spot.size))) ?? null
+}
+
+/** The plot grew past its farm (bigger, or moved): plot_farm extends the farm onto it. */
+function plotOutgrows (farm: Farm, spot: { x0: number, z0: number, size: number, y: number }): boolean {
+  const c = plotCentre(spot)
+  return farm.kind === 'plot' && (spot.size > farm.size || farm.x !== c.x || farm.z !== c.z)
+}
+
 function foodCount (bot: Bot, items: Record<string, number>): number {
   const foods = (bot.registry as { foodsByName?: Record<string, unknown> }).foodsByName ?? {}
   return Object.entries(items).filter(([k]) => foods[k] && !BAD_FOOD.has(k)).reduce((n, [, v]) => n + v, 0)
@@ -126,6 +144,7 @@ export function senseFoodSources (agent: Agent, bot: Bot, now = Date.now()): Foo
   const spot = plotSpot(agent)
   const plotPlace = getPlaces(agent).farm_plot
   const pc = spot ? plotCentre(spot) : null
+  const onPlot = spot ? plotFarmOn(agent, bot, spot) : null
   const grassIds = ['short_grass', 'grass', 'tall_grass'].map(n => bot.registry.blocksByName[n]?.id).filter((x): x is number => x !== undefined)
   const grass = !!agent.canDig && !!bot.findBlock?.({ matching: grassIds, maxDistance: 32 })
   const water = surfaceWater(bot, centre, 48, 4).length > 0 || (fs.iceWater && !!agent.canDig && shoreIce(bot, centre, 48, 8).some(i => i.below === 'water'))
@@ -144,7 +163,7 @@ export function senseFoodSources (agent: Agent, bot: Bot, now = Date.now()): Foo
     seeds: seedCount(inv),
     chestSeeds: seedCount(stored),
     grass,
-    plot: spot && (!plotPlace || sameDimension(bot, plotPlace)) ? { known: true, used: farms.some(f => f.kind === 'plot' || (pc && f.x === pc.x && f.z === pc.z)) } : null,
+    plot: spot && (!plotPlace || sameDimension(bot, plotPlace)) ? { known: true, used: farms.some(f => f.kind === 'plot' || (pc && f.x === pc.x && f.z === pc.z)), ...(onPlot && plotOutgrows(onPlot, spot) ? { grow: true } : {}) } : null,
     rod: !!inv.fishing_rod,
     canMakeRod: (inv.string ?? 0) >= 2 && ((inv.stick ?? 0) >= 3 || planks >= 2 || logs >= 1) || rodPlan({ inv, stored, canCraft: !!agent.getAction('craft') }).step !== 'none',
     water,
@@ -430,30 +449,19 @@ export async function plotFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sign
   const spot = plotSpot(agent)
   if (!spot) return fail('no farm plot kept in the base (the farm_plot base project keeps one)')
   const c = plotCentre(spot)
-  const used = getFarms(agent).find(f => f.x === c.x && f.z === c.z)
-  if (used) return fail(`the plot is already ${used.name}`)
+  // a farm already on the plot: the same square is done; a smaller one (the plot grew) is extended, keeping its name
+  const prev = plotFarmOn(agent, bot, spot)
+  if (prev && !plotOutgrows(prev, spot)) return fail(`the plot is already ${prev.name}`)
   const h = Math.floor(spot.size / 2)
-  if (Math.hypot(c.x - bot.entity.position.x, c.z - bot.entity.position.z) > 6) {
-    try { await travel(bot, { x: c.x, y: c.y + 1, z: c.z }, signal, { range: 3 }) } catch (e) { checkAborted(signal); return fail(`couldn't get to the farm plot at ${fmtPos(c)}: ${(e as Error).message}`) }
+  const toPlot = async (): Promise<string | null> => {
+    if (Math.hypot(c.x - bot.entity.position.x, c.z - bot.entity.position.z) <= 6) return null
+    try { await travel(bot, { x: c.x, y: c.y + 1, z: c.z }, signal, { range: 3 }); return null } catch (e) { checkAborted(signal); return (e as Error).message }
   }
+  const away = await toPlot()
+  if (away) return fail(`couldn't get to the farm plot at ${fmtPos(c)}: ${away}`)
   const steps: string[] = []
-  // seeds first: chests, then grass
-  let seeds = seedCount(inventory(bot))
-  const cellsWanted = spot.size * spot.size - 1
-  if (seeds < cellsWanted) {
-    const got = await seedsFromChests(ctx, 'wheat_seeds', cellsWanted - seeds).catch(e => { checkAborted(signal); return { took: 0 } })
-    if (got.took) steps.push(`took ${got.took} wheat_seeds from my chests`)
-    seeds = seedCount(inventory(bot))
-  }
-  if (!seeds) {
-    const got = await breakPlantsFor(ctx, 4, p.spawnClearance, 2 * 60_000).catch(e => { checkAborted(signal); return { broken: 0, seeds: 0 } })
-    if (got.broken) steps.push(`broke ${got.broken} grass for ${got.seeds} seeds`)
-    seeds = seedCount(inventory(bot))
-  }
-  if (!seeds) return fail(`no seeds for the plot${steps.length ? ` (${steps.join(', ')})` : ''}`)
-  if (Math.hypot(c.x - bot.entity.position.x, c.z - bot.entity.position.z) > 6) {
-    try { await travel(bot, { x: c.x, y: c.y + 1, z: c.z }, signal, { range: 3 }) } catch (e) { checkAborted(signal) }
-  }
+  const ps = plotSettings(agent)
+  const fs = farmingOptions(agent)
 
   const read = (): PlotCell[] | null => {
     const out: PlotCell[] = []
@@ -470,14 +478,100 @@ export async function plotFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sign
     }
     return out
   }
-  const cells = read()
+  const waterNear = (): { dx: number, dy: number, dz: number }[] => {
+    const out: { dx: number, dy: number, dz: number }[] = []
+    for (let dx = -h - 4; dx <= h + 4; dx++) {
+      for (let dz = -h - 4; dz <= h + 4; dz++) {
+        for (const dy of [0, 1]) if (bot.blockAt(vec(bot, c.x + dx, c.y + dy, c.z + dz))?.name === 'water') out.push({ dx, dy, dz })
+      }
+    }
+    return out
+  }
+  let cells = read()
   if (!cells) return fail('the plot is not loaded')
-  const water: { dx: number, dy: number, dz: number }[] = []
-  for (let dx = -h - 4; dx <= h + 4; dx++) {
-    for (let dz = -h - 4; dz <= h + 4; dz++) {
-      for (const dy of [0, 1]) if (bot.blockAt(vec(bot, c.x + dx, c.y + dy, c.z + dz))?.name === 'water') water.push({ dx, dy, dz })
+  let water = waterNear()
+  const centreCell = cells.find(x => x.dx === 0 && x.dz === 0)!
+
+  // water for the centre (choosePlotWater): a bucket carried or in a container, ice, an empty bucket or 3 iron to fill one, else dry
+  const inv0 = inventory(bot)
+  let stored: Record<string, number> = {}
+  try { stored = chestTotals(chestView(agent, bot)).has } catch {}
+  const wet = water.length > 0 && cells.filter(x => x.ground !== 'water').every(x => hydrated(x, water))
+  const fillSpot = () => surfaceWater(bot, vec(bot, c.x, c.y, c.z), 64, 16)
+    .find(w => !offLimits(agent, bot, w, p.spawnClearance) && !(w.x >= spot.x0 && w.x < spot.x0 + spot.size && w.z >= spot.z0 && w.z < spot.z0 + spot.size)) ?? null
+  const choice = choosePlotWater({
+    size: spot.size,
+    mode: ps.water,
+    near: wet || centreCell.ground === 'water',
+    centreBlocked: centreCell.ground === 'blocked',
+    waterBuckets: inv0.water_bucket ?? 0,
+    storedWaterBuckets: stored.water_bucket ?? 0,
+    buckets: (inv0.bucket ?? 0) + (stored.bucket ?? 0),
+    iron: (inv0.iron_ingot ?? 0) + (stored.iron_ingot ?? 0),
+    fillFrom: canPlace(agent) && spot.size >= 5 && !inv0.water_bucket && !stored.water_bucket && !!fillSpot(),
+    ice: fs.iceWater && countItem(bot, 'ice') > 0
+  })
+  let waterNote = choice.reason
+  const take = async (want: Record<string, number>): Promise<Record<string, number>> => {
+    try { return (await takeItemsFromOwnChests(ctx, want, 128, {}, chestView(agent, bot))).took } catch (e) { checkAborted(signal); return {} }
+  }
+  if (canPlace(agent) && ['chest_bucket', 'fill', 'craft'].includes(choice.source)) {
+    try {
+      if (choice.source === 'chest_bucket') await take({ water_bucket: 1 })
+      if (choice.source === 'fill' && !findItem(bot, 'bucket')) await take({ bucket: 1 })
+      if (choice.source === 'craft') {
+        if (countItem(bot, 'iron_ingot') < 3) await take({ iron_ingot: 3 - countItem(bot, 'iron_ingot') })
+        const r = await craftItem(bot, signal, 'bucket', 1).catch(e => fail((e as Error).message))
+        if (findItem(bot, 'bucket')) steps.push('crafted a bucket from 3 iron ingots')
+        else waterNote = `${choice.reason}, but crafting it failed (${r.message})`
+      }
+      if ((choice.source === 'fill' || choice.source === 'craft') && findItem(bot, 'bucket') && !findItem(bot, 'water_bucket')) {
+        const src = fillSpot()
+        if (src && await fillBucket(bot, src, signal)) steps.push(`filled a bucket at ${fmtPos(src)}`)
+      }
+    } catch (e) { checkAborted(signal); waterNote = `${choice.reason}, but it failed (${(e as Error).message})` }
+  }
+  const bucket = choice.source !== 'near' && choice.source !== 'ice' && choice.source !== 'none' && !!findItem(bot, 'water_bucket')
+  if (!bucket && choice.source !== 'near' && choice.source !== 'ice' && choice.source !== 'none' && waterNote === choice.reason) waterNote = `${choice.reason}, but I ended up without a water bucket`
+
+  // seeds: what the plot can take against what it carries; chests first, then grass near home (not protected, not by somebody's build)
+  const centreFree = choice.source === 'near' && centreCell.ground !== 'water'
+  const need = plotSeedNeed({ cells: plantableCells(cells, centreFree), carried: seedCount(inventory(bot)), stored: stored.wheat_seeds ?? 0 })
+  if (need.fromChests + need.fromGrass > 0) {
+    if (need.fromChests) {
+      const got = await seedsFromChests(ctx, 'wheat_seeds', need.fromChests + need.fromGrass).catch(e => { checkAborted(signal); return { took: 0 } })
+      if (got.took) steps.push(`took ${got.took} wheat_seeds from my chests`)
+    }
+    const short = Math.max(0, need.want - seedCount(inventory(bot)))
+    if (short > 0) {
+      const home = getHome(agent)
+      const centre = home && sameDimension(bot, home) ? { x: home.x, z: home.z } : { x: c.x, z: c.z }
+      const got = await breakPlantsFor(ctx, short, p.spawnClearance, 3 * 60_000, ps.plotSeedRadius, undefined, { center: centre, keep: awayFromBuilds(agent, bot) })
+        .catch(e => { checkAborted(signal); return { broken: 0, seeds: 0 } })
+      if (got.broken) steps.push(`broke ${got.broken} grass within ${ps.plotSeedRadius} of home for ${got.seeds} seeds`)
     }
   }
+  const seeds = seedCount(inventory(bot))
+  const growingNow = cells.filter(x => x.above === 'crop').length
+  if (!seeds && !growingNow) return fail(`no seeds for the plot${steps.length ? ` (${steps.join(', ')})` : ''}`)
+
+  // dirt for the stone (the base's floor) the seeds will go on: carried, its chests, then the material sources
+  const swapCells = cells.filter(x => x.ground === 'swap' && (x.above === 'air' || x.above === 'plant' || x.above === 'snow') && !(x.dx === 0 && x.dz === 0)).length
+  const dirtWanted = ps.swap && canPlace(agent) ? Math.min(swapCells, seeds) - countItem(bot, 'dirt') : 0
+  if (dirtWanted > 0) {
+    const took = await take({ dirt: dirtWanted })
+    if (took.dirt) steps.push(`took ${took.dirt} dirt from my chests`)
+    const left = dirtWanted - (took.dirt ?? 0)
+    if (left > 0) {
+      const r = await gatherFromSources(ctx, { dirt: left }, { minutes: 3 }).catch(e => { checkAborted(signal); return fail((e as Error).message) })
+      steps.push(r.ok ? `got ${left} dirt` : `short of dirt for ${left} stone cells (${r.message.slice(0, 80)})`)
+    }
+  }
+  const back = await toPlot()
+  if (back) return fail(`couldn't get back to the farm plot at ${fmtPos(c)}: ${back}${steps.length ? ` (${steps.join(', ')})` : ''}`)
+  cells = read() ?? cells
+  water = waterNear()
+
   const torchSpots: { dx: number, dz: number }[] = []
   const r = h + 1
   for (let dx = -r; dx <= r; dx++) {
@@ -488,23 +582,22 @@ export async function plotFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sign
       if (g?.boundingBox === 'block' && (a?.name === 'air' || a?.name === 'snow') && !/chest|barrel|furnace|crafting/.test(g.name)) torchSpots.push({ dx, dz })
     }
   }
-  const ps = plotSettings(agent)
-  const fs = farmingOptions(agent)
   const plan = planPlotFarm({
     size: spot.size,
     cells,
     water,
     iceItems: fs.iceWater ? countItem(bot, 'ice') : 0,
+    bucket,
     plainBreak: true,
     freezes: freezes(bot, c) && openSky(bot, c.x, c.y, c.z),
     torches: canPlace(agent) ? torchesAvailable(bot) : 0,
     dirt: countItem(bot, 'dirt'),
-    seeds,
+    seeds: seedCount(inventory(bot)),
     torchSpots,
     mode: ps.water,
     swap: ps.swap && canPlace(agent)
   })
-  log.debug('plot_farm: plan', { ok: plan.ok, water: plan.water, till: plan.till.length, swap: plan.swap.length, torches: plan.torches.length, reason: plan.reason })
+  log.debug('plot_farm: plan', { ok: plan.ok, water: plan.water, choice: choice.source, till: plan.till.length, swap: plan.swap.length, torches: plan.torches.length, reason: plan.reason })
   if (!plan.ok) return fail(`farm plot at ${fmtPos(c)}: ${plan.reason}${steps.length ? ` (${steps.join(', ')})` : ''}`)
 
   const hoe = await getHoe(ctx, p.spawnClearance)
@@ -513,15 +606,27 @@ export async function plotFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sign
 
   const at = (dx: number, dz: number, dy = 0) => vec(bot, c.x + dx, c.y + dy, c.z + dz)
   // stone cells: dig out, dirt in
+  let swapped = 0
   for (const [dx, dz] of plan.swap) {
     checkAborted(signal)
     const g = bot.blockAt(at(dx, dz))
     if (!g || !findItem(bot, 'dirt')) break
-    try { await reachBlock(bot, g.position, signal, 3, 15_000); if (!/air$/.test(g.name)) { await equipFor(bot, g).catch(() => {}); await digBlock(bot, g, signal) } await placeAt(bot, 'dirt', at(dx, dz), signal) } catch (e) { checkAborted(signal) }
+    try { await reachBlock(bot, g.position, signal, 3, 15_000); if (!/air$/.test(g.name)) { await equipFor(bot, g).catch(() => {}); await digBlock(bot, g, signal) } await placeAt(bot, 'dirt', at(dx, dz), signal); swapped++ } catch (e) { checkAborted(signal) }
   }
-  if (plan.swap.length) steps.push(`swapped ${plan.swap.length} stone, ice or empty cells for dirt`)
+  if (plan.swap.length) steps.push(`swapped ${swapped} of ${plan.swap.length} stone, ice or empty cells for dirt`)
+  let waterHow: Farm['water'] = plan.water === 'near' ? 'natural' : plan.water === 'ice' ? 'ice' : plan.water === 'bucket' ? 'bucket' : 'none'
+  // water from a bucket: a hole in the middle over something solid, the water poured in
+  if (plan.water === 'bucket') {
+    try {
+      const below = bot.blockAt(at(0, 0, -1))
+      if (below?.boundingBox !== 'block') throw new Error('nothing solid under the middle to hold the water')
+      const g = bot.blockAt(at(0, 0))
+      if (g && g.name !== 'air' && g.name !== 'water') { await reachBlock(bot, g.position, signal, 3, 15_000); await equipFor(bot, g).catch(() => {}); await digBlock(bot, g, signal) }
+      if (bot.blockAt(at(0, 0))?.name === 'water' || await pourWater(bot, at(0, 0), signal)) steps.push('poured water in the middle')
+      else { waterHow = 'none'; steps.push('the water would not go in the middle, so the plot is dry') }
+    } catch (e) { checkAborted(signal); waterHow = 'none'; steps.push(`no water from the bucket (${(e as Error).message}), so the plot is dry`) }
+  }
   // water from carried ice: a hole in the middle, the ice in it, broken without Silk Touch
-  let waterHow: Farm['water'] = plan.water === 'near' ? 'natural' : plan.water === 'ice' ? 'ice' : 'none'
   if (plan.water === 'ice') {
     try {
       const g = bot.blockAt(at(0, 0))
@@ -574,23 +679,35 @@ export async function plotFarm (ctx: Pick<ActionContext, 'bot' | 'agent' | 'sign
   const cropName = ({ wheat_seeds: 'wheat', carrot: 'carrot', potato: 'potato', beetroot_seeds: 'beetroot' } as Record<string, string>)[crop] ?? crop
   let ids: string[] = []
   try { ids = siteBook(agent).all().filter(r => r.kind === 'farm').map(r => r.id) } catch {}
-  const name = nextFarmName([...getFarms(agent).map(f => f.name), ...ids])
+  const name = prev?.name ?? nextFarmName([...getFarms(agent).map(f => f.name), ...ids])
   const dim = bot.game?.dimension
-  // site health judges only the cells that hold crops: a plot by a lake keeps its wet cells out
-  const land = [...new Set([...plan.till.map(([dx, dz]) => `${dx},${dz}`), ...cells.filter(x => x.above === 'crop').map(x => `${x.dx},${x.dz}`)])]
-  const farm: Farm = { name, x: c.x, y: c.y, z: c.z, ...(dim ? { dim } : {}), size: spot.size, crop: cropName, created: Date.now(), tended: Date.now(), land, water: waterHow, kind: 'plot', ...(waterHow !== 'none' && plan.torches.length ? { keptOpen: 'torch' as const } : {}) }
+  // site health judges only the cells that hold crops: a plot by a lake keeps its wet cells out;
+  // an extended farm keeps its old land cells, moved to the new centre
+  const oldLand = prev ? (prev.land ?? []).map(k => k.split(',').map(Number) as [number, number]).map(([dx, dz]) => `${prev.x + dx - c.x},${prev.z + dz - c.z}`) : []
+  const land = [...new Set([...oldLand, ...plan.till.map(([dx, dz]) => `${dx},${dz}`), ...cells.filter(x => x.above === 'crop').map(x => `${x.dx},${x.dz}`)])]
+    .filter(k => { const [dx, dz] = k.split(',').map(Number) as [number, number]; return Math.abs(dx) <= h && Math.abs(dz) <= h && !(dx === 0 && dz === 0 && waterHow !== 'none' && waterHow !== 'natural') })
+  // water it made in the middle before is still its own (not a lake beside the plot)
+  if (prev && (prev.water === 'ice' || prev.water === 'bucket') && prev.x === c.x && prev.z === c.z && bot.blockAt(at(0, 0))?.name === 'water') waterHow = prev.water
+  const farm: Farm = {
+    ...(prev ?? {}), name, x: c.x, y: c.y, z: c.z, ...(dim ? { dim } : {}), size: spot.size, crop: prev?.crop ?? cropName, created: prev?.created ?? Date.now(), tended: Date.now(), land, water: waterHow, kind: 'plot',
+    ...(waterHow !== 'none' && plan.torches.length ? { keptOpen: 'torch' as const } : {})
+  }
+  if (waterHow === 'none') delete farm.keptOpen
   saveFarm(agent, farm)
   setPlace(agent, name, { x: c.x, y: c.y, z: c.z, ...(dim ? { dimension: dim } : {}) })
-  try { agent.journal?.record('farm_started', { name, size: spot.size, crop: cropName, planted, kind: 'plot', water: waterHow }, { pos: farm }) } catch {}
-  return ok(`started ${name} on the farm plot at ${fmtPos(c)}: planted ${planted} ${cropName}; ${plan.reason}${steps.length ? `; ${steps.join(', ')}` : ''}`, { farm })
+  try { agent.journal?.record(prev ? 'farm_extended' : 'farm_started', { name, size: spot.size, crop: cropName, planted, kind: 'plot', water: waterHow, waterFrom: choice.source }, { pos: farm }) } catch {}
+  const head = prev ? `extended ${name} from ${prev.size}x${prev.size} to the ${spot.size}x${spot.size} farm plot at ${fmtPos(c)}` : `started ${name} on the ${spot.size}x${spot.size} farm plot at ${fmtPos(c)}`
+  return ok(`${head}: planted ${planted} ${cropName}; ${plan.reason}; water: ${waterNote}${steps.length ? `; ${steps.join(', ')}` : ''}`, { farm })
 }
 
 const plotFarmAction = defineAction({
   name: 'plot_farm',
-  description: 'Turn the farm plot its base keeps free inside the walls (base project farm_plot) into a small farm, no bucket needed: ' +
-    'water already in reach of the plot, or ice it carries (only Silk Touch brings ice) broken in the middle, else a dry plot ' +
-    '(crops on dry farmland still grow, about half as fast, as long as every tilled cell is planted). Torches give the crops light 9 ' +
-    'and keep the middle water from freezing. Settings farming.plot, plotWater (auto | water | dry), plotSwap.',
+  description: 'Turn the farm plot its base keeps free inside the walls (base project farm_plot) into a farm, or extend its farm when the plot grew: ' +
+    'water already in reach of the plot; on a plot of 5 and up a water bucket (carried, from a container, an empty one filled, or crafted from 3 iron) ' +
+    'poured in the middle; ice it carries (only Silk Touch brings ice) broken in the middle; else a dry plot ' +
+    '(crops on dry farmland still grow, about half as fast, as long as every tilled cell is planted). Short of seeds it takes them from its chests, ' +
+    'then breaks grass near home. Torches give the crops light 9 and keep the middle water from freezing. ' +
+    'Settings farming.plot, plotWater (auto | water | dry), plotSwap, plotSize, plotSeedRadius.',
   capabilities: ['move', 'dig', 'place'],
   params: z.object({
     spawnClearance: z.number().min(0).max(256).default(48).describe('never till within this distance of the world spawn')

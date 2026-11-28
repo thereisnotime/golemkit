@@ -43,7 +43,7 @@ split it into projects; the rest come after:
 |---|---|---|
 | `walls` | foundation, walls, gate door and the gate torches | |
 | `integrity` | [base safety](./base-safety): caves and holes under the floor, tunnels under the walls and mine entrances next to them sealed, filled, capped or lit. Once the base is settled; off with `baseSafety.enabled` | |
-| `farm_plot` | keeps a 3x3 to 5x5 plot inside the walls free for a farm (place `farm_plot`); the floor goes around it. Bots without `start_farm` don't get it | walls |
+| `farm_plot` | keeps an odd square plot inside the walls free for a farm (place `farm_plot`), `farming.plotMin` (3) up to `farming.plotSize` (7); the floor goes around it. A smaller plot is grown later ([growing the plot](./food-sources#growing-the-plot)). Bots without `start_farm` don't get it | walls |
 | `floor` | stone floor inside; columns under another build (a hut, a torch) are left alone | walls, farm_plot |
 | `lighting` | `light_up` over the whole base until no spot inside can spawn a mob; re-checked once a day | walls, floor |
 | `storage` | four chests against an inside wall (`storage_row`), when there is no chest at the base or every one there is nearly full | floor |

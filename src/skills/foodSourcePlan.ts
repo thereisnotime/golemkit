@@ -27,7 +27,7 @@ export interface FoodSourceWorld {
   chestSeeds: number
   grass: boolean
   /** The base's reserved farm plot (base projects: farm_plot): known and in this dimension. */
-  plot: { known: boolean, used: boolean } | null
+  plot: { known: boolean, used: boolean, grow?: boolean } | null
   /** Fishing: a rod, or string and sticks (or planks) to make one; open water or ice it may break near. */
   rod: boolean
   canMakeRod: boolean
@@ -53,6 +53,8 @@ export interface FoodSourceDef {
   assess (w: FoodSourceWorld, s: FoodSourceSettings): FoodSourceVerdict
   /** A lasting source that already stands (its farm exists): nothing to set up. */
   have? (w: FoodSourceWorld): string | null
+  /** A standing source that has more to set up (the base's plot grew past its farm), and why. */
+  extend? (w: FoodSourceWorld): string | null
 }
 
 const seedsText = (w: FoodSourceWorld) => `${w.seeds} seeds${w.chestSeeds ? `, ${w.chestSeeds} in my chests` : ''}`
@@ -89,6 +91,7 @@ export const FOOD_SOURCES: readonly FoodSourceDef[] = [
     kind: 'lasting',
     title: 'the base\'s farm plot',
     have: w => w.farms.find(f => f.kind === 'plot')?.name ?? null,
+    extend: w => w.plot?.grow && w.canDig ? 'the plot grew: extend the farm onto it' : null,
     assess (w, s) {
       if (!s.plot) return { ok: false, reason: 'farming.plot is off' }
       if (!w.plot?.known) return { ok: false, reason: 'no farm plot kept in the base (base project farm_plot)' }
@@ -189,8 +192,12 @@ export function chooseFoodSource (w: FoodSourceWorld, s: FoodSourceSettings, def
     const def = defs.find(d => d.name === name)
     if (!def) continue
     const have = def.have?.(w) ?? null
-    if (have) return { active: name, kind: def.kind, have, run: false, reason: `${have} (${def.title}) is my food supply`, skipped }
     const f = w.failed[name]
+    if (have) {
+      const more = def.extend?.(w) ?? null
+      if (more && !(f && f.until > w.now)) return { active: name, kind: def.kind, have, run: true, reason: `${have} (${def.title}): ${more}`, skipped }
+      return { active: name, kind: def.kind, have, run: false, reason: `${have} (${def.title}) is my food supply`, skipped }
+    }
     if (f && f.until > w.now) { skipped.push({ name, reason: `failed ${Math.max(1, Math.round((w.now - (f.until - s.retryMinutes * 60_000)) / 60_000))}m ago: ${f.reason}` }); continue }
     const v = def.assess(w, s)
     if (!v.ok) { skipped.push({ name, reason: v.reason }); continue }

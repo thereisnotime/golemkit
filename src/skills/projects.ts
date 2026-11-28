@@ -19,7 +19,7 @@ import { vec, gotoWithin, isPlaceFace } from './world.ts'
 import { inventoryCounts } from './toolkit.ts'
 import { rotate, placeCells, bounds, resolveRoles, solidCells, isReplaceableName, isNaturalBlock, FACINGS, type Blueprint, type Facing, type Pos, type WorldCell, type ResolvedRole } from './blueprint.ts'
 import {
-  blueprintStages, stageCells, surveyStage, fitAnchor, interiorOf, fitRow, fitSquare, billOfMaterials, fmtBom, sessionWants,
+  blueprintStages, stageCells, surveyStage, fitAnchor, interiorOf, fitRow, fitSquare, growPlot, billOfMaterials, fmtBom, sessionWants,
   projectWords, projectNamed, safeToWork, EXTRA_PROJECTS, type Stage, type Interior, type Column, type Fit, type AnchorCandidate, type ProjectDef
 } from './basePlan.ts'
 import { buildStructure, ownBlocks, getPlacements, planSite } from './construction.ts'
@@ -32,6 +32,10 @@ import { getHome, getPlaces, setPlace } from './navigation.ts'
 import { lightUp, ownTorches } from './lighting.ts'
 import { tellOwners } from './pvp-actions.ts'
 import { checkBase, secureBase, type BaseCheck } from './baseSafety.ts'
+import { getMines } from './stairMine.ts'
+import { hatchCells } from './stairMinePlan.ts'
+import { mineCells } from './baseSafetyPlan.ts'
+import { plotFarmSettings } from './plotFarmPlan.ts'
 
 const STATE_KEY = 'projects.state'
 const SPOTS_KEY = 'projects.spots'
@@ -183,6 +187,8 @@ export interface Surveyed {
   todo?: WorldCell[]
   /** Where a row or plot goes (computed now, kept when the work starts). */
   fit?: Fit | { x0: number, z0: number, size: number, y: number }
+  /** farm_plot: the smaller plot this fit grows. */
+  grow?: { x0: number, z0: number, size: number, y: number }
   roles?: Record<string, ResolvedRole>
   bp?: Blueprint
   origin?: Pos
@@ -250,14 +256,25 @@ export function surveyBase (agent: Agent, bot: Bot, s = settingsOf(agent)): Base
   const door = base.cells.filter(c => base.roles[c.role]?.kind === 'door').map(c => ({ x: c.x, z: c.z }))
   const y0 = interior?.y ?? base.origin.y
   const fitted: Column[] = [...(spots.storage?.cells ?? []), ...(spots.workshop?.cells ?? [])]
-  const reservedCols = (c: Column) => inPlot(c) || fitted.some(q => q.x === c.x && q.z === c.z)
-  const freeCol = (c: Column) => {
-    if (reservedCols(c)) return false
+  // a plot grown this survey: rows fitted after it keep off its columns too
+  let grown: { x0: number, z0: number, size: number } | null = null
+  const inGrown = (c: Column) => !!grown && c.x >= grown.x0 && c.x < grown.x0 + grown.size && c.z >= grown.z0 && c.z < grown.z0 + grown.size
+  const reservedCols = (c: Column) => inPlot(c) || inGrown(c) || fitted.some(q => q.x === c.x && q.z === c.z)
+  // the floor holds nothing but air above (a bed, a chest, a table or a crop is somebody's spot)
+  const openCol = (c: Column, torchOk = false) => {
     const floor = at({ x: c.x, y: y0, z: c.z })
     if (floor === undefined || floor === 'water' || floor === 'lava') return false
-    for (const dy of [1, 2]) { const n = at({ x: c.x, y: y0 + dy, z: c.z }); if (n === undefined || !isReplaceableName(n)) return false }
+    for (const dy of [1, 2]) { const n = at({ x: c.x, y: y0 + dy, z: c.z }); if (n === undefined || !(isReplaceableName(n) || (torchOk && dy === 1 && n === 'torch'))) return false }
     return true
   }
+  const freeCol = (c: Column) => !reservedCols(c) && openCol(c)
+  // the inside mine's stairs and hatch near the floor: never under the plot
+  const mineCols = new Set<string>()
+  const dim = bot.game?.dimension
+  for (const m of getMines(agent).filter(m => !m.dim || !dim || m.dim === dim)) {
+    for (const p of [m.entrance, ...mineCells(m), ...hatchCells(m.entrance, m.dir)]) if (p.y >= y0 - 4 && p.y <= y0 + 3) mineCols.add(`${p.x},${p.z}`)
+  }
+  const plotSettings = plotFarmSettings((agent.settings as { farming?: unknown }).farming)
   const indoors = stageDone('walls') && !!spots.light && spots.light.dark === 0
   const lib = loadLibrary(libraryDirs(agent)).blueprints
 
@@ -266,12 +283,27 @@ export function surveyBase (agent: Agent, bot: Bot, s = settingsOf(agent)): Base
     const info = (left: number, total: number, extra: Partial<ProjectInfo> = {}): ProjectInfo => ({ name: def.name, title: def.title, left, total, after, ...(requested.includes(def.name) ? { requestedBy: by } : {}), ...extra })
     if (def.kind === 'plot') {
       if (!agent.getAction('start_farm')) continue
-      if (plot) { out.push({ info: info(0, 1, { small: true }), def: { kind: 'plot', def }, fit: plot, note: `${plot.size}x${plot.size} at ${plot.x0} ${plot.z0}` }); continue }
+      if (plot) {
+        // smaller than farming.plotSize: a bigger square inside the walls, the base's own floor in it counts as free
+        // (plot_farm swaps it for dirt), never on the chest row, the workshop, the mine's stairs and hatch or by the gate
+        const g = interior && plot.size < plotSettings.plotSize
+          ? growPlot(interior, c => !fitted.some(q => q.x === c.x && q.z === c.z) && !mineCols.has(`${c.x},${c.z}`) && openCol(c, true), plot, { size: plotSettings.plotSize, margin: 1, avoid: door })
+          : null
+        if (g) {
+          grown = g.plot
+          out.push({ info: info(1, 1, { small: true }), def: { kind: 'plot', def }, fit: { ...g.plot, y: plot.y }, grow: plot,
+            note: `grow the ${plot.size}x${plot.size} plot to ${g.plot.size}x${g.plot.size} at ${g.plot.x0} ${g.plot.z0}${g.keepsOld ? '' : ' (moves off the old plot)'}` })
+        } else {
+          out.push({ info: info(0, 1, { small: true }), def: { kind: 'plot', def }, fit: plot, note: `${plot.size}x${plot.size} at ${plot.x0} ${plot.z0}${plot.size < plotSettings.plotSize ? `; no free ${plot.size + 2}x${plot.size + 2} inside the walls to grow it to` : ''}` })
+        }
+        continue
+      }
       if (!interior) { out.push({ info: info(1, 1, { small: true, blocked: 'no inside to the base' }), def: { kind: 'plot', def } }); continue }
       const floorDone = out.find(p => p.info.name === 'floor')
       if (floorDone && floorDone.info.left === 0 && floorDone.info.total > 0) { out.push({ info: info(0, 1, { small: true }), def: { kind: 'plot', def }, note: 'the floor is stone already: no plot' }); continue }
-      const sq = fitSquare(interior, freeCol, { max: 5, min: 3, margin: 1, avoid: door })
-      out.push({ info: info(sq ? 1 : 1, 1, { small: true, ...(sq ? {} : { blocked: 'no free 3x3 inside the walls' }) }), def: { kind: 'plot', def }, ...(sq ? { fit: { ...sq, y: y0 } } : {}) })
+      const sq = fitSquare(interior, c => freeCol(c) && !mineCols.has(`${c.x},${c.z}`), { max: plotSettings.plotSize, min: plotSettings.plotMin, margin: 1, avoid: door, odd: true })
+      if (sq) grown = sq
+      out.push({ info: info(1, 1, { small: true, ...(sq ? {} : { blocked: `no free ${plotSettings.plotMin}x${plotSettings.plotMin} inside the walls` }) }), def: { kind: 'plot', def }, ...(sq ? { fit: { ...sq, y: y0 } } : {}) })
       continue
     }
     if (def.kind === 'secure') {
@@ -548,11 +580,14 @@ export async function workOn (ctx: Ctx, p: BasePlan, entry: QueueEntry, minutes:
   if (kind === 'plot') {
     const f = sv.fit as Spots['farm_plot']
     if (!f) return fail('no spot for a farm plot')
-    spots.farm_plot = f
+    const old = sv.grow
+    spots.farm_plot = { x0: f.x0, z0: f.z0, size: f.size, y: f.y }
     saveSpots(agent, spots)
     const c = { x: f.x0 + Math.floor(f.size / 2), y: f.y + 1, z: f.z0 + Math.floor(f.size / 2) }
     setPlace(agent, 'farm_plot', { ...c, ...(bot.game?.dimension ? { dimension: String(bot.game.dimension).replace('minecraft:', '') } : {}) })
-    result = ok(`kept a ${f.size}x${f.size} plot inside the walls free for a farm (place farm_plot, ${fmtPos(c)}); the floor goes around it`)
+    result = old
+      ? ok(`grew the farm plot from ${old.size}x${old.size} to ${f.size}x${f.size} inside the walls (place farm_plot, ${fmtPos(c)}); the floor in it becomes farmland, the plot farm takes the new square next time`)
+      : ok(`kept a ${f.size}x${f.size} plot inside the walls free for a farm (place farm_plot, ${fmtPos(c)}); the floor goes around it`)
   } else if (kind === 'secure') {
     result = sv.safety ? await secureBase(ctx, sv.safety, minutes) : fail('no base safety check')
   } else if (kind === 'light') {

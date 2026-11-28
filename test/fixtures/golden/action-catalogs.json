@@ -4459,7 +4459,7 @@
       },
       {
         "name": "plot_farm",
-        "description": "Turn the farm plot its base keeps free inside the walls (base project farm_plot) into a small farm, no bucket needed: water already in reach of the plot, or ice it carries (only Silk Touch brings ice) broken in the middle, else a dry plot (crops on dry farmland still grow, about half as fast, as long as every tilled cell is planted). Torches give the crops light 9 and keep the middle water from freezing. Settings farming.plot, plotWater (auto | water | dry), plotSwap.",
+        "description": "Turn the farm plot its base keeps free inside the walls (base project farm_plot) into a farm, or extend its farm when the plot grew: water already in reach of the plot; on a plot of 5 and up a water bucket (carried, from a container, an empty one filled, or crafted from 3 iron) poured in the middle; ice it carries (only Silk Touch brings ice) broken in the middle; else a dry plot (crops on dry farmland still grow, about half as fast, as long as every tilled cell is planted). Short of seeds it takes them from its chests, then breaks grass near home. Torches give the crops light 9 and keep the middle water from freezing. Settings farming.plot, plotWater (auto | water | dry), plotSwap, plotSize, plotSeedRadius.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -8336,7 +8336,7 @@
       },
       {
         "name": "plot_farm",
-        "description": "Turn the farm plot its base keeps free inside the walls (base project farm_plot) into a small farm, no bucket needed: water already in reach of the plot, or ice it carries (only Silk Touch brings ice) broken in the middle, else a dry plot (crops on dry farmland still grow, about half as fast, as long as every tilled cell is planted). Torches give the crops light 9 and keep the middle water from freezing. Settings farming.plot, plotWater (auto | water | dry), plotSwap.",
+        "description": "Turn the farm plot its base keeps free inside the walls (base project farm_plot) into a farm, or extend its farm when the plot grew: water already in reach of the plot; on a plot of 5 and up a water bucket (carried, from a container, an empty one filled, or crafted from 3 iron) poured in the middle; ice it carries (only Silk Touch brings ice) broken in the middle; else a dry plot (crops on dry farmland still grow, about half as fast, as long as every tilled cell is planted). Short of seeds it takes them from its chests, then breaks grass near home. Torches give the crops light 9 and keep the middle water from freezing. Settings farming.plot, plotWater (auto | water | dry), plotSwap, plotSize, plotSeedRadius.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -14074,7 +14074,7 @@
       },
       {
         "name": "plot_farm",
-        "description": "Turn the farm plot its base keeps free inside the walls (base project farm_plot) into a small farm, no bucket needed: water already in reach of the plot, or ice it carries (only Silk Touch brings ice) broken in the middle, else a dry plot (crops on dry farmland still grow, about half as fast, as long as every tilled cell is planted). Torches give the crops light 9 and keep the middle water from freezing. Settings farming.plot, plotWater (auto | water | dry), plotSwap.",
+        "description": "Turn the farm plot its base keeps free inside the walls (base project farm_plot) into a farm, or extend its farm when the plot grew: water already in reach of the plot; on a plot of 5 and up a water bucket (carried, from a container, an empty one filled, or crafted from 3 iron) poured in the middle; ice it carries (only Silk Touch brings ice) broken in the middle; else a dry plot (crops on dry farmland still grow, about half as fast, as long as every tilled cell is planted). Short of seeds it takes them from its chests, then breaks grass near home. Torches give the crops light 9 and keep the middle water from freezing. Settings farming.plot, plotWater (auto | water | dry), plotSwap, plotSize, plotSeedRadius.",
         "inputSchema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",

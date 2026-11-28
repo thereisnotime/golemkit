@@ -210,28 +210,81 @@ export function fitRow (interior: Interior, length: number, free: (c: Column) =>
   return best?.fit ?? null
 }
 
+/** A square of columns: its north-west corner and side. */
+export interface Square { x0: number, z0: number, size: number }
+
+const squareHas = (s: Square, c: Column) => c.x >= s.x0 && c.x < s.x0 + s.size && c.z >= s.z0 && c.z < s.z0 + s.size
+const squareCentre = (s: Square) => ({ x: s.x0 + (s.size - 1) / 2, z: s.z0 + (s.size - 1) / 2 })
+const containsSquare = (outer: Square, inner: Square) => inner.x0 >= outer.x0 && inner.z0 >= outer.z0 && inner.x0 + inner.size <= outer.x0 + outer.size && inner.z0 + inner.size <= outer.z0 + outer.size
+
 /**
  * The largest free square (up to `max`, at least `min`) inside, away from the walls by `margin`
- * and from `avoid`, for a farm plot. Pure. Returns its corner columns and size.
+ * and from `avoid`, for a farm plot. Pure. Returns its corner columns and size. `odd`: odd sides
+ * only (a plot is worked from its centre). `prefer`: among the squares of one size, one that holds
+ * this square first, then the nearest to its centre (growing a plot keeps its crops); without it
+ * the first in z, x order.
  */
-export function fitSquare (interior: Interior, free: (c: Column) => boolean, o: { max?: number, min?: number, margin?: number, avoid?: Column[], keepClear?: number } = {}): { x0: number, z0: number, size: number } | null {
+export function fitSquare (interior: Interior, free: (c: Column) => boolean, o: { max?: number, min?: number, margin?: number, avoid?: Column[], keepClear?: number, odd?: boolean, prefer?: Square } = {}): Square | null {
   const inside = new Set(interior.cols.map(c => `${c.x},${c.z}`))
   const margin = o.margin ?? 1
   const clear = o.keepClear ?? 2
+  const memo = new Map<string, boolean>()
   const good = (x: number, z: number) => {
-    for (let dx = -margin; dx <= margin; dx++) for (let dz = -margin; dz <= margin; dz++) if (!inside.has(`${x + dx},${z + dz}`)) return false
-    if ((o.avoid ?? []).some(a => Math.abs(a.x - x) + Math.abs(a.z - z) <= clear)) return false
-    return free({ x, z })
+    const k = `${x},${z}`
+    const m = memo.get(k)
+    if (m !== undefined) return m
+    let v = true
+    for (let dx = -margin; dx <= margin && v; dx++) for (let dz = -margin; dz <= margin && v; dz++) if (!inside.has(`${x + dx},${z + dz}`)) v = false
+    if (v && (o.avoid ?? []).some(a => Math.abs(a.x - x) + Math.abs(a.z - z) <= clear)) v = false
+    if (v) v = free({ x, z })
+    memo.set(k, v)
+    return v
   }
+  const starts = [...interior.cols].sort((a, b) => a.z - b.z || a.x - b.x)
   for (let size = o.max ?? 5; size >= (o.min ?? 3); size--) {
-    const starts = [...interior.cols].sort((a, b) => a.z - b.z || a.x - b.x)
+    if (o.odd && size % 2 === 0) continue
+    let best: { sq: Square, rank: number } | null = null
     for (const s of starts) {
       let all = true
       for (let dx = 0; dx < size && all; dx++) for (let dz = 0; dz < size && all; dz++) if (!good(s.x + dx, s.z + dz)) all = false
-      if (all) return { x0: s.x, z0: s.z, size }
+      if (!all) continue
+      const sq = { x0: s.x, z0: s.z, size }
+      if (!o.prefer) return sq
+      const a = squareCentre(sq)
+      const b = squareCentre(o.prefer)
+      const rank = (containsSquare(sq, o.prefer) ? 0 : 1000) + Math.hypot(a.x - b.x, a.z - b.z)
+      if (!best || rank < best.rank) best = { sq, rank }
     }
+    if (best) return best.sq
   }
   return null
+}
+
+export interface PlotGrowth {
+  plot: Square
+  /** The new square holds the old plot (its crops stay in the farm). */
+  keepsOld: boolean
+}
+
+/**
+ * A bigger square for a farm plot that is smaller than `size` (odd sides only). Pure. The old
+ * plot's columns count as free (its farmland and crops are the farm); every other column must be
+ * `free` (not kept for something else, nothing standing on it). A square holding the old plot wins
+ * over a bigger one that doesn't; among those of one size, the nearest to the old centre. Null when
+ * the plot is big enough or nothing bigger fits.
+ */
+export function growPlot (interior: Interior, free: (c: Column) => boolean, old: Square, o: { size: number, margin?: number, avoid?: Column[], keepClear?: number }): PlotGrowth | null {
+  const want = o.size % 2 ? o.size : o.size - 1
+  if (old.size >= want) return null
+  const freeHere = (c: Column) => squareHas(old, c) || free(c)
+  const base = { margin: o.margin ?? 1, ...(o.avoid ? { avoid: o.avoid } : {}), ...(o.keepClear !== undefined ? { keepClear: o.keepClear } : {}), odd: true }
+  // sizes from the wanted one down, a square holding the old plot first
+  for (let size = want; size > old.size; size -= 2) {
+    const sq = fitSquare(interior, freeHere, { ...base, max: size, min: size, prefer: old })
+    if (sq && containsSquare(sq, old)) return { plot: sq, keepsOld: true }
+  }
+  const any = fitSquare(interior, freeHere, { ...base, max: want, min: old.size + 1, prefer: old })
+  return any ? { plot: any, keepsOld: containsSquare(any, old) } : null
 }
 
 // ------------------------------------------------------------------ materials

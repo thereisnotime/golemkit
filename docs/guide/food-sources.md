@@ -85,9 +85,9 @@ comes back (`repair_farm` or the next site re-check), its land list is recorded.
 
 ## The base's farm plot
 
-The `farm_plot` base project keeps a 3x3 (or 5x5) plot free inside the walls. `plot_farm` turns it
-into a farm without a bucket (`planPlotFarm` in `src/skills/plotFarmPlan.ts`). What makes that
-possible, in Minecraft 1.21.1:
+The `farm_plot` base project keeps an odd square plot free inside the walls, from `farming.plotMin`
+(3) up to `farming.plotSize` (7). `plot_farm` turns it into a farm, with or without a bucket
+(`planPlotFarm` in `src/skills/plotFarmPlan.ts`). What makes that possible, in Minecraft 1.21.1:
 
 | rule | consequence |
 |---|---|
@@ -107,16 +107,46 @@ block. Pax's plot was refused for days with "something I must not touch is in th
 
 So `plot_farm`, with `farming.plotWater`:
 
-- `auto` (default): water in reach of the whole plot if there is any, else carried ice, else a dry
-  plot with a torch in the middle.
+- `auto` (default): water in reach of the whole plot if there is any. A plot of 5x5 and up then
+  pours water in the middle (`choosePlotWater`): a water bucket it carries, one from a container it
+  may take from (`storage.anyContainer` widens that to every container), carried ice, an empty
+  bucket filled at water within 64 blocks, a bucket crafted from 3 iron ingots (carried or stored)
+  and filled. Without any of them, or on a 3x3 without water in reach or ice, a dry plot with a
+  torch in the middle. The result says where the water came from, or what was missing ("no water
+  bucket, no bucket and 2 iron ingots (3 make one), no ice").
 - `water`: only with water.
 - `dry`: never bothers with water.
 
 Torches go where they light the most dark cells until every crop cell has light 9 (it reads the
 light the server sends; without light data it puts the middle torch up and says it couldn't
 check). Stone, sand or gravel cells are dug out and filled with dirt when `farming.plotSwap` is on
-and it has the dirt. The farm is saved as `kind: plot`, `water: none | natural | ice`, and tended
-like any farm, but never grown past the plot.
+and it has the dirt; short of dirt it takes it from its chests, then from the material sources
+(3 minutes at most). The farm is saved as `kind: plot`, `water: none | natural | bucket | ice`, and
+tended like any farm, but never grown past the plot. Poured water in the middle is kept open in the
+cold the same way as ice water: a torch on the ring when it is under the open sky.
+
+Seeds: it counts the cells the plot can still take (`plantableCells`) against the seeds it carries
+(`plotSeedNeed`), takes the rest from its chests, and breaks grass for what is still missing within
+`farming.plotSeedRadius` (32) of home: surface grass only, never in a protected area or within a
+block of somebody's build (its own work doesn't count).
+
+### Growing the plot
+
+A plot is fitted once, and Pax's fortress (560 67 -43, a 13x13 stone floor) got a 3x3 that was never
+refit: 7 dry wheat for a starving bot. Now a plot smaller than `farming.plotSize` is grown by the
+`farm_plot` project (`growPlot` in `src/skills/basePlan.ts`): the biggest odd square that fits
+inside the walls, a square holding the old plot first, then the one nearest its centre. The base's
+own stone floor in it counts as free (`plot_farm` swaps it for dirt). Kept out: the chest row and
+the workshop, the inside mine's stairs and hatch, the gate (2 blocks), a block next to the walls,
+and any column with something standing on the floor (a bed, a chest, a table; a floor torch is
+fine and stays). With nothing bigger free the project says so and the plot stays.
+
+The new square is stored as the plot (`projects.spots.farm_plot`) and place `farm_plot` moves to its
+centre, so the floor project leaves the whole square alone and base safety fills a hole in it with
+dirt. The food source registry sees the plot outgrow its farm and runs `plot_farm` again, which
+extends the farm (farm:2 keeps its name, its land cells move with the centre) instead of starting a
+new one. For Pax's fortress, with nothing on the floor around it, the 3x3 at 557 -43 becomes the
+7x7 at 555 -45, which holds the old plot.
 
 ## Somebody's build
 
@@ -155,6 +185,9 @@ wrong call is easy to see.
 | `farming.plot` | on | use the base's farm plot |
 | `farming.plotWater` | `auto` | `auto`, `water`, `dry` |
 | `farming.plotSwap` | on | swap stone cells of the plot for dirt |
+| `farming.plotSize` | 7 | wanted side of the plot (odd, 3 to 11); a smaller one is grown |
+| `farming.plotMin` | 3 | smallest plot worth keeping (odd) |
+| `farming.plotSeedRadius` | 32 | grass this far from home is broken for the plot's seeds |
 
 `farm_setup`'s option `sources: false` goes back to the old rule (only `start_farm`).
 All of them are [live toggles](./live-config).

@@ -20,6 +20,8 @@
 // - Water freezes in a cold biome only as the top block under the sky with block light below 10.
 //   Inside a roofed base it never freezes; inside open walls it needs a block over it or a torch.
 
+import { z } from 'zod'
+
 export type PlotGround =
   | 'farmland'
   | 'tillable' // grass, dirt, coarse dirt, rooted dirt, dirt path
@@ -51,6 +53,8 @@ export interface PlotFarmInput {
   water: { dx: number, dy: number, dz: number }[]
   /** Ice blocks it carries (only from Silk Touch), and whether it can break one without Silk Touch. */
   iceItems: number
+  /** A water bucket in hand for the centre (choosePlotWater picked it and it got one). */
+  bucket?: boolean
   plainBreak: boolean
   /** Cold biome and open sky over the centre: water there would freeze without help. */
   freezes: boolean
@@ -71,8 +75,8 @@ export interface PlotFarmInput {
 
 export interface PlotFarmPlan {
   ok: boolean
-  /** Where its water comes from: water already in reach, ice it carries, or none (a dry plot). */
-  water: 'near' | 'ice' | 'none'
+  /** Where its water comes from: water already in reach, a bucket poured in the middle, ice it carries, or none (a dry plot). */
+  water: 'near' | 'bucket' | 'ice' | 'none'
   /** What the centre becomes. */
   centre: 'water' | 'torch' | 'crop'
   /** Cells to till and plant now (dx,dz), centre first out; as many as there are seeds. */
@@ -135,10 +139,11 @@ export function planPlotFarm (p: PlotFarmInput): PlotFarmPlan {
   if (p.mode !== 'dry') {
     if (centre.ground === 'water') { water = 'near'; wetFrom.push({ dx: 0, dy: 0, dz: 0 }) }
     else if (p.cells.filter(c => c.ground !== 'water').every(c => hydrated(c, wetFrom)) && wetFrom.length) water = 'near'
+    else if (p.bucket && !centreBlocked) { water = 'bucket'; wetFrom.push({ dx: 0, dy: 0, dz: 0 }) }
     else if (p.iceItems > 0 && p.plainBreak && !centreBlocked) { water = 'ice'; wetFrom.push({ dx: 0, dy: 0, dz: 0 }) }
   }
   if (water === 'none' && p.mode === 'water') return no('no water in reach of the plot and no ice to make some (ice only travels with Silk Touch), and farming.plotWater is water')
-  const centreKind: PlotFarmPlan['centre'] = water === 'ice' || centre.ground === 'water' ? 'water' : water === 'none' ? 'torch' : 'crop'
+  const centreKind: PlotFarmPlan['centre'] = water === 'ice' || water === 'bucket' || centre.ground === 'water' ? 'water' : water === 'none' ? 'torch' : 'crop'
   const growth: PlotFarmPlan['growth'] = water === 'none' ? 'dry' : 'wet'
 
   // cells for crops
@@ -215,11 +220,117 @@ export function planPlotFarm (p: PlotFarmInput): PlotFarmPlan {
   if (centreKind === 'water' && p.freezes && centreLight < 10) return no('the water in the middle would freeze under the open sky and I have no torch to put next to it')
 
   const parts = [
-    water === 'near' ? 'water in reach' : water === 'ice' ? 'ice I carry, broken in the middle for water' : 'no water: a dry plot (crops on dry farmland grow about half as fast and the farmland stays as long as it is planted)',
+    water === 'near' ? 'water in reach' : water === 'bucket' ? 'water from a bucket poured in the middle' : water === 'ice' ? 'ice I carry, broken in the middle for water' : 'no water: a dry plot (crops on dry farmland grow about half as fast and the farmland stays as long as it is planted)',
     `till and plant ${till.length}`,
     ...(swap.length ? [`swap ${swap.length} stone cells for dirt`] : []),
     ...(torches.length ? [`${torches.length} torch${torches.length > 1 ? 'es' : ''} for light${centreKind === 'water' && p.freezes ? ' and to keep the water open' : ''}`] : []),
     ...(stillDark && !known ? ['the server sends no light, so I could not check the light'] : [])
   ]
   return { ok: true, water, centre: centreKind, till, swap, torches, minLight, growth, reason: parts.join(', ') }
+}
+
+// ------------------------------------------------------------------ settings
+
+export interface PlotFarmSettings {
+  /** Wanted side of the base's farm plot (odd, 3 to 11): farm_plot fits one this big and grows a smaller one. */
+  plotSize: number
+  /** Smallest plot worth keeping (odd, 3 to plotSize). */
+  plotMin: number
+  /** Grass this far from home may be broken for seeds the plot is short of. */
+  plotSeedRadius: number
+}
+
+export const PLOT_FARM_DEFAULTS: PlotFarmSettings = { plotSize: 7, plotMin: 3, plotSeedRadius: 32 }
+
+const PLOT_SCHEMA = {
+  plotSize: z.number().int().min(3).max(11),
+  plotMin: z.number().int().min(3).max(11),
+  plotSeedRadius: z.number().int().min(8).max(96)
+}
+
+const odd = (n: number) => n % 2 ? n : n - 1
+
+/** settings.farming's plot knobs over the defaults; a value that fails its schema falls back to the default. Even sides go one down. */
+export function plotFarmSettings (raw: unknown): PlotFarmSettings {
+  const o = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
+  const out: PlotFarmSettings = { ...PLOT_FARM_DEFAULTS }
+  for (const k of Object.keys(PLOT_SCHEMA) as (keyof PlotFarmSettings)[]) {
+    if (o[k] === undefined) continue
+    const r = PLOT_SCHEMA[k].safeParse(o[k])
+    if (r.success) out[k] = r.data
+  }
+  out.plotSize = Math.max(3, odd(out.plotSize))
+  out.plotMin = Math.max(3, Math.min(out.plotSize, odd(out.plotMin)))
+  return out
+}
+
+// ------------------------------------------------------------------ water for a bigger plot
+
+/** Plots this big and up get a water source in the centre when it can. */
+export const PLOT_WATER_MIN = 5
+
+export type PlotWaterSource = 'near' | 'bucket' | 'chest_bucket' | 'ice' | 'fill' | 'craft' | 'none'
+
+export interface PlotWaterInput {
+  size: number
+  mode: PlotWaterMode
+  /** Water already wets every cell of the plot. */
+  near: boolean
+  /** The centre can't be dug (something it must not touch). */
+  centreBlocked: boolean
+  /** Water buckets carried, and in containers it may take from. */
+  waterBuckets: number
+  storedWaterBuckets: number
+  /** Empty buckets carried plus stored. */
+  buckets: number
+  /** Iron ingots carried plus stored (3 make a bucket). */
+  iron: number
+  /** A water source it can fill a bucket at. */
+  fillFrom: boolean
+  /** Silk Touch ice it carries and may use (farming.iceWater). */
+  ice: boolean
+  /** Below this side the plot stays as it was (water in reach or ice). Default PLOT_WATER_MIN. */
+  minSize?: number
+}
+
+/**
+ * Where the plot's centre water comes from. Water in reach first; a plot of 5 and up then takes a
+ * water bucket it carries, one from a container, carried ice (the old ice path), an empty bucket
+ * filled at water, a bucket crafted from 3 iron ingots and filled; else it stays dry. Smaller plots
+ * keep the old rule (water in reach, else ice, else dry). Pure.
+ */
+export function choosePlotWater (i: PlotWaterInput): { source: PlotWaterSource, reason: string } {
+  if (i.mode === 'dry') return { source: 'none', reason: 'farming.plotWater is dry' }
+  if (i.near) return { source: 'near', reason: 'water already in reach of the plot' }
+  if (i.centreBlocked) return { source: 'none', reason: 'the middle of the plot is something I must not touch, so no water there' }
+  if (i.size < (i.minSize ?? PLOT_WATER_MIN)) return i.ice ? { source: 'ice', reason: 'ice I carry, broken in the middle' } : { source: 'none', reason: `a ${i.size}x${i.size} plot stays dry without water in reach or ice` }
+  if (i.waterBuckets > 0) return { source: 'bucket', reason: 'a water bucket I carry' }
+  if (i.storedWaterBuckets > 0) return { source: 'chest_bucket', reason: 'a water bucket from my chests' }
+  if (i.ice) return { source: 'ice', reason: 'ice I carry, broken in the middle' }
+  if (i.buckets > 0 && i.fillFrom) return { source: 'fill', reason: 'an empty bucket filled at water near home' }
+  if (i.iron >= 3 && i.fillFrom) return { source: 'craft', reason: 'a bucket crafted from 3 iron ingots and filled at water near home' }
+  const why = [
+    'no water bucket',
+    i.buckets > 0 ? 'no water near home to fill my bucket' : i.iron >= 3 ? 'no water near home to fill a bucket' : `no bucket and ${i.iron} iron ingots (3 make one)`,
+    'no ice'
+  ]
+  return { source: 'none', reason: why.join(', ') }
+}
+
+// ------------------------------------------------------------------ seeds
+
+/**
+ * Seeds the plot is short of: the cells that can still take a crop against what it carries,
+ * what its chests hold and what grass must give. Pure.
+ */
+export function plotSeedNeed (i: { cells: number, carried: number, stored: number }): { want: number, fromChests: number, fromGrass: number } {
+  const want = Math.max(0, i.cells)
+  const short = Math.max(0, want - Math.max(0, i.carried))
+  const fromChests = Math.min(short, Math.max(0, i.stored))
+  return { want, fromChests, fromGrass: short - fromChests }
+}
+
+/** Cells of a plot read that could take a crop now: not water, not blocked, nothing standing on them, not the centre when it gets water or a torch. Pure. */
+export function plantableCells (cells: readonly PlotCell[], centreFree: boolean): number {
+  return cells.filter(c => !(c.dx === 0 && c.dz === 0 && !centreFree) && c.ground !== 'water' && c.ground !== 'blocked' && (c.above === 'air' || c.above === 'plant' || c.above === 'snow')).length
 }

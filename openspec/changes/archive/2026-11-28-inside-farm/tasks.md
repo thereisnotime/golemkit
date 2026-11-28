@@ -1,0 +1,6 @@
+- [x] plotFarmSettings (plotSize, plotMin, plotSeedRadius) with per-key fallback, live toggles, docs
+- [x] fitSquare: odd sides and a preferred square; growPlot planner; farm_plot grows a small plot (mine stairs and hatch, rows, gate kept out)
+- [x] food source registry: extend a standing plot farm when the plot grew; plot_farm extends farm:N instead of a new farm
+- [x] choosePlotWater (bucket, stored bucket, ice, empty bucket, 3 iron, dry) and the bucket path in planPlotFarm / plot_farm
+- [x] plotSeedNeed / plantableCells, grass near home for the shortfall, dirt for the swap cells
+- [x] unit tests (plot growth for Pax's fortress, water choice, seed shortfall, knobs, extend choice), goldens for the plot_farm description
