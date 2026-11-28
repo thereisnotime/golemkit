@@ -1,5 +1,5 @@
 import { defineSkill, defineAction, z, noParams, ok, fail, goals, goto, travel, surfaceY, roofed, TravelUndergroundError, holdGoal, playerEntity, fmtPos, checkAborted } from '../core/index.ts'
-import { climbOut } from './survival.ts'
+import { climbOut, escapeBox } from './survival.ts'
 
 const come = defineAction({
   name: 'come',
@@ -64,6 +64,8 @@ const gotoAction = defineAction({
       }
       return `couldn't climb out (${last})`
     }
+    // sealed in a shallow pit (an interrupted bunker): out through the lid first
+    await escapeBox(ctx)
     const sy = surfaceY(bot, bot.entity.position.x, bot.entity.position.z)
     if (total > 24 && roofed(bot, 32) && sy !== null && sy - bot.entity.position.y > 8) {
       const err = await climb('starting underground')

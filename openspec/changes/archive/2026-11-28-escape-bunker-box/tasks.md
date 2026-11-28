@@ -1,0 +1,3 @@
+- [x] boxedIn with tests
+- [x] escapeBox used by goto and go_home
+- [x] World concepts doc

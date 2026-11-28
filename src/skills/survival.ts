@@ -3,6 +3,7 @@ import type { ActionContext, ActionResult } from '../core/index.ts'
 import { defineSkill, defineAction, z, noParams, ok, fail, goals, goto, fmtPos, sleep, checkAborted, itemName } from '../core/index.ts'
 import { findItem, placeAt, digBlock, DigRefusedError } from './world.ts'
 import { air } from './air.ts'
+import { boxedIn } from './pitPlan.ts'
 import { floodsIfDug } from './airPlan.ts'
 
 /** Cheap full blocks that don't fall, for pillars and emergency shelters. */
@@ -282,6 +283,24 @@ async function climbOutNow (ctx: ActionContext, maxBlocks: number): Promise<Acti
     }
   }
   return fail(`rose ${maxBlocks} blocks and still no open sky, at ${fmtPos(bot.entity.position)}`)
+}
+
+/**
+ * Climbs out first when boxed in (pitPlan.ts): an interrupted bunker leaves the bot in a sealed
+ * shaft the pathfinder never gets out of. Returns a note when it climbed, null when not boxed in.
+ */
+export async function escapeBox (ctx: ActionContext): Promise<string | null> {
+  const { bot } = ctx
+  try {
+    const feet = bot.entity.position.floored()
+    const solid = (dx: number, dy: number, dz: number) => bot.blockAt(feet.offset(dx, dy, dz))?.boundingBox === 'block'
+    const sides = [0, 1].flatMap(dy => [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => solid(dx!, dy, dz!)))
+    let roofDy: number | null = null
+    for (let dy = 2; dy <= 4; dy++) if (solid(0, dy, 0)) { roofDy = dy - 1; break }
+    if (!boxedIn(sides, roofDy)) return null
+  } catch { return null } // no world to read (not spawned yet, a test double)
+  const r = await climbOutNow(ctx, 8).catch((e: Error) => fail(e.message))
+  return r.ok ? `climbed out of a closed pit first (${r.message})` : `boxed in and couldn't climb out: ${r.message}`
 }
 
 const isNight = (bot: Bot) => { const t = bot.time.timeOfDay; return t >= 12_500 && t <= 23_500 }

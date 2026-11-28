@@ -911,6 +911,12 @@ and the bot is unarmed or hurt (and can dig, outside protected areas), reflexes 
 dig straight down 3 blocks, seal the hole with a dug block, wait for morning (or until the mobs
 leave), climb back out with `climb_out` (dig the block above, jump, place a block underneath, until open sky), and check it really is back at the surface. It won't start when the bot is already under cover. Players and LLMs can call `bunker` and `climb_out` too.
 
+When something interrupts `bunker` before it climbs out (a fight, stay_safe sending it home), the
+bot is left at the bottom of a sealed shaft. `goto` and `go_home` check for that first: solid on all
+four sides at the feet and at the head with a lid within 3 blocks (`boxedIn` in `pitPlan.ts`; a
+room with a door doesn't count), and climb out before walking. Pax sat sealed 3 blocks down for an
+hour while `go_home` timed out every 5 minutes.
+
 ## Tools, stone and wood
 
 Bots climb the tool tiers on their own: stone tools as soon as there is a wooden pickaxe and

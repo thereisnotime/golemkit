@@ -8,6 +8,7 @@ import {
 } from '../core/index.ts'
 import { gotoWithin as walkWithin, GotoTimeoutError } from './world.ts'
 import { prepareTripAction } from './trip.ts'
+import { escapeBox } from './survival.ts'
 
 export interface Place {
   x: number
@@ -222,12 +223,14 @@ const goHome = defineAction({
   name: 'go_home',
   description: 'Walk back to the remembered home position.',
   params: z.object({ range: z.number().min(0).max(16).default(2).describe('how close to get, in blocks') }),
-  async run ({ agent, bot, signal }, { range }) {
+  async run (ctx, { range }) {
+    const { agent, bot, signal } = ctx
     const home = getHome(agent)
     if (!home) return fail('no home set')
     if (!sameDimension(bot, home)) return fail(`home is in ${home.dimension}`)
     // already there (inside the walls, a floor up or down): nothing to walk, and no path to fail
     if (atHome(bot.entity.position, home, range)) return ok(`already home (${fmtPos(home)})`)
+    await escapeBox(ctx)
     let arrived = false
     try {
       // far out (after a respawn at world spawn, say): the pathfinder only plans through loaded
