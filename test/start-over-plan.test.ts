@@ -154,6 +154,8 @@ test('state machine: range used up: best fallback, else turn, else give up', () 
   // after a turn the range counts the legs since
   assert.equal(startOverStep(st({ turns: 1, legsSinceTurn: 2 }), far, S).do, 'leg')
   assert.equal(startOverStep(st({ turns: 2, legsSinceTurn: 10 }), far, S).do, 'give_up')
+  // out of turns with a place looked at: settle at the best one even if it isn't fallback-worthy
+  assert.equal(startOverStep(st({ turns: 2, legsSinceTurn: 10, best: { ...best, fallback: false } }), far, S).do, 'settle')
 })
 
 test('best place so far', () => {

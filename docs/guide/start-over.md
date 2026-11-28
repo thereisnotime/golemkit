@@ -86,7 +86,8 @@ it was.
 5. **Range.** At `maxDistance` (1500) without a good place, it settles at the best place it looked
    at, if that place had at least some grass and trees and wasn't snowy, protected or built on.
    Otherwise it turns 90 degrees and tries that way for the same length, up to `maxTurns` times.
-   After that it gives up and makes home where it stands.
+   After that it settles at the best place it looked at even if it was snowy, and only if it never
+   looked anywhere does it make home where it stands.
 6. **Settle.** Home goes there, the bed goes down (`place_bed`), a chest goes down (`place_chest`,
    crafted from planks if needed), and ores and ingots go into the chest. Tools, food, seeds, logs
    and torches stay on it for the work ahead. It tells the owner where and why. From then on its

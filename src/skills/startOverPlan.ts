@@ -487,6 +487,8 @@ export function startOverStep (st: StartOverState | null | undefined, f: StepFac
   if (used >= s.maxDistance) {
     if (st.best?.fallback) return { do: 'settle', at: st.best, why: `best place within ${s.maxDistance} blocks: ${st.best.why}` }
     if ((st.turns ?? 0) < s.maxTurns) return { do: 'turn', heading: (st.heading ?? 0) + 90, why: `nothing good within ${s.maxDistance} blocks that way` }
+    // out of turns: the best place it looked at beats wherever it happens to stand (a mountain top)
+    if (st.best) return { do: 'settle', at: st.best, why: `nothing good after ${(st.turns ?? 0) + 1} directions, the best place seen: ${st.best.why}` }
     return { do: 'give_up', why: `nothing good within ${s.maxDistance} blocks after ${(st.turns ?? 0) + 1} directions` }
   }
   return leg(st, f, s)
