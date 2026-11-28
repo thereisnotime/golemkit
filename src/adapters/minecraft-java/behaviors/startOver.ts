@@ -141,7 +141,9 @@ export const startOverBehavior = defineBehavior({
             // around water: the first detour whose leg ends on land
             const dry = dryLegHeading(st.heading ?? 0, st.fails ?? 0, h => legWet(bot, h, s.legLength))
             // water or ice everywhere ahead (an ocean): turn rather than swim it (guardians, drowned)
-            if (dry === null && (st.turns ?? 0) < s.maxTurns) {
+            // (only from land: in the water every way looks wet, and two turns went at once live)
+            const swimming = /water/.test(bot.blockAt(bot.entity.position.floored())?.name ?? '')
+            if (dry === null && !swimming && (st.turns ?? 0) < s.maxTurns) {
               const h = (st.heading ?? 0) + 90
               st = { ...st, heading: h, turns: (st.turns ?? 0) + 1, legsSinceTurn: 0, walkedSinceTurn: 0, fails: 0, snowyLooks: 0 }
               save(st)
