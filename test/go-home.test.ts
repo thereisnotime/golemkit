@@ -202,3 +202,14 @@ test('stay_safe: night does not pull it out of its own mine (dig_mine has its ow
   assert.equal(assessDanger(c, O), null)
   assert.equal(assessDanger(nightCtx({ x: 600, y: 16, z: -60 }), O), 'night')
 })
+
+test('dry land offsets: near rings first, out to the lake-size radius with 16 directions', async () => {
+  const { dryLandOffsets } = await import('../src/skills/navigation.ts')
+  assert.equal(dryLandOffsets().length, 48)
+  const wide = dryLandOffsets(48)
+  assert.equal(wide.length, 48 + 9 * 16)
+  assert.deepEqual(wide[0], [2, 0])
+  assert.ok(Math.hypot(...wide[wide.length - 1]!) > 47)
+  const d = wide.map(([x, z]) => Math.hypot(x, z))
+  assert.ok(d.slice(48).every((v, i, a) => i === 0 || v >= a[i - 1]! - 1), 'rings outward')
+})

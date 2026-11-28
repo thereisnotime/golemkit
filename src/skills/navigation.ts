@@ -145,19 +145,31 @@ export function inWater (bot: Bot): boolean {
  * whether it ended out of the water. For actions that end with the bot afloat: an idle bot
  * in deep water sinks and drowns.
  */
-export async function reachDryLand (bot: Bot, signal: AbortSignal): Promise<boolean> {
+/**
+ * Offsets to look for dry land at, nearest ring first: every 2 blocks out to 12, then every 4
+ * out to `maxRadius` with 16 directions (the middle of a lake). Pure, exported for tests.
+ */
+export function dryLandOffsets (maxRadius = 12): [number, number][] {
+  const out: [number, number][] = []
+  for (let r = 2; r <= Math.min(12, maxRadius); r += 2) out.push([r, 0], [-r, 0], [0, r], [0, -r], [r, r], [-r, -r], [r, -r], [-r, r])
+  for (let r = 16; r <= maxRadius; r += 4) {
+    for (let i = 0; i < 16; i++) out.push([Math.round(Math.cos(i * Math.PI / 8) * r), Math.round(Math.sin(i * Math.PI / 8) * r)])
+  }
+  return out
+}
+
+export async function reachDryLand (bot: Bot, signal: AbortSignal, maxRadius = 12): Promise<boolean> {
   if (!inWater(bot)) return true
   const p = bot.entity.position
-  for (let r = 2; r <= 12; r += 2) {
-    for (const [dx, dz] of [[r, 0], [-r, 0], [0, r], [0, -r], [r, r], [-r, -r], [r, -r], [-r, r]] as const) {
-      const spot = findStandable(bot, Math.floor(p.x) + dx, Math.floor(p.y), Math.floor(p.z) + dz, 6)
-      if (!spot || bot.blockAt(at(bot, spot.x, spot.y, spot.z))?.name === 'water') continue
-      // under water and short of air: up for a breath before the next try (the pathfinder walks lake beds)
-      if (oxygen(bot) < 12) await swimUp(bot, signal)
-      // the exact spot: within 1 of a spot on the ice is still in the hole
-      await gotoWithin(bot, new goals.GoalBlock(spot.x, spot.y, spot.z), signal, 20000).catch(() => { checkAborted(signal); return false })
-      if (!inWater(bot)) return true
-    }
+  for (const [dx, dz] of dryLandOffsets(maxRadius)) {
+    const spot = findStandable(bot, Math.floor(p.x) + dx, Math.floor(p.y), Math.floor(p.z) + dz, 6)
+    if (!spot || bot.blockAt(at(bot, spot.x, spot.y, spot.z))?.name === 'water') continue
+    // under water and short of air: up for a breath before the next try (the pathfinder walks lake beds)
+    if (oxygen(bot) < 12) await swimUp(bot, signal)
+    // the exact spot: within 1 of a spot on the ice is still in the hole
+    const far = Math.hypot(dx, dz) > 12
+    await gotoWithin(bot, new goals.GoalBlock(spot.x, spot.y, spot.z), signal, far ? 40_000 : 20_000).catch(() => { checkAborted(signal); return false })
+    if (!inWater(bot)) return true
   }
   return !inWater(bot)
 }

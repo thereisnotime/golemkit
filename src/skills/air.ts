@@ -47,7 +47,8 @@ export const air = defineAction({
       const watch = setInterval(() => { if (headInWater(bot) && oxygen(bot) < LOW_ON_THE_WAY) low.abort() }, 250)
       let dry = false
       try {
-        dry = await reachDryLand(bot, AbortSignal.any([signal, low.signal]))
+        // out to 48 blocks: in the middle of a lake 12 found nothing and it bobbed up and down for minutes
+        dry = await reachDryLand(bot, AbortSignal.any([signal, low.signal]), 48)
       } catch (e) {
         if (signal.aborted || !low.signal.aborted) throw e
       } finally {

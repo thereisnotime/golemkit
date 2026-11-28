@@ -1,0 +1,2 @@
+- [x] dryLandOffsets (pure) with a test; reachDryLand takes maxRadius
+- [x] air action passes 48
