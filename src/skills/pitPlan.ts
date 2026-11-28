@@ -8,3 +8,9 @@ export function boxedIn (sides: readonly boolean[], roofDy: number | null, maxRo
   if (roofDy === null || roofDy > maxRoof) return false
   return sides.length >= 8 && sides.slice(0, 8).every(Boolean)
 }
+
+/** What to do about a box before walking: climb out by day; at night the sealed pit is the safest place (Pax climbed out at night and was killed twice in 10 minutes). */
+export function pitAction (boxed: boolean, night: boolean): 'none' | 'climb' | 'stay' {
+  if (!boxed) return 'none'
+  return night ? 'stay' : 'climb'
+}

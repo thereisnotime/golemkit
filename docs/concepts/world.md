@@ -914,8 +914,10 @@ leave), climb back out with `climb_out` (dig the block above, jump, place a bloc
 When something interrupts `bunker` before it climbs out (a fight, stay_safe sending it home), the
 bot is left at the bottom of a sealed shaft. `goto` and `go_home` check for that first: solid on all
 four sides at the feet and at the head with a lid within 3 blocks (`boxedIn` in `pitPlan.ts`; a
-room with a door doesn't count), and climb out before walking. Pax sat sealed 3 blocks down for an
-hour while `go_home` timed out every 5 minutes.
+room with a door doesn't count), and climb out before walking, by day. At night they stay in the
+sealed pit and fail with `sheltered in a sealed pit, staying until morning`: Pax sat sealed 3 blocks
+down for an hour while `go_home` timed out every 5 minutes, and the first fix climbed out at night
+and got it killed twice in 10 minutes.
 
 ## Tools, stone and wood
 

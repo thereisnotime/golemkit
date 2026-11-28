@@ -1,0 +1,2 @@
+- [x] pitAction with tests, escapeBox throws ShelteredError at night, callers return a failure
+- [x] Doc

@@ -8,7 +8,7 @@ import {
 } from '../core/index.ts'
 import { gotoWithin as walkWithin, GotoTimeoutError } from './world.ts'
 import { prepareTripAction } from './trip.ts'
-import { escapeBox } from './survival.ts'
+import { escapeBox, ShelteredError } from './survival.ts'
 
 export interface Place {
   x: number
@@ -230,7 +230,7 @@ const goHome = defineAction({
     if (!sameDimension(bot, home)) return fail(`home is in ${home.dimension}`)
     // already there (inside the walls, a floor up or down): nothing to walk, and no path to fail
     if (atHome(bot.entity.position, home, range)) return ok(`already home (${fmtPos(home)})`)
-    await escapeBox(ctx)
+    try { await escapeBox(ctx) } catch (e) { if (e instanceof ShelteredError) return fail(`${e.message}, at ${fmtPos(bot.entity.position)}`); throw e }
     let arrived = false
     try {
       // far out (after a respawn at world spawn, say): the pathfinder only plans through loaded
