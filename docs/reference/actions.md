@@ -10,7 +10,69 @@ scopeNote: "Generated from the skills: most are Minecraft; the journal and confi
 Every action is a chat command (`!name args`), an LLM tool and a typed call (`agent.act(name, params)`).
 Positional chat arguments follow the parameter order below; `key=value` works too.
 
-28 skills, 125 actions.
+30 skills, 139 actions.
+
+## base_projects
+
+Long-term base projects: improving and extending the fortress by itself.
+
+### `projects`
+
+List the base projects (fortress walls, stone floor, lighting, storage chests, workshop, walkway, towers, a farm plot) in working order: what is done, ready, waiting for an owner's ok, skipped or blocked, the policy and what comes next. Answers "pax projects".
+
+*non-exclusive*
+
+No parameters.
+
+### `project`
+
+Owners: decide about a base project. approve (ok to build), veto (never), skip (not now), unskip, next (build it next, implies ok), pause / resume (all base work), reset (forget what was said about one, or all). Names: walls, floor, walkway, towers, lighting, storage, workshop, farm_plot.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `op` | `approve` \| `veto` \| `skip` \| `unskip` \| `next` \| `pause` \| `resume` \| `reset` | yes |  | approve | veto | skip | unskip | next | pause | resume | reset |
+| `name` | string |  |  | the project (not for pause/resume); words like "chests" or "the towers" work |
+
+### `plan_base`
+
+Dry run of the base projects: finds the base (fits the fortress blueprint to what is built), surveys every project (blocks done and left, spots left alone because they hold someone else's blocks), the materials each still needs against what it carries and what its chests hold, where new things would go, and what it would do next. Builds nothing. Answers "pax plan fortress".
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `detail` | boolean |  | `true` | add the materials and notes per project |
+
+### `work_on_base`
+
+One work session on the base projects (at most `minutes`): the next one in the queue, or the one named. Takes materials from its chests, gathers what is still missing (bounded), then builds only what is not there yet; never digs blocks it did not place itself except natural ones. Resumes where the last session stopped. Big projects need an owner's ok first (policy).
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `project` | string |  |  | work on this one (it must be ready, or an owner asks); default the next in the queue |
+| `minutes` | number (1..60) |  |  | session length (default settings projects.sessionMinutes, 10) |
+
+### `check_base`
+
+Check the base for ways in for mobs: caves and holes under the floor, tunnels under the walls, a mine entrance next to the walls, dark spots mobs spawn on. Says what it found and how it would fix each (cap, fill, seal, light). Changes nothing. Answers "pax is the base safe".
+
+*non-exclusive*
+
+No parameters.
+
+### `secure_base`
+
+Make the base mob-proof now: cap a mine entrance by the walls, seal holes and tunnels into the base, fill small cavities under it, light what stays open (settings baseSafety). One bounded session; the base project "integrity" does the same between chores.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `minutes` | number (1..30) |  | `5` | session length |
 
 ## blueprint-library
 
@@ -693,6 +755,45 @@ Breed two adult animals of a kind it sees (cows/sheep with wheat, pigs with carr
 | `keepSeeds` | integer (0..64) |  | `8` | seeds to keep for replanting |
 | `maxHerd` | integer (2..64) |  | `12` | do not breed a kind with this many adults around |
 
+### `repair_farm`
+
+Look at one of its own farms that site health marked bad (flooded, frozen) and repair it where it is when that is a small job: break the frozen water in the middle and keep it open, fill flooded field cells with dirt, put the water back with a bucket. A farm that reads fine again goes back on its list. When the repair is too big (settings farming.badFarm, repairMaxBlocks, repairTries) it leaves the farm for a new one elsewhere, or for the owners.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `farm` | string |  |  | which bad farm (farm:1...); default the nearest to home |
+| `spawnClearance` | number (0..256) |  | `48` | never dig within this distance of the world spawn |
+
+### `plot_farm`
+
+Turn the farm plot its base keeps free inside the walls (base project farm_plot) into a small farm, no bucket needed: water already in reach of the plot, or ice it carries (only Silk Touch brings ice) broken in the middle, else a dry plot (crops on dry farmland still grow, about half as fast, as long as every tilled cell is planted). Torches give the crops light 9 and keep the middle water from freezing. Settings farming.plot, plotWater (auto | water | dry), plotSwap.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `spawnClearance` | number (0..256) |  | `48` | never till within this distance of the world spawn |
+
+### `fish`
+
+Fish for food: takes a rod from its chests or makes one from 2 string and 3 sticks (taking what it lacks from its chests) when it has none, goes to open water near home (or breaks a hole in a frozen lake, which turns back into water over the lake), and fishes until it has `count` catches or `maxMinutes` pass. Cod and salmon are cooked later by keep_fed.
+
+*long-running*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `count` | integer (1..32) |  | `6` | catches to stop at |
+| `maxMinutes` | number (1..30) |  | `5` | stop after this long |
+| `radius` | number (8..96) |  | `48` | how far from home to look for water |
+
+### `food_sources`
+
+Say which food source it relies on for the long run (a farm, the base plot, a bad farm to repair, animals, fishing, foraging), in the order settings food.sources gives, and why each one before it was skipped.
+
+No parameters.
+
 ## gather
 
 Mining and collecting blocks.
@@ -747,7 +848,7 @@ What happened: recent journal events (deaths, damage, kills, items, chat, action
 
 | param | type | required | default | description |
 |---|---|---|---|---|
-| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help, site; or deaths, chat, items, blocks, players, actions, places, combat, llm, connections, food, finds, stuck, sites, chests, containers, storage |
+| `type` | string |  |  | event types, comma separated: death, respawn, damage, kill, item_gained, item_lost, block_broken, block_placed, chat_in, chat_out, whisper, action, goal, player_seen, player_joined, player_left, place_visited, advancement, protected_area, food_spot, farm_started, found, connect, disconnect, llm_turn, container_changed, container_gone, help, site, start_over; or deaths, chat, items, blocks, players, actions, places, combat, llm, connections, food, finds, stuck, sites, chests, containers, storage |
 | `since` | string |  |  | how far back: 30m, 1h, 2d, today, yesterday, a date (YYYY-MM-DD); default 24h |
 | `player` | string |  |  | only events involving this player |
 | `near` | string |  |  | only events near "x y z" or "x z", optionally with a radius as 4th number (default 32) |
@@ -1254,6 +1355,56 @@ Shear sheep nearby with shears from the inventory and pick up the wool. Leaves b
 | `count` | integer (1..16) |  | `3` | how many sheep to shear |
 | `radius` | number (4..64) |  | `24` | how far to look |
 | `pens` | boolean |  | `false` | also shear sheep inside fences (only your own) |
+
+## start_over
+
+Starting over somewhere better: pack the best things, walk off, settle with home, bed and chest.
+
+### `start_over`
+
+Leave this base behind and start over somewhere better: pack the most precious things from my chests near home (iron and diamond gear, ores and ingots, the best weapon, armour, shield and bow, arrows, food, seeds, the bed, torches, a stack of logs, some cobblestone), walk off in one direction by day (500+ blocks, digging in at night) to a place with grass, trees, water and animals that is not snowy, protected or built on, then set home there with a bed and a chest and build up from scratch. cancel stops it; status says how far it got.
+
+*non-exclusive*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `cancel` | boolean |  | `false` | stop a start-over under way (it stays where it is) |
+| `status` | boolean |  | `false` | only say how far it got |
+| `direction` | `n` \| `ne` \| `e` \| `se` \| `s` \| `sw` \| `w` \| `nw` |  |  | which way to go (default: away from spawn and the avoid points) |
+
+### `start_over_pack`
+
+Packs for a start-over: its own bed by home comes along, then the most precious things from its chests near home (startOverPlan.packPlan) up to the inventory space.
+
+*internal*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `radius` | integer (8..128) |  | `48` |  |
+
+### `start_over_leg`
+
+Walks one leg of a start-over towards x z (travel, avoiding water), giving up after `minutes`.
+
+*internal*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `x` | number | yes |  |  |
+| `z` | number | yes |  |  |
+| `minutes` | number (0.5..30) |  | `4` |  |
+
+### `start_over_settle`
+
+Sets home for a start-over at x y z (walking there first): a standable spot on the ground.
+
+*internal*
+
+| param | type | required | default | description |
+|---|---|---|---|---|
+| `x` | integer (-9007199254740991..9007199254740991) | yes |  |  |
+| `y` | integer (-9007199254740991..9007199254740991) | yes |  |  |
+| `z` | integer (-9007199254740991..9007199254740991) | yes |  |  |
 
 ## status
 

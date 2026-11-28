@@ -250,6 +250,23 @@ can't change their own.
 | `deathSpots.enabled` | on/off | keep out of the spot of a recent death (default on) |
 | `deathSpots.minutes` | 0.5–240 | how long (default 10) |
 | `deathSpots.stepCost` | 0–50 | extra path cost per block inside a death spot (default 8; 0 = paths ignore it) |
+| `startOver.go` | on/off | start over once on its own when it starts (remembered: it doesn't fire again once done) ([start over](./start-over)) |
+| `startOver.minDistance` | 64–5000 | settle no closer than this to the old base, blocks (default 500) |
+| `startOver.maxDistance` | 128–10000 | look no further than this from the old base before turning 90 degrees, blocks (default 1500) |
+| `startOver.legLength` | 32–256 | walk this far per leg before looking again, blocks (default 96) |
+| `startOver.legMinutes` | 0.5–30 | a leg taking longer than this counts as blocked and the next one turns 45 degrees (default 4) |
+| `startOver.direction` | n / ne / e / se / s / sw / w / nw / empty | which way to go; empty = away from spawn and the avoid points (default empty) |
+| `startOver.spawnRadius` | 0–5000 | keep this far from world spawn, blocks (default 300) |
+| `startOver.take` | item names | packed first whatever the value table says (comma separated; prefix* and *suffix work) |
+| `startOver.leave` | item names | never packed (comma separated; prefix* and *suffix work) |
+| `startOver.freeSlots` | 0–20 | inventory slots left free after packing (default 2) |
+| `startOver.minGrass` | 0–1000 | grass blocks within 32 a new place needs (default 24) |
+| `startOver.minLogs` | 0–1000 | tree logs within 32 a new place needs (default 8) |
+| `startOver.minWater` | 0–100 | open water sources within 32 that don't freeze (default 1) |
+| `startOver.minAnimals` | 0–100 | passive animals within 64 (default 2) |
+| `startOver.maxBuildBlocks` | 0–1000 | blocks of somebody's build nearby that rule a place out (default 6) |
+| `startOver.allowSnow` | on/off | snowy and frozen biomes are fine (default off) |
+| `startOver.maxTurns` | 0–3 | times it turns 90 degrees after maxDistance without a good place before making do (default 2) |
 | `respawn.enabled` | on/off | respawn by itself when dead, also when it logs in dead (default on) |
 | `respawn.retrySeconds` | 1–120 | ask to respawn again this often while still dead (default 5) |
 | `respawn.maxTries` | 1–50 | reconnect after this many asks without coming back (default 6) |

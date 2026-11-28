@@ -34,7 +34,7 @@ export default defineVariant({
     commandBrain({ verbose: false, whisperNeedsPrefix: true }),
     reflexes(),
     hooksBrain(), // runs the context pack's hooks.yaml (profiles/<name>/), no-op without one
-    behaviorsBrain({ defaults: { keep_fed: true, stay_safe: true } }), // a profile's behaviors: block merges over these
+    behaviorsBrain({ defaults: { keep_fed: true, stay_safe: true, start_over: true } }), // a profile's behaviors: block merges over these
     intentsBrain(), // plain-language commands while the LLM can't think (profile intents.mode: first to save tokens)
     llmBrain({
       provider: process.env.MC_LLM_PROVIDER || 'claude-subscription',

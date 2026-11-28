@@ -17,6 +17,8 @@ export const JOURNAL_TYPES = [
   'help',
   /** A place it depends on (farm, bed, chest, home) went bad or is fine again (site health). */
   'site',
+  /** start_over: packing, leaving the old base, legs, looks, settling. */
+  'start_over',
   /** Written by the journal itself when a type hit its per-minute cap. */
   'journal_dropped'
 ] as const

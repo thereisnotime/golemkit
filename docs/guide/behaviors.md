@@ -1606,7 +1606,7 @@ Keeps its distance from dangerous mobs (creepers, wardens by default) instead of
 
 ### `keep_fed`
 
-*survival · priority behavior (35) · needs `eat` · uses `withdraw`, `harvest`, `hunt`, `smelt`, `craft`, `goto`, `goto_place`, `list_container`, `find_food`, `start_farm`, `tend_farm`, `plant`, `gather_seeds`, `forage`, `breed` when present*
+*survival · priority behavior (35) · needs `eat` · uses `withdraw`, `harvest`, `hunt`, `smelt`, `craft`, `eat`, `fish`, `goto`, `goto_place`, `list_container`, `find_food`, `start_farm`, `tend_farm`, `plant`, `gather_seeds`, `forage`, `breed` when present*
 
 Looks after food on its own, climbing a ladder when hungry (or hurt and too hungry to heal): eat, cook or bake what it carries; take food from known chests, its own or a village farm, remembered spots, animals in range (sparing breeders); search close, then wider, then wide (picking up seeds on the way); before the far rings (by day only) walk to a known farm or village, harvest, bake, eat and come back; with no proper source start a farm near home, plant it and use it, foraging berries, kelp (dried in a furnace) and, when desperate, apples meanwhile; when starving and nothing works, tell the owner and stay safe. Between meals it starts, replants, re-tills and grows its farm and breeds animals near home. Arm it so you never starve between turns.
 
@@ -1676,6 +1676,16 @@ After a death, goes back for the dropped things before they despawn (5 minutes):
 | `radius` | number (2..24) | `10` | pick up drops this close to the spot |
 | `goHome` | boolean | `true` | go home afterwards |
 | `announce` | boolean | `true` | tell the owner what came back (or why not) |
+
+### `start_over`
+
+*routine · priority behavior (35) · needs `start_over_pack`, `start_over_leg`, `start_over_settle` · uses `check_chests`, `deposit`, `bunker`, `place_bed`, `place_chest` when present*
+
+Carries out a start-over (the start_over action, or settings.startOver.go once on start): packs the most precious things from its chests near home, leaves the old base behind (kept as the place old_base), walks off in one direction by day and digs in at night, looks around once it is far enough (startOver.minDistance, default 500) and settles at the first place with grass, trees, water and animals that isn't snowy, protected or built on: home, bed and a chest there, then its other behaviours build up from scratch. Resumes after a restart or a death.
+
+| option | type | default | description |
+|---|---|---|---|
+| `announce` | boolean | `true` | tell the owner when it leaves, settles or gives up |
 
 ### `bodyguard`
 
@@ -1820,6 +1830,7 @@ Makes the bot self-sufficient for food: when it has no farm it starts one (seeds
 | `keepWheat` | integer (0..64) | `4` | wheat to keep for breeding instead of baking |
 | `maxHerd` | integer (2..64) | `12` | stop breeding a kind at this many adults |
 | `spawnClearance` | number (0..256) | `48` | never farm within this distance of the world spawn |
+| `sources` | boolean | `true` | pick the food source from settings food.sources (repair, farm, plot, animals, fish, forage); off = only start_farm |
 
 ### `farm_loop`
 

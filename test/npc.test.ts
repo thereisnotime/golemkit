@@ -340,3 +340,15 @@ test('suspended: no behaviour runs, even above the holder, and the running one s
   assert.equal(c.current, 'keep_fed')
   c.stop()
 })
+
+test('autoHome: home goes where it stands, unless home.away says no home on purpose (start_over travelling)', () => {
+  const f = fake()
+  f.agent.storage.set('home', undefined)
+  new NpcController(f.agent, f.bot, { behaviors: [], now: () => f.clock.t })
+  assert.deepEqual(f.agent.storage.get('home'), { x: 0, y: 64, z: 0, dimension: 'overworld' })
+  const g = fake()
+  g.agent.storage.set('home', undefined)
+  g.agent.storage.set('home.away', 'starting over')
+  new NpcController(g.agent, g.bot, { behaviors: [], now: () => g.clock.t })
+  assert.equal(g.agent.storage.get('home'), undefined)
+})

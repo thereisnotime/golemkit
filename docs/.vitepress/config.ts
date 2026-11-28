@@ -94,6 +94,7 @@ export default withMermaid(defineConfig({
           { text: 'Food sources', link: '/guide/food-sources' },
           { text: 'Base projects', link: '/guide/base-projects' },
           { text: 'Base safety', link: '/guide/base-safety' },
+          { text: 'Start over', link: '/guide/start-over' },
           { text: 'Self-improver', link: '/guide/self-improver' },
           { text: 'Scenes', link: '/guide/scenes' }
         ]

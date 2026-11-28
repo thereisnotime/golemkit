@@ -44,6 +44,7 @@ export { lighting, ownTorches } from './lighting.ts'
 export { recovery, lastOwnDeath } from './recover.ts'
 export { recoverDecision, tripCheck, recoveryReport } from './recoverPlan.ts'
 export { baseProjects, planBase, surveyBase, findBase } from './projects.ts'
+export { startOver } from './startOver.ts'
 
 import { crafting } from './crafting.ts'
 import { containers } from './containers.ts'
@@ -63,8 +64,9 @@ import { spawnBed } from './bed.ts'
 import { lighting } from './lighting.ts'
 import { recovery } from './recover.ts'
 import { baseProjects } from './projects.ts'
+import { startOver } from './startOver.ts'
 
-/** Extra skills on top of standardSkills(): crafting, containers, farming, food, search, woodcutting, building, construction, roads, blueprint library, materials, progression, pickup, WorldEdit, spawn bed, lighting, recovering own drops, base projects. */
-export const extendedSkills = () => [crafting(), containers(), farming(), food(), search(), woodcutting(), building(), construction(), roads(), blueprintLibrary(), materialsSkill(), progressionSkill(), pickup(), worldedit(), spawnBed(), lighting(), recovery(), baseProjects()]
+/** Extra skills on top of standardSkills(): crafting, containers, farming, food, search, woodcutting, building, construction, roads, blueprint library, materials, progression, pickup, WorldEdit, spawn bed, lighting, recovering own drops, base projects, starting over. */
+export const extendedSkills = () => [crafting(), containers(), farming(), food(), search(), woodcutting(), building(), construction(), roads(), blueprintLibrary(), materialsSkill(), progressionSkill(), pickup(), worldedit(), spawnBed(), lighting(), recovery(), baseProjects(), startOver()]
 export { modsSkill, installedMods } from './mods.ts'
 export { config } from './config.ts'

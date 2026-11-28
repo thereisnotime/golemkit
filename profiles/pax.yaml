@@ -72,6 +72,13 @@ settings:
   # out there it turns back home at half the food it left with or when the daylight left is the walk
   # home plus a minute. Owner orders are left alone.
   trips: { food: 8, minFood: 4, minHealth: 12, turnBackAt: 0.5, foodFloor: 6, daylightMarginS: 60 }
+  # Start over (docs/guide/start-over.md). pe4ka on 2026-11-28: "make it migrate somewhere ... it can just
+  # start over and get all its chest items that are most precious and go". The fortress at 560 67 -43 is
+  # in a snowy biome: no grass for seeds, frozen shores, animals 285+ blocks off, 16 deaths in a night.
+  # go fires once on start; the state in storage (startOver) keeps it from firing again once settled.
+  # It packs, walks 500+ blocks by day away from spawn and the village, and settles where there is
+  # grass, trees, water and animals. The old base stays as the place old_base.
+  startOver: { go: true, minDistance: 500, maxDistance: 1500, avoid: [{ name: spawn, x: 545, z: 45, radius: 300 }, { name: village, x: -2770, z: 1090, radius: 500 }] }
 # Behaviours that run on their own between LLM turns (docs/guide/behaviors.md). Pax or ${MC_OWNER:-Robin}
 # can arm more at runtime (behavior_arm / !behavior_arm follow_owner); those changes persist.
 behaviors:
@@ -82,8 +89,7 @@ behaviors:
     { below: 14, healBelow: 14, radius: 64, scout: true, rings: [48, 120, 250, 400, 600], keepBreeders: true, keepAtLeast: 2, startFarm: true, minSeeds: 8,
       growFarm: true, farmSize: 9, seedReserve: 4, seedRange: 96, seedMinutes: 4,
       foodPlaces: [
-        { name: village, x: -2770, z: 1090, crops: [wheat, carrots, potatoes] },   # the village farms, ~3500 blocks west
-        { name: own farm, place: "farm:1", crops: [wheat] }                        # its own farm by the fortress
+        { name: village, x: -2770, z: 1090, crops: [wheat, carrots, potatoes] }    # the village farms, ~3500 blocks west
       ] }
   recover_drops: { maxDistance: 400, giveUpHealth: 8 }   # after a death: back for its things before they despawn (5 min) when they can
                               # still be had (no lava/void/other dimension, close enough) and the spot is safe for its gear,
@@ -110,6 +116,7 @@ behaviors:
   light_home: { radius: 24, farmRadius: 14, target: 8, maxTorches: 12 }
   check_storage: { max: 3 }   # with settings.inventoryMemory.indexOwn: looks into its chests near home now and then
   anti_afk: { afterSeconds: 45 }   # small look/swing/hop so idle-kick servers don't drop it
+  start_over: {}                  # carries out a start-over (settings.startOver above, or "pax start over")
 # Needs and idle mode (docs/guide/needs-and-idle.md). Pax stood around for hours: its farm froze over
 # (0 cells of work, 35 seeds in the pantry) and it had no iron armour because it only used ore in sight.
 # Site health drops a flooded or frozen farm and starts a new one near home; the gear need goes looking

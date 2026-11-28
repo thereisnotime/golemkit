@@ -1,0 +1,6 @@
+- [x] Pure planner: settings, packPlan, chooseHeading/headingAfterBlock, siteVerdict/fallbackOk, startOverStep, abandonedState, with tests
+- [x] Skill: start_over action, pack/leg/settle internal actions, lookAround
+- [x] Behaviour start_over (resumable, night shelter, settle with bed and chest)
+- [x] NPC controller skips auto-home while home.away is set (test)
+- [x] Toggles, journal type, docs page, live-config rows, generated docs, golden snapshots
+- [x] Pax profile: startOver.go with spawn and village avoided; dropped the old farm:1 food place
