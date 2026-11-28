@@ -79,13 +79,13 @@ it was.
    it looks around after every leg (`siteVerdict`). Within 32 blocks it wants:
    - `minGrass` grass blocks open to the sky;
    - `minLogs` tree logs;
-   - `minWater` water sources that don't freeze;
+   - `minWater` water sources that don't freeze (within 64; with `allowSnow` ice counts);
    - `minAnimals` passive animals (within 64).
 
    The place must not be a snowy or frozen biome (unless `allowSnow`), a protected area, or next to
    somebody's build (more than `maxBuildBlocks` blocks of planks, glass, doors, farmland...). The
    first place that passes is the one. After `snowTurnAfter` (3) snowy places in a row, the main
-   heading turns 90 degrees. North of Pax's fortress was frozen land with polar bears.
+   heading turns 90 degrees (not with `allowSnow`). North of Pax's fortress was frozen land with polar bears.
 5. **Range.** After a turn, the range counts the blocks actually walked, so short legs in the
    mountains don't use it up. At `maxDistance` (1500) without a good place, it settles at the best place it looked
    at, if that place had at least some grass and trees and wasn't snowy, protected or built on.

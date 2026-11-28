@@ -357,7 +357,7 @@ export interface SiteFacts {
   grass: number
   /** Logs of natural trees nearby. */
   logs: number
-  /** Water sources open to the sky that don't freeze. */
+  /** Water sources open to the sky that don't freeze (within twice the look radius; ice too with allowSnow). */
   water: number
   /** Passive animals in sight. */
   animals: number
@@ -483,7 +483,7 @@ export function startOverStep (st: StartOverState | null | undefined, f: StepFac
   if (f.daylightMs < DUSK_MS) return { do: 'wait', why: 'dusk: digging in once it is dark' }
   const dist = Math.hypot(f.pos.x - st.origin.x, f.pos.z - st.origin.z)
   if (dist >= s.minDistance && !f.avoided) {
-    if (s.snowTurnAfter > 0 && (st.snowyLooks ?? 0) >= s.snowTurnAfter && (st.turns ?? 0) < s.maxTurns) {
+    if (!s.allowSnow && s.snowTurnAfter > 0 && (st.snowyLooks ?? 0) >= s.snowTurnAfter && (st.turns ?? 0) < s.maxTurns) {
       return { do: 'turn', heading: (st.heading ?? 0) + 90, why: `snow for ${st.snowyLooks} looks in a row that way` }
     }
     if (f.site === undefined) return { do: 'look' }

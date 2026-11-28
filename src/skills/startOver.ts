@@ -115,11 +115,12 @@ export function lookAround (agent: Agent, bot: Bot, radius = 32, iceAsWater = fa
     useExtraInfo: (b: Block) => { const up = bot.blockAt(b.position.offset(0, 1, 0)); return !!up && (up.name === 'air' || GRASS_PLANTS.test(up.name)) }
   }).length
   const logs = bot.findBlocks({ matching: blockIds(bot, LOGS), maxDistance: radius, count: 200 }).filter(p => surface(p, 12)).length
-  let water = surfaceWater(bot, here, radius, 32).filter(w => !freezes(bot, w)).length
+  // water a bit further out: the farm code looks for a site by water out to 96
+  let water = surfaceWater(bot, here, radius * 2, 32).filter(w => !freezes(bot, w)).length
   // snow allowed: frozen water counts too (the cold-farm code keeps a farm's water open)
   if (iceAsWater) {
     const ice = blockIds(bot, ['ice'])
-    if (ice.length) water += bot.findBlocks({ matching: ice, maxDistance: radius, count: 16, useExtraInfo: (b: Block) => bot.blockAt(b.position.offset(0, 1, 0))?.name === 'air' }).length
+    if (ice.length) water += bot.findBlocks({ matching: ice, maxDistance: radius * 2, count: 16, useExtraInfo: (b: Block) => bot.blockAt(b.position.offset(0, 1, 0))?.name === 'air' }).length
   }
   const animals = Object.values(bot.entities ?? {}).filter(e => e?.position && ANIMALS.includes(e.name ?? '') && e.position.distanceTo(bot.entity.position) <= radius * 2).length
   const buildNames = Object.keys(bot.registry.blocksByName).filter(n => BUILD.test(n))

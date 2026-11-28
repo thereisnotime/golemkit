@@ -213,6 +213,7 @@ test('state machine: snow look after look turns the heading', () => {
   assert.equal(startOverStep(st({ snowyLooks: 2 }), day({ x: 600, z: 0 }), S).do, 'look')
   assert.equal(startOverStep(st({ snowyLooks: 3, turns: 2 }), day({ x: 600, z: 0 }), S).do, 'look', 'no turns left')
   assert.equal(startOverStep(st({ snowyLooks: 5 }), day({ x: 600, z: 0 }), startOverSettings({ snowTurnAfter: 0 })).do, 'look')
+  assert.equal(startOverStep(st({ snowyLooks: 5 }), day({ x: 600, z: 0 }), startOverSettings({ allowSnow: true })).do, 'look', 'snow allowed: no snow turns')
 })
 
 test('night shelter fallback: protected ground does not count', async () => {
