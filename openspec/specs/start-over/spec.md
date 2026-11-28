@@ -93,3 +93,10 @@ After a turn, the start-over range SHALL count the blocks actually walked, and a
 #### Scenario: mountains
 - **WHEN** legs in the mountains move 20 blocks each
 - **THEN** they use up 20 blocks of range each, not a full leg length
+
+### Requirement: Redirect a run
+A startOver.run id different from the travelling run's SHALL redirect it to startOver.direction with fresh turns and range, keeping its origin.
+
+#### Scenario: west instead
+- **WHEN** run 2 is travelling north and the profile sets run 3 with direction w
+- **THEN** on start it carries on west from where it is

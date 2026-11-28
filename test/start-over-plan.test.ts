@@ -241,3 +241,16 @@ test('a second start-over keeps the first old base', async () => {
   const r = abandonedState(k => store[k], { x: 1092, y: 148, z: -68 })
   assert.deepEqual((r.set.places as Record<string, unknown>).old_base, { x: 560, y: 68, z: -46 })
 })
+
+test('a new run id while travelling redirects the run', async () => {
+  const { redirected } = await import('../src/skills/startOverPlan.ts')
+  const cur = st({ heading: 270, turns: 2, walkedSinceTurn: 900, snowyLooks: 2, run: '2' })
+  const r = redirected(cur, { go: true, run: '3', direction: 'w' })!
+  assert.equal(r.heading, 180)
+  assert.equal(r.turns, 0)
+  assert.equal(r.walkedSinceTurn, 0)
+  assert.equal(r.run, '3')
+  assert.deepEqual(r.origin, cur.origin)
+  assert.equal(redirected(cur, { go: true, run: '2', direction: 'w' }), null)
+  assert.equal(redirected({ ...cur, phase: 'settled' }, { go: true, run: '3', direction: 'w' }), null)
+})

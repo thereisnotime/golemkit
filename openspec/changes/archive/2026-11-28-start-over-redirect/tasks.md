@@ -1,0 +1,2 @@
+- [x] redirected (pure) with a test, applied on start
+- [x] Docs, Pax profile

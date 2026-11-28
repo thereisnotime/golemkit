@@ -29,7 +29,8 @@ behaviors:
 `go: true` fires when the bot starts. The run is stored in `data/bots/<name>/store.json` under
 `startOver`. Once that key exists, even as settled or failed, `go` doesn't fire again. To run it a
 second time, call the action, or set `startOver.run` to a new id (`run: "2"`). That run starts
-from the current home and keeps the first `old_base`.
+from the current home and keeps the first `old_base`. A new `run` id while a run is still
+travelling redirects it: the new `direction`, fresh turns and range, the same origin.
 
 ## Steps
 

@@ -7,7 +7,7 @@ import type { Bot } from 'mineflayer'
 import { z, needsSurvival, fmtPos, sleep } from '../../../core/index.ts'
 import { defineBehavior } from '../../../brains/behaviors/types.ts'
 import {
-  startOverStep, chooseHeading, siteVerdict, fallbackOk, betterBest, angleCompass, packValue, dryLegHeading, pointAt, shelterFallback, goFires, settleRetry,
+  startOverStep, chooseHeading, siteVerdict, fallbackOk, betterBest, angleCompass, packValue, dryLegHeading, pointAt, shelterFallback, goFires, settleRetry, redirected,
   type StartOverState, type StepFacts, type SiteFacts
 } from '../../../skills/startOverPlan.ts'
 import {
@@ -67,6 +67,8 @@ export const startOverBehavior = defineBehavior({
           const s = startOverConfig(agent)
           // settings.startOver.go: once; the stored state (even settled or failed) keeps it from firing again, unless startOver.run is new
           if (goFires(startOverState(agent), s)) beginStartOver(agent, b, 'settings', s.direction || undefined, s.run || undefined)
+          const r = redirected(startOverState(agent), s)
+          if (r) { save(r); noteStartOver(agent, b, 'redirect', `run ${s.run}: carrying on ${r.heading !== undefined ? angleCompass(r.heading) : ''} from here`, { run: s.run }) }
         }
         if (now < waitUntil || !startingOver(agent)) return 0
         const st = startOverState(agent)!

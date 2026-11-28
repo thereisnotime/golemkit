@@ -612,3 +612,14 @@ export function goFires (st: Pick<StartOverState, 'phase' | 'run'> | null | unde
 export function settleRetry (fails: number, distance: number): boolean {
   return distance > 64 && fails < 5
 }
+
+/**
+ * settings.startOver.run changed while a run is travelling (the owner changed the plan): carry on
+ * from where it is with the new direction (or the old heading), fresh turns, range and snow count,
+ * same origin. Null when nothing changes. Pure.
+ */
+export function redirected (st: StartOverState | null | undefined, s: Pick<StartOverSettings, 'go' | 'run' | 'direction'>): StartOverState | null {
+  if (!st || !s.go || !s.run || st.phase !== 'travelling' || (st.run ?? '') === s.run) return null
+  const given = s.direction ? compassAngle(s.direction) : null
+  return { ...st, run: s.run, ...(s.direction ? { direction: s.direction } : {}), heading: given ?? st.heading, turns: 0, legsSinceTurn: 0, walkedSinceTurn: 0, snowyLooks: 0, fails: 0 }
+}
