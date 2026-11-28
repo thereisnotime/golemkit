@@ -15,7 +15,7 @@ import {
   type Agent, type ActionResult
 } from '../core/index.ts'
 import {
-  startOverSettings, packPlan, siteVerdict, abandonedState, angleCompass, inAvoided, pointAt,
+  startOverSettings, packPlan, siteVerdict, abandonedState, angleCompass, inAvoided, pointAt, wetTop,
   type StartOverSettings, type StartOverState, type SiteFacts, type AvoidPoint, type Pos
 } from './startOverPlan.ts'
 import { chestView, chestTotals, takeItemsFromOwnChests, fmtTally } from './containers.ts'
@@ -123,7 +123,7 @@ export function lookAround (agent: Agent, bot: Bot, radius = 32): SiteFacts {
 }
 
 /**
- * Whether a leg from the bot at `deg` ends (or passes half way and three quarters) over water:
+ * Whether a leg from the bot at `deg` ends (or passes half way and three quarters) over water or ice:
  * true water, false land, null not loaded. For dryLegHeading.
  */
 export function legWet (bot: Bot, deg: number, length: number): boolean | null {
@@ -134,7 +134,7 @@ export function legWet (bot: Bot, deg: number, length: number): boolean | null {
     const top = surfaceAt(bot, q.x, Math.floor(p.y), q.z)
     if (!top) continue
     seen = true
-    if (/water|lava|bubble_column|kelp|seagrass/.test(top.name)) return true
+    if (wetTop(top.name)) return true
   }
   return seen ? false : null
 }

@@ -623,3 +623,8 @@ export function redirected (st: StartOverState | null | undefined, s: Pick<Start
   const given = s.direction ? compassAngle(s.direction) : null
   return { ...st, run: s.run, ...(s.direction ? { direction: s.direction } : {}), heading: given ?? st.heading, turns: 0, legsSinceTurn: 0, walkedSinceTurn: 0, snowyLooks: 0, fails: 0 }
 }
+
+/** A surface block a leg shouldn't end on: water, lava and ice (frozen oceans and rivers have holes and drowned under them). Pure. */
+export function wetTop (name: string): boolean {
+  return /water|lava|bubble_column|kelp|seagrass|^ice$|packed_ice|blue_ice|frosted_ice/.test(name)
+}

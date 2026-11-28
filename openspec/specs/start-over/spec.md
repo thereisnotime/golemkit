@@ -100,3 +100,10 @@ A startOver.run id different from the travelling run's SHALL redirect it to star
 #### Scenario: west instead
 - **WHEN** run 2 is travelling north and the profile sets run 3 with direction w
 - **THEN** on start it carries on west from where it is
+
+### Requirement: Legs avoid ice
+Picking a start-over leg SHALL treat ice at the surface like open water.
+
+#### Scenario: frozen ocean ahead
+- **WHEN** the leg west ends on a frozen ocean and the leg south-west on land
+- **THEN** it walks south-west

@@ -254,3 +254,9 @@ test('a new run id while travelling redirects the run', async () => {
   assert.equal(redirected(cur, { go: true, run: '2', direction: 'w' }), null)
   assert.equal(redirected({ ...cur, phase: 'settled' }, { go: true, run: '3', direction: 'w' }), null)
 })
+
+test('ice counts as water for legs', async () => {
+  const { wetTop } = await import('../src/skills/startOverPlan.ts')
+  for (const n of ['water', 'ice', 'packed_ice', 'blue_ice', 'kelp']) assert.equal(wetTop(n), true, n)
+  for (const n of ['grass_block', 'snow_block', 'snow', 'dirt', 'stone']) assert.equal(wetTop(n), false, n)
+})
