@@ -267,6 +267,7 @@ export const TOGGLES: ToggleDef[] = [
   { key: 'baseSafety.mineHatch', description: 'base safety: a mine inside the walls gets a trapdoor hatch, opened for a trip and closed after it (default on)', schema: bool },
   { key: 'baseSafety.mineKeepClear', description: 'base safety: a mine inside the walls starts at least this many blocks from the gate (default 2)', schema: z.number().int().min(0).max(8) },
   { key: 'baseSafety.retireCloseMines', description: 'base safety: a known mine just outside the walls is capped and not used again; a new one is started (default on)', schema: bool },
+  { key: 'baseSafety.useOutsideMines', description: 'base safety: with minePlacement inside, trips still go down a known mine outside the walls instead of digging one inside (default off)', schema: bool },
   { key: 'baseSafety.floorHoles', description: 'base safety: also fill holes in the floor surface inside the walls, dirt in a farm plot (default on)', schema: bool },
   { key: 'deathSpots.enabled', description: 'after a death, keep out of that spot for a while (default on)', schema: bool },
   { key: 'deathSpots.minutes', description: 'how long a death spot is avoided (default 10)', schema: z.number().min(0.5).max(240) },

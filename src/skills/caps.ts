@@ -5,7 +5,8 @@
 import type { Bot } from 'mineflayer'
 import type { Pos } from './blueprint.ts'
 import { checkAborted, type CapKind } from '../core/index.ts'
-import { vec, digBlock } from './world.ts'
+import { vec, digBlock, isReplaceable } from './world.ts'
+import { clearForCap } from './baseSafetyPlan.ts'
 import { placeBlockState, reachToDig, NotPlaceableYet } from './placement.ts'
 import { equipFor } from './toolkit.ts'
 import { fillerBlock } from './survival.ts'
@@ -33,11 +34,19 @@ export function isCapBlock (name: string | undefined, solid: boolean): boolean {
 const stateFor = (kind: PlacedCap): Record<string, string> | undefined =>
   kind === 'trapdoor' ? { half: 'bottom', open: 'false' } : kind === 'slab' ? { type: 'bottom' } : undefined
 
-/** Puts one cap down. Throws when it can't (nothing to place against, out of reach). */
-export async function placeCap (bot: Bot, pos: Pos, item: string, kind: PlacedCap, signal: AbortSignal): Promise<void> {
+/**
+ * Puts one cap down. Throws when it can't (nothing to place against, out of reach). A torch,
+ * ladder or rail in the cell is taken out first (clearForCap) unless `clear` is false.
+ */
+export async function placeCap (bot: Bot, pos: Pos, item: string, kind: PlacedCap, signal: AbortSignal, clear = true): Promise<void> {
   const v = vec(bot, pos.x, pos.y, pos.z)
   const here = bot.blockAt(v)
   if (here && isCapBlock(here.name, here.boundingBox === 'block')) return
+  if (here && clearForCap(here.name, here.boundingBox === 'block', isReplaceable(here.name))) {
+    if (!clear) throw new Error(`${here.name} is in the way and digging is off`)
+    await reachToDig(bot, here.position, signal)
+    await digBlock(bot, here, signal)
+  }
   try {
     await placeBlockState(bot, item, v, stateFor(kind), signal, { canDig: false })
   } catch (e) {

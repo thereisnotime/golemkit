@@ -30,6 +30,7 @@ export const BaseSafetySettingsSchema = z.object({
   mineHatch: z.boolean().optional().describe('a mine inside the walls: shut the hatch behind it on the way down and on the way up, so the base stays closed while it is down there (default on)'),
   mineKeepClear: z.number().int().min(0).max(8).optional().describe('a mine inside the walls starts at least this many blocks from the gate (default 2)'),
   retireCloseMines: z.boolean().optional().describe('a known mine outside the walls and within mineClearance of them is capped and no longer used; a new one is started (default on)'),
+  useOutsideMines: z.boolean().optional().describe('with minePlacement inside: trips still go down a known mine outside the walls (far enough from them) instead of digging one inside (default off)'),
   floorHoles: z.boolean().optional().describe('also find holes in the floor surface inside the walls (open to the sky, so not a cavity) and fill them; dirt in a farm plot (default on)')
 }).strict()
 
@@ -48,12 +49,13 @@ export interface BaseSafetySettings {
   mineHatch: boolean
   mineKeepClear: number
   retireCloseMines: boolean
+  useOutsideMines: boolean
   floorHoles: boolean
 }
 
 export const BASE_SAFETY_DEFAULTS: BaseSafetySettings = {
   enabled: true, margin: 4, depth: 8, techniques: [...SAFETY_TECHNIQUES], fillMax: 48, sealMax: 24, lightSpacing: 7,
-  capWith: 'trapdoor', keepOutDepth: 8, mineClearance: 4, minePlacement: 'inside', mineHatch: true, mineKeepClear: 2, retireCloseMines: true, floorHoles: true
+  capWith: 'trapdoor', keepOutDepth: 8, mineClearance: 4, minePlacement: 'inside', mineHatch: true, mineKeepClear: 2, retireCloseMines: true, useOutsideMines: false, floorHoles: true
 }
 
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {}
@@ -82,6 +84,7 @@ export function baseSafetySettings (raw: unknown): BaseSafetySettings {
     mineHatch: typeof o.mineHatch === 'boolean' ? o.mineHatch : d.mineHatch,
     mineKeepClear: num(o.mineKeepClear, d.mineKeepClear, 0, 8),
     retireCloseMines: typeof o.retireCloseMines === 'boolean' ? o.retireCloseMines : d.retireCloseMines,
+    useOutsideMines: typeof o.useOutsideMines === 'boolean' ? o.useOutsideMines : d.useOutsideMines,
     floorHoles: typeof o.floorHoles === 'boolean' ? o.floorHoles : d.floorHoles
   }
 }

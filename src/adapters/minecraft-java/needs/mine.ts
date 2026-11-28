@@ -20,6 +20,8 @@ export function mineSiteProbe (agent: Agent): SiteProbe {
       if (!m || !b.entity || typeof b.blockAt !== 'function') return null
       if (m.dim && b.game?.dimension && m.dim !== b.game.dimension) return null
       if (Math.hypot(b.entity.position.x - m.entrance.x, b.entity.position.z - m.entrance.z) > CHECK_RANGE) return null
+      // retired (capped by base safety, no more trips): nothing to judge, and not "unsafe" for ever
+      if (m.retired) return { ok: true, note: `retired: ${m.retired.why}` }
       // an open hole next to (or inside) the base walls: a way under them for mobs (baseSafety.mineClearance)
       const near = mineNearBase(agent, m.entrance)
       if (near && !m.cap) return { ok: false, fault: 'unsafe', reason: `its entrance is ${near} and not capped` }

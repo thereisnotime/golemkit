@@ -1,0 +1,6 @@
+- [x] clearForCap and retireMine in baseSafetyPlan.ts, placeCap clears the cell first
+- [x] secureBase retires close mines that are capped already
+- [x] mineFitsPlacement, pickMine fits filter, knownMine uses the placement; digMine falls back to an outside mine with no room inside
+- [x] baseSafety.useOutsideMines setting, toggle, docs
+- [x] site check: retired mine is ok
+- [x] unit tests (test/inside-mine.test.ts)

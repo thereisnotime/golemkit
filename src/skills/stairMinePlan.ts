@@ -476,9 +476,19 @@ export function nextMineName (names: readonly string[]): string {
   return `mine:${max + 1}`
 }
 
-/** Which remembered mine to use: same dimension, entrance within `radius` of home, not bad; the most worked first. Pure. */
-export function pickMine (mines: readonly MineSite[], home: P | null, radius: number, dim: string | undefined, bad: (id: string) => boolean): MineSite | null {
-  const ok = mines.filter(m => !m.retired && !bad(m.id) && (!m.dim || !dim || m.dim === dim) &&
+/**
+ * Whether a known mine suits where its mine belongs (baseSafety.minePlacement). Pure. With
+ * `inside` a mine outside the walls is not used for trips unless `useOutsideMines` is on, so the
+ * next trip digs one inside under a hatch: Pax kept walking out to an old mine 16 blocks from its
+ * walls and the inside mine it was set up for never got dug. `outside` and `either` take any.
+ */
+export function mineFitsPlacement (m: { inside: boolean }, placement: 'outside' | 'inside' | 'either', useOutsideMines: boolean): boolean {
+  return placement !== 'inside' || m.inside || useOutsideMines
+}
+
+/** Which remembered mine to use: same dimension, entrance within `radius` of home, not bad, fits the placement (`fits`); the most worked first. Pure. */
+export function pickMine (mines: readonly MineSite[], home: P | null, radius: number, dim: string | undefined, bad: (id: string) => boolean, fits: (m: MineSite) => boolean = () => true): MineSite | null {
+  const ok = mines.filter(m => !m.retired && !bad(m.id) && fits(m) && (!m.dim || !dim || m.dim === dim) &&
     (!home || Math.hypot(m.entrance.x - home.x, m.entrance.z - home.z) <= radius + 8))
   return ok.sort((a, b) => (b.bottom ? 1 : 0) - (a.bottom ? 1 : 0) || b.mainSteps - a.mainSteps || b.lastAt - a.lastAt)[0] ?? null
 }

@@ -407,6 +407,32 @@ export function mineFindings (mines: readonly MineRef[], area: Pick<BaseArea, 'm
   return out
 }
 
+/**
+ * Small blocks that stand in a cap cell without filling it and don't give way to a placed block:
+ * the torch a trip put on the first stair step, a ladder, a rail. A cap there is a solid block's
+ * worth of air to a mob, so they are taken out before the cap goes on.
+ */
+const CAP_BLOCKERS = /(^|_)torch$|(^|_)lantern$|^ladder$|(^|_)rail$|_carpet$|_button$|_pressure_plate$|^redstone_wire$|^lever$|^cobweb$|_sign$/
+
+/**
+ * Whether a block in a cap cell has to be taken out before the cap can go on. Pure. Pax's first
+ * mine had a torch on its first step, on the wall line: the cap step failed with "torch is
+ * already there" every session for hours, the mine was never capped, so never retired.
+ */
+export function clearForCap (name: string | undefined, solid: boolean, replaceable: boolean): boolean {
+  if (!name || solid || replaceable || isCap({ name, solid })) return false
+  return CAP_BLOCKERS.test(name)
+}
+
+/**
+ * Whether a known mine near the base gets retired (no more trips, a new one is dug): capped (just
+ * now or already), outside the walls, not retired yet, retireCloseMines on and its own mine
+ * allowed inside. Pure.
+ */
+export function retireMine (m: { inside?: boolean, retired?: unknown }, capped: boolean, s: { retireCloseMines: boolean, minePlacement: MinePlacement }): boolean {
+  return capped && s.retireCloseMines && !m.inside && !m.retired && s.minePlacement !== 'outside'
+}
+
 /** The steps for the mine findings: a cap (or torches down the stairs) per entrance. Pure. */
 export function planMineCaps (found: readonly MineFinding[], o: Pick<FixOptions, 'techniques' | 'capWith' | 'lightSpacing'>): { steps: FixStep[], unfixed: string[] } {
   const steps: FixStep[] = []

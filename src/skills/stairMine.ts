@@ -27,7 +27,7 @@ import { baseSafetySettings } from '../core/index.ts'
 import {
   stairMineSettings, stairMineReadiness, pickEntrance, mineTargetY, mineTripStep, branchEvery, sides, mineJunk,
   visibleOre, tunnelAir, nextMineName, pickMine, mineLit, mineSiteVerdict, stairPoints, relightSpots, ORE_FAMILIES, ENTRANCE_STEPS,
-  insideEntrances, stairDigCells, hatchCells,
+  insideEntrances, stairDigCells, hatchCells, mineFitsPlacement,
   type StairMineSettings, type EntranceCandidate, type MineSite, type MinePhase, type Dir, type P, type BlockLook
 } from './stairMinePlan.ts'
 
@@ -50,12 +50,19 @@ export function saveMine (agent: Agent, m: MineSite): void {
 /** When the last trip down ended (ms), for mine.cooldownMinutes. */
 export function lastMineTrip (agent: Agent): number | undefined { return agent.storage.get<number>(LAST_TRIP_KEY) }
 
-/** The mine it would use now (remembered, not bad, near home), or null. */
-export function knownMine (agent: Agent, bot: Bot): MineSite | null {
+/**
+ * The mine it would use now (remembered, not bad, near home, where baseSafety.minePlacement wants
+ * it: inside the walls unless useOutsideMines), or null. `anyPlace`: any spot (the fallback when
+ * there is no room for one inside).
+ */
+export function knownMine (agent: Agent, bot: Bot, anyPlace = false): MineSite | null {
   const s = stairMineConfig(agent)
   const home = getHome(agent)
   const book = siteBook(agent)
-  return pickMine(getMines(agent), home && sameDimension(bot, home) ? home : null, s.radius, bot.game?.dimension, id => book.isBad('mine', id))
+  const bs = baseSafetySettings(agent.settings.baseSafety)
+  const base = bs.enabled && !anyPlace ? settledBase(agent) : null
+  const fits = (m: MineSite) => !base || mineFitsPlacement({ inside: !!m.inside || base.area.inside(m.entrance.x, m.entrance.z) }, bs.minePlacement, bs.useOutsideMines)
+  return pickMine(getMines(agent), home && sameDimension(bot, home) ? home : null, s.radius, bot.game?.dimension, id => book.isBad('mine', id), fits)
 }
 
 /** Torches it makes for a trip down before it leaves home (fewer when it can't make more). */
@@ -332,17 +339,24 @@ export async function digMine (ctx: Ctx, o: DigMineOptions = {}): Promise<Action
     let pick = pickEntrance(inside, s)
     // outside when allowed, or when there is no settled base to be inside of
     if ('none' in pick && (placement !== 'inside' || !base)) pick = pickEntrance(entranceCandidates(agent, bot, center, s), s)
-    if ('none' in pick) return fail(placement === 'inside' && base ? `no free spot for a mine inside the base: ${pick.none}` : pick.none)
-    const id = nextMineName(getMines(agent).map(m => m.id))
-    site = { id, entrance: pick.pick.pos, dir: pick.pick.dir, ...(bot.game?.dimension ? { dim: bot.game.dimension } : {}), path: [], deepest: pick.pick.pos.y, mainSteps: 0, branches: 0, torches: 0, stairSteps: 0, trips: 0, lastAt: Date.now(), got: {} }
-    // inside the walls: a trapdoor hatch where the stairs cut the floor (baseSafety.mineHatch), put on after the trip
-    if (base?.area.inside(site.entrance.x, site.entrance.z)) {
-      site.inside = true
-      if (baseSafetySettings(agent.settings.baseSafety).mineHatch) site.cap = { cells: hatchCells(site.entrance, site.dir), kind: 'trapdoor', at: Date.now() }
+    if ('none' in pick) {
+      // no room inside: a known mine outside the walls (far enough from them) beats no mine at all
+      const outside = placement === 'inside' && base && !o.fresh ? knownMine(agent, bot, true) : null
+      if (!outside) return fail(placement === 'inside' && base ? `no free spot for a mine inside the base: ${pick.none}` : pick.none)
+      site = outside
+      notes.push(`no free spot for a mine inside the base (${pick.none}): down ${outside.id} outside the walls`)
+    } else {
+      const id = nextMineName(getMines(agent).map(m => m.id))
+      site = { id, entrance: pick.pick.pos, dir: pick.pick.dir, ...(bot.game?.dimension ? { dim: bot.game.dimension } : {}), path: [], deepest: pick.pick.pos.y, mainSteps: 0, branches: 0, torches: 0, stairSteps: 0, trips: 0, lastAt: Date.now(), got: {} }
+      // inside the walls: a trapdoor hatch where the stairs cut the floor (baseSafety.mineHatch), put on after the trip
+      if (base?.area.inside(site.entrance.x, site.entrance.z)) {
+        site.inside = true
+        if (baseSafetySettings(agent.settings.baseSafety).mineHatch) site.cap = { cells: hatchCells(site.entrance, site.dir), kind: 'trapdoor', at: Date.now() }
+      }
+      saveMine(agent, site)
+      notes.push(`new mine ${id} at ${fmtPos(site.entrance)}`)
+      try { agent.journal?.record('found', { target: 'mine', what: `a spot for ${id}`, count: 1, how: 'dug a staircase mine' }, { pos: site.entrance }) } catch {}
     }
-    saveMine(agent, site)
-    notes.push(`new mine ${id} at ${fmtPos(site.entrance)}`)
-    try { agent.journal?.record('found', { target: 'mine', what: `a spot for ${id}`, count: 1, how: 'dug a staircase mine' }, { pos: site.entrance }) } catch {}
   }
   const mine: MineSite = site
   // an inside mine's first steps go through the base's own floor, only there

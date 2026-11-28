@@ -18,7 +18,7 @@ import { settledBase, type SettledBase } from './baseArea.ts'
 import { getMines, saveMine } from './stairMine.ts'
 import { capItem, placeCap, type PlacedCap } from './caps.ts'
 import {
-  scanBase, planFixes, mineFindings, planMineCaps, mineCells, describeCavity, planHoleFills, describeHole,
+  scanBase, planFixes, mineFindings, planMineCaps, retireMine, mineCells, describeCavity, planHoleFills, describeHole,
   type Look, type MineRef, type FixStep, type CavityFix, type MineFinding, type ScanResult
 } from './baseSafetyPlan.ts'
 
@@ -138,11 +138,24 @@ export async function secureBase (ctx: Ctx, check: BaseCheck, minutes: number): 
   const bot = ctx.bot as Bot
   const { agent, signal, log } = ctx
   const until = Date.now() + minutes * 60_000
-  if (!check.steps.length) return check.unfixed.length ? fail(`nothing I can do: ${check.unfixed.join('; ')}`) : ok('the base is mob-proof: no open cavity, hole in the floor or mine entrance by it')
+  const bs = baseSafetySettings((agent.settings as { baseSafety?: unknown }).baseSafety)
+  // a close mine that is capped already (by an earlier session, the floor, a player) is retired too
+  const retiredNow: string[] = []
+  for (const f of check.mines) {
+    if (!f.capped) continue
+    const m = getMines(agent as Agent).find(x => x.id === f.mine.id)
+    if (!m || !retireMine(m, true, bs)) continue
+    saveMine(agent as Agent, { ...m, retired: { at: Date.now(), why: 'outside the walls and too close to them: capped, a new mine goes inside the base' } })
+    retiredNow.push(m.id)
+  }
+  if (!check.steps.length) {
+    const r = retiredNow.length ? `retired ${retiredNow.join(', ')} (capped already; the next mine goes inside the base); ` : ''
+    return check.unfixed.length ? fail(`${r}nothing I can do: ${check.unfixed.join('; ')}`) : ok(`${r}the base is mob-proof: no open cavity, hole in the floor or mine entrance by it`)
+  }
   const fills = check.steps.filter(s => s.action === 'fill').length
   const torches = check.steps.filter(s => s.action === 'torch').length
   const caps = check.steps.filter(s => s.action === 'cap')
-  const notes: string[] = []
+  const notes: string[] = retiredNow.map(id => `retired ${id} (capped already; the next mine goes inside the base)`)
   if (fills) await supplyFiller(ctx, fills, check.steps.filter(s => s.action === 'fill' && s.soil).length)
   if (caps.some(s => s.cap === 'trapdoor')) await supplyTrapdoors(ctx, caps.filter(s => s.cap === 'trapdoor').length)
   if (torches) {
@@ -168,7 +181,7 @@ export async function secureBase (ctx: Ctx, check: BaseCheck, minutes: number): 
       } else {
         const pick = capItem(bot, s.cap ?? 'block')
         if (!pick) { failed.push('nothing to cap with'); continue }
-        await placeCap(bot, s.pos, pick.item, pick.kind, signal)
+        await placeCap(bot, s.pos, pick.item, pick.kind, signal, (agent as Agent).canDig)
         if (s.mine) {
           const c = capped.get(s.mine) ?? { cells: [], kind: pick.kind }
           c.cells.push(s.pos)
@@ -184,13 +197,12 @@ export async function secureBase (ctx: Ctx, check: BaseCheck, minutes: number): 
     }
   }
   // the mine remembers its cap, so its trips take it off and put it back
-  const bs = baseSafetySettings((agent.settings as { baseSafety?: unknown }).baseSafety)
   for (const [id, c] of capped) {
     const m = getMines(agent as Agent).find(x => x.id === id)
     if (!m) continue
     const cap = { cells: [...(m.cap?.cells ?? []), ...c.cells].filter((p, i, a) => a.findIndex(q => q.x === p.x && q.y === p.y && q.z === p.z) === i), kind: c.kind, at: Date.now() }
     // an outside mine hugging the walls is closed for good when its own mine belongs inside (baseSafety.retireCloseMines)
-    const retire = bs.retireCloseMines && !m.inside && !m.retired && bs.minePlacement !== 'outside'
+    const retire = retireMine(m, true, bs)
     saveMine(agent as Agent, { ...m, cap, ...(retire ? { retired: { at: Date.now(), why: 'outside the walls and too close to them: capped, a new mine goes inside the base' } } : {}) })
     if (retire) notes.push(`retired ${id} (capped; the next mine goes inside the base)`)
   }

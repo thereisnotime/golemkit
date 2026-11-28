@@ -65,7 +65,9 @@ technique out to turn it off.
 A cap is remembered on its mine (`cap` in the mine record): `dig_mine` takes it off before a trip
 and puts it back after, since the pathfinder can't walk through a trapdoor. Without a trapdoor the
 bot makes two from its planks; without planks it caps with a filler block, which is still better
-than an open hole.
+than an open hole. A torch, ladder or rail standing in a cap cell (the first trip lights the first
+stair step) is taken out first; without that, Pax's cap failed with "torch is already there" for
+hours.
 
 Fixing runs as the base project `integrity` (first after the walls in the default order, small,
 so it never needs an ok), between other chores, in bounded sessions like the other projects.
@@ -100,6 +102,12 @@ default):
   the hatch and the shaft alone.
 - `retireCloseMines` (on): an old mine outside the walls and within `mineClearance` of them is
   capped by the integrity check and retired (no more trips); the next trip starts the inside one.
+  One that is capped already (by an earlier session, the floor, a player) is retired as well.
+- `useOutsideMines` (off): with `minePlacement: inside`, a known mine outside the walls, even one
+  far enough from them, is not used for trips, so the next trip (for iron, or cobblestone a repair
+  needs that its chests don't hold) digs the inside one. Pax kept going down an old mine 16
+  blocks out and the inside mine never got dug. Turn it on to keep using the old mine. When there
+  is no free spot inside, a trip still goes down the old one rather than none.
 - `minePlacement: outside` keeps the old rule (at least `mineClearance` from the walls, no digging
   through the keep-out); `either` tries inside first. With no settled base yet it starts near home.
 
@@ -109,6 +117,7 @@ default):
 | `baseSafety.mineHatch` | on | trapdoor hatch over an inside mine's stairs |
 | `baseSafety.mineKeepClear` | 2 | an inside mine keeps this far from the gate |
 | `baseSafety.retireCloseMines` | on | cap and retire an outside mine hugging the walls |
+| `baseSafety.useOutsideMines` | off | with `inside`, still take trips down a known mine outside the walls |
 
 ## Death spots
 

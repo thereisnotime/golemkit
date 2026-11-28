@@ -235,6 +235,7 @@ can't change their own.
 | `baseSafety.mineHatch` | on/off | a trapdoor hatch over an inside mine's stairs, opened for a trip and closed after (default on) |
 | `baseSafety.mineKeepClear` | 0–8 | an inside mine starts at least this far from the gate (default 2) |
 | `baseSafety.retireCloseMines` | on/off | an old mine just outside the walls is capped and retired (default on) |
+| `baseSafety.useOutsideMines` | on/off | with minePlacement inside, trips still go down a known mine outside the walls instead of digging one inside (default off) |
 | `baseSafety.floorHoles` | on/off | fill holes in the floor surface inside the walls, dirt in a farm plot (default on) |
 | `baseSafety.floorHoles` | on/off | also fill holes in the floor surface inside the walls; dirt in a farm plot (default on) |
 | `materials.sources` | list of chests / substitutes / craft / nearby / mine / far | [where build and repair materials come from](./base-projects#where-materials-come-from), in this order; leave one out to turn it off (default all six in that order) |
