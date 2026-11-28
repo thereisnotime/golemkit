@@ -667,6 +667,15 @@ export function nextRing (searches: readonly SearchRecord[], rings: readonly num
   return ring === undefined ? null : { radius: ring, covered }
 }
 
+/**
+ * find_food's atNight for a scout the ladder picked: the profile's scoutAtNight, or night and a ring
+ * no wider than riskyRingsFrom (the ladder only picks that for a starving bot). Without it find_food
+ * refused with "it is night" and keep_fed asked again every 20 s all night.
+ */
+export function scoutAtNightFor (night: boolean, radius: number, o: { scoutAtNight?: boolean, riskyRingsFrom?: number }): boolean {
+  return !!o.scoutAtNight || (night && radius <= (o.riskyRingsFrom ?? RISKY_RINGS_FROM))
+}
+
 /** Adds a search record and drops the ones older than `keepMs` (and all but the last 12). */
 export function recordSearch (searches: readonly SearchRecord[], rec: SearchRecord, keepMs = RING_MEMORY_MS * 3): SearchRecord[] {
   return [...searches.filter(s => rec.at - s.at < keepMs), rec].slice(-12)

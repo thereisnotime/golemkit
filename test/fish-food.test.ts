@@ -1,7 +1,7 @@
 // The rod plan and the starving rules of the food ladder: rod plan, shore spot, rotten flesh, chest wheat, closest sure food.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { planFood, type FoodWorld, type FoodStepOptions } from '../src/skills/foodPlan.ts'
+import { planFood, scoutAtNightFor, type FoodWorld, type FoodStepOptions } from '../src/skills/foodPlan.ts'
 import { rodPlan } from '../src/skills/fishPlan.ts'
 
 const NOW = 1_000_000_000
@@ -65,4 +65,11 @@ test('starving: no trip to a food place 3500 blocks away; a near one is fine', (
   // food 7 with starvingRangeAt 8: no trip either (Pax set off at 7 and turned back at 6 within seconds)
   assert.notEqual(planFood({ ...pax, food: 7, starving: false }, { ...opts, starvingRangeAt: 8 }).step, 'trip')
   assert.equal(planFood({ ...pax, food: 9, starving: false }, { ...opts, starvingRangeAt: 8 }).step, 'trip')
+})
+
+test('scoutAtNightFor: the near ring at night goes, a wide one does not, the profile option wins', () => {
+  assert.equal(scoutAtNightFor(true, 48, { riskyRingsFrom: 48 }), true)
+  assert.equal(scoutAtNightFor(true, 120, { riskyRingsFrom: 48 }), false)
+  assert.equal(scoutAtNightFor(false, 120, {}), false)
+  assert.equal(scoutAtNightFor(true, 400, { scoutAtNight: true }), true)
 })

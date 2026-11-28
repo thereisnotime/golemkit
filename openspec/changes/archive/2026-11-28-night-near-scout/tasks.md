@@ -1,0 +1,1 @@
+- [x] scoutAtNightFor helper with tests, used by keep_fed's scout step

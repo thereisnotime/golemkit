@@ -18,7 +18,7 @@ import {
   shoreKelp, appleLeaves, canSmeltKelp, farmWorkFor, breakableGrass, type Farm
 } from '../../../skills/food.ts'
 import {
-  rankSpots, seedCount, planFood, foodReportText, nextRing, recordSearch, breedPlan, foodDanger, farmChore, chorePause, rankFoodPlaces, placeSource,
+  rankSpots, seedCount, planFood, scoutAtNightFor, foodReportText, nextRing, recordSearch, breedPlan, foodDanger, farmChore, chorePause, rankFoodPlaces, placeSource,
   BREED_FOOD, STEP_PAUSE_MS, SEEDS_RETRY_MS, TRIP_PAUSE_MS, DEFAULT_RINGS, FAR_RINGS_FROM, RISKY_RINGS_FROM, SCOUT_GEAR, SCOUT_HUNGER_AT, SCOUT_FOOD_FLOOR,
   type FoodStep, type FoodWorld, type FoodDecision, type SearchRecord, type FoodChore, type ChoreWorld, type FoodPlace
 } from '../../../skills/foodPlan.ts'
@@ -656,7 +656,8 @@ async function doStep (ctx: BehaviorContext, d: FoodDecision, o: O): Promise<Act
         radius,
         minRadius: d.minRadius ?? 0,
         maxMinutes: Math.min(30, Math.max(3, Math.round(radius / 25))),
-        atNight: o.scoutAtNight,
+        // the ladder only picks a scout at night for a starving bot on the near ring: let it go (it looped on "it is night" every 20 s)
+        atNight: scoutAtNightFor(isNightTime(bot), radius, o),
         animals: o.animals,
         crops: o.harvest,
         keepAtLeast: d.keepAtLeast ?? 0,
